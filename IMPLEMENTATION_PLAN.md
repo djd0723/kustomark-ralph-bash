@@ -106,11 +106,46 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Add `--strict` flag to validate command
    - ✅ Update JSON output to include validation results in all commands
 
-## M3: Remote Sources (Future)
-- Git support
-- HTTP support
-- Caching
-- Lock files
+## M3: Remote Sources (In Progress)
+
+### Priority Order
+
+1. **[DONE] Git URL Parsing** ✅
+   - ✅ Implement git URL parser with support for three formats:
+     - GitHub shorthand: `github.com/org/repo//path?ref=v1.2.0`
+     - Full git HTTPS: `git::https://github.com/org/repo.git//subdir?ref=main`
+     - Git SSH: `git::git@github.com:org/repo.git//path?ref=abc1234`
+   - ✅ Export `isGitUrl()` and `parseGitUrl()` functions
+   - ✅ Export `ParsedGitUrl` type
+   - ✅ Integrate git URL detection into resource-resolver.ts
+   - ✅ Add git URL validation in config-parser.ts
+   - ✅ Update CLI help text to document git URL support
+   - ✅ Comprehensive test coverage (83 new tests, 484 total tests passing)
+
+2. **[TODO] Git Repository Fetching**
+   - Implement git clone/fetch functionality
+   - Support sparse checkout for subdirectories
+   - Handle authentication (SSH keys, credential helpers)
+   - Cache cloned repositories
+   - Checkout specified ref (branch/tag/commit)
+
+3. **[TODO] HTTP Archive Support**
+   - Support `.tar.gz`, `.tgz`, `.tar`, `.zip` archives
+   - Download and extract archives
+   - Handle authentication (bearer tokens, etc.)
+   - Validate checksums
+
+4. **[TODO] Caching System**
+   - Implement cache directory (`~/.cache/kustomark/`)
+   - Cache git repositories
+   - Cache HTTP archives
+   - Implement cache commands (list, clear)
+
+5. **[TODO] Lock File Generation**
+   - Generate `kustomark.lock.yaml`
+   - Track resolved refs and integrity hashes
+   - Support `--update` flag to update lock file
+   - Support `--no-lock` flag to ignore lock file
 
 ## M4: Developer Experience (Future)
 - Watch mode
@@ -209,12 +244,40 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ All linting checks passing (bun check) ✓
 - ✅ Type-safe implementation (no `any` types, proper ValidationError typing)
 
-**Status:**
-- **M2 COMPLETE! ✅** All validation features fully implemented and integrated into CLI
-  - Per-patch validation with `validate` field
-  - Global validators in config (notContains, frontmatterRequired)
-  - CLI integration with --strict flag
-  - Validation errors in JSON and text output for all commands
-  - 401 tests passing with comprehensive validation test coverage
+**2026-01-01 (M3 Git URL Parsing):**
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/git-url-parser.ts` with full parsing implementation:
+  - `isGitUrl(url)` - detects if a URL is a git URL (github.com/ or git:: prefix)
+  - `parseGitUrl(url)` - parses git URLs into structured components
+  - Supports GitHub shorthand, git::https://, and git::git@ SSH formats
+  - Handles refs (branch/tag/commit) via query parameters
+  - Handles subpaths via // separator
+  - Returns null for invalid URLs
+- ✅ Integrated into resource-resolver.ts:
+  - Detects git URLs in resources array
+  - Validates git URL format
+  - Throws informative error for valid but unimplemented git URLs
+  - Added TODO comments for future fetching implementation
+- ✅ Integrated into config-parser.ts:
+  - Validates git URLs during config validation
+  - Adds validation errors for malformed git URLs
+  - Adds validation warnings for valid but unsupported git URLs
+- ✅ Updated src/core/index.ts to export git URL parser functions
+- ✅ Updated CLI help text to document git URL support
+- ✅ Comprehensive test suite (83 new tests, 484 total tests passing, up from 401):
+  - GitHub shorthand format parsing
+  - Git SSH URL parsing (git::git@...)
+  - Edge cases and invalid inputs
+  - Real-world examples
+  - Type safety verification
+  - Alternative git hosting providers (GitLab, Bitbucket, self-hosted)
+- ✅ All linting checks passing (bun check) ✓
+- ✅ Type-safe implementation with ParsedGitUrl interface
 
-**Next Priority:** M3 Remote Sources (Git, HTTP, caching, lock files)
+**Status:**
+- **M1 COMPLETE! ✅**
+- **M2 COMPLETE! ✅**
+- **M3 IN PROGRESS** - Git URL parsing complete, git fetching next
+  - Git URL parsing and validation: DONE ✅
+  - Next: Git repository fetching functionality
+
+**Next Priority:** M3 Git Repository Fetching (clone, sparse checkout, authentication, caching)

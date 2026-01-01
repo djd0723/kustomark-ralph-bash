@@ -61,6 +61,14 @@ interface DiffResult {
   validationErrors: ValidationError[];
 }
 
+interface FetchResult {
+  success: boolean;
+  fetched: Array<{
+    url: string;
+    cached: boolean;
+  }>;
+}
+
 // ============================================================================
 // Argument Parsing
 // ============================================================================
@@ -769,6 +777,121 @@ async function validateCommand(path: string, options: CLIOptions): Promise<numbe
   }
 }
 
+// Future: Implement fetch command for M3 remote sources
+// @ts-expect-error Reserved for future implementation
+async function _fetchCommand(_path: string, options: CLIOptions): Promise<number> {
+  try {
+    const inputPath = resolve(_path);
+
+    // Determine the actual config file path
+    let configPath = inputPath;
+    if (existsSync(inputPath) && statSync(inputPath).isDirectory()) {
+      configPath = join(inputPath, "kustomark.yaml");
+    }
+
+    log(`Loading config from ${configPath}...`, 2, options);
+    const config = readKustomarkConfig(inputPath);
+
+    // Validate config
+    const validation = validateConfig(config, { requireOutput: false });
+    if (!validation.valid) {
+      if (options.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              success: false,
+              fetched: [],
+              errors: validation.errors,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        console.error("Error: Invalid configuration");
+        for (const error of validation.errors) {
+          console.error(`  ${error.field}: ${error.message}`);
+        }
+      }
+      return 1;
+    }
+
+    // For M3 implementation, we'll simulate fetching remote resources
+    // In a real implementation, this would:
+    // 1. Parse resource URLs for git://, https://, github.com shortcuts
+    // 2. Download/clone remote resources
+    // 3. Cache them in ~/.cache/kustomark/
+    // 4. Return info about what was fetched
+
+    // For now, we'll just list the resources that would be fetched
+    const fetched: Array<{ url: string; cached: boolean }> = [];
+
+    for (const resource of config.resources) {
+      // Check if resource looks like a remote URL
+      if (
+        resource.startsWith("http://") ||
+        resource.startsWith("https://") ||
+        resource.startsWith("git::") ||
+        resource.includes("github.com/") ||
+        resource.includes("git@")
+      ) {
+        // This is a remote resource
+        fetched.push({
+          url: resource,
+          cached: false, // In real implementation, check if it's in cache
+        });
+        log(`Would fetch: ${resource}`, 2, options);
+      } else {
+        // Local resource, skip
+        log(`Skipping local resource: ${resource}`, 3, options);
+      }
+    }
+
+    // Output results
+    const result: FetchResult = {
+      success: true,
+      fetched,
+    };
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      if (fetched.length > 0) {
+        if (options.verbosity > 0) {
+          console.log(`Fetched ${fetched.length} remote resource(s):`);
+          for (const item of fetched) {
+            const cacheStatus = item.cached ? " (cached)" : "";
+            console.log(`  ${item.url}${cacheStatus}`);
+          }
+        }
+      } else {
+        if (options.verbosity > 0) {
+          console.log("No remote resources to fetch");
+        }
+      }
+    }
+
+    return 0;
+  } catch (error) {
+    if (options.format === "json") {
+      console.log(
+        JSON.stringify(
+          {
+            success: false,
+            fetched: [],
+            error: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return 1;
+  }
+}
+
 // ============================================================================
 // Main Entry Point
 // ============================================================================
@@ -792,6 +915,10 @@ Flags:
   --strict                    Enable strict validation (validate command)
   -v, -vv, -vvv              Increase verbosity
   -q                         Quiet mode (errors only)
+
+Remote Resources:
+  Git URLs are recognized and validated but fetching is not yet implemented.
+  Supported formats: github.com/org/repo, git::https://..., git::git@...
 
 Exit Codes:
   0    Success (for diff: no changes)

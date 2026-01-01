@@ -3,6 +3,7 @@
  */
 
 import * as yaml from "js-yaml";
+import { isGitUrl, parseGitUrl } from "./git-url-parser.js";
 import type {
   KustomarkConfig,
   OnNoMatchStrategy,
@@ -97,6 +98,23 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
           field: `resources[${index}]`,
           message: "resource must be a string",
         });
+      } else {
+        // Validate git URLs
+        if (isGitUrl(resource)) {
+          const parsed = parseGitUrl(resource);
+          if (!parsed) {
+            errors.push({
+              field: `resources[${index}]`,
+              message: `Invalid git URL format: "${resource}"`,
+            });
+          } else {
+            // Add warning that git URL fetching is not yet implemented
+            warnings.push({
+              field: `resources[${index}]`,
+              message: `Git URL detected but fetching is not yet fully supported: "${resource}"`,
+            });
+          }
+        }
       }
     });
   }

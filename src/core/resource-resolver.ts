@@ -1,5 +1,6 @@
 import { isAbsolute, join, normalize, resolve } from "node:path";
 import micromatch from "micromatch";
+import { isGitUrl, parseGitUrl } from "./git-url-parser.js";
 
 /**
  * Represents a resolved markdown file resource
@@ -115,6 +116,30 @@ export function resolveResources(
 
   // Process each positive pattern
   for (const pattern of positivePatterns) {
+    // Check if pattern is a git URL
+    if (isGitUrl(pattern)) {
+      // Validate that the git URL is parseable
+      const parsedGit = parseGitUrl(pattern);
+      if (!parsedGit) {
+        throw new ResourceResolutionError(
+          `Malformed git URL: ${pattern}. Please check the URL format.`,
+          pattern,
+        );
+      }
+
+      // TODO: Implement git URL fetching in a future task
+      // For now, we just validate that the URL is parseable
+      // Future implementation will:
+      // 1. Clone the repository (or use existing cache)
+      // 2. Checkout the specified ref (branch/tag/commit)
+      // 3. Extract files from the specified path
+      // 4. Add resolved markdown files to resolvedResources
+      throw new ResourceResolutionError(
+        `Git URL resolution not yet implemented: ${pattern}. Git fetching will be added in a future update.`,
+        pattern,
+      );
+    }
+
     // Check if pattern is a reference to another kustomark config (directory)
     if (isDirectoryReference(pattern)) {
       const resolvedDir = resolvePathFromBase(pattern, normalizedBaseDir);

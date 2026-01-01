@@ -359,3 +359,25 @@ export interface MarkdownSection {
   /** The full header text including # symbols */
   headerText: string;
 }
+
+/**
+ * Parsed Git URL components for remote sources
+ */
+export interface ParsedGitUrl {
+  /** Resource type - always 'git' for Git URLs */
+  type: "git";
+  /** Protocol used - 'https' or 'ssh' */
+  protocol: "https" | "ssh";
+  /** Git host (e.g., github.com, gitlab.com) */
+  host: string;
+  /** Organization or user name */
+  org: string;
+  /** Repository name */
+  repo: string;
+  /** Subpath within repository (after //) */
+  path?: string;
+  /** Git ref - branch, tag, or SHA */
+  ref: string;
+  /** Full git clone URL (always HTTPS format) */
+  fullUrl: string;
+}

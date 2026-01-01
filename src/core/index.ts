@@ -49,6 +49,7 @@ export type {
   ValidationResult,
   PatchResult,
   MarkdownSection,
+  ParsedGitUrl,
 } from "./types.js";
 
 // Export config parser functions
@@ -89,3 +90,6 @@ export {
   runValidator,
   runValidators,
 } from "./validators.js";
+
+// Export git URL parser functions
+export { isGitUrl, parseGitUrl } from "./git-url-parser.js";
