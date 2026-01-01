@@ -14,9 +14,21 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
-import yaml from "js-yaml";
-import type { KustomarkConfig, ValidationResult } from "../core/types";
+import { dirname, join, normalize, relative, resolve } from "node:path";
+import micromatch from "micromatch";
+import {
+  parseConfig as coreParseConfig,
+  validateConfig as coreValidateConfig,
+} from "../core/config-parser.js";
+import { generateFileDiff } from "../core/diff-generator.js";
+import { applyPatches as coreApplyPatches } from "../core/patch-engine.js";
+import { resolveResources as coreResolveResources } from "../core/resource-resolver.js";
+import type {
+  KustomarkConfig,
+  OnNoMatchStrategy,
+  PatchOperation,
+  ValidationResult,
+} from "../core/types.js";
 
 // ============================================================================
 // Types
@@ -100,95 +112,156 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
 }
 
 // ============================================================================
-// Core Library Stubs (to be implemented in separate files)
+// Core Library Integration
 // ============================================================================
 
-function parseConfig(yamlContent: string): KustomarkConfig {
-  const config = yaml.load(yamlContent) as KustomarkConfig;
-  return config;
-}
-
+/**
+ * Wrapper around core validateConfig that adds CLI-specific validation
+ */
 function validateConfig(
   config: KustomarkConfig,
   options: { requireOutput: boolean },
 ): ValidationResult {
-  const errors: Array<{ field: string; message: string }> = [];
-  const warnings: string[] = [];
+  // Use core validation
+  const result = coreValidateConfig(config);
 
-  if (!config.apiVersion) {
-    errors.push({ field: "apiVersion", message: "apiVersion is required" });
-  } else if (config.apiVersion !== "kustomark/v1") {
-    errors.push({
-      field: "apiVersion",
-      message: `apiVersion must be 'kustomark/v1', got '${config.apiVersion}'`,
-    });
-  }
-
-  if (!config.kind) {
-    errors.push({ field: "kind", message: "kind is required" });
-  } else if (config.kind !== "Kustomization") {
-    errors.push({ field: "kind", message: `kind must be 'Kustomization', got '${config.kind}'` });
-  }
-
+  // Add CLI-specific validation for output field
   if (options.requireOutput && !config.output) {
-    errors.push({ field: "output", message: "output is required for build command" });
+    result.errors.push({
+      field: "output",
+      message: "output is required for build command",
+    });
+    result.valid = false;
   }
 
-  if (!config.resources || config.resources.length === 0) {
-    errors.push({ field: "resources", message: "resources is required and must not be empty" });
+  return result;
+}
+
+/**
+ * Resolve resources using the core resource resolver
+ * This builds a fileMap and calls the core resolver
+ */
+function resolveResources(config: KustomarkConfig, basePath: string): Map<string, string> {
+  // Build file map by scanning the file system
+  const fileMap = buildCompleteFileMap(basePath);
+
+  // Use core resource resolver
+  const resolvedResources = coreResolveResources(config.resources, basePath, fileMap);
+
+  // Convert from ResolvedResource[] to Map<string, string>
+  // For now, use just the basename of each file as the key
+  // This matches kustomize behavior where resources are flattened into the output directory
+  const resultMap = new Map<string, string>();
+
+  for (const resource of resolvedResources) {
+    const normalizedPath = normalize(resource.path);
+    // Extract just the filename
+    const parts = normalizedPath.split('/');
+    const filename = parts[parts.length - 1] || normalizedPath;
+
+    resultMap.set(filename, resource.content);
   }
 
-  return {
-    valid: errors.length === 0,
-    errors,
-    warnings,
-  };
+  return resultMap;
 }
 
-function resolveResources(_config: KustomarkConfig, _basePath: string): Map<string, string> {
-  // Placeholder: Returns a map of file paths to their content
-  // In real implementation, this would:
-  // 1. Resolve globs
-  // 2. Load files
-  // 3. Recursively load other kustomark configs
-  const resources = new Map<string, string>();
-
-  // For now, just return empty map
-  // TODO: Implement actual resource resolution
-  return resources;
-}
-
+/**
+ * Apply patches to resources using the core patch engine
+ */
 function applyPatches(
   resources: Map<string, string>,
-  _patches: Array<unknown>,
-  _onNoMatch: string,
+  patches: PatchOperation[],
+  onNoMatch: OnNoMatchStrategy,
 ): { resources: Map<string, string>; patchesApplied: number; warnings: string[] } {
-  // Placeholder: Apply patches to resources
-  // In real implementation, this would apply all patch operations
+  const patchedResources = new Map<string, string>();
+  let totalPatchesApplied = 0;
+  const allWarnings: string[] = [];
+
+  // Apply patches to each file
+  for (const [filePath, content] of resources.entries()) {
+    // Filter patches that apply to this file
+    const applicablePatches = patches.filter((patch) => shouldApplyPatch(patch, filePath));
+
+    if (applicablePatches.length === 0) {
+      // No patches for this file, keep original content
+      patchedResources.set(filePath, content);
+      continue;
+    }
+
+    // Apply all applicable patches using the core patch engine
+    const result = coreApplyPatches(content, applicablePatches, onNoMatch);
+    patchedResources.set(filePath, result.content);
+    totalPatchesApplied += result.applied;
+    allWarnings.push(...result.warnings);
+  }
 
   return {
-    resources,
-    patchesApplied: 0,
-    warnings: [],
+    resources: patchedResources,
+    patchesApplied: totalPatchesApplied,
+    warnings: allWarnings,
   };
 }
 
+/**
+ * Check if a patch should be applied to a file based on include/exclude patterns
+ */
+function shouldApplyPatch(patch: PatchOperation, filePath: string): boolean {
+  // If include is specified, file must match at least one include pattern
+  if (patch.include) {
+    const includePatterns = Array.isArray(patch.include) ? patch.include : [patch.include];
+    const matches = micromatch.isMatch(filePath, includePatterns);
+    if (!matches) {
+      return false;
+    }
+  }
+
+  // If exclude is specified, file must not match any exclude pattern
+  if (patch.exclude) {
+    const excludePatterns = Array.isArray(patch.exclude) ? patch.exclude : [patch.exclude];
+    const matches = micromatch.isMatch(filePath, excludePatterns);
+    if (matches) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Generate diff using the core diff generator
+ */
 function generateDiff(
-  _original: Map<string, string>,
-  _modified: Map<string, string>,
+  original: Map<string, string>,
+  modified: Map<string, string>,
   _outputDir: string,
   _basePath: string,
 ): DiffResult {
-  // Placeholder: Generate unified diff
-  // In real implementation, this would:
-  // 1. Compare original vs modified
-  // 2. Generate unified diff format
-  // 3. Detect additions/deletions
+  // Build list of files for diff generation
+  const allPaths = new Set<string>();
+  for (const path of original.keys()) {
+    allPaths.add(path);
+  }
+  for (const path of modified.keys()) {
+    allPaths.add(path);
+  }
 
-  const files: DiffResult["files"] = [];
-  const hasChanges = files.length > 0;
+  const files: Array<{ path: string; original?: string; modified?: string }> = [];
 
-  return { hasChanges, files };
+  for (const path of allPaths) {
+    files.push({
+      path,
+      original: original.get(path),
+      modified: modified.get(path),
+    });
+  }
+
+  // Use core diff generator
+  const result = generateFileDiff(files);
+
+  return {
+    hasChanges: result.hasChanges,
+    files: result.files,
+  };
 }
 
 // ============================================================================
@@ -199,6 +272,63 @@ function log(message: string, level: number, options: CLIOptions): void {
   if (options.verbosity >= level) {
     console.error(message);
   }
+}
+
+/**
+ * Build a complete file map by scanning the directory tree
+ * This includes all .md files and kustomark config files
+ *
+ * To support references to parent/sibling directories (like ../base/),
+ * we scan from the parent directory of basePath to capture all relevant files.
+ */
+function buildCompleteFileMap(basePath: string): Map<string, string> {
+  const fileMap = new Map<string, string>();
+  const normalizedBasePath = normalize(resolve(basePath));
+
+  // Start scanning from the parent directory to catch sibling references
+  const scanRoot = dirname(normalizedBasePath);
+
+  function scanDirectory(dir: string): void {
+    if (!existsSync(dir)) {
+      return;
+    }
+
+    const entries = readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        // Skip node_modules, .git, and other common directories
+        if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "output") {
+          continue;
+        }
+        // Recursively scan subdirectories
+        scanDirectory(fullPath);
+      } else if (entry.isFile()) {
+        // Include markdown files and kustomark config files
+        if (
+          entry.name.endsWith(".md") ||
+          entry.name === "kustomark.yaml" ||
+          entry.name === "kustomark.yml"
+        ) {
+          try {
+            const content = readFileSync(fullPath, "utf-8");
+            const normalizedPath = normalize(fullPath);
+            fileMap.set(normalizedPath, content);
+          } catch (error) {
+            // Skip files we can't read
+            console.warn(
+              `Warning: Could not read file ${fullPath}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  scanDirectory(scanRoot);
+  return fileMap;
 }
 
 function readKustomarkConfig(configPath: string): KustomarkConfig {
@@ -214,7 +344,7 @@ function readKustomarkConfig(configPath: string): KustomarkConfig {
   }
 
   const content = readFileSync(configFile, "utf-8");
-  return parseConfig(content);
+  return coreParseConfig(content);
 }
 
 function cleanOutputDir(outputDir: string, sourceFiles: Set<string>): number {
@@ -246,11 +376,18 @@ function cleanOutputDir(outputDir: string, sourceFiles: Set<string>): number {
 
 async function buildCommand(path: string, options: CLIOptions): Promise<number> {
   try {
-    const configPath = resolve(path);
+    const inputPath = resolve(path);
+
+    // Determine the actual config file path
+    let configPath = inputPath;
+    if (existsSync(inputPath) && statSync(inputPath).isDirectory()) {
+      configPath = join(inputPath, "kustomark.yaml");
+    }
+
     const basePath = dirname(configPath);
 
     log(`Loading config from ${configPath}...`, 2, options);
-    const config = readKustomarkConfig(configPath);
+    const config = readKustomarkConfig(inputPath);
 
     // Validate config
     const validation = validateConfig(config, { requireOutput: true });
@@ -362,11 +499,18 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
 
 async function diffCommand(path: string, options: CLIOptions): Promise<number> {
   try {
-    const configPath = resolve(path);
+    const inputPath = resolve(path);
+
+    // Determine the actual config file path
+    let configPath = inputPath;
+    if (existsSync(inputPath) && statSync(inputPath).isDirectory()) {
+      configPath = join(inputPath, "kustomark.yaml");
+    }
+
     const basePath = dirname(configPath);
 
     log(`Loading config from ${configPath}...`, 2, options);
-    const config = readKustomarkConfig(configPath);
+    const config = readKustomarkConfig(inputPath);
 
     // Validate config
     const validation = validateConfig(config, { requireOutput: false });

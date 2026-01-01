@@ -1,0 +1,32 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+output: ./output
+
+resources:
+  - ../base/
+
+patches:
+  # Simple replace patch - change package name
+  - op: replace
+    old: "myproject"
+    new: "awesome-project"
+
+  # Section operation - remove the Advanced Topics section
+  - op: remove-section
+    id: advanced-topics
+    include: "file1.md"
+
+  # Section operation - append to the Usage section
+  - op: append-to-section
+    id: usage
+    include: "file1.md"
+    content: |
+
+      ### Additional Options
+
+      You can also use these options:
+      - `--verbose` - Enable verbose output
+      - `--config <path>` - Specify config file
+
+onNoMatch: warn

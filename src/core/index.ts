@@ -39,3 +39,22 @@ export type {
   PatchResult,
   MarkdownSection,
 } from "./types.js";
+
+// Export config parser functions
+export { parseConfig, validateConfig } from "./config-parser.js";
+
+// Export resource resolver functions and types
+export {
+  resolveResources,
+  type ResolvedResource,
+  ResourceResolutionError,
+} from "./resource-resolver.js";
+
+// Export diff generator functions and types
+export {
+  generateDiff,
+  generateFileDiff,
+  type FileDiff,
+  type FileStatus,
+  type DiffResult,
+} from "./diff-generator.js";

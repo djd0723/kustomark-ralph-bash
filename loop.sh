@@ -5,5 +5,6 @@ while true; do
         --model sonnet \
         --verbose \
         | bunx repomirror visualize
+    git push origin main
     echo -n "\n\n========================LOOP=========================\n\n"
 done
