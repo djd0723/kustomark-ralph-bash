@@ -92,11 +92,11 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Support regex matching for insert operations
    - ✅ Comprehensive unit tests (50 new tests, 294 total tests passing)
 
-3. **[TODO] Additional Section Operations**
-   - ⏳ Implement `rename-header` operation
-   - ⏳ Implement `move-section` operation
-   - ⏳ Implement `change-section-level` operation
-   - ⏳ Unit tests for new section operations
+3. **[DONE] Additional Section Operations** ✅
+   - ✅ Implement `rename-header` operation
+   - ✅ Implement `move-section` operation
+   - ✅ Implement `change-section-level` operation
+   - ✅ Unit tests for new section operations (73 new tests added)
 
 4. **[TODO] Validation Features**
    - ⏳ Implement per-patch validation (`validate` field)
@@ -151,4 +151,13 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ Full integration with onNoMatch strategy system
 - ✅ All linting and tests passing
 
-**Next Priority:** M2 Additional Section Operations - rename-header, move-section, change-section-level
+**2026-01-01 (M2 Additional Section Operations):**
+- ✅ All 3 additional section operations implemented (rename-header, move-section, change-section-level)
+- ✅ `rename-header`: Rename section headers while preserving level and custom IDs
+- ✅ `move-section`: Move sections with all children to new positions
+- ✅ `change-section-level`: Promote/demote sections with level clamping (1-6)
+- ✅ 73 comprehensive unit tests added (367 total tests passing, up from 294)
+- ✅ Fixed edge cases: empty header text, substring matching in tests, section hierarchy
+- ✅ All linting and tests passing
+
+**Next Priority:** M2 Validation Features - per-patch validation, global validators, --strict flag

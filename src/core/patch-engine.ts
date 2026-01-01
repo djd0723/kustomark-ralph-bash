@@ -816,6 +816,164 @@ export function applyInsertBeforeLine(
 }
 
 /**
+ * Apply a rename-header patch operation
+ *
+ * @param content - The content to patch
+ * @param id - The section ID to find
+ * @param newHeaderText - The new header text
+ * @returns Object with patched content and count (1 if renamed, 0 if not found)
+ */
+export function applyRenameHeader(
+  content: string,
+  id: string,
+  newHeaderText: string,
+): { content: string; count: number } {
+  const sections = parseSections(content);
+  const section = findSection(sections, id);
+
+  if (!section) {
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+  const headerLine = lines[section.startLine];
+
+  if (!headerLine) {
+    return { content, count: 0 };
+  }
+
+  // Extract the header level (# symbols)
+  const headerMatch = headerLine.match(/^(#{1,6})\s+/);
+  if (!headerMatch?.[1]) {
+    return { content, count: 0 };
+  }
+
+  const hashMarks = headerMatch[1];
+
+  // Create the new header line (handle empty string case)
+  lines[section.startLine] = newHeaderText ? `${hashMarks} ${newHeaderText}` : hashMarks;
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply a move-section patch operation
+ *
+ * @param content - The content to patch
+ * @param id - The section ID to move
+ * @param afterId - The section ID to move after
+ * @returns Object with patched content and count (1 if moved, 0 if not found)
+ */
+export function applyMoveSection(
+  content: string,
+  id: string,
+  afterId: string,
+): { content: string; count: number } {
+  const sections = parseSections(content);
+  const sourceSection = findSection(sections, id);
+  const targetSection = findSection(sections, afterId);
+
+  // Return early if either section not found
+  if (!sourceSection || !targetSection) {
+    return { content, count: 0 };
+  }
+
+  // Handle edge case: trying to move a section after itself
+  if (id === afterId) {
+    return { content, count: 0 };
+  }
+
+  // Check if moving a section after one of its descendants or itself
+  // This would create an invalid structure
+  if (
+    targetSection.startLine >= sourceSection.startLine &&
+    targetSection.startLine < sourceSection.endLine
+  ) {
+    // Target is a child of source - invalid move
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+
+  // Extract the source section (including all children)
+  const sectionLines = lines.slice(sourceSection.startLine, sourceSection.endLine);
+
+  // Remove source section from its current position
+  lines.splice(sourceSection.startLine, sourceSection.endLine - sourceSection.startLine);
+
+  // Recalculate target position after removal
+  // If target was after source, its position shifted up
+  let insertAfterLine = targetSection.startLine;
+  if (targetSection.startLine > sourceSection.startLine) {
+    insertAfterLine -= sourceSection.endLine - sourceSection.startLine;
+  }
+
+  // Find the end of the target section after the removal
+  // Need to re-parse to get accurate boundaries
+  const tempContent = lines.join("\n");
+  const updatedSections = parseSections(tempContent);
+  const updatedTarget = findSection(updatedSections, afterId);
+
+  if (!updatedTarget) {
+    // This shouldn't happen, but handle it gracefully
+    return { content, count: 0 };
+  }
+
+  // Insert the section after the target section's end
+  lines.splice(updatedTarget.endLine, 0, ...sectionLines);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply a change-section-level patch operation
+ *
+ * @param content - The content to patch
+ * @param id - The section ID to find
+ * @param delta - The level change (negative to promote, positive to demote)
+ * @returns Object with patched content and count (1 if changed, 0 if not found)
+ */
+export function applyChangeSectionLevel(
+  content: string,
+  id: string,
+  delta: number,
+): { content: string; count: number } {
+  const sections = parseSections(content);
+  const section = findSection(sections, id);
+
+  if (!section) {
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+  const headerLine = lines[section.startLine];
+
+  if (!headerLine) {
+    return { content, count: 0 };
+  }
+
+  // Extract the header level (# symbols) and text
+  const headerMatch = headerLine.match(/^(#{1,6})\s+(.*)$/);
+  if (!headerMatch?.[1]) {
+    return { content, count: 0 };
+  }
+
+  const currentLevel = headerMatch[1].length;
+  const headerText = headerMatch[2] || "";
+
+  // Calculate new level and clamp to valid range (1-6)
+  const newLevel = Math.max(1, Math.min(6, currentLevel + delta));
+
+  // If level didn't actually change (due to clamping or zero delta), still count as success
+  const newHashMarks = "#".repeat(newLevel);
+
+  // Create the new header line (handle empty text case)
+  lines[section.startLine] = headerText ? `${newHashMarks} ${headerText}` : newHashMarks;
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply a single patch operation to content
  *
  * @param content - The content to patch
@@ -904,6 +1062,18 @@ export function applySinglePatch(
       );
       break;
 
+    case "rename-header":
+      result = applyRenameHeader(content, patch.id, patch.new);
+      break;
+
+    case "move-section":
+      result = applyMoveSection(content, patch.id, patch.after);
+      break;
+
+    case "change-section-level":
+      result = applyChangeSectionLevel(content, patch.id, patch.delta);
+      break;
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = patch;
@@ -970,6 +1140,12 @@ function getPatchDescription(patch: PatchOperation): string {
       return `insert-after-line ${patch.match ? `'${patch.match}'` : `pattern '${patch.pattern}'`}`;
     case "insert-before-line":
       return `insert-before-line ${patch.match ? `'${patch.match}'` : `pattern '${patch.pattern}'`}`;
+    case "rename-header":
+      return `rename-header '${patch.id}' to '${patch.new}'`;
+    case "move-section":
+      return `move-section '${patch.id}' after '${patch.after}'`;
+    case "change-section-level":
+      return `change-section-level '${patch.id}' by ${patch.delta}`;
     default:
       return "unknown patch";
   }

@@ -193,6 +193,39 @@ export interface InsertBeforeLinePatch extends PatchCommonFields {
 }
 
 /**
+ * Move section operation - moves a section after another section
+ */
+export interface MoveSectionPatch extends PatchCommonFields {
+  op: "move-section";
+  /** Section ID to move (GitHub-style slug or explicit {#custom-id}) */
+  id: string;
+  /** Section ID to move after (GitHub-style slug or explicit {#custom-id}) */
+  after: string;
+}
+
+/**
+ * Rename header operation - renames a section header while preserving level
+ */
+export interface RenameHeaderPatch extends PatchCommonFields {
+  op: "rename-header";
+  /** Section ID (GitHub-style slug or explicit {#custom-id}) */
+  id: string;
+  /** New header text */
+  new: string;
+}
+
+/**
+ * Change section level operation - changes the heading level of a section
+ */
+export interface ChangeSectionLevelPatch extends PatchCommonFields {
+  op: "change-section-level";
+  /** Section ID (GitHub-style slug or explicit {#custom-id}) */
+  id: string;
+  /** Level change delta (e.g., -1 to promote ### → ##, +1 to demote ## → ###) */
+  delta: number;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -210,7 +243,10 @@ export type PatchOperation =
   | ReplaceBetweenPatch
   | ReplaceLinePatch
   | InsertAfterLinePatch
-  | InsertBeforeLinePatch;
+  | InsertBeforeLinePatch
+  | MoveSectionPatch
+  | RenameHeaderPatch
+  | ChangeSectionLevelPatch;
 
 /**
  * Kustomark configuration structure
