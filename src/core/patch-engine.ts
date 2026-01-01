@@ -4,10 +4,12 @@
  * Implements patch operations on markdown content:
  * - String replacement (exact and regex)
  * - Section operations (remove, replace, prepend, append)
+ * - Frontmatter operations (set, remove, rename, merge)
  * - GitHub-style header slug parsing
  * - Custom ID support with {#custom-id} syntax
  */
 
+import * as yaml from "js-yaml";
 import type { MarkdownSection, OnNoMatchStrategy, PatchOperation, PatchResult } from "./types.js";
 
 /**
@@ -317,6 +319,275 @@ export function applyAppendToSection(
 }
 
 /**
+ * Parse frontmatter from markdown content
+ *
+ * @param content - The markdown content
+ * @returns Object with frontmatter data, body content, and whether frontmatter exists
+ */
+export function parseFrontmatter(content: string): {
+  data: Record<string, unknown>;
+  body: string;
+  hasFrontmatter: boolean;
+} {
+  const lines = content.split("\n");
+
+  // Check if content starts with ---
+  if (lines[0] !== "---") {
+    return { data: {}, body: content, hasFrontmatter: false };
+  }
+
+  // Find the closing ---
+  let closingIndex = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === "---") {
+      closingIndex = i;
+      break;
+    }
+  }
+
+  if (closingIndex === -1) {
+    // No closing delimiter found
+    return { data: {}, body: content, hasFrontmatter: false };
+  }
+
+  // Extract frontmatter YAML
+  const frontmatterLines = lines.slice(1, closingIndex);
+  const frontmatterYaml = frontmatterLines.join("\n");
+
+  // Parse YAML
+  let data: Record<string, unknown> = {};
+  try {
+    const parsed = yaml.load(frontmatterYaml);
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      data = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // If YAML parsing fails, treat as no frontmatter
+    return { data: {}, body: content, hasFrontmatter: false };
+  }
+
+  // Get body content (everything after closing ---)
+  const body = lines.slice(closingIndex + 1).join("\n");
+
+  return { data, body, hasFrontmatter: true };
+}
+
+/**
+ * Serialize frontmatter and body back to markdown
+ *
+ * @param data - Frontmatter data object
+ * @param body - Body content
+ * @returns Complete markdown content with frontmatter
+ */
+export function serializeFrontmatter(data: Record<string, unknown>, body: string): string {
+  const frontmatterYaml = yaml.dump(data, { lineWidth: -1, noRefs: true });
+  return `---\n${frontmatterYaml}---\n${body}`;
+}
+
+/**
+ * Get a nested value from an object using dot notation
+ *
+ * @param obj - Object to get value from
+ * @param path - Dot-separated path (e.g., "metadata.author")
+ * @returns The value at the path, or undefined if not found
+ */
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  const keys = path.split(".");
+  let current: unknown = obj;
+
+  for (const key of keys) {
+    if (current === null || current === undefined || typeof current !== "object") {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[key];
+  }
+
+  return current;
+}
+
+/**
+ * Set a nested value in an object using dot notation
+ *
+ * @param obj - Object to set value in
+ * @param path - Dot-separated path (e.g., "metadata.author")
+ * @param value - Value to set
+ */
+function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
+  const keys = path.split(".");
+  let current: unknown = obj;
+
+  for (let i = 0; i < keys.length - 1; i++) {
+    const key = keys[i];
+    if (!key) continue;
+
+    const currentObj = current as Record<string, unknown>;
+    if (!currentObj[key] || typeof currentObj[key] !== "object" || Array.isArray(currentObj[key])) {
+      currentObj[key] = {};
+    }
+    current = currentObj[key];
+  }
+
+  const lastKey = keys[keys.length - 1];
+  if (lastKey) {
+    (current as Record<string, unknown>)[lastKey] = value;
+  }
+}
+
+/**
+ * Delete a nested value from an object using dot notation
+ *
+ * @param obj - Object to delete value from
+ * @param path - Dot-separated path (e.g., "metadata.author")
+ * @returns true if the key existed and was deleted, false otherwise
+ */
+function deleteNestedValue(obj: Record<string, unknown>, path: string): boolean {
+  const keys = path.split(".");
+  let current: unknown = obj;
+
+  for (let i = 0; i < keys.length - 1; i++) {
+    const key = keys[i];
+    if (!key) continue;
+
+    if (!current || typeof current !== "object" || !(key in (current as Record<string, unknown>))) {
+      return false;
+    }
+    current = (current as Record<string, unknown>)[key];
+  }
+
+  const lastKey = keys[keys.length - 1];
+  if (
+    lastKey &&
+    current &&
+    typeof current === "object" &&
+    lastKey in (current as Record<string, unknown>)
+  ) {
+    delete (current as Record<string, unknown>)[lastKey];
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Apply a set-frontmatter patch operation
+ *
+ * @param content - The content to patch
+ * @param key - The frontmatter key (supports dot notation)
+ * @param value - The value to set
+ * @returns Object with patched content and count (1 if set, 0 if no frontmatter and creation failed)
+ */
+export function applySetFrontmatter(
+  content: string,
+  key: string,
+  value: unknown,
+): { content: string; count: number } {
+  const { data, body } = parseFrontmatter(content);
+
+  // Set the value using dot notation
+  setNestedValue(data, key, value);
+
+  // Serialize back
+  const result = serializeFrontmatter(data, body);
+
+  return { content: result, count: 1 };
+}
+
+/**
+ * Apply a remove-frontmatter patch operation
+ *
+ * @param content - The content to patch
+ * @param key - The frontmatter key to remove (supports dot notation)
+ * @returns Object with patched content and count (1 if removed, 0 if key didn't exist)
+ */
+export function applyRemoveFrontmatter(
+  content: string,
+  key: string,
+): { content: string; count: number } {
+  const { data, body, hasFrontmatter } = parseFrontmatter(content);
+
+  if (!hasFrontmatter) {
+    return { content, count: 0 };
+  }
+
+  // Try to delete the key
+  const deleted = deleteNestedValue(data, key);
+
+  if (!deleted) {
+    return { content, count: 0 };
+  }
+
+  // If data is now empty, remove frontmatter entirely
+  if (Object.keys(data).length === 0) {
+    return { content: body, count: 1 };
+  }
+
+  // Serialize back
+  const result = serializeFrontmatter(data, body);
+
+  return { content: result, count: 1 };
+}
+
+/**
+ * Apply a rename-frontmatter patch operation
+ *
+ * @param content - The content to patch
+ * @param oldKey - The old frontmatter key
+ * @param newKey - The new frontmatter key
+ * @returns Object with patched content and count (1 if renamed, 0 if old key didn't exist)
+ */
+export function applyRenameFrontmatter(
+  content: string,
+  oldKey: string,
+  newKey: string,
+): { content: string; count: number } {
+  const { data, body, hasFrontmatter } = parseFrontmatter(content);
+
+  if (!hasFrontmatter) {
+    return { content, count: 0 };
+  }
+
+  // Get the value at oldKey
+  const value = getNestedValue(data, oldKey);
+
+  if (value === undefined) {
+    return { content, count: 0 };
+  }
+
+  // Delete old key and set new key
+  deleteNestedValue(data, oldKey);
+  setNestedValue(data, newKey, value);
+
+  // Serialize back
+  const result = serializeFrontmatter(data, body);
+
+  return { content: result, count: 1 };
+}
+
+/**
+ * Apply a merge-frontmatter patch operation
+ *
+ * @param content - The content to patch
+ * @param values - Key-value pairs to merge into frontmatter
+ * @returns Object with patched content and count (1 if merged, 0 otherwise)
+ */
+export function applyMergeFrontmatter(
+  content: string,
+  values: Record<string, unknown>,
+): { content: string; count: number } {
+  const { data, body } = parseFrontmatter(content);
+
+  // Merge values into data
+  for (const [key, value] of Object.entries(values)) {
+    setNestedValue(data, key, value);
+  }
+
+  // Serialize back
+  const result = serializeFrontmatter(data, body);
+
+  return { content: result, count: 1 };
+}
+
+/**
  * Apply a single patch operation to content
  *
  * @param content - The content to patch
@@ -355,6 +626,22 @@ export function applySinglePatch(
 
     case "append-to-section":
       result = applyAppendToSection(content, patch.id, patch.content);
+      break;
+
+    case "set-frontmatter":
+      result = applySetFrontmatter(content, patch.key, patch.value);
+      break;
+
+    case "remove-frontmatter":
+      result = applyRemoveFrontmatter(content, patch.key);
+      break;
+
+    case "rename-frontmatter":
+      result = applyRenameFrontmatter(content, patch.old, patch.new);
+      break;
+
+    case "merge-frontmatter":
+      result = applyMergeFrontmatter(content, patch.values);
       break;
 
     default: {
@@ -405,6 +692,14 @@ function getPatchDescription(patch: PatchOperation): string {
       return `prepend-to-section '${patch.id}'`;
     case "append-to-section":
       return `append-to-section '${patch.id}'`;
+    case "set-frontmatter":
+      return `set-frontmatter '${patch.key}'`;
+    case "remove-frontmatter":
+      return `remove-frontmatter '${patch.key}'`;
+    case "rename-frontmatter":
+      return `rename-frontmatter '${patch.old}' to '${patch.new}'`;
+    case "merge-frontmatter":
+      return "merge-frontmatter";
     default:
       return "unknown patch";
   }

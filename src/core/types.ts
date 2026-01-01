@@ -84,6 +84,46 @@ export interface AppendToSectionPatch extends PatchCommonFields {
 }
 
 /**
+ * Set frontmatter operation - sets a frontmatter field
+ */
+export interface SetFrontmatterPatch extends PatchCommonFields {
+  op: "set-frontmatter";
+  /** Frontmatter key */
+  key: string;
+  /** Value to set */
+  value: unknown;
+}
+
+/**
+ * Remove frontmatter operation - removes a frontmatter field
+ */
+export interface RemoveFrontmatterPatch extends PatchCommonFields {
+  op: "remove-frontmatter";
+  /** Frontmatter key to remove */
+  key: string;
+}
+
+/**
+ * Rename frontmatter operation - renames a frontmatter field
+ */
+export interface RenameFrontmatterPatch extends PatchCommonFields {
+  op: "rename-frontmatter";
+  /** Old key name */
+  old: string;
+  /** New key name */
+  new: string;
+}
+
+/**
+ * Merge frontmatter operation - merges multiple values into frontmatter
+ */
+export interface MergeFrontmatterPatch extends PatchCommonFields {
+  op: "merge-frontmatter";
+  /** Key-value pairs to merge */
+  values: Record<string, unknown>;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -92,7 +132,11 @@ export type PatchOperation =
   | RemoveSectionPatch
   | ReplaceSectionPatch
   | PrependToSectionPatch
-  | AppendToSectionPatch;
+  | AppendToSectionPatch
+  | SetFrontmatterPatch
+  | RemoveFrontmatterPatch
+  | RenameFrontmatterPatch
+  | MergeFrontmatterPatch;
 
 /**
  * Kustomark configuration structure

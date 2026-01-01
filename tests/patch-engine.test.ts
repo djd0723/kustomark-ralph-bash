@@ -11,6 +11,12 @@ import {
   applyReplaceSection,
   applyPrependToSection,
   applyAppendToSection,
+  applySetFrontmatter,
+  applyRemoveFrontmatter,
+  applyRenameFrontmatter,
+  applyMergeFrontmatter,
+  parseFrontmatter,
+  serializeFrontmatter,
   parseSections,
   generateSlug,
   findSection,
@@ -344,5 +350,561 @@ Advanced content`;
     expect(result.content).toContain('**Note**: Updated documentation');
     expect(result.content).not.toContain('Old getting started content');
     expect(result.applied).toBe(2);
+  });
+});
+
+describe('parseFrontmatter', () => {
+  test('parses valid frontmatter', () => {
+    const content = `---
+title: My Document
+version: 1.0
+---
+# Content here`;
+    const result = parseFrontmatter(content);
+
+    expect(result.hasFrontmatter).toBe(true);
+    expect(result.data.title).toBe('My Document');
+    expect(result.data.version).toBe(1.0);
+    expect(result.body).toBe('# Content here');
+  });
+
+  test('handles content without frontmatter', () => {
+    const content = '# Just a heading\nSome content';
+    const result = parseFrontmatter(content);
+
+    expect(result.hasFrontmatter).toBe(false);
+    expect(result.data).toEqual({});
+    expect(result.body).toBe(content);
+  });
+
+  test('handles empty frontmatter', () => {
+    const content = `---
+---
+# Content`;
+    const result = parseFrontmatter(content);
+
+    expect(result.hasFrontmatter).toBe(true);
+    expect(result.data).toEqual({});
+    expect(result.body).toBe('# Content');
+  });
+
+  test('handles nested frontmatter objects', () => {
+    const content = `---
+metadata:
+  author: John
+  version: '2.0'
+tags:
+  - test
+  - example
+---
+Content`;
+    const result = parseFrontmatter(content);
+
+    expect(result.hasFrontmatter).toBe(true);
+    expect(result.data.metadata.author).toBe('John');
+    expect(result.data.metadata.version).toBe('2.0');
+    expect(result.data.tags).toEqual(['test', 'example']);
+  });
+
+  test('handles malformed frontmatter', () => {
+    const content = `---
+invalid: yaml: syntax:
+---
+Content`;
+    const result = parseFrontmatter(content);
+
+    expect(result.hasFrontmatter).toBe(false);
+    expect(result.body).toBe(content);
+  });
+
+  test('handles content with --- but no closing delimiter', () => {
+    const content = `---
+title: Test
+# Missing closing delimiter`;
+    const result = parseFrontmatter(content);
+
+    expect(result.hasFrontmatter).toBe(false);
+    expect(result.body).toBe(content);
+  });
+});
+
+describe('serializeFrontmatter', () => {
+  test('serializes frontmatter and body', () => {
+    const data = { title: 'Test', version: '1.0' };
+    const body = '# Content';
+    const result = serializeFrontmatter(data, body);
+
+    expect(result).toContain('---');
+    expect(result).toContain('title: Test');
+    expect(result).toContain('version: \'1.0\'');
+    expect(result).toContain('# Content');
+  });
+
+  test('handles empty frontmatter object', () => {
+    const data = {};
+    const body = 'Content';
+    const result = serializeFrontmatter(data, body);
+
+    expect(result).toBe('---\n{}\n---\nContent');
+  });
+
+  test('handles nested objects', () => {
+    const data = {
+      metadata: {
+        author: 'John',
+        date: '2024-01-01',
+      },
+    };
+    const body = 'Content';
+    const result = serializeFrontmatter(data, body);
+
+    expect(result).toContain('metadata:');
+    expect(result).toContain('author: John');
+    expect(result).toContain('date: \'2024-01-01\'');
+  });
+});
+
+describe('applySetFrontmatter', () => {
+  test('sets simple key in existing frontmatter', () => {
+    const content = `---
+title: Old Title
+---
+# Content`;
+    const result = applySetFrontmatter(content, 'version', '2.0');
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('version: \'2.0\'');
+    expect(result.content).toContain('title: Old Title');
+  });
+
+  test('sets nested key with dot notation', () => {
+    const content = `---
+title: Test
+---
+Content`;
+    const result = applySetFrontmatter(content, 'metadata.author', 'kustomark');
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('metadata:');
+    expect(result.content).toContain('author: kustomark');
+  });
+
+  test('creates frontmatter if it does not exist', () => {
+    const content = '# Just content\nNo frontmatter here';
+    const result = applySetFrontmatter(content, 'version', '1.0');
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('---');
+    expect(result.content).toContain('version: \'1.0\'');
+    expect(result.content).toContain('# Just content');
+  });
+
+  test('overwrites existing key', () => {
+    const content = `---
+version: 1.0
+---
+Content`;
+    const result = applySetFrontmatter(content, 'version', '2.0');
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('version: \'2.0\'');
+    expect(result.content).not.toContain('version: \'1.0\'');
+  });
+
+  test('sets deeply nested key with dot notation', () => {
+    const content = `---
+title: Test
+---
+Content`;
+    const result = applySetFrontmatter(content, 'metadata.deep.nested.value', 'test');
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('metadata:');
+    expect(result.content).toContain('deep:');
+    expect(result.content).toContain('nested:');
+    expect(result.content).toContain('value: test');
+  });
+
+  test('sets value to different types', () => {
+    const content = `---
+title: Test
+---
+Content`;
+
+    // Number
+    let result = applySetFrontmatter(content, 'count', 42);
+    expect(result.content).toContain('count: 42');
+
+    // Boolean
+    result = applySetFrontmatter(content, 'published', true);
+    expect(result.content).toContain('published: true');
+
+    // Array
+    result = applySetFrontmatter(content, 'tags', ['test', 'example']);
+    expect(result.content).toContain('tags:');
+    expect(result.content).toContain('- test');
+    expect(result.content).toContain('- example');
+  });
+});
+
+describe('applyRemoveFrontmatter', () => {
+  test('removes existing simple key', () => {
+    const content = `---
+title: Test
+version: 1.0
+author: John
+---
+Content`;
+    const result = applyRemoveFrontmatter(content, 'version');
+
+    expect(result.count).toBe(1);
+    expect(result.content).not.toContain('version');
+    expect(result.content).toContain('title: Test');
+    expect(result.content).toContain('author: John');
+  });
+
+  test('removes nested key with dot notation', () => {
+    const content = `---
+title: Test
+metadata:
+  author: John
+  version: '2.0'
+---
+Content`;
+    const result = applyRemoveFrontmatter(content, 'metadata.author');
+
+    expect(result.count).toBe(1);
+    expect(result.content).not.toContain('author: John');
+    expect(result.content).toContain('metadata:');
+    expect(result.content).toContain('version: \'2.0\'');
+  });
+
+  test('returns zero count for non-existing key', () => {
+    const content = `---
+title: Test
+---
+Content`;
+    const result = applyRemoveFrontmatter(content, 'nonexistent');
+
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(content);
+  });
+
+  test('returns zero count when no frontmatter exists', () => {
+    const content = '# Just content';
+    const result = applyRemoveFrontmatter(content, 'title');
+
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(content);
+  });
+
+  test('removes frontmatter entirely when last key is removed', () => {
+    const content = `---
+title: Test
+---
+Content here`;
+    const result = applyRemoveFrontmatter(content, 'title');
+
+    expect(result.count).toBe(1);
+    expect(result.content).not.toContain('---');
+    expect(result.content).toBe('Content here');
+  });
+
+  test('handles removing deeply nested keys', () => {
+    const content = `---
+metadata:
+  deep:
+    nested:
+      value: test
+---
+Content`;
+    const result = applyRemoveFrontmatter(content, 'metadata.deep.nested.value');
+
+    expect(result.count).toBe(1);
+    expect(result.content).not.toContain('value: test');
+  });
+});
+
+describe('applyRenameFrontmatter', () => {
+  test('renames existing simple key', () => {
+    const content = `---
+name: old-name
+version: '1.0'
+---
+Content`;
+    const result = applyRenameFrontmatter(content, 'name', 'skill_name');
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('skill_name: old-name');
+    expect(result.content).toContain('version: \'1.0\'');
+  });
+
+  test('renames nested key with dot notation', () => {
+    const content = `---
+metadata:
+  oldKey: value
+  other: data
+---
+Content`;
+    const result = applyRenameFrontmatter(content, 'metadata.oldKey', 'metadata.newKey');
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('newKey: value');
+    expect(result.content).not.toContain('oldKey: value');
+    expect(result.content).toContain('other: data');
+  });
+
+  test('returns zero count for non-existing key', () => {
+    const content = `---
+title: Test
+---
+Content`;
+    const result = applyRenameFrontmatter(content, 'nonexistent', 'newname');
+
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(content);
+  });
+
+  test('returns zero count when no frontmatter exists', () => {
+    const content = '# Just content';
+    const result = applyRenameFrontmatter(content, 'old', 'new');
+
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(content);
+  });
+
+  test('moves key to different nesting level', () => {
+    const content = `---
+topLevel: value
+metadata:
+  other: data
+---
+Content`;
+    const result = applyRenameFrontmatter(content, 'topLevel', 'metadata.nested');
+
+    expect(result.count).toBe(1);
+    expect(result.content).not.toContain('topLevel: value');
+    expect(result.content).toContain('nested: value');
+    expect(result.content).toContain('metadata:');
+  });
+
+  test('preserves value type when renaming', () => {
+    const content = `---
+count: 42
+active: true
+tags:
+  - one
+  - two
+---
+Content`;
+
+    let result = applyRenameFrontmatter(content, 'count', 'number');
+    expect(result.content).toContain('number: 42');
+
+    result = applyRenameFrontmatter(content, 'active', 'enabled');
+    expect(result.content).toContain('enabled: true');
+
+    result = applyRenameFrontmatter(content, 'tags', 'labels');
+    expect(result.content).toContain('labels:');
+    expect(result.content).toContain('- one');
+  });
+});
+
+describe('applyMergeFrontmatter', () => {
+  test('merges values into existing frontmatter', () => {
+    const content = `---
+title: Test
+---
+Content`;
+    const result = applyMergeFrontmatter(content, {
+      version: '2.0',
+      author: 'kustomark',
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('title: Test');
+    expect(result.content).toContain('version: \'2.0\'');
+    expect(result.content).toContain('author: kustomark');
+  });
+
+  test('merges into empty frontmatter', () => {
+    const content = '# Content without frontmatter';
+    const result = applyMergeFrontmatter(content, {
+      version: '1.0',
+      tags: ['test', 'example'],
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('---');
+    expect(result.content).toContain('version: \'1.0\'');
+    expect(result.content).toContain('tags:');
+    expect(result.content).toContain('- test');
+    expect(result.content).toContain('- example');
+  });
+
+  test('overwrites existing keys', () => {
+    const content = `---
+version: 1.0
+author: old
+---
+Content`;
+    const result = applyMergeFrontmatter(content, {
+      version: '2.0',
+      title: 'New',
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('version: \'2.0\'');
+    expect(result.content).not.toContain('version: \'1.0\'');
+    expect(result.content).toContain('title: New');
+    expect(result.content).toContain('author: old');
+  });
+
+  test('supports nested keys with dot notation', () => {
+    const content = `---
+title: Test
+---
+Content`;
+    const result = applyMergeFrontmatter(content, {
+      'metadata.author': 'John',
+      'metadata.date': '2024-01-01',
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('metadata:');
+    expect(result.content).toContain('author: John');
+    expect(result.content).toContain('date: \'2024-01-01\'');
+  });
+
+  test('handles empty values object', () => {
+    const content = `---
+title: Test
+---
+Content`;
+    const result = applyMergeFrontmatter(content, {});
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('title: Test');
+  });
+
+  test('merges complex nested structures', () => {
+    const content = `---
+existing: value
+---
+Content`;
+    const result = applyMergeFrontmatter(content, {
+      metadata: {
+        author: 'John',
+        tags: ['test', 'example'],
+      },
+      config: {
+        enabled: true,
+        count: 5,
+      },
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain('existing: value');
+    expect(result.content).toContain('metadata:');
+    expect(result.content).toContain('author: John');
+    expect(result.content).toContain('config:');
+    expect(result.content).toContain('enabled: true');
+  });
+});
+
+describe('frontmatter operations with applyPatches', () => {
+  test('applies multiple frontmatter operations in sequence', () => {
+    const content = `---
+name: old-name
+version: 1.0
+---
+# Content`;
+
+    const patches: PatchOperation[] = [
+      { op: 'rename-frontmatter', old: 'name', new: 'skill_name' },
+      { op: 'set-frontmatter', key: 'version', value: '2.0' },
+      { op: 'merge-frontmatter', values: { author: 'kustomark', tags: ['patched'] } },
+    ];
+
+    const result = applyPatches(content, patches);
+
+    expect(result.applied).toBe(3);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.content).toContain('skill_name: old-name');
+    expect(result.content).toContain('version: \'2.0\'');
+    expect(result.content).toContain('author: kustomark');
+    expect(result.content).toContain('tags:');
+  });
+
+  test('generates warning when removing non-existent key with onNoMatch=warn', () => {
+    const content = `---
+title: Test
+---
+Content`;
+
+    const patches: PatchOperation[] = [
+      { op: 'remove-frontmatter', key: 'nonexistent' },
+    ];
+
+    const result = applyPatches(content, patches, 'warn');
+
+    expect(result.applied).toBe(0);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('matched 0 times');
+  });
+
+  test('skips non-matching frontmatter operations with onNoMatch=skip', () => {
+    const content = `---
+title: Test
+---
+Content`;
+
+    const patches: PatchOperation[] = [
+      { op: 'remove-frontmatter', key: 'nonexistent', onNoMatch: 'skip' },
+      { op: 'set-frontmatter', key: 'version', value: '1.0' },
+    ];
+
+    const result = applyPatches(content, patches, 'warn');
+
+    expect(result.applied).toBe(1);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.content).toContain('version: \'1.0\'');
+  });
+
+  test('throws error for non-matching frontmatter operations with onNoMatch=error', () => {
+    const content = `---
+title: Test
+---
+Content`;
+
+    const patches: PatchOperation[] = [
+      { op: 'rename-frontmatter', old: 'nonexistent', new: 'new' },
+    ];
+
+    expect(() => applyPatches(content, patches, 'error')).toThrow('matched 0 times');
+  });
+
+  test('combines frontmatter and section operations', () => {
+    const content = `---
+title: Original
+---
+# Introduction
+Old intro
+
+# Details {#details}
+Old details`;
+
+    const patches: PatchOperation[] = [
+      { op: 'set-frontmatter', key: 'version', value: '2.0' },
+      { op: 'replace-section', id: 'introduction', content: 'New introduction text' },
+      { op: 'append-to-section', id: 'details', content: '\nAppended content' },
+    ];
+
+    const result = applyPatches(content, patches);
+
+    expect(result.applied).toBe(3);
+    expect(result.content).toContain('version: \'2.0\'');
+    expect(result.content).toContain('New introduction text');
+    expect(result.content).toContain('Appended content');
   });
 });

@@ -1,6 +1,6 @@
 # Kustomark Implementation Plan
 
-## Status: M1 (MVP) Core Implementation Complete ✅
+## Status: M1 Complete ✅ | M2 In Progress (Frontmatter ✅)
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
@@ -55,8 +55,8 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Support `--clean` flag for build command
 
 8. **[DONE] Testing** ✅
-   - ✅ Unit tests for config parsing (154 tests pass)
-   - ✅ Unit tests for patch operations
+   - ✅ Unit tests for config parsing
+   - ✅ Unit tests for patch operations (244 tests pass)
    - ✅ Unit tests for resource resolution
    - ✅ Unit tests for diff generation
    - ✅ Integration tests with fixtures
@@ -69,10 +69,42 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Basic README with examples
    - ⏳ API documentation for core library (deferred to M2)
 
-## M2: Enhanced Operations (Future)
-- Frontmatter operations
-- Line operations
-- Advanced validation
+## M2: Enhanced Operations (In Progress)
+
+### Priority Order
+
+1. **[DONE] Frontmatter Operations** ✅
+   - ✅ Implement `set-frontmatter` operation with dot notation support
+   - ✅ Implement `remove-frontmatter` operation
+   - ✅ Implement `rename-frontmatter` operation
+   - ✅ Implement `merge-frontmatter` operation
+   - ✅ Add frontmatter parsing and serialization utilities
+   - ✅ Support nested keys with dot notation (e.g., "metadata.author")
+   - ✅ Comprehensive unit tests (244 tests passing)
+   - ✅ Type safety with `unknown` instead of `any`
+
+2. **[TODO] Line Operations**
+   - ⏳ Implement `insert-after-line` operation
+   - ⏳ Implement `insert-before-line` operation
+   - ⏳ Implement `replace-line` operation
+   - ⏳ Implement `delete-between` operation
+   - ⏳ Implement `replace-between` operation
+   - ⏳ Support regex matching for line operations
+   - ⏳ Unit tests for line operations
+
+3. **[TODO] Additional Section Operations**
+   - ⏳ Implement `rename-header` operation
+   - ⏳ Implement `move-section` operation
+   - ⏳ Implement `change-section-level` operation
+   - ⏳ Unit tests for new section operations
+
+4. **[TODO] Validation Features**
+   - ⏳ Implement per-patch validation (`validate` field)
+   - ⏳ Implement global validators in config
+   - ⏳ Add `notContains` validator
+   - ⏳ Add `frontmatterRequired` validator
+   - ⏳ Add `--strict` flag to validate command
+   - ⏳ Update JSON output to include validation results
 
 ## M3: Remote Sources (Future)
 - Git support
@@ -97,14 +129,18 @@ This document tracks the implementation of kustomark based on the spec milestone
 - Comprehensive test coverage (154 tests passing)
 - Complete README with usage examples and API reference
 
-**Recent Completion (2026-01-01):**
-- ✅ Comprehensive README.md with:
-  - Installation instructions
-  - Quick start guide
-  - Complete CLI documentation
-  - All 6 patch operations with examples
-  - Resource resolution and overlay patterns
-  - JSON output schemas
-  - Contributing guidelines
+**Recent Completions:**
 
-**Next Milestone:** M2 (Enhanced Operations) - Frontmatter, line operations, advanced validation
+**2026-01-01 (Initial):**
+- ✅ M1 MVP Complete - All core functionality
+- ✅ Comprehensive README.md with installation, usage, and API reference
+
+**2026-01-01 (M2 Start - Frontmatter Operations):**
+- ✅ Frontmatter parsing utilities with YAML support
+- ✅ All 4 frontmatter operations (set, remove, rename, merge)
+- ✅ Dot notation support for nested keys (e.g., "metadata.author")
+- ✅ Type-safe implementation (using `unknown` instead of `any`)
+- ✅ Comprehensive test coverage (244 tests passing, up from 154)
+- ✅ All linting checks passing
+
+**Next Priority:** M2 Line Operations - insert-after/before-line, replace-line, delete/replace-between

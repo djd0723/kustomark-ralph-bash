@@ -16,6 +16,10 @@ export {
   applyReplaceSection,
   applyPrependToSection,
   applyAppendToSection,
+  applySetFrontmatter,
+  applyRemoveFrontmatter,
+  applyRenameFrontmatter,
+  applyMergeFrontmatter,
   parseSections,
   generateSlug,
   findSection,
@@ -32,6 +36,10 @@ export type {
   ReplaceSectionPatch,
   PrependToSectionPatch,
   AppendToSectionPatch,
+  SetFrontmatterPatch,
+  RemoveFrontmatterPatch,
+  RenameFrontmatterPatch,
+  MergeFrontmatterPatch,
   PatchOperation,
   KustomarkConfig,
   ValidationError,
@@ -58,3 +66,15 @@ export {
   type FileStatus,
   type DiffResult,
 } from "./diff-generator.js";
+
+// Export frontmatter parser functions and types
+export {
+  parseFrontmatter,
+  stringifyFrontmatter,
+  extractFrontmatter,
+  insertFrontmatter,
+  getNestedValue,
+  setNestedValue,
+  deleteNestedValue,
+  type FrontmatterResult,
+} from "./frontmatter-parser.js";
