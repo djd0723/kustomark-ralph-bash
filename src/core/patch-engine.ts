@@ -588,6 +588,234 @@ export function applyMergeFrontmatter(
 }
 
 /**
+ * Apply a delete-between patch operation
+ *
+ * @param content - The content to patch
+ * @param start - The start marker string
+ * @param end - The end marker string
+ * @param inclusive - Whether to include the marker lines (default: true)
+ * @returns Object with patched content and count (1 if deleted, 0 if markers not found)
+ */
+export function applyDeleteBetween(
+  content: string,
+  start: string,
+  end: string,
+  inclusive = true,
+): { content: string; count: number } {
+  const lines = content.split("\n");
+
+  // Find first occurrence of start marker
+  let startLine = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]?.includes(start)) {
+      startLine = i;
+      break;
+    }
+  }
+
+  if (startLine === -1) {
+    return { content, count: 0 };
+  }
+
+  // Find end marker after start marker
+  let endLine = -1;
+  for (let i = startLine + 1; i < lines.length; i++) {
+    if (lines[i]?.includes(end)) {
+      endLine = i;
+      break;
+    }
+  }
+
+  if (endLine === -1) {
+    return { content, count: 0 };
+  }
+
+  // Determine what to delete based on inclusive flag
+  const deleteStart = inclusive ? startLine : startLine + 1;
+  const deleteEnd = inclusive ? endLine + 1 : endLine;
+
+  // Delete the lines
+  lines.splice(deleteStart, deleteEnd - deleteStart);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply a replace-between patch operation
+ *
+ * @param content - The content to patch
+ * @param start - The start marker string
+ * @param end - The end marker string
+ * @param newContent - The replacement content
+ * @param inclusive - Whether to include the marker lines (default: true)
+ * @returns Object with patched content and count (1 if replaced, 0 if markers not found)
+ */
+export function applyReplaceBetween(
+  content: string,
+  start: string,
+  end: string,
+  newContent: string,
+  inclusive = true,
+): { content: string; count: number } {
+  const lines = content.split("\n");
+
+  // Find first occurrence of start marker
+  let startLine = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]?.includes(start)) {
+      startLine = i;
+      break;
+    }
+  }
+
+  if (startLine === -1) {
+    return { content, count: 0 };
+  }
+
+  // Find end marker after start marker
+  let endLine = -1;
+  for (let i = startLine + 1; i < lines.length; i++) {
+    if (lines[i]?.includes(end)) {
+      endLine = i;
+      break;
+    }
+  }
+
+  if (endLine === -1) {
+    return { content, count: 0 };
+  }
+
+  // Determine what to replace based on inclusive flag
+  const replaceStart = inclusive ? startLine : startLine + 1;
+  const replaceEnd = inclusive ? endLine + 1 : endLine;
+
+  // Replace the lines with new content
+  const newContentLines = newContent.split("\n");
+  lines.splice(replaceStart, replaceEnd - replaceStart, ...newContentLines);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply a replace-line patch operation
+ *
+ * @param content - The content to patch
+ * @param match - The exact line content to match
+ * @param replacement - The replacement line content
+ * @returns Object with patched content and number of lines replaced
+ */
+export function applyReplaceLine(
+  content: string,
+  match: string,
+  replacement: string,
+): { content: string; count: number } {
+  const lines = content.split("\n");
+  let count = 0;
+
+  // Replace all lines that match exactly
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === match) {
+      lines[i] = replacement;
+      count++;
+    }
+  }
+
+  return { content: lines.join("\n"), count };
+}
+
+/**
+ * Apply an insert-after-line patch operation
+ *
+ * @param content - The content to patch
+ * @param match - Exact string to match (mutually exclusive with pattern)
+ * @param pattern - Regex pattern to match (mutually exclusive with match)
+ * @param regex - Whether pattern is a regex
+ * @param insertContent - Content to insert after the matching line
+ * @returns Object with patched content and number of insertions
+ */
+export function applyInsertAfterLine(
+  content: string,
+  match: string | undefined,
+  pattern: string | undefined,
+  regex: boolean | undefined,
+  insertContent: string,
+): { content: string; count: number } {
+  const lines = content.split("\n");
+  let count = 0;
+  const result: string[] = [];
+
+  for (const line of lines) {
+    result.push(line);
+
+    // Check if this line matches
+    let isMatch = false;
+    if (match !== undefined) {
+      // Exact string matching
+      isMatch = line === match;
+    } else if (pattern !== undefined && regex) {
+      // Regex matching
+      const regexPattern = new RegExp(pattern);
+      isMatch = regexPattern.test(line);
+    }
+
+    if (isMatch) {
+      count++;
+      // Insert content after this line
+      const insertLines = insertContent.split("\n");
+      result.push(...insertLines);
+    }
+  }
+
+  return { content: result.join("\n"), count };
+}
+
+/**
+ * Apply an insert-before-line patch operation
+ *
+ * @param content - The content to patch
+ * @param match - Exact string to match (mutually exclusive with pattern)
+ * @param pattern - Regex pattern to match (mutually exclusive with match)
+ * @param regex - Whether pattern is a regex
+ * @param insertContent - Content to insert before the matching line
+ * @returns Object with patched content and number of insertions
+ */
+export function applyInsertBeforeLine(
+  content: string,
+  match: string | undefined,
+  pattern: string | undefined,
+  regex: boolean | undefined,
+  insertContent: string,
+): { content: string; count: number } {
+  const lines = content.split("\n");
+  let count = 0;
+  const result: string[] = [];
+
+  for (const line of lines) {
+    // Check if this line matches
+    let isMatch = false;
+    if (match !== undefined) {
+      // Exact string matching
+      isMatch = line === match;
+    } else if (pattern !== undefined && regex) {
+      // Regex matching
+      const regexPattern = new RegExp(pattern);
+      isMatch = regexPattern.test(line);
+    }
+
+    if (isMatch) {
+      count++;
+      // Insert content before this line
+      const insertLines = insertContent.split("\n");
+      result.push(...insertLines);
+    }
+
+    result.push(line);
+  }
+
+  return { content: result.join("\n"), count };
+}
+
+/**
  * Apply a single patch operation to content
  *
  * @param content - The content to patch
@@ -642,6 +870,38 @@ export function applySinglePatch(
 
     case "merge-frontmatter":
       result = applyMergeFrontmatter(content, patch.values);
+      break;
+
+    case "delete-between":
+      result = applyDeleteBetween(content, patch.start, patch.end, patch.inclusive);
+      break;
+
+    case "replace-between":
+      result = applyReplaceBetween(content, patch.start, patch.end, patch.content, patch.inclusive);
+      break;
+
+    case "replace-line":
+      result = applyReplaceLine(content, patch.match, patch.replacement);
+      break;
+
+    case "insert-after-line":
+      result = applyInsertAfterLine(
+        content,
+        patch.match,
+        patch.pattern,
+        patch.regex,
+        patch.content,
+      );
+      break;
+
+    case "insert-before-line":
+      result = applyInsertBeforeLine(
+        content,
+        patch.match,
+        patch.pattern,
+        patch.regex,
+        patch.content,
+      );
       break;
 
     default: {
@@ -700,6 +960,16 @@ function getPatchDescription(patch: PatchOperation): string {
       return `rename-frontmatter '${patch.old}' to '${patch.new}'`;
     case "merge-frontmatter":
       return "merge-frontmatter";
+    case "delete-between":
+      return `delete-between '${patch.start}' and '${patch.end}'`;
+    case "replace-between":
+      return `replace-between '${patch.start}' and '${patch.end}'`;
+    case "replace-line":
+      return `replace-line '${patch.match}'`;
+    case "insert-after-line":
+      return `insert-after-line ${patch.match ? `'${patch.match}'` : `pattern '${patch.pattern}'`}`;
+    case "insert-before-line":
+      return `insert-before-line ${patch.match ? `'${patch.match}'` : `pattern '${patch.pattern}'`}`;
     default:
       return "unknown patch";
   }

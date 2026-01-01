@@ -124,6 +124,75 @@ export interface MergeFrontmatterPatch extends PatchCommonFields {
 }
 
 /**
+ * Delete between markers operation - deletes content between two markers
+ */
+export interface DeleteBetweenPatch extends PatchCommonFields {
+  op: "delete-between";
+  /** Start marker string */
+  start: string;
+  /** End marker string */
+  end: string;
+  /** Whether to include the marker lines (default: true) */
+  inclusive?: boolean;
+}
+
+/**
+ * Replace between markers operation - replaces content between two markers
+ */
+export interface ReplaceBetweenPatch extends PatchCommonFields {
+  op: "replace-between";
+  /** Start marker string */
+  start: string;
+  /** End marker string */
+  end: string;
+  /** Replacement content */
+  content: string;
+  /** Whether to include the marker lines (default: true) */
+  inclusive?: boolean;
+}
+
+/**
+ * Replace line operation - replaces entire lines that match
+ */
+export interface ReplaceLinePatch extends PatchCommonFields {
+  op: "replace-line";
+  /** Exact string to match (entire line) */
+  match: string;
+  /** Replacement line content */
+  replacement: string;
+}
+
+/**
+ * Insert after line operation - inserts content after a matching line
+ */
+export interface InsertAfterLinePatch extends PatchCommonFields {
+  op: "insert-after-line";
+  /** Exact string to match (mutually exclusive with pattern) */
+  match?: string;
+  /** Regex pattern to match (mutually exclusive with match) */
+  pattern?: string;
+  /** Whether pattern is a regex (default: false) */
+  regex?: boolean;
+  /** Content to insert after the matching line */
+  content: string;
+}
+
+/**
+ * Insert before line operation - inserts content before a matching line
+ */
+export interface InsertBeforeLinePatch extends PatchCommonFields {
+  op: "insert-before-line";
+  /** Exact string to match (mutually exclusive with pattern) */
+  match?: string;
+  /** Regex pattern to match (mutually exclusive with match) */
+  pattern?: string;
+  /** Whether pattern is a regex (default: false) */
+  regex?: boolean;
+  /** Content to insert before the matching line */
+  content: string;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -136,7 +205,12 @@ export type PatchOperation =
   | SetFrontmatterPatch
   | RemoveFrontmatterPatch
   | RenameFrontmatterPatch
-  | MergeFrontmatterPatch;
+  | MergeFrontmatterPatch
+  | DeleteBetweenPatch
+  | ReplaceBetweenPatch
+  | ReplaceLinePatch
+  | InsertAfterLinePatch
+  | InsertBeforeLinePatch;
 
 /**
  * Kustomark configuration structure

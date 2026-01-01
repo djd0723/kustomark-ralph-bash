@@ -15,6 +15,11 @@ import {
   applyRemoveFrontmatter,
   applyRenameFrontmatter,
   applyMergeFrontmatter,
+  applyReplaceLine,
+  applyInsertAfterLine,
+  applyInsertBeforeLine,
+  applyDeleteBetween,
+  applyReplaceBetween,
   parseFrontmatter,
   serializeFrontmatter,
   parseSections,
@@ -906,5 +911,728 @@ Old details`;
     expect(result.content).toContain('version: \'2.0\'');
     expect(result.content).toContain('New introduction text');
     expect(result.content).toContain('Appended content');
+  });
+});
+
+describe('applyReplaceLine', () => {
+  test('replaces single matching line', () => {
+    const content = `line 1
+line 2
+line 3`;
+    const result = applyReplaceLine(content, 'line 2', 'NEW LINE');
+
+    expect(result.content).toBe(`line 1
+NEW LINE
+line 3`);
+    expect(result.count).toBe(1);
+  });
+
+  test('replaces multiple matching lines', () => {
+    const content = `foo
+bar
+foo
+baz
+foo`;
+    const result = applyReplaceLine(content, 'foo', 'replaced');
+
+    expect(result.content).toBe(`replaced
+bar
+replaced
+baz
+replaced`);
+    expect(result.count).toBe(3);
+  });
+
+  test('returns zero count when no match', () => {
+    const content = `line 1
+line 2
+line 3`;
+    const result = applyReplaceLine(content, 'nonexistent', 'new');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('handles empty content', () => {
+    const content = '';
+    const result = applyReplaceLine(content, 'anything', 'new');
+
+    expect(result.content).toBe('');
+    expect(result.count).toBe(0);
+  });
+
+  test('requires exact line match', () => {
+    const content = `partial line match
+other content`;
+    const result = applyReplaceLine(content, 'partial', 'new');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('matches lines with special characters', () => {
+    const content = `# Header
+$special = 100;
+normal line`;
+    const result = applyReplaceLine(content, '$special = 100;', '$special = 200;');
+
+    expect(result.content).toContain('$special = 200;');
+    expect(result.count).toBe(1);
+  });
+});
+
+describe('applyInsertAfterLine', () => {
+  test('inserts after single matching line with exact match', () => {
+    const content = `line 1
+line 2
+line 3`;
+    const result = applyInsertAfterLine(content, 'line 2', undefined, undefined, 'inserted');
+
+    expect(result.content).toBe(`line 1
+line 2
+inserted
+line 3`);
+    expect(result.count).toBe(1);
+  });
+
+  test('inserts after multiple matching lines with exact match', () => {
+    const content = `marker
+content
+marker
+more content`;
+    const result = applyInsertAfterLine(content, 'marker', undefined, undefined, 'new line');
+
+    expect(result.content).toBe(`marker
+new line
+content
+marker
+new line
+more content`);
+    expect(result.count).toBe(2);
+  });
+
+  test('inserts after line matching regex pattern', () => {
+    const content = `# Header 1
+content
+## Header 2
+more content`;
+    const result = applyInsertAfterLine(content, undefined, '^##\\s+', true, 'inserted after h2');
+
+    expect(result.content).toBe(`# Header 1
+content
+## Header 2
+inserted after h2
+more content`);
+    expect(result.count).toBe(1);
+  });
+
+  test('inserts after multiple lines matching regex', () => {
+    const content = `// TODO: fix this
+code here
+// TODO: review
+more code
+// TODO: test`;
+    const result = applyInsertAfterLine(
+      content,
+      undefined,
+      '// TODO:',
+      true,
+      '// PRIORITY: HIGH',
+    );
+
+    expect(result.content).toContain('// TODO: fix this\n// PRIORITY: HIGH');
+    expect(result.content).toContain('// TODO: review\n// PRIORITY: HIGH');
+    expect(result.content).toContain('// TODO: test\n// PRIORITY: HIGH');
+    expect(result.count).toBe(3);
+  });
+
+  test('returns zero count when no match with exact string', () => {
+    const content = `line 1
+line 2`;
+    const result = applyInsertAfterLine(content, 'nonexistent', undefined, undefined, 'new');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('returns zero count when no match with regex', () => {
+    const content = `line 1
+line 2`;
+    const result = applyInsertAfterLine(content, undefined, '^###', true, 'new');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('handles multi-line insertion', () => {
+    const content = `before
+marker
+after`;
+    const result = applyInsertAfterLine(content, 'marker', undefined, undefined, `line 1
+line 2
+line 3`);
+
+    expect(result.content).toBe(`before
+marker
+line 1
+line 2
+line 3
+after`);
+    expect(result.count).toBe(1);
+  });
+
+  test('handles empty content', () => {
+    const content = '';
+    const result = applyInsertAfterLine(content, 'anything', undefined, undefined, 'new');
+
+    expect(result.content).toBe('');
+    expect(result.count).toBe(0);
+  });
+
+  test('inserts with complex regex patterns', () => {
+    const content = `import React from 'react';
+import { useState } from 'react';
+const Component = () => {};`;
+    const result = applyInsertAfterLine(
+      content,
+      undefined,
+      "^import React from ['\"]react['\"];$",
+      true,
+      "import { useEffect } from 'react';",
+    );
+
+    expect(result.count).toBe(1);
+    expect(result.content).toContain("import React from 'react';\nimport { useEffect } from 'react';");
+  });
+});
+
+describe('applyInsertBeforeLine', () => {
+  test('inserts before single matching line with exact match', () => {
+    const content = `line 1
+line 2
+line 3`;
+    const result = applyInsertBeforeLine(content, 'line 2', undefined, undefined, 'inserted');
+
+    expect(result.content).toBe(`line 1
+inserted
+line 2
+line 3`);
+    expect(result.count).toBe(1);
+  });
+
+  test('inserts before multiple matching lines with exact match', () => {
+    const content = `marker
+content
+marker
+more content`;
+    const result = applyInsertBeforeLine(content, 'marker', undefined, undefined, 'before marker');
+
+    expect(result.content).toBe(`before marker
+marker
+content
+before marker
+marker
+more content`);
+    expect(result.count).toBe(2);
+  });
+
+  test('inserts before line matching regex pattern', () => {
+    const content = `# Header 1
+content
+## Header 2
+more content`;
+    const result = applyInsertBeforeLine(content, undefined, '^##\\s+', true, 'before h2');
+
+    expect(result.content).toBe(`# Header 1
+content
+before h2
+## Header 2
+more content`);
+    expect(result.count).toBe(1);
+  });
+
+  test('inserts before multiple lines matching regex', () => {
+    const content = `export function a() {}
+export function b() {}
+function helper() {}
+export function c() {}`;
+    const result = applyInsertBeforeLine(content, undefined, '^export function', true, '// Exported');
+
+    expect(result.content).toContain('// Exported\nexport function a()');
+    expect(result.content).toContain('// Exported\nexport function b()');
+    expect(result.content).toContain('// Exported\nexport function c()');
+    expect(result.count).toBe(3);
+  });
+
+  test('returns zero count when no match with exact string', () => {
+    const content = `line 1
+line 2`;
+    const result = applyInsertBeforeLine(content, 'nonexistent', undefined, undefined, 'new');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('returns zero count when no match with regex', () => {
+    const content = `line 1
+line 2`;
+    const result = applyInsertBeforeLine(content, undefined, '^###', true, 'new');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('handles multi-line insertion', () => {
+    const content = `before
+marker
+after`;
+    const result = applyInsertBeforeLine(content, 'marker', undefined, undefined, `line 1
+line 2
+line 3`);
+
+    expect(result.content).toBe(`before
+line 1
+line 2
+line 3
+marker
+after`);
+    expect(result.count).toBe(1);
+  });
+
+  test('handles empty content', () => {
+    const content = '';
+    const result = applyInsertBeforeLine(content, 'anything', undefined, undefined, 'new');
+
+    expect(result.content).toBe('');
+    expect(result.count).toBe(0);
+  });
+
+  test('inserts at beginning of file', () => {
+    const content = `first line
+second line`;
+    const result = applyInsertBeforeLine(content, 'first line', undefined, undefined, 'new first');
+
+    expect(result.content).toBe(`new first
+first line
+second line`);
+    expect(result.count).toBe(1);
+  });
+});
+
+describe('applyDeleteBetween', () => {
+  test('deletes between markers with inclusive=true (default)', () => {
+    const content = `line 1
+<!-- START -->
+delete this
+and this
+<!-- END -->
+line 2`;
+    const result = applyDeleteBetween(content, '<!-- START -->', '<!-- END -->', true);
+
+    expect(result.content).toBe(`line 1
+line 2`);
+    expect(result.count).toBe(1);
+  });
+
+  test('deletes between markers with inclusive=false', () => {
+    const content = `line 1
+<!-- START -->
+delete this
+and this
+<!-- END -->
+line 2`;
+    const result = applyDeleteBetween(content, '<!-- START -->', '<!-- END -->', false);
+
+    expect(result.content).toBe(`line 1
+<!-- START -->
+<!-- END -->
+line 2`);
+    expect(result.count).toBe(1);
+  });
+
+  test('deletes only first occurrence', () => {
+    const content = `<!-- START -->
+first block
+<!-- END -->
+keep this
+<!-- START -->
+second block
+<!-- END -->`;
+    const result = applyDeleteBetween(content, '<!-- START -->', '<!-- END -->', true);
+
+    expect(result.content).not.toContain('first block');
+    expect(result.content).toContain('second block');
+    expect(result.count).toBe(1);
+  });
+
+  test('returns zero count when start marker not found', () => {
+    const content = `line 1
+<!-- END -->
+line 2`;
+    const result = applyDeleteBetween(content, '<!-- START -->', '<!-- END -->');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('returns zero count when end marker not found', () => {
+    const content = `line 1
+<!-- START -->
+line 2`;
+    const result = applyDeleteBetween(content, '<!-- START -->', '<!-- END -->');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('handles partial string matches in markers', () => {
+    const content = `before
+marker-start-here
+content to delete
+marker-end-here
+after`;
+    const result = applyDeleteBetween(content, 'start', 'end', true);
+
+    expect(result.content).toBe(`before
+after`);
+    expect(result.count).toBe(1);
+  });
+
+  test('handles empty content between markers with inclusive=true', () => {
+    const content = `line 1
+<!-- START -->
+<!-- END -->
+line 2`;
+    const result = applyDeleteBetween(content, '<!-- START -->', '<!-- END -->', true);
+
+    expect(result.content).toBe(`line 1
+line 2`);
+    expect(result.count).toBe(1);
+  });
+
+  test('handles empty content between markers with inclusive=false', () => {
+    const content = `line 1
+<!-- START -->
+<!-- END -->
+line 2`;
+    const result = applyDeleteBetween(content, '<!-- START -->', '<!-- END -->', false);
+
+    expect(result.content).toBe(`line 1
+<!-- START -->
+<!-- END -->
+line 2`);
+    expect(result.count).toBe(1);
+  });
+
+  test('handles adjacent markers', () => {
+    const content = `before
+start-marker
+end-marker
+after`;
+    const result = applyDeleteBetween(content, 'start-marker', 'end-marker', true);
+
+    expect(result.content).toBe(`before
+after`);
+    expect(result.count).toBe(1);
+  });
+});
+
+describe('applyReplaceBetween', () => {
+  test('replaces between markers with inclusive=true (default)', () => {
+    const content = `line 1
+<!-- START -->
+old content
+more old
+<!-- END -->
+line 2`;
+    const result = applyReplaceBetween(
+      content,
+      '<!-- START -->',
+      '<!-- END -->',
+      'NEW CONTENT',
+      true,
+    );
+
+    expect(result.content).toBe(`line 1
+NEW CONTENT
+line 2`);
+    expect(result.count).toBe(1);
+  });
+
+  test('replaces between markers with inclusive=false', () => {
+    const content = `line 1
+<!-- START -->
+old content
+more old
+<!-- END -->
+line 2`;
+    const result = applyReplaceBetween(
+      content,
+      '<!-- START -->',
+      '<!-- END -->',
+      'NEW CONTENT',
+      false,
+    );
+
+    expect(result.content).toBe(`line 1
+<!-- START -->
+NEW CONTENT
+<!-- END -->
+line 2`);
+    expect(result.count).toBe(1);
+  });
+
+  test('replaces with multi-line content', () => {
+    const content = `before
+<!-- START -->
+old
+<!-- END -->
+after`;
+    const result = applyReplaceBetween(
+      content,
+      '<!-- START -->',
+      '<!-- END -->',
+      `line 1
+line 2
+line 3`,
+      true,
+    );
+
+    expect(result.content).toBe(`before
+line 1
+line 2
+line 3
+after`);
+    expect(result.count).toBe(1);
+  });
+
+  test('replaces only first occurrence', () => {
+    const content = `<!-- START -->
+first
+<!-- END -->
+middle
+<!-- START -->
+second
+<!-- END -->`;
+    const result = applyReplaceBetween(content, '<!-- START -->', '<!-- END -->', 'REPLACED', true);
+
+    expect(result.content).toBe(`REPLACED
+middle
+<!-- START -->
+second
+<!-- END -->`);
+    expect(result.count).toBe(1);
+  });
+
+  test('returns zero count when start marker not found', () => {
+    const content = `line 1
+<!-- END -->
+line 2`;
+    const result = applyReplaceBetween(content, '<!-- START -->', '<!-- END -->', 'new');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('returns zero count when end marker not found', () => {
+    const content = `line 1
+<!-- START -->
+line 2`;
+    const result = applyReplaceBetween(content, '<!-- START -->', '<!-- END -->', 'new');
+
+    expect(result.content).toBe(content);
+    expect(result.count).toBe(0);
+  });
+
+  test('handles partial string matches in markers', () => {
+    const content = `before
+marker-start-here
+old content
+marker-end-here
+after`;
+    const result = applyReplaceBetween(content, 'start', 'end', 'REPLACED', true);
+
+    expect(result.content).toBe(`before
+REPLACED
+after`);
+    expect(result.count).toBe(1);
+  });
+
+  test('replaces empty region with content', () => {
+    const content = `line 1
+<!-- START -->
+<!-- END -->
+line 2`;
+    const result = applyReplaceBetween(
+      content,
+      '<!-- START -->',
+      '<!-- END -->',
+      'NEW CONTENT',
+      true,
+    );
+
+    expect(result.content).toBe(`line 1
+NEW CONTENT
+line 2`);
+    expect(result.count).toBe(1);
+  });
+
+  test('replaces with empty string', () => {
+    const content = `line 1
+<!-- START -->
+delete this
+<!-- END -->
+line 2`;
+    const result = applyReplaceBetween(content, '<!-- START -->', '<!-- END -->', '', true);
+
+    expect(result.content).toBe(`line 1
+
+line 2`);
+    expect(result.count).toBe(1);
+  });
+
+  test('handles adjacent markers with inclusive=false', () => {
+    const content = `before
+start
+end
+after`;
+    const result = applyReplaceBetween(content, 'start', 'end', 'MIDDLE', false);
+
+    expect(result.content).toBe(`before
+start
+MIDDLE
+end
+after`);
+    expect(result.count).toBe(1);
+  });
+});
+
+describe('line operations with applyPatches', () => {
+  test('applies multiple line operations in sequence', () => {
+    const content = `line 1
+line 2
+line 3
+line 4`;
+
+    const patches: PatchOperation[] = [
+      { op: 'replace-line', match: 'line 2', replacement: 'REPLACED' },
+      { op: 'insert-after-line', match: 'line 3', content: 'inserted after 3' },
+      { op: 'insert-before-line', match: 'line 4', content: 'inserted before 4' },
+    ];
+
+    const result = applyPatches(content, patches);
+
+    expect(result.applied).toBe(3);
+    expect(result.content).toContain('REPLACED');
+    expect(result.content).toContain('inserted after 3');
+    expect(result.content).toContain('inserted before 4');
+  });
+
+  test('generates warning for no match with onNoMatch=warn', () => {
+    const content = `line 1
+line 2`;
+
+    const patches: PatchOperation[] = [
+      { op: 'replace-line', match: 'nonexistent', replacement: 'new' },
+    ];
+
+    const result = applyPatches(content, patches, 'warn');
+
+    expect(result.applied).toBe(0);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('matched 0 times');
+  });
+
+  test('throws error for no match with onNoMatch=error', () => {
+    const content = `line 1
+line 2`;
+
+    const patches: PatchOperation[] = [
+      { op: 'insert-after-line', match: 'nonexistent', content: 'new' },
+    ];
+
+    expect(() => applyPatches(content, patches, 'error')).toThrow('matched 0 times');
+  });
+
+  test('skips non-matching operations with onNoMatch=skip', () => {
+    const content = `line 1
+line 2`;
+
+    const patches: PatchOperation[] = [
+      { op: 'replace-line', match: 'nonexistent', replacement: 'new', onNoMatch: 'skip' },
+      { op: 'replace-line', match: 'line 2', replacement: 'REPLACED' },
+    ];
+
+    const result = applyPatches(content, patches, 'warn');
+
+    expect(result.applied).toBe(1);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.content).toContain('REPLACED');
+  });
+
+  test('applies delete-between and replace-between operations', () => {
+    const content = `keep
+<!-- DELETE START -->
+remove this
+<!-- DELETE END -->
+also keep
+<!-- REPLACE START -->
+replace this
+<!-- REPLACE END -->
+final`;
+
+    const patches: PatchOperation[] = [
+      { op: 'delete-between', start: '<!-- DELETE START -->', end: '<!-- DELETE END -->' },
+      {
+        op: 'replace-between',
+        start: '<!-- REPLACE START -->',
+        end: '<!-- REPLACE END -->',
+        content: 'REPLACED',
+      },
+    ];
+
+    const result = applyPatches(content, patches);
+
+    expect(result.applied).toBe(2);
+    expect(result.content).not.toContain('remove this');
+    expect(result.content).toContain('REPLACED');
+    expect(result.content).not.toContain('replace this');
+  });
+
+  test('combines line operations with section operations', () => {
+    const content = `# Section 1
+content
+marker-line
+# Section 2
+more content`;
+
+    const patches: PatchOperation[] = [
+      { op: 'insert-after-line', match: 'marker-line', content: 'inserted line' },
+      { op: 'append-to-section', id: 'section-2', content: '\nappended to section' },
+    ];
+
+    const result = applyPatches(content, patches);
+
+    expect(result.applied).toBe(2);
+    expect(result.content).toContain('marker-line\ninserted line');
+    expect(result.content).toContain('appended to section');
+  });
+
+  test('respects per-operation onNoMatch override', () => {
+    const content = `line 1
+line 2`;
+
+    const patches: PatchOperation[] = [
+      { op: 'replace-line', match: 'missing1', replacement: 'x', onNoMatch: 'skip' },
+      { op: 'replace-line', match: 'missing2', replacement: 'y', onNoMatch: 'warn' },
+      { op: 'replace-line', match: 'line 2', replacement: 'REPLACED' },
+    ];
+
+    const result = applyPatches(content, patches, 'error');
+
+    expect(result.applied).toBe(1);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('missing2');
+    expect(result.content).toContain('REPLACED');
   });
 });

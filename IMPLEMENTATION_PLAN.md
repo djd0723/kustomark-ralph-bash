@@ -1,6 +1,6 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 In Progress (Frontmatter ✅)
+## Status: M1 Complete ✅ | M2 In Progress (Frontmatter ✅, Line Ops ✅)
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
@@ -83,14 +83,14 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Comprehensive unit tests (244 tests passing)
    - ✅ Type safety with `unknown` instead of `any`
 
-2. **[TODO] Line Operations**
-   - ⏳ Implement `insert-after-line` operation
-   - ⏳ Implement `insert-before-line` operation
-   - ⏳ Implement `replace-line` operation
-   - ⏳ Implement `delete-between` operation
-   - ⏳ Implement `replace-between` operation
-   - ⏳ Support regex matching for line operations
-   - ⏳ Unit tests for line operations
+2. **[DONE] Line Operations** ✅
+   - ✅ Implement `insert-after-line` operation with exact and regex matching
+   - ✅ Implement `insert-before-line` operation with exact and regex matching
+   - ✅ Implement `replace-line` operation
+   - ✅ Implement `delete-between` operation with inclusive/exclusive modes
+   - ✅ Implement `replace-between` operation with inclusive/exclusive modes
+   - ✅ Support regex matching for insert operations
+   - ✅ Comprehensive unit tests (50 new tests, 294 total tests passing)
 
 3. **[TODO] Additional Section Operations**
    - ⏳ Implement `rename-header` operation
@@ -143,4 +143,12 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ Comprehensive test coverage (244 tests passing, up from 154)
 - ✅ All linting checks passing
 
-**Next Priority:** M2 Line Operations - insert-after/before-line, replace-line, delete/replace-between
+**2026-01-01 (M2 Line Operations):**
+- ✅ All 5 line operations implemented (insert-after-line, insert-before-line, replace-line, delete-between, replace-between)
+- ✅ Support for both exact string matching and regex patterns
+- ✅ Inclusive/exclusive modes for delete/replace-between operations
+- ✅ 50 comprehensive unit tests added (294 total tests passing, up from 244)
+- ✅ Full integration with onNoMatch strategy system
+- ✅ All linting and tests passing
+
+**Next Priority:** M2 Additional Section Operations - rename-header, move-section, change-section-level
