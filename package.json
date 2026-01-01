@@ -1,0 +1,31 @@
+{
+  "name": "kustomark",
+  "version": "0.1.0",
+  "description": "Declarative markdown patching pipeline. Like kustomize, but for markdown.",
+  "type": "module",
+  "bin": {
+    "kustomark": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "bun build src/cli/index.ts --outdir dist/cli --target node --minify && chmod +x dist/cli/index.js",
+    "check": "tsc --noEmit && biome check src",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "lint": "biome check src",
+    "lint:fix": "biome check --write src",
+    "format": "biome format --write src"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest",
+    "@types/js-yaml": "^4.0.9",
+    "@types/micromatch": "^4.0.9"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "micromatch": "^4.0.8"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
