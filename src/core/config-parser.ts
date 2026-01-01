@@ -8,6 +8,7 @@ import type {
   OnNoMatchStrategy,
   ValidationError,
   ValidationResult,
+  ValidationWarning,
 } from "./types.js";
 
 /**
@@ -44,7 +45,7 @@ export function parseConfig(yamlContent: string): KustomarkConfig {
  */
 export function validateConfig(config: KustomarkConfig): ValidationResult {
   const errors: ValidationError[] = [];
-  const warnings: string[] = [];
+  const warnings: ValidationWarning[] = [];
 
   // Validate apiVersion
   if (!config.apiVersion) {

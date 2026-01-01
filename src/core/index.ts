@@ -30,6 +30,7 @@ export {
 export type {
   OnNoMatchStrategy,
   PatchCommonFields,
+  PatchValidation,
   ReplacePatch,
   ReplaceRegexPatch,
   RemoveSectionPatch,
@@ -41,8 +42,10 @@ export type {
   RenameFrontmatterPatch,
   MergeFrontmatterPatch,
   PatchOperation,
+  Validator,
   KustomarkConfig,
   ValidationError,
+  ValidationWarning,
   ValidationResult,
   PatchResult,
   MarkdownSection,
@@ -78,3 +81,11 @@ export {
   deleteNestedValue,
   type FrontmatterResult,
 } from "./frontmatter-parser.js";
+
+// Export validator functions
+export {
+  validateNotContains,
+  validateFrontmatterRequired,
+  runValidator,
+  runValidators,
+} from "./validators.js";

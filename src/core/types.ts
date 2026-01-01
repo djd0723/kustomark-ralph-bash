@@ -8,6 +8,14 @@
 export type OnNoMatchStrategy = "skip" | "warn" | "error";
 
 /**
+ * Per-patch validation configuration
+ */
+export interface PatchValidation {
+  /** Validate that the result does not contain this string */
+  notContains?: string;
+}
+
+/**
  * Common fields shared by all patch operations
  */
 export interface PatchCommonFields {
@@ -17,6 +25,8 @@ export interface PatchCommonFields {
   exclude?: string | string[];
   /** Override the default onNoMatch behavior for this patch */
   onNoMatch?: OnNoMatchStrategy;
+  /** Per-patch validation rules */
+  validate?: PatchValidation;
 }
 
 /**
@@ -249,6 +259,18 @@ export type PatchOperation =
   | ChangeSectionLevelPatch;
 
 /**
+ * Global validator configuration
+ */
+export interface Validator {
+  /** Unique name for this validator */
+  name: string;
+  /** Validate that content does not contain this string */
+  notContains?: string;
+  /** Validate that frontmatter has these required fields */
+  frontmatterRequired?: string[];
+}
+
+/**
  * Kustomark configuration structure
  */
 export interface KustomarkConfig {
@@ -264,6 +286,8 @@ export interface KustomarkConfig {
   patches?: PatchOperation[];
   /** Default strategy for patches that don't match */
   onNoMatch?: OnNoMatchStrategy;
+  /** Global validators to run on all resources */
+  validators?: Validator[];
 }
 
 /**
@@ -271,8 +295,26 @@ export interface KustomarkConfig {
  */
 export interface ValidationError {
   /** Field path where the error occurred */
-  field: string;
+  field?: string;
+  /** File path where the error occurred (for resource validation) */
+  file?: string;
+  /** Validator name that triggered the error (for global validators) */
+  validator?: string;
   /** Error message */
+  message: string;
+}
+
+/**
+ * Validation warning details
+ */
+export interface ValidationWarning {
+  /** Field path where the warning occurred */
+  field?: string;
+  /** File path where the warning occurred (for resource validation) */
+  file?: string;
+  /** Validator name that triggered the warning (for global validators) */
+  validator?: string;
+  /** Warning message */
   message: string;
 }
 
@@ -285,7 +327,7 @@ export interface ValidationResult {
   /** List of validation errors */
   errors: ValidationError[];
   /** List of warnings (non-fatal issues) */
-  warnings: string[];
+  warnings: ValidationWarning[];
 }
 
 /**
@@ -298,6 +340,8 @@ export interface PatchResult {
   applied: number;
   /** Warnings from patches with onNoMatch=warn that had no matches */
   warnings: string[];
+  /** Validation errors from per-patch validation */
+  validationErrors: ValidationError[];
 }
 
 /**

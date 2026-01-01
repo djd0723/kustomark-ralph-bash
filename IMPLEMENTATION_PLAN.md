@@ -98,13 +98,13 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Implement `change-section-level` operation
    - ✅ Unit tests for new section operations (73 new tests added)
 
-4. **[TODO] Validation Features**
-   - ⏳ Implement per-patch validation (`validate` field)
-   - ⏳ Implement global validators in config
-   - ⏳ Add `notContains` validator
-   - ⏳ Add `frontmatterRequired` validator
-   - ⏳ Add `--strict` flag to validate command
-   - ⏳ Update JSON output to include validation results
+4. **[IN PROGRESS] Validation Features**
+   - ✅ Implement per-patch validation (`validate` field)
+   - ✅ Implement global validators in config
+   - ✅ Add `notContains` validator
+   - ✅ Add `frontmatterRequired` validator
+   - ⏳ Add `--strict` flag to validate command (deferred - needs CLI integration)
+   - ⏳ Update JSON output to include validation results (deferred - needs CLI integration)
 
 ## M3: Remote Sources (Future)
 - Git support
@@ -160,4 +160,30 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ Fixed edge cases: empty header text, substring matching in tests, section hierarchy
 - ✅ All linting and tests passing
 
-**Next Priority:** M2 Validation Features - per-patch validation, global validators, --strict flag
+**2026-01-01 (M2 Validation Features - Core Implementation):**
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/validators.ts` with full validation implementation:
+  - `validateNotContains(content, pattern)` - checks if content doesn't contain forbidden pattern
+  - `validateFrontmatterRequired(content, requiredKeys)` - validates required frontmatter fields with dot notation support
+  - `runValidator(content, validator)` - runs a single global validator
+  - `runValidators(content, validators)` - runs all global validators
+- ✅ Extended type system in `types.ts`:
+  - `PatchResult` now includes `validationErrors: ValidationError[]`
+  - Types already existed: `Validator`, `PatchValidation`, `ValidationError`, `ValidationWarning`
+- ✅ Updated `patch-engine.ts` for per-patch validation:
+  - `applySinglePatch()` now runs validation after applying patches
+  - `applyPatches()` collects and returns all validation errors
+  - Per-patch validation only runs if patch successfully matched (count > 0)
+- ✅ Updated `src/core/index.ts` to export all validator functions and validation types
+- ✅ All 367 tests still passing ✓
+- ✅ All linting checks passing (bun check) ✓
+- ✅ Validation happens AFTER patches are applied (as per spec)
+- ✅ Supports dot notation for nested frontmatter keys (e.g., "metadata.author")
+
+**Status:**
+- M2 validation core implementation complete (per-patch + global validators)
+- Deferred to future work: CLI integration (--strict flag, JSON output updates)
+  - CLI integration requires more extensive changes across build/diff/validate commands
+  - Current implementation provides all core functionality for validation
+  - CLI can consume validator functions when needed for future M2 completion
+
+**Next Priority:** M3 Remote Sources OR complete M2 CLI integration

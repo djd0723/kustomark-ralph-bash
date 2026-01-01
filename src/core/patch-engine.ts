@@ -10,7 +10,14 @@
  */
 
 import * as yaml from "js-yaml";
-import type { MarkdownSection, OnNoMatchStrategy, PatchOperation, PatchResult } from "./types.js";
+import type {
+  MarkdownSection,
+  OnNoMatchStrategy,
+  PatchOperation,
+  PatchResult,
+  ValidationError,
+} from "./types.js";
+import { validateNotContains } from "./validators.js";
 
 /**
  * Parse markdown content to find all sections with their boundaries
@@ -979,13 +986,13 @@ export function applyChangeSectionLevel(
  * @param content - The content to patch
  * @param patch - The patch operation to apply
  * @param defaultOnNoMatch - Default behavior when patch doesn't match
- * @returns Object with patched content, count, and optional warning
+ * @returns Object with patched content, count, optional warning, and validation errors
  */
 export function applySinglePatch(
   content: string,
   patch: PatchOperation,
   defaultOnNoMatch: OnNoMatchStrategy = "warn",
-): { content: string; count: number; warning?: string } {
+): { content: string; count: number; warning?: string; validationErrors: ValidationError[] } {
   const onNoMatch = patch.onNoMatch ?? defaultOnNoMatch;
   let result: { content: string; count: number };
 
@@ -1095,10 +1102,28 @@ export function applySinglePatch(
     // 'skip' - no warning or error
   }
 
+  // Run per-patch validation if specified
+  const validationErrors: ValidationError[] = [];
+  if (patch.validate && result.count > 0) {
+    // Only validate if the patch was actually applied
+    const patchDesc = getPatchDescription(patch);
+
+    // Check notContains validation
+    if (patch.validate.notContains !== undefined) {
+      const isValid = validateNotContains(result.content, patch.validate.notContains);
+      if (!isValid) {
+        validationErrors.push({
+          message: `Patch '${patchDesc}' validation failed: content contains forbidden pattern '${patch.validate.notContains}'`,
+        });
+      }
+    }
+  }
+
   return {
     content: result.content,
     count: result.count,
     warning,
+    validationErrors,
   };
 }
 
@@ -1155,12 +1180,12 @@ function getPatchDescription(patch: PatchOperation): string {
  * Apply multiple patches to content in order
  *
  * Patches are applied sequentially, with each patch operating on the result
- * of the previous patch.
+ * of the previous patch. Validation happens after each patch is applied.
  *
  * @param content - The content to patch
  * @param patches - Array of patch operations to apply
  * @param defaultOnNoMatch - Default behavior when patches don't match (default: 'warn')
- * @returns PatchResult with patched content, count of applied patches, and warnings
+ * @returns PatchResult with patched content, count of applied patches, warnings, and validation errors
  */
 export function applyPatches(
   content: string,
@@ -1170,6 +1195,7 @@ export function applyPatches(
   let currentContent = content;
   let appliedCount = 0;
   const warnings: string[] = [];
+  const validationErrors: ValidationError[] = [];
 
   for (const patch of patches) {
     const result = applySinglePatch(currentContent, patch, defaultOnNoMatch);
@@ -1182,11 +1208,17 @@ export function applyPatches(
     if (result.warning) {
       warnings.push(result.warning);
     }
+
+    // Collect validation errors from per-patch validation
+    if (result.validationErrors.length > 0) {
+      validationErrors.push(...result.validationErrors);
+    }
   }
 
   return {
     content: currentContent,
     applied: appliedCount,
     warnings,
+    validationErrors,
   };
 }
