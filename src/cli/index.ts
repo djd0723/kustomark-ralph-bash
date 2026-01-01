@@ -156,7 +156,7 @@ function resolveResources(config: KustomarkConfig, basePath: string): Map<string
   for (const resource of resolvedResources) {
     const normalizedPath = normalize(resource.path);
     // Extract just the filename
-    const parts = normalizedPath.split('/');
+    const parts = normalizedPath.split("/");
     const filename = parts[parts.length - 1] || normalizedPath;
 
     resultMap.set(filename, resource.content);
