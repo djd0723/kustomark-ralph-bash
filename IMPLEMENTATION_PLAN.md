@@ -1,6 +1,6 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 In Progress (Frontmatter ✅, Line Ops ✅)
+## Status: M1 Complete ✅ | M2 Complete ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
@@ -98,13 +98,13 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Implement `change-section-level` operation
    - ✅ Unit tests for new section operations (73 new tests added)
 
-4. **[IN PROGRESS] Validation Features**
+4. **[DONE] Validation Features** ✅
    - ✅ Implement per-patch validation (`validate` field)
    - ✅ Implement global validators in config
    - ✅ Add `notContains` validator
    - ✅ Add `frontmatterRequired` validator
-   - ⏳ Add `--strict` flag to validate command (deferred - needs CLI integration)
-   - ⏳ Update JSON output to include validation results (deferred - needs CLI integration)
+   - ✅ Add `--strict` flag to validate command
+   - ✅ Update JSON output to include validation results in all commands
 
 ## M3: Remote Sources (Future)
 - Git support
@@ -179,11 +179,42 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ Validation happens AFTER patches are applied (as per spec)
 - ✅ Supports dot notation for nested frontmatter keys (e.g., "metadata.author")
 
-**Status:**
-- M2 validation core implementation complete (per-patch + global validators)
-- Deferred to future work: CLI integration (--strict flag, JSON output updates)
-  - CLI integration requires more extensive changes across build/diff/validate commands
-  - Current implementation provides all core functionality for validation
-  - CLI can consume validator functions when needed for future M2 completion
+**2026-01-01 (M2 Validation Features - CLI Integration Complete):**
+- ✅ Added `--strict` flag to CLI argument parser (added to CLIOptions interface)
+- ✅ Implemented `--strict` flag behavior in validate command:
+  - Treats warnings as errors when strict mode is enabled
+  - JSON output includes `"strict"` field in all responses
+  - Text output clearly indicates when strict mode caused validation to fail
+- ✅ Integrated validation errors into build command:
+  - Collects per-patch validation errors from patch engine
+  - Runs global validators on all patched files
+  - Includes `validationErrors` field in JSON output (BuildResult interface)
+  - Displays validation errors in text output with file location, validator name, and message
+  - Build succeeds (exit 0) even with validation errors - they're informational
+- ✅ Integrated validation errors into diff command:
+  - Collects per-patch validation errors from patch engine
+  - Runs global validators on all patched files
+  - Includes `validationErrors` field in JSON output (DiffResult interface)
+  - Displays validation errors in text output after diff summary
+  - Exit code unaffected by validation errors (only based on changes)
+- ✅ Comprehensive integration tests (34 new tests, 401 total tests passing):
+  - Per-patch validation with notContains
+  - Global validators with notContains and frontmatterRequired
+  - JSON output validation for all commands
+  - Text output validation display
+  - --strict flag behavior in validate command
+  - Validation errors don't affect build/diff exit codes
+  - File context preservation in error messages
+  - Mixed per-patch and global validation scenarios
+- ✅ All linting checks passing (bun check) ✓
+- ✅ Type-safe implementation (no `any` types, proper ValidationError typing)
 
-**Next Priority:** M3 Remote Sources OR complete M2 CLI integration
+**Status:**
+- **M2 COMPLETE! ✅** All validation features fully implemented and integrated into CLI
+  - Per-patch validation with `validate` field
+  - Global validators in config (notContains, frontmatterRequired)
+  - CLI integration with --strict flag
+  - Validation errors in JSON and text output for all commands
+  - 401 tests passing with comprehensive validation test coverage
+
+**Next Priority:** M3 Remote Sources (Git, HTTP, caching, lock files)

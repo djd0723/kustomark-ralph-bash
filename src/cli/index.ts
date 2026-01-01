@@ -27,8 +27,10 @@ import type {
   KustomarkConfig,
   OnNoMatchStrategy,
   PatchOperation,
+  ValidationError,
   ValidationResult,
 } from "../core/types.js";
+import { runValidators } from "../core/validators.js";
 
 // ============================================================================
 // Types
@@ -37,6 +39,7 @@ import type {
 interface CLIOptions {
   format: "text" | "json";
   clean: boolean;
+  strict: boolean;
   verbosity: number; // 0=quiet, 1=normal, 2=-v, 3=-vv, 4=-vvv
 }
 
@@ -45,6 +48,7 @@ interface BuildResult {
   filesWritten: number;
   patchesApplied: number;
   warnings: string[];
+  validationErrors: ValidationError[];
 }
 
 interface DiffResult {
@@ -54,6 +58,7 @@ interface DiffResult {
     status: "added" | "modified" | "deleted";
     diff?: string;
   }>;
+  validationErrors: ValidationError[];
 }
 
 // ============================================================================
@@ -66,6 +71,7 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
   const options: CLIOptions = {
     format: "text",
     clean: false,
+    strict: false,
     verbosity: 1,
   };
 
@@ -97,6 +103,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       }
     } else if (arg === "--clean") {
       options.clean = true;
+    } else if (arg === "--strict") {
+      options.strict = true;
     } else if (arg === "-q") {
       options.verbosity = 0;
     } else if (arg === "-vvv") {
@@ -172,10 +180,16 @@ function applyPatches(
   resources: Map<string, string>,
   patches: PatchOperation[],
   onNoMatch: OnNoMatchStrategy,
-): { resources: Map<string, string>; patchesApplied: number; warnings: string[] } {
+): {
+  resources: Map<string, string>;
+  patchesApplied: number;
+  warnings: string[];
+  validationErrors: ValidationError[];
+} {
   const patchedResources = new Map<string, string>();
   let totalPatchesApplied = 0;
   const allWarnings: string[] = [];
+  const allValidationErrors: ValidationError[] = [];
 
   // Apply patches to each file
   for (const [filePath, content] of resources.entries()) {
@@ -193,12 +207,21 @@ function applyPatches(
     patchedResources.set(filePath, result.content);
     totalPatchesApplied += result.applied;
     allWarnings.push(...result.warnings);
+
+    // Collect validation errors from per-patch validation
+    for (const error of result.validationErrors) {
+      allValidationErrors.push({
+        ...error,
+        file: filePath,
+      });
+    }
   }
 
   return {
     resources: patchedResources,
     patchesApplied: totalPatchesApplied,
     warnings: allWarnings,
+    validationErrors: allValidationErrors,
   };
 }
 
@@ -261,6 +284,7 @@ function generateDiff(
   return {
     hasChanges: result.hasChanges,
     files: result.files,
+    validationErrors: [],
   };
 }
 
@@ -400,6 +424,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
               filesWritten: 0,
               patchesApplied: 0,
               warnings: [],
+              validationErrors: [],
               errors: validation.errors,
             },
             null,
@@ -425,7 +450,24 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       resources: patchedResources,
       patchesApplied,
       warnings,
+      validationErrors: patchValidationErrors,
     } = applyPatches(resources, config.patches || [], config.onNoMatch || "warn");
+
+    // Collect all validation errors (from patches and global validators)
+    const allValidationErrors: ValidationError[] = [...patchValidationErrors];
+
+    // Run global validators on each patched file
+    if (config.validators && config.validators.length > 0) {
+      for (const [filePath, content] of patchedResources.entries()) {
+        const errors = runValidators(content, config.validators);
+        for (const error of errors) {
+          allValidationErrors.push({
+            ...error,
+            file: filePath,
+          });
+        }
+      }
+    }
 
     // Write output files
     const outputDir = resolve(basePath, config.output ?? ".");
@@ -458,6 +500,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       filesWritten,
       patchesApplied,
       warnings,
+      validationErrors: allValidationErrors,
     };
 
     if (options.format === "json") {
@@ -469,6 +512,15 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           console.log("\nWarnings:");
           for (const warning of warnings) {
             console.log(`  ${warning}`);
+          }
+        }
+        if (allValidationErrors.length > 0) {
+          console.error("\nValidation Errors:");
+          for (const error of allValidationErrors) {
+            const location = error.file ? `${error.file}` : "";
+            const validator = error.validator ? `[${error.validator}]` : "";
+            const field = error.field ? `(${error.field})` : "";
+            console.error(`  Error in ${location}${validator}${field}: ${error.message}`);
           }
         }
       }
@@ -484,6 +536,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
             filesWritten: 0,
             patchesApplied: 0,
             warnings: [],
+            validationErrors: [],
             error: error instanceof Error ? error.message : String(error),
           },
           null,
@@ -521,6 +574,7 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
             {
               hasChanges: false,
               files: [],
+              validationErrors: [],
               errors: validation.errors,
             },
             null,
@@ -542,15 +596,34 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
 
     // Apply patches
     log("Applying patches...", 2, options);
-    const { resources: patchedResources } = applyPatches(
+    const { resources: patchedResources, validationErrors: patchValidationErrors } = applyPatches(
       originalResources,
       config.patches || [],
       config.onNoMatch || "warn",
     );
 
+    // Collect all validation errors (from patches and global validators)
+    const allValidationErrors: ValidationError[] = [...patchValidationErrors];
+
+    // Run global validators on each patched file
+    if (config.validators && config.validators.length > 0) {
+      for (const [filePath, content] of patchedResources.entries()) {
+        const errors = runValidators(content, config.validators);
+        for (const error of errors) {
+          allValidationErrors.push({
+            ...error,
+            file: filePath,
+          });
+        }
+      }
+    }
+
     // Generate diff
     const outputDir = config.output ? resolve(basePath, config.output) : basePath;
     const diffResult = generateDiff(originalResources, patchedResources, outputDir, basePath);
+
+    // Add validation errors to diff result
+    diffResult.validationErrors = allValidationErrors;
 
     // Output results
     if (options.format === "json") {
@@ -570,6 +643,17 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
           console.log("No changes");
         }
       }
+
+      // Show validation errors after diff summary
+      if (allValidationErrors.length > 0) {
+        console.log("\nValidation Errors:");
+        for (const error of allValidationErrors) {
+          const location = error.file ? `${error.file}` : "unknown";
+          const validator = error.validator ? ` [${error.validator}]` : "";
+          const field = error.field ? ` (${error.field})` : "";
+          console.log(`  Error in ${location}${validator}${field}: ${error.message}`);
+        }
+      }
     }
 
     return diffResult.hasChanges ? 1 : 0;
@@ -580,6 +664,7 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
           {
             hasChanges: false,
             files: [],
+            validationErrors: [],
             error: error instanceof Error ? error.message : String(error),
           },
           null,
@@ -603,11 +688,20 @@ async function validateCommand(path: string, options: CLIOptions): Promise<numbe
     // Validate config
     const validation = validateConfig(config, { requireOutput: false });
 
+    // In strict mode, treat warnings as errors
+    const hasWarnings = validation.warnings.length > 0;
+    const failsStrictMode = options.strict && hasWarnings;
+    const isValid = validation.valid && !failsStrictMode;
+
     // Output results
     if (options.format === "json") {
-      console.log(JSON.stringify(validation, null, 2));
+      const jsonOutput = {
+        ...validation,
+        strict: options.strict,
+      };
+      console.log(JSON.stringify(jsonOutput, null, 2));
     } else {
-      if (validation.valid) {
+      if (validation.valid && !failsStrictMode) {
         if (options.verbosity > 0) {
           console.log("Configuration is valid");
         }
@@ -616,6 +710,22 @@ async function validateCommand(path: string, options: CLIOptions): Promise<numbe
           for (const warning of validation.warnings) {
             console.log(`  ${warning}`);
           }
+        }
+      } else if (failsStrictMode) {
+        console.error("Configuration validation failed (strict mode)\n");
+        if (validation.errors.length > 0) {
+          console.error("Errors:");
+          for (const error of validation.errors) {
+            console.error(`  ${error.field}: ${error.message}`);
+          }
+        }
+        console.error(
+          validation.errors.length > 0
+            ? "\nWarnings (treated as errors in strict mode):"
+            : "Warnings (treated as errors in strict mode):",
+        );
+        for (const warning of validation.warnings) {
+          console.error(`  ${warning}`);
         }
       } else {
         console.error("Configuration is invalid\n");
@@ -632,7 +742,7 @@ async function validateCommand(path: string, options: CLIOptions): Promise<numbe
       }
     }
 
-    return validation.valid ? 0 : 1;
+    return isValid ? 0 : 1;
   } catch (error) {
     if (options.format === "json") {
       console.log(
@@ -646,6 +756,7 @@ async function validateCommand(path: string, options: CLIOptions): Promise<numbe
               },
             ],
             warnings: [],
+            strict: options.strict,
           },
           null,
           2,
@@ -678,6 +789,7 @@ Usage:
 Flags:
   --format <text|json>        Output format (default: text)
   --clean                     Remove output files not in source
+  --strict                    Enable strict validation (validate command)
   -v, -vv, -vvv              Increase verbosity
   -q                         Quiet mode (errors only)
 
