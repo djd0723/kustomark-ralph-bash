@@ -17,7 +17,16 @@
  * - Save to new file: kustomark fix ./path/to/config --save-to=./fixed-config.yaml
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, normalize, resolve } from "node:path";
 import * as clack from "@clack/prompts";
 import * as yaml from "js-yaml";
@@ -76,6 +85,81 @@ interface FixResult {
   };
   configSaved?: string;
   error?: string;
+}
+
+// ============================================================================
+// Editor Helper Functions
+// ============================================================================
+
+/**
+ * Open a patch in the user's editor for manual editing
+ * @param patch - The patch to edit
+ * @returns The edited patch, or null if editing was cancelled/failed
+ */
+function editPatchInEditor(patch: PatchOperation): PatchOperation | null {
+  // Get the user's preferred editor
+  const editor = process.env.EDITOR || process.env.VISUAL || "vi";
+
+  // Create a temporary file
+  const tempDir = mkdtempSync(join(tmpdir(), "kustomark-fix-"));
+  const tempFile = join(tempDir, "patch.yaml");
+
+  try {
+    // Write the patch to the temp file
+    const patchYaml = yaml.dump([patch], {
+      indent: 2,
+      lineWidth: 120,
+      noRefs: true,
+    });
+    writeFileSync(tempFile, patchYaml, "utf-8");
+
+    // Open the editor
+    clack.log.info(`Opening ${editor}... (save and quit to apply changes)`);
+    const result = spawnSync(editor, [tempFile], {
+      stdio: "inherit",
+      shell: true,
+    });
+
+    // Check if the editor exited successfully
+    if (result.status !== 0) {
+      clack.log.error("Editor exited with error");
+      return null;
+    }
+
+    // Read the edited content
+    const editedContent = readFileSync(tempFile, "utf-8");
+
+    // Parse the edited YAML
+    const parsed = yaml.load(editedContent);
+
+    // Validate that it's a valid patch array
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      clack.log.error("Invalid YAML format - expected an array with one patch");
+      return null;
+    }
+
+    const editedPatch = parsed[0] as PatchOperation;
+
+    // Basic validation - ensure it has an op field
+    if (!editedPatch || typeof editedPatch !== "object" || !("op" in editedPatch)) {
+      clack.log.error("Invalid patch format - missing 'op' field");
+      return null;
+    }
+
+    return editedPatch;
+  } catch (error) {
+    clack.log.error(
+      `Failed to edit patch: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return null;
+  } finally {
+    // Clean up the temp file
+    try {
+      unlinkSync(tempFile);
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
 }
 
 // ============================================================================
@@ -398,9 +482,15 @@ async function runInteractiveSession(session: FixSession, options: CLIOptions): 
       }
 
       case "edit": {
-        clack.log.warn("Manual editing not implemented in this version");
-        clack.log.info("Please edit the config file directly after saving");
-        session.stats.skipped++;
+        const editedPatch = editPatchInEditor(failed.patch);
+        if (editedPatch && session.config.patches) {
+          session.config.patches[failed.patchIndex] = editedPatch;
+          session.stats.fixed++;
+          clack.log.success("Patch updated with manual edits");
+        } else {
+          clack.log.warn("Edit cancelled or invalid - patch not changed");
+          session.stats.skipped++;
+        }
         break;
       }
 
