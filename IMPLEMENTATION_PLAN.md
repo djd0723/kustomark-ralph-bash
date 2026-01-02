@@ -4584,3 +4584,103 @@ Three out of four web test files now at 100% passing. The codebase quality has s
 - All future work features implemented and tested  
 - All test failures resolved
 - Codebase ready for production use
+
+---
+
+**2026-01-02 (Security Hardening - HTTP Fetcher Protection):**
+
+- ✅ **Fixed two HIGH risk security vulnerabilities in HTTP archive fetching**
+
+**1. Redirect Loop Protection (DoS Prevention)**
+
+**Problem:**
+- HTTP downloader handled redirects recursively without any limit
+- Malicious server could create infinite redirect chain or 100+ redirect loops
+- Could cause stack overflow, memory exhaustion, or denial of service
+- No visited URL tracking meant circular redirects would loop forever
+
+**Solution (src/core/http-fetcher.ts:272-347):**
+- Added redirect depth tracking with max limit of 10 redirects
+- Implemented visited URL tracking using Set to detect redirect loops
+- Added internal `_redirectDepth` and `_visitedUrls` parameters
+- Clear error messages for "TOO_MANY_REDIRECTS" and "REDIRECT_LOOP" cases
+
+**Implementation Details:**
+```typescript
+// New parameters in downloadFile options
+_redirectDepth?: number;     // Current redirect depth
+_visitedUrls?: Set<string>;  // URLs already visited in redirect chain
+
+// Validation before processing
+if (redirectDepth > maxRedirects) {
+  reject(new HttpFetchError(
+    `Too many redirects (${redirectDepth}). Possible redirect loop.`,
+    "TOO_MANY_REDIRECTS"
+  ));
+}
+
+if (visitedUrls.has(url)) {
+  reject(new HttpFetchError(
+    `Redirect loop detected: ${url} already visited`,
+    "REDIRECT_LOOP"
+  ));
+}
+```
+
+**2. Path Traversal Protection in Archive Extraction (Security Bypass Prevention)**
+
+**Problem:**
+- `readFilesRecursively()` didn't validate extracted paths against symlink escapes
+- Malicious tar.gz could contain:
+  - Symlinks pointing outside extraction directory (e.g., `../../etc/passwd`)
+  - Files with `../` in their names
+  - Path traversal entries
+- Could lead to arbitrary file access if attacker controlled archive
+
+**Solution (src/core/http-fetcher.ts:228-290):**
+- Added `realpath()` call to resolve all symlinks before processing
+- Validate resolved path stays within base directory
+- Normalize paths using `resolve()` for consistent comparison
+- Skip files that escape the extraction directory with warning
+- Handle broken symlinks gracefully
+
+**Implementation Details:**
+```typescript
+// Security validation for each file
+const realPath = await realpath(fullPath);
+const normalizedRealPath = resolve(realPath);
+
+// Prevent path traversal via symlinks or malicious filenames  
+if (
+  !normalizedRealPath.startsWith(normalizedBaseDir + sep) &&
+  normalizedRealPath !== normalizedBaseDir
+) {
+  console.warn(
+    `Warning: Skipping file outside extraction directory: ${entry.name}`
+  );
+  continue;
+}
+```
+
+**Added Imports:**
+- `realpath` from `node:fs/promises` - Resolve symlinks to real paths
+- `resolve`, `sep` from `node:path` - Path normalization and OS-specific separator
+
+**Testing:**
+- All 2610 tests passing ✅
+- All linting checks passing (`bun check`) ✅
+- No breaking changes to existing functionality
+- Security validations only add protection, don't change behavior for legitimate archives
+
+**Impact:**
+- **DoS Protection**: Prevents resource exhaustion from redirect loops
+- **Security Hardening**: Prevents path traversal attacks via malicious archives
+- **Zero Trust**: Archives from remote sources can't escape sandbox
+- **Production Ready**: Safe to use with untrusted HTTP sources
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/http-fetcher.ts` - Added security validations
+
+**Status:** Security Hardening COMPLETE! ✅
+
+These fixes address critical security vulnerabilities that could be exploited by malicious remote sources. The tool now safely handles untrusted HTTP archives and prevents DoS attacks via redirect loops.

@@ -5,11 +5,11 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { get as httpGet } from "node:http";
 import { get as httpsGet } from "node:https";
 import { homedir } from "node:os";
-import { basename, extname, join } from "node:path";
+import { basename, extname, join, resolve, sep } from "node:path";
 import { findLockEntry } from "./lock-file.js";
 import type { LockFile, LockFileEntry } from "./types.js";
 
@@ -233,8 +233,35 @@ async function readFilesRecursively(
   const files: ExtractedFile[] = [];
   const entries = await readdir(dir, { withFileTypes: true });
 
+  // Normalize base directory for security validation
+  const normalizedBaseDir = resolve(baseDir);
+
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
+
+    // Security: Resolve symlinks and validate the real path is within baseDir
+    try {
+      const realPath = await realpath(fullPath);
+      const normalizedRealPath = resolve(realPath);
+
+      // Prevent path traversal via symlinks or malicious filenames
+      if (
+        !normalizedRealPath.startsWith(normalizedBaseDir + sep) &&
+        normalizedRealPath !== normalizedBaseDir
+      ) {
+        console.warn(
+          `Warning: Skipping file outside extraction directory: ${entry.name} (resolved to ${realPath})`,
+        );
+        continue;
+      }
+    } catch (error) {
+      // If realpath fails (e.g., broken symlink), skip this entry
+      console.warn(
+        `Warning: Could not resolve path for ${fullPath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      continue;
+    }
+
     const relativePath = fullPath.substring(baseDir.length + 1);
 
     if (entry.isDirectory()) {
@@ -272,9 +299,38 @@ async function readFilesRecursively(
 async function downloadFile(
   url: string,
   destPath: string,
-  options: { authToken?: string; headers?: Record<string, string>; timeout?: number } = {},
+  options: {
+    authToken?: string;
+    headers?: Record<string, string>;
+    timeout?: number;
+    _redirectDepth?: number;
+    _visitedUrls?: Set<string>;
+  } = {},
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    // Redirect loop protection
+    const redirectDepth = options._redirectDepth ?? 0;
+    const visitedUrls = options._visitedUrls ?? new Set<string>();
+    const maxRedirects = 10;
+
+    // Check for redirect loop or excessive redirects
+    if (redirectDepth > maxRedirects) {
+      reject(
+        new HttpFetchError(
+          `Too many redirects (${redirectDepth}). Possible redirect loop.`,
+          "TOO_MANY_REDIRECTS",
+        ),
+      );
+      return;
+    }
+
+    if (visitedUrls.has(url)) {
+      reject(new HttpFetchError(`Redirect loop detected: ${url} already visited`, "REDIRECT_LOOP"));
+      return;
+    }
+
+    visitedUrls.add(url);
+
     const headers: Record<string, string> = {
       "User-Agent": "kustomark-http-fetcher/1.0",
       ...options.headers,
@@ -304,7 +360,13 @@ async function downloadFile(
           response.headers.location
         ) {
           const redirectUrl = response.headers.location;
-          downloadFile(redirectUrl, destPath, options).then(resolve).catch(reject);
+          downloadFile(redirectUrl, destPath, {
+            ...options,
+            _redirectDepth: redirectDepth + 1,
+            _visitedUrls: visitedUrls,
+          })
+            .then(resolve)
+            .catch(reject);
           return;
         }
 
