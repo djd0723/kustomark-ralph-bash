@@ -1,0 +1,16 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+output: ./output
+
+resources:
+  - ../base/
+
+patches:
+  # Add a footer to all SKILL.md files
+  - op: replace
+    old: "Run this skill"
+    new: "Execute this skill"
+    include: "**/SKILL.md"
+
+onNoMatch: warn

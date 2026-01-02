@@ -186,17 +186,17 @@ async function resolveResources(
   });
 
   // Convert from ResolvedResource[] to Map<string, string>
-  // For now, use just the basename of each file as the key
-  // This matches kustomize behavior where resources are flattened into the output directory
   const resultMap = new Map<string, string>();
 
   for (const resource of resolvedResources) {
     const normalizedPath = normalize(resource.path);
-    // Extract just the filename
-    const parts = normalizedPath.split("/");
-    const filename = parts[parts.length - 1] || normalizedPath;
 
-    resultMap.set(filename, resource.content);
+    // Compute relative path from the resource's base directory
+    // If baseDir is provided, use it; otherwise fall back to basePath
+    const baseDirectory = resource.baseDir || basePath;
+    const relativePath = relative(baseDirectory, normalizedPath);
+
+    resultMap.set(relativePath, resource.content);
   }
 
   return resultMap;

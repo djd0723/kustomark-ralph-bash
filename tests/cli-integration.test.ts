@@ -8,8 +8,8 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { parseConfig, validateConfig } from '../src/core/config-parser.js';
 import { resolveResources } from '../src/core/resource-resolver.js';
 import { applyPatches } from '../src/core/patch-engine.js';
@@ -131,6 +131,163 @@ describe('CLI Integration Tests', () => {
       expect(file1Output).toContain('### Additional Options');
       expect(file1Output).toContain('--verbose');
       expect(file1Output).toContain('--config <path>');
+
+    } finally {
+      // Cleanup output directory
+      if (existsSync(outputDir)) {
+        rmSync(outputDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  test('preserves directory structure with nested files', async () => {
+    // Setup paths
+    const fixtureRoot = resolve(__dirname, 'fixtures/integration/nested-dirs');
+    const baseDir = join(fixtureRoot, 'base');
+    const overlayDir = join(fixtureRoot, 'overlay');
+    const expectedDir = join(fixtureRoot, 'expected');
+    const outputDir = join(overlayDir, 'output');
+
+    // Clean output directory if it exists
+    if (existsSync(outputDir)) {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+
+    try {
+      // Step 1: Load the kustomark.yaml config
+      const configPath = join(overlayDir, 'kustomark.yaml');
+      const configContent = readFileSync(configPath, 'utf-8');
+      const config = parseConfig(configContent);
+
+      // Step 2: Validate the config
+      const validation = validateConfig(config);
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+
+      // Step 3: Create a file map with all markdown files
+      const fileMap = new Map<string, string>();
+
+      // Function to recursively load markdown files
+      const loadMarkdownFiles = (dir: string, baseDir: string) => {
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name);
+          if (entry.isDirectory()) {
+            loadMarkdownFiles(fullPath, baseDir);
+          } else if (entry.name.endsWith('.md')) {
+            const content = readFileSync(fullPath, 'utf-8');
+            fileMap.set(resolve(fullPath), content);
+          }
+        }
+      };
+
+      // Load base files
+      loadMarkdownFiles(join(baseDir, 'skills'), baseDir);
+
+      // Add the overlay kustomark.yaml to the file map
+      fileMap.set(resolve(configPath), configContent);
+
+      // Add the base kustomark.yaml to the file map
+      const baseConfigPath = join(baseDir, 'kustomark.yaml');
+      const baseConfigContent = readFileSync(baseConfigPath, 'utf-8');
+      fileMap.set(resolve(baseConfigPath), baseConfigContent);
+
+      // Step 4: Resolve resources
+      const resolvedResources = await resolveResources(
+        config.resources,
+        overlayDir,
+        fileMap
+      );
+
+      // Verify we resolved 4 markdown files (2 SKILL.md + 2 reference files)
+      expect(resolvedResources).toHaveLength(4);
+
+      // Step 5: Apply patches to each resource
+      const patchedResources = new Map<string, string>();
+
+      for (const resource of resolvedResources) {
+        // Get the relative path from the base directory
+        const relativePath = resource.path.replace(resolve(baseDir) + '/', '');
+
+        // Filter patches that apply to this file
+        const applicablePatches = filterPatchesForFile(
+          config.patches || [],
+          relativePath
+        );
+
+        // Apply patches
+        const result = applyPatches(
+          resource.content,
+          applicablePatches,
+          config.onNoMatch || 'warn'
+        );
+
+        patchedResources.set(relativePath, result.content);
+      }
+
+      // Step 6: Write output files maintaining directory structure
+      mkdirSync(outputDir, { recursive: true });
+
+      for (const [relativePath, content] of patchedResources.entries()) {
+        const outputPath = join(outputDir, relativePath);
+        mkdirSync(dirname(outputPath), { recursive: true });
+        writeFileSync(outputPath, content, 'utf-8');
+      }
+
+      // Step 7: Verify output structure matches expected
+      const expectedFiles = [
+        'skills/create-research/SKILL.md',
+        'skills/create-research/references/research_template.md',
+        'skills/iterate-research/SKILL.md',
+        'skills/iterate-research/references/research_final_answer.md'
+      ];
+
+      // Verify all expected files exist in output with correct paths
+      for (const file of expectedFiles) {
+        const outputPath = join(outputDir, file);
+        expect(existsSync(outputPath)).toBe(true);
+
+        const outputContent = readFileSync(outputPath, 'utf-8');
+        const expectedPath = join(expectedDir, file.replace('skills/', ''));
+        const expectedContent = readFileSync(expectedPath, 'utf-8');
+
+        expect(outputContent).toBe(expectedContent);
+      }
+
+      // Step 8: Verify that both SKILL.md files exist separately (not overwritten)
+      const createResearchSkill = readFileSync(
+        join(outputDir, 'skills/create-research/SKILL.md'),
+        'utf-8'
+      );
+      const iterateResearchSkill = readFileSync(
+        join(outputDir, 'skills/iterate-research/SKILL.md'),
+        'utf-8'
+      );
+
+      // Both files should exist and have different content
+      expect(createResearchSkill).toContain('Create Research Skill');
+      expect(createResearchSkill).toContain('Execute this skill to start a new research project');
+      expect(iterateResearchSkill).toContain('Iterate Research Skill');
+      expect(iterateResearchSkill).toContain('Execute this skill to refine and improve your research');
+
+      // Verify patches were applied (Run -> Execute)
+      expect(createResearchSkill).toContain('Execute this skill');
+      expect(createResearchSkill).not.toContain('Run this skill');
+      expect(iterateResearchSkill).toContain('Execute this skill');
+      expect(iterateResearchSkill).not.toContain('Run this skill');
+
+      // Verify reference files are preserved in their subdirectories
+      const researchTemplate = readFileSync(
+        join(outputDir, 'skills/create-research/references/research_template.md'),
+        'utf-8'
+      );
+      const researchFinalAnswer = readFileSync(
+        join(outputDir, 'skills/iterate-research/references/research_final_answer.md'),
+        'utf-8'
+      );
+
+      expect(researchTemplate).toContain('Research Template');
+      expect(researchFinalAnswer).toContain('Research Final Answer');
 
     } finally {
       // Cleanup output directory

@@ -404,3 +404,18 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ All linting checks passing (bun check) ✓
 - ✅ Type-safe implementation with proper validation
 - ✅ Lock file format matches M3 spec exactly (version, url, resolved, integrity, fetched)
+
+**2026-01-02 (Issue #1 Fix - Directory Structure Preservation):**
+- ✅ Fixed critical bug where CLI flattened directory structure to basenames
+- ✅ Added optional `baseDir` field to `ResolvedResource` interface in resource-resolver.ts
+- ✅ Updated resource resolution to track base directory for all resource types:
+  - Git repository resources: uses searchDir as baseDir
+  - HTTP archive resources: uses normalizedBaseDir as baseDir
+  - Glob pattern resources: uses normalizedBaseDir as baseDir
+- ✅ Updated CLI's resolveResources() to compute relative paths using baseDir
+- ✅ Now preserves nested directory structure in output (e.g., skills/create-research/SKILL.md)
+- ✅ Fixed filename collision issue where files with same basename would overwrite each other
+- ✅ Created comprehensive integration test in cli-integration.test.ts
+- ✅ Test verifies directory structure preservation with nested files
+- ✅ All 662 tests passing (1 new test) ✓
+- ✅ All linting checks passing (bun check) ✓

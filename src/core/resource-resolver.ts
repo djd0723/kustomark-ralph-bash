@@ -18,6 +18,8 @@ export interface ResolvedResource {
   content: string;
   /** Source pattern or config that resolved to this resource */
   source: string;
+  /** Base directory to compute relative paths from (optional) */
+  baseDir?: string;
 }
 
 /**
@@ -192,6 +194,7 @@ export async function resolveResources(
             path: normalize(filePath),
             content,
             source: pattern,
+            baseDir: searchDir,
           });
         }
       } catch (error) {
@@ -249,6 +252,7 @@ export async function resolveResources(
             path: normalizedPath,
             content: file.content,
             source: pattern,
+            baseDir: normalizedBaseDir,
           });
         }
       } catch (error) {
@@ -334,6 +338,7 @@ export async function resolveResources(
             path: filePath,
             content,
             source: pattern,
+            baseDir: normalizedBaseDir,
           });
         }
       }
