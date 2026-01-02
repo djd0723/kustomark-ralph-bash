@@ -72,6 +72,7 @@ ${formatSection("ADVANCED COMMANDS")}
   ${formatCommand("debug")}        Interactive patch debugging mode
   ${formatCommand("lint")}         Check for common issues in configuration
   ${formatCommand("explain")}      Show resolution chain and patch details
+  ${formatCommand("test")}         Run patch tests against sample content
   ${formatCommand("fetch")}        Fetch remote resources without building
   ${formatCommand("web")}          Launch web UI for visual editing
   ${formatCommand("cache")}        Manage cache for remote resources
@@ -134,6 +135,7 @@ export function getCommandHelp(command: string): string {
     debug: getDebugHelp,
     lint: getLintHelp,
     explain: getExplainHelp,
+    test: getTestHelp,
     fetch: getFetchHelp,
     web: getWebHelp,
     cache: getCacheHelp,
@@ -816,6 +818,108 @@ ${formatSection("SEE ALSO")}
 }
 
 // ============================================================================
+// Test Command Help
+// ============================================================================
+
+function getTestHelp(): string {
+  return `
+${formatTitle("kustomark test - Run patch tests")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark test --suite")} <file> [options]
+  ${formatCommand("kustomark test --patch")} <yaml> --input <file> [options]
+  ${formatCommand("kustomark test --patch-file")} <file> --input <file> [options]
+
+${formatSection("DESCRIPTION")}
+  Test runs patch tests against sample markdown content. You can run a full
+  test suite from a file, or test individual patches inline or from a file.
+  Tests verify that patches produce expected output and help catch regressions.
+
+${formatSection("TEST MODES")}
+  ${formatHighlight("Test Suite Mode:")}
+    ${formatCommand("kustomark test --suite tests.yaml")}
+    Run multiple tests defined in a PatchTestSuite file
+
+  ${formatHighlight("Inline Patch Mode:")}
+    ${formatCommand("kustomark test --patch '<yaml>' --input file.md")}
+    Test a single inline patch against an input file
+
+  ${formatHighlight("Patch File Mode:")}
+    ${formatCommand("kustomark test --patch-file patches.yaml --input file.md")}
+    Test patches from a file against an input file
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--suite")} <file>         Path to test suite YAML file
+  ${formatFlag("--patch")} <yaml>         Inline YAML patch to test
+  ${formatFlag("--patch-file")} <file>    Path to file containing patches
+  ${formatFlag("--input")} <file>         Input markdown file to test against
+  ${formatFlag("--content")} <string>     Inline markdown content to test against
+  ${formatFlag("--format")} <text|json>   Output format (default: text)
+  ${formatFlag("--show-steps")}          Show intermediate results for multi-patch sequences
+  ${formatFlag("--strict")}              Exit with code 1 if any test fails
+  ${formatFlag("-v, -vv, -vvv")}         Increase verbosity
+  ${formatFlag("-q")}                    Quiet mode (errors only)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Run a test suite")}
+  ${formatCommand("kustomark test --suite tests/patches.yaml")}
+
+  ${formatExample("# Test a single inline patch")}
+  ${formatCommand("kustomark test --patch 'op: replace")}
+  ${formatCommand("old: foo")}
+  ${formatCommand("new: bar' --input doc.md")}
+
+  ${formatExample("# Test patches from a file")}
+  ${formatCommand("kustomark test --patch-file patches.yaml --input sample.md")}
+
+  ${formatExample("# Test with inline content")}
+  ${formatCommand("kustomark test --patch 'op: replace")}
+  ${formatCommand("old: hello")}
+  ${formatCommand("new: goodbye' --content 'hello world'")}
+
+  ${formatExample("# Get test results as JSON")}
+  ${formatCommand("kustomark test --suite tests.yaml --format=json")}
+
+  ${formatExample("# Fail on any test failure (for CI/CD)")}
+  ${formatCommand("kustomark test --suite tests.yaml --strict")}
+
+${formatSection("TEST SUITE FORMAT")}
+  ${formatHighlight("A PatchTestSuite YAML file contains:")}
+    ${formatExample("apiVersion: kustomark/v1")}
+    ${formatExample("kind: PatchTestSuite")}
+    ${formatExample("tests:")}
+    ${formatExample("  - name: Test name")}
+    ${formatExample("    input: |")}
+    ${formatExample("      # Input markdown")}
+    ${formatExample("    patches:")}
+    ${formatExample("      - op: replace")}
+    ${formatExample("        old: foo")}
+    ${formatExample("        new: bar")}
+    ${formatExample("    expected: |")}
+    ${formatExample("      # Expected output")}
+
+${formatSection("OUTPUT FORMAT")}
+  ${formatHighlight("Text format:")}
+    - Colorized pass/fail indicators
+    - Unified diff for failures
+    - Summary with counts
+
+  ${formatHighlight("JSON format:")}
+    - Structured test results
+    - All test outcomes
+    - Error details and diffs
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    All tests passed
+  ${formatHighlight("1")}    One or more tests failed or validation errors
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark debug")}      Interactive patch debugging
+  ${formatCommand("kustomark validate")}   Validate configuration
+`;
+}
+
+// ============================================================================
 // Fetch Command Help
 // ============================================================================
 
@@ -1148,6 +1252,7 @@ export const helpCommands = [
   "debug",
   "lint",
   "explain",
+  "test",
   "fetch",
   "web",
   "cache",

@@ -663,3 +663,67 @@ export interface DependencyGraph {
   /** List of unique patch group names */
   patchGroups: string[];
 }
+
+/**
+ * Individual patch test case
+ */
+export interface PatchTest {
+  /** Name of the test */
+  name: string;
+  /** Input markdown content */
+  input: string;
+  /** Patches to apply */
+  patches: PatchOperation[];
+  /** Expected output after applying patches */
+  expected: string;
+}
+
+/**
+ * Test suite file structure
+ */
+export interface PatchTestSuite {
+  /** API version - must be "kustomark/v1" */
+  apiVersion: string;
+  /** Kind - must be "PatchTestSuite" */
+  kind: string;
+  /** List of test cases */
+  tests: PatchTest[];
+}
+
+/**
+ * Result of running a single test
+ */
+export interface TestResult {
+  /** Name of the test */
+  name: string;
+  /** Whether the test passed */
+  passed: boolean;
+  /** Actual output from applying patches */
+  actual: string;
+  /** Expected output */
+  expected: string;
+  /** Unified diff between expected and actual (if failed) */
+  diff?: string;
+  /** Error message (if test execution failed) */
+  error?: string;
+  /** Number of patches applied */
+  appliedPatches: number;
+  /** Warnings from patch application */
+  warnings: ValidationWarning[];
+  /** Validation errors from patch application */
+  validationErrors: ValidationError[];
+}
+
+/**
+ * Result of running a test suite
+ */
+export interface TestSuiteResult {
+  /** Total number of tests */
+  total: number;
+  /** Number of passed tests */
+  passed: number;
+  /** Number of failed tests */
+  failed: number;
+  /** Individual test results */
+  results: TestResult[];
+}

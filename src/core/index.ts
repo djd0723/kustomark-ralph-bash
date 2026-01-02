@@ -224,3 +224,17 @@ export {
   generateFrontmatterKeySuggestions,
   generatePatchSuggestions,
 } from "./suggestion-engine.js";
+
+// Export test suite parser functions
+export { parseTestSuite, validateTestSuite } from "./test-suite-parser.js";
+
+// Export test runner functions
+export { runPatchTest, runTestSuite } from "./test-runner.js";
+
+// Export test types
+export type {
+  PatchTest,
+  PatchTestSuite,
+  TestResult,
+  TestSuiteResult,
+} from "./types.js";

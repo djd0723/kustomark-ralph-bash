@@ -2659,3 +2659,132 @@ This document tracks the implementation of kustomark based on the spec milestone
   - **Maintainability** - Centralized help system easier to update than scattered docs
 
   **Status:** COMPLETE! ✅ Comprehensive help system production-ready and fully tested.
+
+
+**2026-01-02 (Test Command - Patch Testing & Development Tool - COMPLETE!):**
+- ✅ Implemented comprehensive patch testing framework:
+
+  **Core Functionality:**
+  - Created `/home/dex/kustomark-ralph-bash/src/core/test-runner.ts`:
+    - `runPatchTest()` - Execute individual patch tests with expected output validation
+    - `runTestSuite()` - Execute multiple tests with summary statistics
+    - Detailed test results with pass/fail status and unified diffs
+    - Warning and validation error collection
+    - Support for all 22 patch operations
+  - Created `/home/dex/kustomark-ralph-bash/src/core/test-suite-parser.ts`:
+    - Parse YAML test suite files (apiVersion: kustomark/v1, kind: PatchTestSuite)
+    - Comprehensive validation with detailed error messages
+    - Detect duplicate test names
+    - Structure validation for all required fields
+
+  **Type System:**
+  - Added to `/home/dex/kustomark-ralph-bash/src/core/types.ts`:
+    - `PatchTest` - Individual test case with input, patches, expected
+    - `PatchTestSuite` - Collection of tests with metadata
+    - `TestResult` - Single test result with pass/fail, diff, warnings
+    - `TestSuiteResult` - Aggregated results with summary statistics
+
+  **CLI Integration:**
+  - Added `kustomark test` command to `/home/dex/kustomark-ralph-bash/src/cli/index.ts`:
+    - `--suite <file>` - Run a test suite file
+    - `--patch <yaml>` - Test a single inline patch
+    - `--patch-file <file>` - Test patches from a file
+    - `--input <file>` - Input markdown file to test against
+    - `--content <string>` - Inline markdown content to test against
+    - `--format <text|json>` - Output format (default: text)
+    - `--show-steps` - Show intermediate results for multi-patch sequences
+    - `--strict` - Exit with code 1 if any test fails
+    - `-v` - Verbose output with details
+
+  **Output Formats:**
+  - Text: Colorized pass/fail indicators (✓/✗) with unified diff for failures
+  - JSON: Structured results with all test outcomes
+  - Exit codes: 0 for all tests pass, 1 for any test failure
+
+  **Help Integration:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/cli/help.ts`:
+    - Added test command to main help listing
+    - Implemented `getTestHelp()` function
+    - Added to helpFunctions and helpCommands arrays
+    - Updated command count from 12 to 13
+
+  **Documentation:**
+  - Updated `/home/dex/kustomark-ralph-bash/README.md`:
+    - Added comprehensive test command documentation
+    - Included test suite format specification
+    - Added usage examples and use cases
+    - Updated Table of Contents with test command link
+  - Created `/home/dex/kustomark-ralph-bash/docs/test-command.md`:
+    - Detailed API documentation
+    - Usage examples and best practices
+  - Created `/home/dex/kustomark-ralph-bash/examples/test-suite-example.yaml`:
+    - 5 sample test cases demonstrating different patch operations
+  - Created `/home/dex/kustomark-ralph-bash/examples/run-test-example.ts`:
+    - Executable demonstration script
+
+  **Testing:**
+  - Created `/home/dex/kustomark-ralph-bash/tests/core/test-runner.test.ts` (41 tests):
+    - Tests for runPatchTest with passing and failing scenarios
+    - Coverage of all 22 patch operations
+    - Edge cases: empty input, no patches, invalid operations, unicode
+    - Tests for runTestSuite including empty suites and large suites (100 tests)
+  - Created `/home/dex/kustomark-ralph-bash/tests/core/test-suite-parser.test.ts` (45 tests):
+    - Valid YAML parsing tests
+    - Invalid YAML error handling
+    - Comprehensive validation tests for all fields
+    - Test name uniqueness validation
+  - Created `/home/dex/kustomark-ralph-bash/tests/cli/test-command.test.ts` (29 tests):
+    - All CLI flags and combinations tested
+    - JSON and text output validation
+    - Exit code verification
+    - Error handling for missing files and invalid YAML
+  - Updated `/home/dex/kustomark-ralph-bash/src/cli/help.test.ts`:
+    - Updated command count from 12 to 13
+    - Added test to expected commands list
+  - All 1,751 tests passing (115 new tests added) ✓
+  - 6,728 expect() calls successful (242 new assertions)
+  - All linting checks passing (bun check) ✓
+  - Zero TypeScript compilation errors
+
+  **Design Principles:**
+  - Reuses existing patch engine for consistency
+  - Returns structured results for both text and JSON output
+  - Includes detailed error messages and diffs
+  - Follows existing codebase patterns
+  - Comprehensive validation with helpful error messages
+
+  **Use Cases:**
+  - **Patch Development:** Test patches before adding them to configurations
+  - **Debugging:** Understand why a patch isn't matching expected content
+  - **Regression Testing:** Create test suites to ensure patches work correctly
+  - **Documentation:** Share reproducible examples with teams
+  - **Learning:** Experiment with patch operations interactively
+  - **CI/CD Integration:** Automated test suites ensure patches don't break over time
+
+  **Impact:**
+  - **Dramatically Lowers Barrier to Entry:** New users can experiment without understanding full config system
+  - **Enables TDD for Documentation:** Teams can write patch tests before implementing documentation changes
+  - **Debugging Superpower:** Instantly test why a patch isn't matching without full rebuild cycles
+  - **Shareability:** Test cases become portable, making it easy to share examples in issues/docs
+  - **Learning Tool:** Built-in examples show "before/after" for every operation type
+
+  **Files Created:**
+  - `/home/dex/kustomark-ralph-bash/src/core/test-runner.ts` (2.4 KB)
+  - `/home/dex/kustomark-ralph-bash/src/core/test-suite-parser.ts` (6.3 KB)
+  - `/home/dex/kustomark-ralph-bash/docs/test-command.md` (9.9 KB)
+  - `/home/dex/kustomark-ralph-bash/examples/test-suite-example.yaml` (1.8 KB)
+  - `/home/dex/kustomark-ralph-bash/examples/run-test-example.ts` (1.8 KB)
+  - `/home/dex/kustomark-ralph-bash/examples/README.md` (1.8 KB)
+  - `/home/dex/kustomark-ralph-bash/tests/core/test-runner.test.ts` (41 tests)
+  - `/home/dex/kustomark-ralph-bash/tests/core/test-suite-parser.test.ts` (45 tests)
+  - `/home/dex/kustomark-ralph-bash/tests/cli/test-command.test.ts` (29 tests)
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added test-related types
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Added test command
+  - `/home/dex/kustomark-ralph-bash/src/cli/help.ts` - Added test help
+  - `/home/dex/kustomark-ralph-bash/src/cli/help.test.ts` - Updated for 13 commands
+  - `/home/dex/kustomark-ralph-bash/README.md` - Added test command documentation
+  - `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md` - This entry
+
+  **Status:** COMPLETE! ✅ Test command production-ready and fully tested. This feature addresses the #1 developer experience pain point - making it easy to prototype, debug, and validate patches without full configuration files.

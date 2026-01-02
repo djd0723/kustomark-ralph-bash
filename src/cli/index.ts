@@ -19,6 +19,7 @@ import {
 import { mkdir as mkdirAsync, writeFile as writeFileAsync } from "node:fs/promises";
 import { cpus } from "node:os";
 import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
+import * as yaml from "js-yaml";
 import micromatch from "micromatch";
 import {
   calculateFileHash,
@@ -55,6 +56,8 @@ import { findLockEntry, loadLockFile, saveLockFile } from "../core/lock-file.js"
 import { applyPatches as coreApplyPatches } from "../core/patch-engine.js";
 import { resolveResources as coreResolveResources } from "../core/resource-resolver.js";
 import { generateSchema } from "../core/schema.js";
+import { runTestSuite } from "../core/test-runner.js";
+import { parseTestSuite, validateTestSuite } from "../core/test-suite-parser.js";
 import type {
   BuildCache,
   BuildCacheEntry,
@@ -115,6 +118,12 @@ interface CLIOptions {
   noHooks?: boolean; // For watch --no-hooks option
   offline?: boolean; // For build --offline option (fail if remote fetch needed)
   dryRun?: boolean; // For build --dry-run option (preview changes without writing files)
+  suite?: string; // For test --suite option (test suite file path)
+  patch?: string; // For test --patch option (inline YAML patch)
+  patchFile?: string; // For test --patch-file option (patch file path)
+  input?: string; // For test --input option (input markdown file)
+  content?: string; // For test --content option (inline markdown content)
+  showSteps?: boolean; // For test --show-steps option (show intermediate results)
 }
 
 interface BuildStats {
@@ -249,6 +258,12 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     saveDecisions: undefined,
     loadDecisions: undefined,
     offline: false,
+    suite: undefined,
+    patch: undefined,
+    patchFile: undefined,
+    input: undefined,
+    content: undefined,
+    showSteps: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -463,6 +478,63 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
           i++;
         }
       }
+    } else if (arg === "--suite" || arg.startsWith("--suite=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.suite = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.suite = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--patch" || arg.startsWith("--patch=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.patch = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.patch = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--patch-file" || arg.startsWith("--patch-file=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.patchFile = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.patchFile = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--input" || arg.startsWith("--input=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.input = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.input = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--content" || arg.startsWith("--content=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.content = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.content = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--show-steps") {
+      options.showSteps = true;
     }
   }
 
@@ -2358,6 +2430,432 @@ async function validateCommand(path: string, options: CLIOptions): Promise<numbe
   }
 }
 
+async function testCommand(_path: string, options: CLIOptions): Promise<number> {
+  try {
+    // ANSI color codes for colored output
+    const colors = {
+      reset: "\x1b[0m",
+      green: "\x1b[32m",
+      red: "\x1b[31m",
+      yellow: "\x1b[33m",
+      cyan: "\x1b[36m",
+      dim: "\x1b[2m",
+      bold: "\x1b[1m",
+    };
+
+    // Validate input: must have either --suite, --patch, or --patch-file
+    if (!options.suite && !options.patch && !options.patchFile) {
+      const errorMsg = "Error: Must specify one of --suite, --patch, or --patch-file";
+      if (options.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              success: false,
+              total: 0,
+              passed: 0,
+              failed: 0,
+              results: [],
+              error: errorMsg,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        console.error(errorMsg);
+        console.error("\nUsage:");
+        console.error("  kustomark test --suite <file>");
+        console.error("  kustomark test --patch <yaml> --input <file>");
+        console.error("  kustomark test --patch-file <file> --input <file>");
+      }
+      return 1;
+    }
+
+    // Mode 1: Test suite file
+    if (options.suite) {
+      const suitePath = resolve(options.suite);
+
+      if (!existsSync(suitePath)) {
+        const errorMsg = `Test suite file not found: ${suitePath}`;
+        if (options.format === "json") {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                total: 0,
+                passed: 0,
+                failed: 0,
+                results: [],
+                error: errorMsg,
+              },
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.error(`Error: ${errorMsg}`);
+        }
+        return 1;
+      }
+
+      log(`Loading test suite from ${suitePath}...`, 2, options);
+      const suiteContent = readFileSync(suitePath, "utf-8");
+
+      // Parse and validate the test suite
+      const suite = parseTestSuite(suiteContent);
+      const validation = validateTestSuite(suite);
+
+      if (!validation.valid) {
+        if (options.format === "json") {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                total: 0,
+                passed: 0,
+                failed: 0,
+                results: [],
+                validationErrors: validation.errors,
+              },
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.error("Test suite validation failed:\n");
+          for (const error of validation.errors) {
+            console.error(`  ${error.field}: ${error.message}`);
+          }
+        }
+        return 1;
+      }
+
+      log(`Running ${suite.tests.length} test(s)...`, 2, options);
+
+      // Run the test suite
+      const result = runTestSuite(suite);
+
+      // Output results
+      if (options.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              success: result.failed === 0,
+              total: result.total,
+              passed: result.passed,
+              failed: result.failed,
+              results: result.results.map((r) => ({
+                name: r.name,
+                passed: r.passed,
+                actual: r.actual,
+                expected: r.expected,
+                diff: r.diff,
+                error: r.error,
+                appliedPatches: r.appliedPatches,
+                warnings: r.warnings,
+                validationErrors: r.validationErrors,
+              })),
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        // Text format with colorized output
+        console.log(`\n${colors.bold}Test Results${colors.reset}`);
+        console.log("=".repeat(60));
+
+        for (const testResult of result.results) {
+          const statusIcon = testResult.passed
+            ? `${colors.green}✓${colors.reset}`
+            : `${colors.red}✗${colors.reset}`;
+          console.log(`\n${statusIcon} ${testResult.name}`);
+
+          if (!testResult.passed) {
+            if (testResult.error) {
+              console.log(`  ${colors.red}Error: ${testResult.error}${colors.reset}`);
+            } else if (testResult.diff) {
+              console.log(`\n  ${colors.yellow}Diff:${colors.reset}`);
+              // Print diff with indentation
+              const diffLines = testResult.diff.split("\n");
+              for (const line of diffLines) {
+                if (line.startsWith("+")) {
+                  console.log(`  ${colors.green}${line}${colors.reset}`);
+                } else if (line.startsWith("-")) {
+                  console.log(`  ${colors.red}${line}${colors.reset}`);
+                } else {
+                  console.log(`  ${colors.dim}${line}${colors.reset}`);
+                }
+              }
+            }
+          }
+
+          // Show warnings if any
+          if (testResult.warnings.length > 0 && options.verbosity >= 2) {
+            console.log(`  ${colors.yellow}Warnings:${colors.reset}`);
+            for (const warning of testResult.warnings) {
+              console.log(`    ${warning}`);
+            }
+          }
+
+          // Show validation errors if any
+          if (testResult.validationErrors.length > 0) {
+            console.log(`  ${colors.red}Validation Errors:${colors.reset}`);
+            for (const error of testResult.validationErrors) {
+              console.log(`    ${error.field}: ${error.message}`);
+            }
+          }
+        }
+
+        // Summary
+        console.log(`\n${"=".repeat(60)}`);
+        const passColor = result.passed === result.total ? colors.green : colors.yellow;
+        const failColor = result.failed > 0 ? colors.red : colors.dim;
+        console.log(
+          `${colors.bold}Summary:${colors.reset} ${passColor}${result.passed} passed${colors.reset}, ${failColor}${result.failed} failed${colors.reset}, ${result.total} total`,
+        );
+      }
+
+      // Exit with appropriate code
+      if (options.strict && result.failed > 0) {
+        return 1;
+      }
+      return result.failed > 0 ? 1 : 0;
+    }
+
+    // Mode 2 & 3: Single patch test (inline or from file)
+    // Must have either --input or --content
+    if (!options.input && !options.content) {
+      const errorMsg = "Error: Must specify either --input or --content for patch testing";
+      if (options.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              success: false,
+              total: 0,
+              passed: 0,
+              failed: 0,
+              results: [],
+              error: errorMsg,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        console.error(errorMsg);
+      }
+      return 1;
+    }
+
+    // Get input content
+    let inputContent: string;
+    if (options.input) {
+      const inputPath = resolve(options.input);
+      if (!existsSync(inputPath)) {
+        const errorMsg = `Input file not found: ${inputPath}`;
+        if (options.format === "json") {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                total: 0,
+                passed: 0,
+                failed: 0,
+                results: [],
+                error: errorMsg,
+              },
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.error(`Error: ${errorMsg}`);
+        }
+        return 1;
+      }
+      inputContent = readFileSync(inputPath, "utf-8");
+    } else {
+      inputContent = options.content || "";
+    }
+
+    // Get patches
+    let patches: PatchOperation[];
+    if (options.patch) {
+      // Parse inline YAML patch
+      try {
+        const parsed = yaml.load(options.patch);
+        patches = Array.isArray(parsed) ? parsed : [parsed];
+      } catch (error) {
+        const errorMsg = `Failed to parse patch YAML: ${error instanceof Error ? error.message : String(error)}`;
+        if (options.format === "json") {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                total: 0,
+                passed: 0,
+                failed: 0,
+                results: [],
+                error: errorMsg,
+              },
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.error(`Error: ${errorMsg}`);
+        }
+        return 1;
+      }
+    } else if (options.patchFile) {
+      const patchFilePath = resolve(options.patchFile);
+      if (!existsSync(patchFilePath)) {
+        const errorMsg = `Patch file not found: ${patchFilePath}`;
+        if (options.format === "json") {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                total: 0,
+                passed: 0,
+                failed: 0,
+                results: [],
+                error: errorMsg,
+              },
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.error(`Error: ${errorMsg}`);
+        }
+        return 1;
+      }
+
+      const patchContent = readFileSync(patchFilePath, "utf-8");
+      try {
+        const parsed = yaml.load(patchContent);
+        patches = Array.isArray(parsed) ? parsed : [parsed];
+      } catch (error) {
+        const errorMsg = `Failed to parse patch file: ${error instanceof Error ? error.message : String(error)}`;
+        if (options.format === "json") {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                total: 0,
+                passed: 0,
+                failed: 0,
+                results: [],
+                error: errorMsg,
+              },
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.error(`Error: ${errorMsg}`);
+        }
+        return 1;
+      }
+    } else {
+      // This should never happen due to earlier validation
+      patches = [];
+    }
+
+    // Apply patches
+    log(`Applying ${patches.length} patch(es)...`, 2, options);
+
+    try {
+      const patchResult = coreApplyPatches(inputContent, patches, "warn");
+
+      // Show results
+      if (options.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              success: true,
+              applied: patchResult.applied,
+              skipped: patchResult.conditionSkipped,
+              output: patchResult.content,
+              warnings: patchResult.warnings,
+              validationErrors: patchResult.validationErrors,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        console.log(`\n${colors.bold}Patch Application Results${colors.reset}`);
+        console.log("=".repeat(60));
+        console.log(`${colors.green}Applied: ${patchResult.applied}${colors.reset}`);
+        console.log(`${colors.yellow}Skipped: ${patchResult.conditionSkipped}${colors.reset}`);
+
+        if (patchResult.warnings.length > 0) {
+          console.log(`\n${colors.yellow}Warnings:${colors.reset}`);
+          for (const warning of patchResult.warnings) {
+            console.log(`  ${warning}`);
+          }
+        }
+
+        if (patchResult.validationErrors.length > 0) {
+          console.log(`\n${colors.red}Validation Errors:${colors.reset}`);
+          for (const error of patchResult.validationErrors) {
+            console.log(`  ${error.field}: ${error.message}`);
+          }
+        }
+
+        console.log(`\n${colors.bold}Output:${colors.reset}`);
+        console.log(patchResult.content);
+      }
+
+      return 0;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (options.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              success: false,
+              applied: 0,
+              skipped: 0,
+              output: "",
+              error: errorMsg,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        console.error(`Error: ${errorMsg}`);
+      }
+      return 1;
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    if (options.format === "json") {
+      console.log(
+        JSON.stringify(
+          {
+            success: false,
+            total: 0,
+            passed: 0,
+            failed: 0,
+            results: [],
+            error: errorMsg,
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.error(`Error: ${errorMsg}`);
+    }
+    return 1;
+  }
+}
+
 async function initCommand(path: string, options: CLIOptions): Promise<number> {
   // Route to interactive or non-interactive implementation
   if (options.interactive) {
@@ -3347,6 +3845,8 @@ async function main(): Promise<number> {
       });
     case "debug":
       return await debugCommand(path, options);
+    case "test":
+      return await testCommand(path, options);
     case "cache":
       return await cacheCommand(args.slice(1), options);
     default:

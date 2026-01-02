@@ -1,0 +1,98 @@
+apiVersion: kustomark/v1
+kind: PatchTestSuite
+tests:
+  - name: simple string replacement
+    input: |
+      Hello World
+    patches:
+      - op: replace
+        old: World
+        new: Universe
+    expected: |
+      Hello Universe
+
+  - name: section manipulation
+    input: |
+      # Introduction
+
+      Welcome to the guide.
+
+      # Getting Started
+
+      First steps here.
+
+      # Conclusion
+
+      Thanks for reading.
+    patches:
+      - op: remove-section
+        id: getting-started
+    expected: |
+      # Introduction
+
+      Welcome to the guide.
+
+      # Conclusion
+
+      Thanks for reading.
+
+  - name: frontmatter updates
+    input: |
+      ---
+      title: Old Title
+      author: John Doe
+      ---
+
+      Content goes here.
+    patches:
+      - op: set-frontmatter
+        key: title
+        value: New Title
+      - op: set-frontmatter
+        key: version
+        value: "1.0.0"
+    expected: |
+      ---
+      title: New Title
+      author: John Doe
+      version: 1.0.0
+      ---
+
+      Content goes here.
+
+  - name: regex replacement
+    input: |
+      Email: user@example.com
+      Email: admin@example.com
+    patches:
+      - op: replace-regex
+        pattern: '(\w+)@example\.com'
+        replacement: '$1@newdomain.com'
+        flags: g
+    expected: |
+      Email: user@newdomain.com
+      Email: admin@newdomain.com
+
+  - name: multiple sequential patches
+    input: |
+      # Documentation
+
+      This is the old content.
+
+      Version: 1.0
+    patches:
+      - op: replace
+        old: old content
+        new: new content
+      - op: replace
+        old: "Version: 1.0"
+        new: "Version: 2.0"
+      - op: rename-header
+        id: documentation
+        new: API Reference
+    expected: |
+      # API Reference
+
+      This is the new content.
+
+      Version: 2.0

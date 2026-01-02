@@ -13,6 +13,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark build](#kustomark-build-path)
   - [kustomark diff](#kustomark-diff-path)
   - [kustomark validate](#kustomark-validate-path)
+  - [kustomark test](#kustomark-test)
   - [kustomark init](#kustomark-init-path)
   - [kustomark debug](#kustomark-debug-path)
   - [kustomark watch](#kustomark-watch-path)
@@ -200,6 +201,91 @@ kustomark validate ./team/ --format=json
 ```
 
 **Exit code:** Returns 0 if valid, 1 if invalid.
+
+### `kustomark test`
+
+Test patches against markdown content without creating full configurations. Perfect for prototyping patches, debugging complex operations, and creating regression test suites.
+
+```bash
+# Run a test suite file
+kustomark test --suite tests/patch-tests.yaml
+
+# Test inline patch with file input
+kustomark test --patch "op: replace
+old: foo
+new: bar" --input doc.md
+
+# Test inline patch with inline content
+kustomark test --patch "op: replace
+old: hello
+new: goodbye" --content "hello world"
+
+# Test patches from file
+kustomark test --patch-file patches.yaml --input sample.md
+
+# Get JSON output
+kustomark test --suite tests.yaml --format=json
+
+# Strict mode (fail on any test failure)
+kustomark test --suite tests.yaml --strict
+```
+
+**Options:**
+- `--suite <file>` - Run a test suite file (YAML)
+- `--patch <yaml>` - Test a single inline patch (YAML string)
+- `--patch-file <file>` - Test patches from a file
+- `--input <file>` - Input markdown file to test against
+- `--content <string>` - Inline markdown content to test against
+- `--format <text|json>` - Output format (default: text)
+- `--show-steps` - Show intermediate results for multi-patch sequences
+- `--strict` - Exit with code 1 if any test fails
+- `-v` - Verbose output with details
+
+**Exit code:** Returns 0 if all tests pass, 1 if any test fails.
+
+**Test Suite Format:**
+
+```yaml
+apiVersion: kustomark/v1
+kind: PatchTestSuite
+
+tests:
+  - name: "Replace company name"
+    input: |
+      # Welcome to ACME Corp
+      ACME Corp is the best!
+    patches:
+      - op: replace
+        old: "ACME Corp"
+        new: "TechCorp"
+    expected: |
+      # Welcome to TechCorp
+      TechCorp is the best!
+
+  - name: "Remove deprecated section"
+    input: |
+      ## Features
+      Great features here
+      ## Deprecated
+      Old stuff
+      ## Installation
+      Install guide
+    patches:
+      - op: remove-section
+        id: deprecated
+    expected: |
+      ## Features
+      Great features here
+      ## Installation
+      Install guide
+```
+
+**Use Cases:**
+- **Patch Development:** Test patches before adding them to configurations
+- **Debugging:** Understand why a patch isn't matching expected content
+- **Regression Testing:** Create test suites to ensure patches work correctly
+- **Documentation:** Share reproducible examples with teams
+- **Learning:** Experiment with patch operations interactively
 
 ### `kustomark init [path]`
 
