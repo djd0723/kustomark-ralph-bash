@@ -6,6 +6,7 @@
  * - Real-time validation and diagnostics
  * - Autocomplete for fields and operations
  * - Hover documentation
+ * - Go-to-definition for resource paths
  * - Document symbols (outline view)
  */
 
@@ -22,6 +23,7 @@ import {
   createConnection,
 } from "vscode-languageserver/node";
 import { CompletionProvider } from "./completion.js";
+import { DefinitionProvider } from "./definition.js";
 import { DiagnosticsProvider } from "./diagnostics.js";
 import { DocumentManager } from "./document-manager.js";
 import { HoverProvider } from "./hover.js";
@@ -37,6 +39,7 @@ const documentManager = new DocumentManager();
 const diagnosticsProvider = new DiagnosticsProvider();
 const completionProvider = new CompletionProvider();
 const hoverProvider = new HoverProvider();
+const definitionProvider = new DefinitionProvider();
 
 // Server initialization
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
@@ -50,6 +53,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
         triggerCharacters: ["-", " ", ":", "\n"],
       },
       hoverProvider: true,
+      definitionProvider: true,
     },
   };
 });
@@ -125,6 +129,21 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
     return hoverProvider.provideHover(document, params.position);
   } catch (error) {
     connection.console.error(`Error providing hover: ${error}`);
+    return null;
+  }
+});
+
+// Definition handler
+connection.onDefinition((params: TextDocumentPositionParams) => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return null;
+  }
+
+  try {
+    return definitionProvider.provideDefinition(document, params.position);
+  } catch (error) {
+    connection.console.error(`Error providing definition: ${error}`);
     return null;
   }
 });

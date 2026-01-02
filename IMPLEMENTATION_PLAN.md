@@ -788,7 +788,7 @@ This document tracks the implementation of kustomark based on the spec milestone
   - ✅ Build LSP server binary (add to package.json scripts) - COMPLETE!
   - ✅ Create VSCode extension with extension manifest - COMPLETE!
   - ✅ Add JSON Schema integration for editor validation - COMPLETE!
-  - ⏳ Implement go-to-definition for resource paths (future enhancement)
+  - ✅ Implement go-to-definition for resource paths - COMPLETE! 2026-01-02
   - ⏳ Implement document symbols provider (outline view) (future enhancement)
   - ✅ Package and publish VSCode extension - COMPLETE!
   - ✅ Document installation and usage in README.md - COMPLETE!
@@ -1244,3 +1244,35 @@ This document tracks the implementation of kustomark based on the spec milestone
 - Cache lookups significantly faster for large projects (O(1) vs O(n))
 - Better code quality and error visibility for debugging
 
+**2026-01-02 (LSP Go-to-Definition Enhancement):**
+- ✅ Implemented go-to-definition feature for LSP server (deferred item from M4):
+  - Created `/home/dex/kustomark-ralph-bash/src/lsp/definition.ts` (137 lines)
+    - `DefinitionProvider` class with go-to-definition logic
+    - `provideDefinition()` - Main handler for definition requests
+    - `extractPathValue()` - Extracts file paths from YAML lines
+    - `resolveFilePath()` - Resolves paths to file URLs
+  - Updated `/home/dex/kustomark-ralph-bash/src/lsp/server.ts`:
+    - Added `DefinitionProvider` import and initialization
+    - Added `definitionProvider: true` capability
+    - Added `onDefinition` handler for LSP definition requests
+    - Updated header comment to reflect new feature
+  - Features implemented:
+    - Navigate from resource paths to actual files (Ctrl+Click / F12)
+    - Supports both relative and absolute file paths
+    - Handles kustomark:// protocol references
+    - Skips git URLs, HTTP URLs, and glob patterns (non-navigable)
+    - Works for files in resources array and output paths
+  - Fixed linting issue in `/home/dex/kustomark-ralph-bash/src/web/server/server.ts`:
+    - Changed `forEach` to `for...of` loop for WebSocket broadcast
+  - All 911 tests passing ✓
+  - Main project linting clean (core/cli/lsp - web UI has cosmetic warnings only)
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/lsp/definition.ts` (137 lines)
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/lsp/server.ts` - Added definition provider integration
+- `/home/dex/kustomark-ralph-bash/src/web/server/server.ts` - Fixed forEach linting issue
+
+**Status:** LSP go-to-definition COMPLETE! ✅
+- Remaining LSP enhancement: Document symbols provider (outline view) - deferred

@@ -108,12 +108,12 @@ export function startServer(config: ServerConfig): {
       if (!wss) return;
 
       const payload = JSON.stringify(message);
-      wss.clients.forEach((client) => {
+      for (const client of wss.clients) {
         if (client.readyState === 1) {
           // OPEN
           client.send(payload);
         }
-      });
+      }
     };
   }
 
