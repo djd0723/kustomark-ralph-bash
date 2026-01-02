@@ -546,3 +546,32 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ All 689 tests passing (13 new tests: 5 watch, 8 stats) ✓
 - ✅ All linting checks passing (bun check) ✓
 - ✅ M4 Developer Experience milestone COMPLETE! ✅
+
+**2026-01-02 (Parallel Builds Feature - Future Work):**
+- ✅ Implemented Parallel Builds feature (Medium complexity from Future Candidates list):
+  - Added `parallel?: boolean` flag to enable parallel processing (default: false)
+  - Added `jobs?: number` flag to control concurrency (default: CPU cores)
+  - Created concurrency limiter for controlled parallel execution
+  - Implemented `applyPatchesParallel()` for concurrent file processing
+  - Implemented `writeFilesParallel()` for async file I/O with concurrency control
+  - Patches remain sequential within each file (critical for correctness)
+  - Files are sorted before processing for deterministic output
+  - Safe accumulation of warnings, validation errors, and operation counts
+  - Handles directory creation race conditions with try-catch
+  - Updated CLI help text with "Performance" section
+  - Created comprehensive test suite in tests/cli/parallel.test.ts
+  - All 724 tests passing (7 new parallel tests) ✓
+  - All linting checks passing (bun check) ✓
+
+  **Parallel processing features:**
+  - File-level parallelism (patches stay sequential per file)
+  - Configurable concurrency with `--jobs=N` flag
+  - Deterministic output (sorted files, sorted operation counts)
+  - Backward compatible (default is sequential mode)
+  - Works with all existing flags (--stats, --format=json, etc.)
+
+  **Files modified:**
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Added parallel processing logic
+  - `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts` - Fixed validOps list
+  - `/home/dex/kustomark-ralph-bash/tests/cli/parallel.test.ts` - Added 7 tests
+  - `/home/dex/kustomark-ralph-bash/PARALLEL_BUILDS.md` - Added documentation

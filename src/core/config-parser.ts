@@ -198,6 +198,18 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "replace-section",
     "prepend-to-section",
     "append-to-section",
+    "set-frontmatter",
+    "remove-frontmatter",
+    "rename-frontmatter",
+    "merge-frontmatter",
+    "delete-between",
+    "replace-between",
+    "replace-line",
+    "insert-after-line",
+    "insert-before-line",
+    "rename-header",
+    "move-section",
+    "change-section-level",
   ];
 
   if (!validOps.includes(p.op as string)) {

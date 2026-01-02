@@ -16,6 +16,8 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { mkdir as mkdirAsync, writeFile as writeFileAsync } from "node:fs/promises";
+import { cpus } from "node:os";
 import { dirname, join, normalize, relative, resolve } from "node:path";
 import * as yaml from "js-yaml";
 import micromatch from "micromatch";
@@ -58,6 +60,8 @@ interface CLIOptions {
   debounce?: number; // For watch --debounce option (in milliseconds)
   enableGroups?: string[]; // For group filtering (whitelist)
   disableGroups?: string[]; // For group filtering (blacklist)
+  parallel?: boolean; // For parallel processing (default: false)
+  jobs?: number; // For parallel job count (default: CPU cores)
 }
 
 interface BuildStats {
@@ -171,6 +175,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     debounce: undefined,
     enableGroups: undefined,
     disableGroups: undefined,
+    parallel: false,
+    jobs: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -299,6 +305,19 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.verbosity = 3;
     } else if (arg === "-v") {
       options.verbosity = 2;
+    } else if (arg === "--parallel") {
+      options.parallel = true;
+    } else if (arg === "--jobs" || arg.startsWith("--jobs=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.jobs = Number.parseInt(value, 10);
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.jobs = Number.parseInt(nextArg, 10);
+          i++;
+        }
+      }
     }
   }
 
@@ -439,6 +458,197 @@ function applyPatches(
     validationErrors: allValidationErrors,
     operationCounts,
   };
+}
+
+/**
+ * Concurrency limiter for parallel operations
+ * Ensures only a limited number of operations run concurrently
+ *
+ * @param concurrency - Maximum number of concurrent operations
+ * @returns A limiter function that wraps async operations
+ */
+function createConcurrencyLimiter(concurrency: number) {
+  let activeCount = 0;
+  const queue: Array<() => void> = [];
+
+  return async function limit<T>(fn: () => Promise<T>): Promise<T> {
+    while (activeCount >= concurrency) {
+      await new Promise<void>((resolve) => queue.push(resolve));
+    }
+
+    activeCount++;
+    try {
+      return await fn();
+    } finally {
+      activeCount--;
+      const next = queue.shift();
+      if (next) next();
+    }
+  };
+}
+
+/**
+ * Apply patches to resources in parallel
+ * Parallelizes at the file level while keeping patches sequential within each file
+ *
+ * @param resources - Map of file paths to content
+ * @param patches - Array of patch operations
+ * @param onNoMatch - Strategy for handling patches that don't match
+ * @param options - CLI options including parallel settings
+ * @returns Object with patched resources, stats, warnings, and errors
+ */
+async function applyPatchesParallel(
+  resources: Map<string, string>,
+  patches: PatchOperation[],
+  onNoMatch: OnNoMatchStrategy,
+  options: CLIOptions,
+): Promise<{
+  resources: Map<string, string>;
+  patchesApplied: number;
+  patchesSkipped: number;
+  warnings: string[];
+  validationErrors: ValidationError[];
+  operationCounts: Record<string, number>;
+}> {
+  // Determine concurrency level
+  const jobCount = options.jobs || cpus().length;
+  const limit = createConcurrencyLimiter(jobCount);
+
+  log(`Processing ${resources.size} files with ${jobCount} parallel jobs`, 2, options);
+
+  // Sort file paths for deterministic processing order
+  const sortedEntries = Array.from(resources.entries()).sort(([a], [b]) => a.localeCompare(b));
+
+  // Process files in parallel with concurrency limit
+  const results = await Promise.all(
+    sortedEntries.map(([filePath, content]) =>
+      limit(async () => {
+        // Filter patches by group first, then by file patterns
+        const applicablePatches = patches.filter(
+          (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
+        );
+
+        if (applicablePatches.length === 0) {
+          // No patches for this file, return original content
+          return {
+            filePath,
+            content,
+            applied: 0,
+            skipped: 0,
+            warnings: [] as string[],
+            validationErrors: [] as ValidationError[],
+            operations: {} as Record<string, number>,
+          };
+        }
+
+        // Apply all applicable patches sequentially for this file
+        const result = coreApplyPatches(content, applicablePatches, onNoMatch);
+
+        // Calculate skipped patches
+        const skipped = applicablePatches.length - result.applied;
+
+        // Count patches by operation type
+        const operations: Record<string, number> = {};
+        for (const patch of applicablePatches) {
+          const opType = patch.op;
+          operations[opType] = (operations[opType] || 0) + 1;
+        }
+
+        // Add file path to validation errors
+        const errorsWithFile = result.validationErrors.map((error) => ({
+          ...error,
+          file: filePath,
+        }));
+
+        return {
+          filePath,
+          content: result.content,
+          applied: result.applied,
+          skipped,
+          warnings: result.warnings,
+          validationErrors: errorsWithFile,
+          operations,
+        };
+      }),
+    ),
+  );
+
+  // Merge results
+  const patchedResources = new Map<string, string>();
+  let totalPatchesApplied = 0;
+  let totalPatchesSkipped = 0;
+  const allWarnings: string[] = [];
+  const allValidationErrors: ValidationError[] = [];
+  const operationCounts: Record<string, number> = {};
+
+  for (const result of results) {
+    patchedResources.set(result.filePath, result.content);
+    totalPatchesApplied += result.applied;
+    totalPatchesSkipped += result.skipped;
+    allWarnings.push(...result.warnings);
+    allValidationErrors.push(...result.validationErrors);
+
+    // Merge operation counts
+    for (const [op, count] of Object.entries(result.operations)) {
+      operationCounts[op] = (operationCounts[op] || 0) + count;
+    }
+  }
+
+  return {
+    resources: patchedResources,
+    patchesApplied: totalPatchesApplied,
+    patchesSkipped: totalPatchesSkipped,
+    warnings: allWarnings,
+    validationErrors: allValidationErrors,
+    operationCounts,
+  };
+}
+
+/**
+ * Write files asynchronously in parallel
+ *
+ * @param outputDir - Output directory path
+ * @param resources - Map of file paths to content
+ * @param concurrency - Maximum number of concurrent write operations
+ * @returns Total bytes written
+ */
+async function writeFilesParallel(
+  outputDir: string,
+  resources: Map<string, string>,
+  concurrency: number,
+): Promise<number> {
+  const limit = createConcurrencyLimiter(concurrency);
+  let totalBytes = 0;
+
+  // Sort file paths for deterministic order
+  const sortedEntries = Array.from(resources.entries()).sort(([a], [b]) => a.localeCompare(b));
+
+  await Promise.all(
+    sortedEntries.map(([filePath, content]) =>
+      limit(async () => {
+        const outputPath = join(outputDir, filePath);
+
+        // Ensure parent directory exists
+        const dir = dirname(outputPath);
+        try {
+          await mkdirAsync(dir, { recursive: true });
+        } catch (error) {
+          // Directory might already exist from another parallel operation
+          if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+            throw error;
+          }
+        }
+
+        // Write file
+        await writeFileAsync(outputPath, content, "utf-8");
+
+        // Track bytes written
+        totalBytes += Buffer.byteLength(content, "utf-8");
+      }),
+    ),
+  );
+
+  return totalBytes;
 }
 
 /**
@@ -1031,7 +1241,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
     // Track build start time for stats
     const startTime = options.stats ? performance.now() : 0;
 
-    // Apply patches
+    // Apply patches (parallel or sequential)
     log("Applying patches...", 2, options);
     const {
       resources: patchedResources,
@@ -1040,7 +1250,14 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       warnings,
       validationErrors: patchValidationErrors,
       operationCounts,
-    } = applyPatches(resources, config.patches || [], config.onNoMatch || "warn", options);
+    } = options.parallel
+      ? await applyPatchesParallel(
+          resources,
+          config.patches || [],
+          config.onNoMatch || "warn",
+          options,
+        )
+      : applyPatches(resources, config.patches || [], config.onNoMatch || "warn", options);
 
     // Collect all validation errors (from patches and global validators)
     const allValidationErrors: ValidationError[] = [...patchValidationErrors];
@@ -1066,20 +1283,41 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
     let filesWritten = 0;
     let totalBytes = 0;
 
-    for (const [filePath, content] of patchedResources.entries()) {
-      const outputPath = join(outputDir, filePath);
-      sourceFiles.add(filePath);
+    if (options.parallel) {
+      // Parallel file writing
+      const jobCount = options.jobs || cpus().length;
+      log(`Writing ${patchedResources.size} files with ${jobCount} parallel jobs`, 2, options);
 
-      mkdirSync(dirname(outputPath), { recursive: true });
-      writeFileSync(outputPath, content, "utf-8");
-      filesWritten++;
+      totalBytes = await writeFilesParallel(outputDir, patchedResources, jobCount);
+      filesWritten = patchedResources.size;
 
-      // Track bytes written for stats
-      if (options.stats) {
-        totalBytes += Buffer.byteLength(content, "utf-8");
+      // Track source files for cleaning
+      for (const filePath of patchedResources.keys()) {
+        sourceFiles.add(filePath);
       }
 
-      log(`  Wrote ${filePath}`, 3, options);
+      if (options.verbosity >= 3) {
+        for (const filePath of patchedResources.keys()) {
+          log(`  Wrote ${filePath}`, 3, options);
+        }
+      }
+    } else {
+      // Sequential file writing
+      for (const [filePath, content] of patchedResources.entries()) {
+        const outputPath = join(outputDir, filePath);
+        sourceFiles.add(filePath);
+
+        mkdirSync(dirname(outputPath), { recursive: true });
+        writeFileSync(outputPath, content, "utf-8");
+        filesWritten++;
+
+        // Track bytes written for stats
+        if (options.stats) {
+          totalBytes += Buffer.byteLength(content, "utf-8");
+        }
+
+        log(`  Wrote ${filePath}`, 3, options);
+      }
     }
 
     // Clean if requested
@@ -1164,7 +1402,11 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         console.log(`  Total bytes: ${stats.bytes}`);
         if (Object.keys(stats.byOperation).length > 0) {
           console.log("  By operation:");
-          for (const [op, count] of Object.entries(stats.byOperation)) {
+          // Sort operation names for deterministic output
+          const sortedOps = Object.entries(stats.byOperation).sort(([a], [b]) =>
+            a.localeCompare(b),
+          );
+          for (const [op, count] of sortedOps) {
             console.log(`    ${op}: ${count}`);
           }
         }
@@ -2267,6 +2509,14 @@ Flags:
   --stats                     Show build statistics (build command)
   -v, -vv, -vvv              Increase verbosity
   -q                         Quiet mode (errors only)
+
+Performance:
+  --parallel                  Enable parallel processing of files (build command)
+  --jobs <N>                  Number of parallel jobs (default: CPU cores)
+
+  Parallel mode processes files concurrently while keeping patches
+  sequential within each file. This can significantly speed up builds
+  for projects with many files. Output order is deterministic.
 
 Group Filtering:
   --enable-groups <groups>    Enable only specified groups (comma-separated)
