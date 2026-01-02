@@ -6,7 +6,8 @@ import { type GitFetchOptions, fetchGitRepository } from "./git-fetcher.js";
 import { isGitUrl, parseGitUrl } from "./git-url-parser.js";
 import { type HttpFetchOptions, fetchHttpArchive } from "./http-fetcher.js";
 import { isHttpArchiveUrl, parseHttpArchiveUrl } from "./http-url-parser.js";
-import type { LockFile, LockFileEntry } from "./types.js";
+import { SecurityValidationError, validateResourceSecurity } from "./security.js";
+import type { LockFile, LockFileEntry, SecurityConfig } from "./types.js";
 
 /**
  * Represents a resolved markdown file resource
@@ -65,6 +66,8 @@ interface ResolveOptions {
   updateLock?: boolean;
   /** Array to collect lock entries (mutated by function) */
   lockEntries?: LockFileEntry[];
+  /** Security configuration for remote resource validation */
+  security?: SecurityConfig;
 }
 
 /**
@@ -153,6 +156,9 @@ export async function resolveResources(
       }
 
       try {
+        // Validate security before fetching
+        validateResourceSecurity(pattern, options.security);
+
         // Fetch the git repository
         const fetchResult = await fetchGitRepository(pattern, {
           ...options.gitFetchOptions,
@@ -201,6 +207,13 @@ export async function resolveResources(
         if (error instanceof ResourceResolutionError) {
           throw error;
         }
+        if (error instanceof SecurityValidationError) {
+          throw new ResourceResolutionError(
+            `Security validation failed: ${error.message}`,
+            pattern,
+            error,
+          );
+        }
         throw new ResourceResolutionError(
           `Failed to fetch git repository: ${error instanceof Error ? error.message : String(error)}`,
           pattern,
@@ -222,6 +235,9 @@ export async function resolveResources(
       }
 
       try {
+        // Validate security before fetching
+        validateResourceSecurity(pattern, options.security);
+
         // Fetch and extract the HTTP archive
         const fetchResult = await fetchHttpArchive(pattern, {
           ...options.httpFetchOptions,
@@ -258,6 +274,13 @@ export async function resolveResources(
       } catch (error) {
         if (error instanceof ResourceResolutionError) {
           throw error;
+        }
+        if (error instanceof SecurityValidationError) {
+          throw new ResourceResolutionError(
+            `Security validation failed: ${error.message}`,
+            pattern,
+            error,
+          );
         }
         throw new ResourceResolutionError(
           `Failed to fetch HTTP archive: ${error instanceof Error ? error.message : String(error)}`,
@@ -310,6 +333,7 @@ export async function resolveResources(
               lockFile,
               updateLock,
               lockEntries,
+              security: options.security,
             });
 
             resolvedResources.push(...nestedResources);

@@ -207,3 +207,11 @@ export {
   validatePath,
   type FileOperationResult,
 } from "./file-operations.js";
+
+// Export security validation functions and types
+export {
+  validateResourceSecurity,
+  SecurityValidationError,
+} from "./security.js";
+
+export type { SecurityConfig } from "./types.js";

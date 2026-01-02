@@ -229,6 +229,72 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
     }
   }
 
+  // Validate security config (optional)
+  if (config.security !== undefined) {
+    if (typeof config.security !== "object" || Array.isArray(config.security)) {
+      errors.push({
+        field: "security",
+        message: "security must be an object",
+      });
+    } else {
+      const security = config.security as Record<string, unknown>;
+
+      // Validate allowedHosts
+      if (security.allowedHosts !== undefined) {
+        if (!Array.isArray(security.allowedHosts)) {
+          errors.push({
+            field: "security.allowedHosts",
+            message: "allowedHosts must be an array of strings",
+          });
+        } else {
+          security.allowedHosts.forEach((host: unknown, index: number) => {
+            if (typeof host !== "string") {
+              errors.push({
+                field: `security.allowedHosts[${index}]`,
+                message: "allowedHosts entry must be a string",
+              });
+            } else if (host.trim() === "") {
+              errors.push({
+                field: `security.allowedHosts[${index}]`,
+                message: "allowedHosts entry cannot be empty",
+              });
+            }
+          });
+        }
+      }
+
+      // Validate allowedProtocols
+      if (security.allowedProtocols !== undefined) {
+        if (!Array.isArray(security.allowedProtocols)) {
+          errors.push({
+            field: "security.allowedProtocols",
+            message: "allowedProtocols must be an array of strings",
+          });
+        } else {
+          const validProtocols = ["https", "http", "git", "ssh"];
+          security.allowedProtocols.forEach((protocol: unknown, index: number) => {
+            if (typeof protocol !== "string") {
+              errors.push({
+                field: `security.allowedProtocols[${index}]`,
+                message: "allowedProtocols entry must be a string",
+              });
+            } else if (protocol.trim() === "") {
+              errors.push({
+                field: `security.allowedProtocols[${index}]`,
+                message: "allowedProtocols entry cannot be empty",
+              });
+            } else if (!validProtocols.includes(protocol)) {
+              warnings.push({
+                field: `security.allowedProtocols[${index}]`,
+                message: `Protocol "${protocol}" is not a standard protocol (valid: ${validProtocols.join(", ")})`,
+              });
+            }
+          });
+        }
+      }
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,

@@ -55,6 +55,8 @@ export interface GitFetchOptions {
   lockFile?: LockFile;
   /** Whether to update the lock file (fetch latest) */
   updateLock?: boolean;
+  /** Offline mode - fail if remote fetch is needed */
+  offline?: boolean;
 }
 
 /**
@@ -333,7 +335,23 @@ export async function fetchGitRepository(
   let cached = false;
   let needsClone = !existsSync(repoPath);
 
+  // In offline mode, fail if repository is not cached
+  if (needsClone && options.offline) {
+    throw new GitFetchError(
+      `Cannot fetch ${parsed.host}/${parsed.org}/${parsed.repo} in offline mode. Run without --offline to fetch.`,
+      "OFFLINE_MODE",
+    );
+  }
+
   if (!needsClone && options.update) {
+    // In offline mode, cannot update existing repository
+    if (options.offline) {
+      throw new GitFetchError(
+        `Cannot update ${parsed.host}/${parsed.org}/${parsed.repo} in offline mode. Run without --offline to update.`,
+        "OFFLINE_MODE",
+      );
+    }
+
     // Update existing repository
     try {
       await executeGit(["fetch", "origin"], { cwd: repoPath, timeout: options.timeout });

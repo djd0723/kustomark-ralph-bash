@@ -402,6 +402,16 @@ export interface Validator {
 }
 
 /**
+ * Security configuration for remote resource validation
+ */
+export interface SecurityConfig {
+  /** List of allowed hostnames for remote resources (e.g., github.com, internal.company.com) */
+  allowedHosts?: string[];
+  /** List of allowed protocols for remote resources (e.g., https, git) */
+  allowedProtocols?: string[];
+}
+
+/**
  * Watch mode hooks configuration
  */
 export interface WatchHooks {
@@ -447,6 +457,8 @@ export interface KustomarkConfig {
   validators?: Validator[];
   /** Watch mode hooks - shell commands triggered on build events */
   watch?: WatchHooks;
+  /** Security configuration for remote resource validation */
+  security?: SecurityConfig;
 }
 
 /**

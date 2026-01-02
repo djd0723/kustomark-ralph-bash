@@ -60,6 +60,8 @@ export interface HttpFetchOptions {
   lockFile?: LockFile;
   /** Whether to update the lock file (fetch latest) */
   updateLock?: boolean;
+  /** Offline mode - fail if remote fetch is needed */
+  offline?: boolean;
 }
 
 /**
@@ -360,8 +362,24 @@ export async function fetchHttpArchive(
   let cached = false;
   let needsDownload = !existsSync(archivePath);
 
+  // In offline mode, fail if archive is not cached
+  if (needsDownload && options.offline) {
+    throw new HttpFetchError(
+      `Cannot fetch ${url} in offline mode. Run without --offline to fetch.`,
+      "OFFLINE_MODE",
+    );
+  }
+
   // Check if we should update existing cache
   if (!needsDownload && (options.update || options.updateLock)) {
+    // In offline mode, cannot update existing cache
+    if (options.offline) {
+      throw new HttpFetchError(
+        `Cannot update ${url} in offline mode. Run without --offline to update.`,
+        "OFFLINE_MODE",
+      );
+    }
+
     needsDownload = true;
     cached = false;
   } else if (!needsDownload) {

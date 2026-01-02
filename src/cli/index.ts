@@ -41,7 +41,17 @@ import {
   applyMoveFile,
   applyRenameFile,
 } from "../core/file-operations.js";
-import { loadLockFile, saveLockFile } from "../core/lock-file.js";
+import {
+  clearGitCache,
+  getDefaultCacheDir as getDefaultGitCacheDir,
+  listGitCache,
+} from "../core/git-fetcher.js";
+import {
+  clearHttpCache,
+  getDefaultCacheDir as getDefaultHttpCacheDir,
+  listHttpCache,
+} from "../core/http-fetcher.js";
+import { findLockEntry, loadLockFile, saveLockFile } from "../core/lock-file.js";
 import { applyPatches as coreApplyPatches } from "../core/patch-engine.js";
 import { resolveResources as coreResolveResources } from "../core/resource-resolver.js";
 import { generateSchema } from "../core/schema.js";
@@ -101,6 +111,7 @@ interface CLIOptions {
   saveDecisions?: string; // For debug --save-decisions option
   loadDecisions?: string; // For debug --load-decisions option
   noHooks?: boolean; // For watch --no-hooks option
+  offline?: boolean; // For build --offline option (fail if remote fetch needed)
 }
 
 interface BuildStats {
@@ -233,6 +244,7 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     autoApply: false,
     saveDecisions: undefined,
     loadDecisions: undefined,
+    offline: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -271,6 +283,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.update = true;
     } else if (arg === "--no-lock") {
       options.noLock = true;
+    } else if (arg === "--offline") {
+      options.offline = true;
     } else if (arg === "--no-hooks") {
       options.noHooks = true;
     } else if (arg === "--file" || arg.startsWith("--file=")) {
@@ -512,6 +526,7 @@ async function resolveResources(
   lockFile?: LockFile | null,
   updateLock?: boolean,
   lockEntries?: LockFileEntry[],
+  offline?: boolean,
 ): Promise<Map<string, string>> {
   // Build file map by scanning the file system
   const fileMap = buildCompleteFileMap(basePath);
@@ -521,6 +536,12 @@ async function resolveResources(
     lockFile: lockFile ?? undefined,
     updateLock,
     lockEntries,
+    gitFetchOptions: {
+      offline,
+    },
+    httpFetchOptions: {
+      offline,
+    },
   });
 
   // Convert from ResolvedResource[] to Map<string, string>
@@ -1589,6 +1610,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       lockFile,
       options.update,
       lockEntries,
+      options.offline,
     );
 
     // Track build start time for stats
@@ -2882,17 +2904,20 @@ async function performWatchBuild(
   }
 }
 
-// Future: Implement fetch command for M3 remote sources
-// @ts-expect-error Reserved for future implementation
-async function _fetchCommand(_path: string, options: CLIOptions): Promise<number> {
+/**
+ * Fetch command - fetch remote resources only (no build)
+ */
+async function fetchCommand(path: string, options: CLIOptions): Promise<number> {
   try {
-    const inputPath = resolve(_path);
+    const inputPath = resolve(path);
 
     // Determine the actual config file path
     let configPath = inputPath;
     if (existsSync(inputPath) && statSync(inputPath).isDirectory()) {
       configPath = join(inputPath, "kustomark.yaml");
     }
+
+    const basePath = dirname(configPath);
 
     log(`Loading config from ${configPath}...`, 2, options);
     const config = readKustomarkConfig(inputPath);
@@ -2921,57 +2946,113 @@ async function _fetchCommand(_path: string, options: CLIOptions): Promise<number
       return 1;
     }
 
-    // For M3 implementation, we'll simulate fetching remote resources
-    // In a real implementation, this would:
-    // 1. Parse resource URLs for git://, https://, github.com shortcuts
-    // 2. Download/clone remote resources
-    // 3. Cache them in ~/.cache/kustomark/
-    // 4. Return info about what was fetched
+    // Load lock file if not disabled
+    let lockFile: LockFile | null = null;
+    const lockEntries: LockFileEntry[] = [];
 
-    // For now, we'll just list the resources that would be fetched
-    const fetched: Array<{ url: string; cached: boolean }> = [];
+    if (!options.noLock) {
+      log("Loading lock file...", 3, options);
+      lockFile = loadLockFile(configPath);
 
+      if (!lockFile && options.verbosity >= 2) {
+        log("Lock file not found, will be created after fetch", 2, options);
+      }
+    }
+
+    // Track which resources are remote and will be fetched
+    const remoteResources: string[] = [];
+    const fetchedInfo: Array<{ url: string; cached: boolean }> = [];
+
+    // Identify remote resources
     for (const resource of config.resources) {
-      // Check if resource looks like a remote URL
       if (
+        resource.startsWith("git::") ||
         resource.startsWith("http://") ||
         resource.startsWith("https://") ||
-        resource.startsWith("git::") ||
-        resource.includes("github.com/") ||
-        resource.includes("git@")
+        resource.match(/^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\//) || // github.com/org/repo style
+        resource.startsWith("git@")
       ) {
-        // This is a remote resource
-        fetched.push({
-          url: resource,
-          cached: false, // In real implementation, check if it's in cache
-        });
-        log(`Would fetch: ${resource}`, 2, options);
-      } else {
-        // Local resource, skip
-        log(`Skipping local resource: ${resource}`, 3, options);
+        remoteResources.push(resource);
       }
+    }
+
+    if (remoteResources.length === 0) {
+      const result: FetchResult = {
+        success: true,
+        fetched: [],
+      };
+
+      if (options.format === "json") {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        if (options.verbosity > 0) {
+          console.log("No remote resources to fetch");
+        }
+      }
+      return 0;
+    }
+
+    // Build file map and resolve resources (this will trigger fetching)
+    log("Resolving resources...", 2, options);
+    const fileMap = buildCompleteFileMap(basePath);
+
+    // Before resolving, check cache status for each remote resource
+    // This is a heuristic - we check if resources exist in lock file before resolving
+    const cacheStatusBefore = new Map<string, boolean>();
+    for (const resource of remoteResources) {
+      // Check if resource is in lock file (indicates it was previously fetched)
+      const lockEntry = lockFile ? findLockEntry(lockFile, resource) : null;
+      cacheStatusBefore.set(resource, lockEntry !== null);
+    }
+
+    await coreResolveResources(config.resources, basePath, fileMap, {
+      lockFile: lockFile ?? undefined,
+      updateLock: options.update,
+      lockEntries,
+    });
+
+    // After resolution, determine cached status based on whether lock entries were created
+    for (const resource of remoteResources) {
+      const wasCached = cacheStatusBefore.get(resource) ?? false;
+
+      // If we're not updating and it was in the lock file, it was cached
+      // If we're updating or it wasn't in lock file, it was fetched fresh
+      const cached = !options.update && wasCached;
+
+      fetchedInfo.push({
+        url: resource,
+        cached,
+      });
+
+      const status = cached ? "(cached)" : "(fetched)";
+      log(`${resource} ${status}`, 2, options);
+    }
+
+    // Save lock file if update flag is set
+    if (options.update && lockEntries.length > 0) {
+      log("Updating lock file...", 2, options);
+      const newLockFile: LockFile = {
+        version: 1,
+        resources: lockEntries,
+      };
+      saveLockFile(configPath, newLockFile);
+      log("Lock file updated", 2, options);
     }
 
     // Output results
     const result: FetchResult = {
       success: true,
-      fetched,
+      fetched: fetchedInfo,
     };
 
     if (options.format === "json") {
       console.log(JSON.stringify(result, null, 2));
     } else {
-      if (fetched.length > 0) {
-        if (options.verbosity > 0) {
-          console.log(`Fetched ${fetched.length} remote resource(s):`);
-          for (const item of fetched) {
-            const cacheStatus = item.cached ? " (cached)" : "";
-            console.log(`  ${item.url}${cacheStatus}`);
-          }
-        }
-      } else {
-        if (options.verbosity > 0) {
-          console.log("No remote resources to fetch");
+      if (options.verbosity > 0) {
+        console.log(`Fetched ${fetchedInfo.length} remote resource(s):`);
+        for (const item of fetchedInfo) {
+          const cacheStatus = item.cached ? " (cached)" : "";
+          console.log(`  ${item.url}${cacheStatus}`);
         }
       }
     }
@@ -2998,17 +3079,154 @@ async function _fetchCommand(_path: string, options: CLIOptions): Promise<number
 }
 
 // ============================================================================
+// Cache Command
+// ============================================================================
+
+interface CacheListItem {
+  type: "git" | "http";
+  key: string;
+}
+
+interface CacheListResult {
+  success: boolean;
+  cached: CacheListItem[];
+  error?: string;
+}
+
+interface CacheClearResult {
+  success: boolean;
+  cleared: number;
+  error?: string;
+}
+
+/**
+ * Cache command - list or clear cached resources
+ */
+async function cacheCommand(args: string[], options: CLIOptions): Promise<number> {
+  const subcommand = args[0];
+
+  if (!subcommand || subcommand === "list") {
+    // List all cached resources
+    try {
+      const gitCached = await listGitCache();
+      const httpCached = await listHttpCache();
+
+      const cached: CacheListItem[] = [
+        ...gitCached.map((key) => ({ type: "git" as const, key })),
+        ...httpCached.map((key) => ({ type: "http" as const, key })),
+      ];
+
+      if (options.format === "json") {
+        const result: CacheListResult = {
+          success: true,
+          cached,
+        };
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        if (cached.length === 0) {
+          console.log("No cached resources");
+        } else {
+          console.log(`Cached resources (${cached.length}):`);
+          console.log();
+
+          if (gitCached.length > 0) {
+            console.log("Git repositories:");
+            for (const key of gitCached) {
+              console.log(`  ${key}`);
+            }
+            console.log();
+          }
+
+          if (httpCached.length > 0) {
+            console.log("HTTP archives:");
+            for (const key of httpCached) {
+              console.log(`  ${key}`);
+            }
+          }
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      if (options.format === "json") {
+        const result: CacheListResult = {
+          success: false,
+          cached: [],
+          error: error instanceof Error ? error.message : String(error),
+        };
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.error(
+          `Error listing cache: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      return 1;
+    }
+  } else if (subcommand === "clear") {
+    // Clear cache (optionally with pattern)
+    const pattern = args[1]; // Optional pattern for selective clearing
+
+    try {
+      const gitCleared = await clearGitCache(getDefaultGitCacheDir(), pattern);
+      const httpCleared = await clearHttpCache(getDefaultHttpCacheDir(), pattern);
+      const totalCleared = gitCleared + httpCleared;
+
+      if (options.format === "json") {
+        const result: CacheClearResult = {
+          success: true,
+          cleared: totalCleared,
+        };
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        if (pattern) {
+          console.log(`Cleared ${totalCleared} cache entries matching pattern: ${pattern}`);
+        } else {
+          console.log(`Cleared ${totalCleared} cache entries`);
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      if (options.format === "json") {
+        const result: CacheClearResult = {
+          success: false,
+          cleared: 0,
+          error: error instanceof Error ? error.message : String(error),
+        };
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.error(
+          `Error clearing cache: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      return 1;
+    }
+  } else {
+    console.error(`Unknown cache subcommand: ${subcommand}`);
+    console.error("Usage:");
+    console.error("  kustomark cache list              List all cached resources");
+    console.error("  kustomark cache clear             Clear all caches");
+    console.error("  kustomark cache clear <pattern>   Clear specific resources matching pattern");
+    console.error("");
+    console.error("All commands support --format=json");
+    return 1;
+  }
+}
+
+// ============================================================================
 // Exports (for testing)
 // ============================================================================
 
 export {
   buildCommand,
   diffCommand,
+  fetchCommand,
   validateCommand,
   watchCommand,
   lintCommand,
   explainCommand,
   initCommand,
+  cacheCommand,
 };
 
 // ============================================================================
@@ -3026,6 +3244,7 @@ Kustomark - Declarative markdown patching pipeline
 Usage:
   kustomark build [path]      Build and write output
   kustomark diff [path]       Show what would change
+  kustomark fetch [path]      Fetch remote resources only (no build)
   kustomark validate [path]   Validate configuration
   kustomark watch [path]      Watch and rebuild on file changes
   kustomark lint [path]       Check for common issues in config
@@ -3034,6 +3253,14 @@ Usage:
   kustomark init [path]       Create a new kustomark.yaml config
   kustomark web [path]        Launch web UI for visual editing
   kustomark debug [path]      Interactive patch debugging mode
+  kustomark cache <cmd>       Manage cache for remote resources
+
+Cache Commands:
+  kustomark cache list              List all cached resources (git and HTTP)
+  kustomark cache clear             Clear all caches
+  kustomark cache clear <pattern>   Clear specific resources matching pattern
+
+  All cache commands support --format=json for machine-readable output.
 
 Debug Mode Flags:
   --auto-apply                Auto-apply all patches without prompting
@@ -3100,6 +3327,7 @@ Group Filtering:
 Lock File:
   --update                    Update kustomark.lock with latest refs
   --no-lock                   Ignore lock file (fetch latest versions)
+  --offline                   Fail if remote fetch is needed (use cached resources only)
 
 Remote Resources:
   Git URLs are recognized and validated but fetching is not yet implemented.
@@ -3120,6 +3348,8 @@ Exit Codes:
       return await buildCommand(path, options);
     case "diff":
       return await diffCommand(path, options);
+    case "fetch":
+      return await fetchCommand(path, options);
     case "validate":
       return await validateCommand(path, options);
     case "watch":
@@ -3142,6 +3372,8 @@ Exit Codes:
       });
     case "debug":
       return await debugCommand(path, options);
+    case "cache":
+      return await cacheCommand(args.slice(1), options);
     default:
       console.error(`Unknown command: ${command}`);
       console.error(`Run 'kustomark --help' for usage information`);

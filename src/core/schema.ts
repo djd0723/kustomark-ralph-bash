@@ -2059,6 +2059,33 @@ export function generateSchema(): object {
         },
         additionalProperties: false,
       },
+      security: {
+        type: "object",
+        description:
+          "Security configuration for remote resource validation. Use this to restrict which hosts and protocols can be accessed when fetching remote resources.",
+        properties: {
+          allowedHosts: {
+            type: "array",
+            description:
+              "List of allowed hostnames for remote resources (e.g., github.com, internal.company.com). If specified, only resources from these hosts will be allowed.",
+            items: {
+              type: "string",
+              description: "Hostname (e.g., github.com, gitlab.com, internal.company.com)",
+            },
+          },
+          allowedProtocols: {
+            type: "array",
+            description:
+              "List of allowed protocols for remote resources (e.g., https, git, ssh). If specified, only resources using these protocols will be allowed.",
+            items: {
+              type: "string",
+              description: "Protocol name (e.g., https, http, git, ssh)",
+              enum: ["https", "http", "git", "ssh"],
+            },
+          },
+        },
+        additionalProperties: false,
+      },
     },
     additionalProperties: false,
   };
