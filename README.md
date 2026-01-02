@@ -22,6 +22,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark watch](#kustomark-watch-path)
 - [Configuration](#configuration)
 - [Patch Operations](#patch-operations)
+- [Table Operations](#table-operations)
 - [File Operations](#file-operations)
 - [Conditional Patches](#conditional-patches)
   - [Condition Types](#condition-types)
@@ -1492,6 +1493,237 @@ config:
 - `includeStart: true` replaces the start marker too
 - `includeEnd: true` replaces the end marker too
 - Supports both exact string matching and regex patterns
+
+## Table Operations
+
+Table operations allow you to manipulate GitHub Flavored Markdown tables. Tables can be identified by their zero-based index in the document or by the section ID containing the table.
+
+### `replace-table-cell` - Replace Content in Table Cell
+
+Replace the content of a specific cell in a table.
+
+```yaml
+- op: replace-table-cell
+  table: 0              # Table identifier (index or section ID)
+  row: 0                # Row identifier (index or search criteria)
+  column: "Age"         # Column identifier (index or header name)
+  content: "31"
+```
+
+**Table Identification:**
+- By index: `table: 0` (first table in document)
+- By section: `table: "team-members"` (table in section with ID "team-members")
+
+**Row Identification:**
+- By index: `row: 0` (first data row, 0-based)
+- By search criteria: `row: { column: "Name", value: "Alice" }` (first row where column "Name" equals "Alice")
+
+**Column Identification:**
+- By index: `column: 0` (first column, 0-based)
+- By header name: `column: "Age"` (column with header "Age")
+
+**Example:**
+
+Input:
+```markdown
+| Name  | Age | City |
+|-------|-----|------|
+| Alice | 30  | NYC  |
+| Bob   | 25  | LA   |
+```
+
+After applying:
+```yaml
+- op: replace-table-cell
+  table: 0
+  row: { column: "Name", value: "Alice" }
+  column: "Age"
+  content: "31"
+```
+
+Output:
+```markdown
+| Name  | Age | City |
+|-------|-----|------|
+| Alice | 31  | NYC  |
+| Bob   | 25  | LA   |
+```
+
+### `add-table-row` - Add Row to Table
+
+Add a new row to a table at a specified position.
+
+```yaml
+- op: add-table-row
+  table: 0
+  values: ["Charlie", "35", "SF"]
+  position: -1          # Optional: -1 or omit for end, 0 for beginning
+```
+
+**Position Parameter:**
+- Omitted or `-1`: Append to end of table (default)
+- `0`: Insert at beginning
+- Any number: Insert at that position (0-based)
+
+**Example:**
+
+Input:
+```markdown
+| Name  | Age | City |
+|-------|-----|------|
+| Alice | 30  | NYC  |
+| Bob   | 25  | LA   |
+```
+
+After applying:
+```yaml
+- op: add-table-row
+  table: 0
+  values: ["Charlie", "35", "SF"]
+```
+
+Output:
+```markdown
+| Name  | Age | City |
+|-------|-----|------|
+| Alice | 30  | NYC  |
+| Bob   | 25  | LA   |
+| Charlie | 35  | SF   |
+```
+
+**Notes:**
+- Values array must match the number of columns in the table
+- Use empty strings for empty cells: `["Name", "", "City"]`
+
+### `remove-table-row` - Remove Row from Table
+
+Remove a row from a table by index or search criteria.
+
+```yaml
+- op: remove-table-row
+  table: 0
+  row: 1                # Row identifier (index or search criteria)
+```
+
+**Row Identification:**
+- By index: `row: 1` (second data row, 0-based)
+- By search criteria: `row: { column: "Name", value: "Bob" }` (first row where column "Name" equals "Bob")
+
+**Example with search criteria:**
+
+Input:
+```markdown
+| Name  | Age | City |
+|-------|-----|------|
+| Alice | 30  | NYC  |
+| Bob   | 25  | LA   |
+| Carol | 28  | SF   |
+```
+
+After applying:
+```yaml
+- op: remove-table-row
+  table: 0
+  row: { column: "Name", value: "Bob" }
+```
+
+Output:
+```markdown
+| Name  | Age | City |
+|-------|-----|------|
+| Alice | 30  | NYC  |
+| Carol | 28  | SF   |
+```
+
+### `add-table-column` - Add Column to Table
+
+Add a new column to a table with an optional default value for all rows.
+
+```yaml
+- op: add-table-column
+  table: 0
+  header: "Email"
+  defaultValue: "N/A"   # Optional: default value for all rows
+  position: -1          # Optional: -1 or omit for end, 0 for beginning
+```
+
+**Position Parameter:**
+- Omitted or `-1`: Append to end (default)
+- `0`: Insert at beginning
+- Any number: Insert at that position (0-based)
+
+**Example:**
+
+Input:
+```markdown
+| Name  | Age | City |
+|-------|-----|------|
+| Alice | 30  | NYC  |
+| Bob   | 25  | LA   |
+```
+
+After applying:
+```yaml
+- op: add-table-column
+  table: 0
+  header: "Email"
+  defaultValue: ""
+```
+
+Output:
+```markdown
+| Name  | Age | City | Email |
+|-------|-----|------|-------|
+| Alice | 30  | NYC  |       |
+| Bob   | 25  | LA   |       |
+```
+
+**Notes:**
+- If `defaultValue` is omitted, empty strings are used
+- The column will be added to all rows in the table
+
+### `remove-table-column` - Remove Column from Table
+
+Remove a column from a table by index or header name.
+
+```yaml
+- op: remove-table-column
+  table: 0
+  column: "Age"         # Column identifier (index or header name)
+```
+
+**Column Identification:**
+- By index: `column: 1` (second column, 0-based)
+- By header name: `column: "Age"` (column with header "Age")
+
+**Example:**
+
+Input:
+```markdown
+| Name  | Age | City | Email |
+|-------|-----|------|-------|
+| Alice | 30  | NYC  | a@example.com |
+| Bob   | 25  | LA   | b@example.com |
+```
+
+After applying:
+```yaml
+- op: remove-table-column
+  table: 0
+  column: "Age"
+```
+
+Output:
+```markdown
+| Name  | City | Email |
+|-------|------|-------|
+| Alice | NYC  | a@example.com |
+| Bob   | LA   | b@example.com |
+```
+
+**Notes:**
+- Removing a column affects all rows in the table
+- The header row and alignment row are also updated
 
 ## File Operations
 

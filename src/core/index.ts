@@ -156,6 +156,16 @@ export {
   generatePatchSuggestions,
   generateSectionSuggestions,
 } from "./suggestion-engine.js";
+// Export table parser functions and types
+export {
+  type ColumnAlignment,
+  findRowIndex,
+  findTable,
+  getColumnIndex,
+  type MarkdownTable,
+  parseTables,
+  serializeTable,
+} from "./table-parser.js";
 // Export test runner functions
 export { runPatchTest, runTestSuite } from "./test-runner.js";
 // Export test suite parser functions

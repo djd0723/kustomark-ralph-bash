@@ -363,6 +363,71 @@ export interface MoveFilePatch extends PatchCommonFields {
 }
 
 /**
+ * Replace table cell operation - replaces content in a specific table cell
+ */
+export interface ReplaceTableCellPatch extends PatchCommonFields {
+  op: "replace-table-cell";
+  /** Table identifier (index 0-based or heading text) */
+  table: number | string;
+  /** Row identifier (0-based index or object with column and value to match) */
+  row: number | { column: number | string; value: string };
+  /** Column identifier (0-based index or header name) */
+  column: number | string;
+  /** New content for the cell */
+  content: string;
+}
+
+/**
+ * Add table row operation - adds a new row to a table
+ */
+export interface AddTableRowPatch extends PatchCommonFields {
+  op: "add-table-row";
+  /** Table identifier (index 0-based or heading text) */
+  table: number | string;
+  /** Array of cell values for the new row */
+  values: string[];
+  /** Position to insert the row (0-based index, default: append to end) */
+  position?: number;
+}
+
+/**
+ * Remove table row operation - removes a row from a table
+ */
+export interface RemoveTableRowPatch extends PatchCommonFields {
+  op: "remove-table-row";
+  /** Table identifier (index 0-based or heading text) */
+  table: number | string;
+  /** Row identifier (0-based index or object with column and value to match) */
+  row: number | { column: number | string; value: string };
+}
+
+/**
+ * Add table column operation - adds a new column to a table
+ */
+export interface AddTableColumnPatch extends PatchCommonFields {
+  op: "add-table-column";
+  /** Table identifier (index 0-based or heading text) */
+  table: number | string;
+  /** Header name for the new column */
+  header: string;
+  /** Default value for existing rows (default: empty string) */
+  defaultValue?: string;
+  /** Position to insert the column (0-based index, default: append to end) */
+  position?: number;
+}
+
+/**
+ * Remove table column operation - removes a column from a table
+ */
+export interface RemoveTableColumnPatch extends PatchCommonFields {
+  op: "remove-table-column";
+  /** Table identifier (index 0-based or heading text) */
+  table: number | string;
+  /** Column identifier (0-based index or header name) */
+  column: number | string;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -387,7 +452,12 @@ export type PatchOperation =
   | CopyFilePatch
   | RenameFilePatch
   | DeleteFilePatch
-  | MoveFilePatch;
+  | MoveFilePatch
+  | ReplaceTableCellPatch
+  | AddTableRowPatch
+  | RemoveTableRowPatch
+  | AddTableColumnPatch
+  | RemoveTableColumnPatch;
 
 /**
  * Global validator configuration

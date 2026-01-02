@@ -2048,6 +2048,469 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            {
+              type: "object",
+              required: ["op", "table", "row", "column", "content"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "replace-table-cell",
+                  description: "Replace content in a specific table cell",
+                },
+                table: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Table identifier (0-based index or heading text)",
+                },
+                row: {
+                  oneOf: [
+                    { type: "number" },
+                    {
+                      type: "object",
+                      required: ["column", "value"],
+                      properties: {
+                        column: {
+                          oneOf: [{ type: "number" }, { type: "string" }],
+                          description: "Column identifier (0-based index or header name)",
+                        },
+                        value: {
+                          type: "string",
+                          description: "Value to match in the specified column",
+                        },
+                      },
+                      additionalProperties: false,
+                    },
+                  ],
+                  description:
+                    "Row identifier (0-based index or object with column and value to match)",
+                },
+                column: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Column identifier (0-based index or header name)",
+                },
+                content: {
+                  type: "string",
+                  description: "New content for the cell",
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["op", "table", "values"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "add-table-row",
+                  description: "Add a new row to a table",
+                },
+                table: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Table identifier (0-based index or heading text)",
+                },
+                values: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Array of cell values for the new row",
+                },
+                position: {
+                  type: "number",
+                  description: "Position to insert the row (0-based index, default: append to end)",
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["op", "table", "row"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "remove-table-row",
+                  description: "Remove a row from a table",
+                },
+                table: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Table identifier (0-based index or heading text)",
+                },
+                row: {
+                  oneOf: [
+                    { type: "number" },
+                    {
+                      type: "object",
+                      required: ["column", "value"],
+                      properties: {
+                        column: {
+                          oneOf: [{ type: "number" }, { type: "string" }],
+                          description: "Column identifier (0-based index or header name)",
+                        },
+                        value: {
+                          type: "string",
+                          description: "Value to match in the specified column",
+                        },
+                      },
+                      additionalProperties: false,
+                    },
+                  ],
+                  description:
+                    "Row identifier (0-based index or object with column and value to match)",
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["op", "table", "header"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "add-table-column",
+                  description: "Add a new column to a table",
+                },
+                table: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Table identifier (0-based index or heading text)",
+                },
+                header: {
+                  type: "string",
+                  description: "Header name for the new column",
+                },
+                defaultValue: {
+                  type: "string",
+                  description: "Default value for existing rows (default: empty string)",
+                },
+                position: {
+                  type: "number",
+                  description:
+                    "Position to insert the column (0-based index, default: append to end)",
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["op", "table", "column"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "remove-table-column",
+                  description: "Remove a column from a table",
+                },
+                table: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Table identifier (0-based index or heading text)",
+                },
+                column: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Column identifier (0-based index or header name)",
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
           ],
         },
       },

@@ -5,6 +5,7 @@
  * - String replacement (exact and regex)
  * - Section operations (remove, replace, prepend, append)
  * - Frontmatter operations (set, remove, rename, merge)
+ * - Table operations (replace cell, add/remove row, add/remove column)
  * - GitHub-style header slug parsing
  * - Custom ID support with {#custom-id} syntax
  */
@@ -14,6 +15,7 @@ import { evaluateCondition } from "./condition-evaluator.js";
 import { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
 import { resolveInheritance } from "./patch-inheritance.js";
 import { generatePatchSuggestions } from "./suggestion-engine.js";
+import { findRowIndex, findTable, getColumnIndex, serializeTable } from "./table-parser.js";
 import type {
   MarkdownSection,
   OnNoMatchStrategy,
@@ -1095,6 +1097,243 @@ export function applyChangeSectionLevel(
 }
 
 /**
+ * Apply a replace-table-cell patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table index (number) or section ID (string) containing the table
+ * @param rowIdentifier - Row index (number) or search criteria (object)
+ * @param columnIdentifier - Column index (number) or column name (string)
+ * @param newContent - The new cell content
+ * @returns Object with patched content and count (1 if replaced, 0 if table/cell not found)
+ */
+export function applyReplaceTableCell(
+  content: string,
+  tableIdentifier: number | string,
+  rowIdentifier: number | { column: number | string; value: string },
+  columnIdentifier: number | string,
+  newContent: string,
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  // Find column index
+  const columnIndex = getColumnIndex(table, columnIdentifier);
+  if (columnIndex === -1) {
+    return { content, count: 0 };
+  }
+
+  // Find row index
+  const rowIndex = findRowIndex(table, rowIdentifier);
+  if (rowIndex === -1) {
+    return { content, count: 0 };
+  }
+
+  // Replace the cell content
+  const existingRow = table.rows[rowIndex];
+  if (!existingRow) {
+    return { content, count: 0 };
+  }
+  const newRow = [...existingRow];
+  newRow[columnIndex] = newContent;
+  table.rows[rowIndex] = newRow;
+
+  // Serialize the modified table
+  const newTableContent = serializeTable(table);
+
+  // Replace the table in the content
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply an add-table-row patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table index (number) or section ID (string) containing the table
+ * @param values - Array of cell values for the new row
+ * @param position - Position to insert the row (-1 or undefined to append to end)
+ * @returns Object with patched content and count (1 if added, 0 if table not found)
+ */
+export function applyAddTableRow(
+  content: string,
+  tableIdentifier: number | string,
+  values: string[],
+  position?: number,
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  // Ensure the row has the correct number of columns
+  const normalizedRow = [...values];
+  while (normalizedRow.length < table.headers.length) {
+    normalizedRow.push("");
+  }
+  // Truncate if too many columns
+  normalizedRow.splice(table.headers.length);
+
+  // Insert the row at the specified position
+  const insertIndex =
+    position === undefined || position === -1 || position >= table.rows.length
+      ? table.rows.length
+      : Math.max(0, position);
+
+  table.rows.splice(insertIndex, 0, normalizedRow);
+
+  // Serialize the modified table
+  const newTableContent = serializeTable(table);
+
+  // Replace the table in the content
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply a remove-table-row patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table index (number) or section ID (string) containing the table
+ * @param rowIdentifier - Row index (number) or search criteria (object)
+ * @returns Object with patched content and count (1 if removed, 0 if table/row not found)
+ */
+export function applyRemoveTableRow(
+  content: string,
+  tableIdentifier: number | string,
+  rowIdentifier: number | { column: number | string; value: string },
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  // Find row index
+  const rowIndex = findRowIndex(table, rowIdentifier);
+  if (rowIndex === -1) {
+    return { content, count: 0 };
+  }
+
+  // Remove the row
+  table.rows.splice(rowIndex, 1);
+
+  // Serialize the modified table
+  const newTableContent = serializeTable(table);
+
+  // Replace the table in the content
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply an add-table-column patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table index (number) or section ID (string) containing the table
+ * @param header - Header name for the new column
+ * @param defaultValue - Default value for existing rows (default: empty string)
+ * @param position - Position to insert the column (-1 or undefined to append to end)
+ * @returns Object with patched content and count (1 if added, 0 if table not found)
+ */
+export function applyAddTableColumn(
+  content: string,
+  tableIdentifier: number | string,
+  header: string,
+  defaultValue = "",
+  position?: number,
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  // Determine insert position
+  const insertIndex =
+    position === undefined || position === -1 || position >= table.headers.length
+      ? table.headers.length
+      : Math.max(0, position);
+
+  // Add header
+  table.headers.splice(insertIndex, 0, header);
+
+  // Add alignment (default to "none")
+  table.alignments.splice(insertIndex, 0, "none");
+
+  // Add column to each row
+  for (const row of table.rows) {
+    row.splice(insertIndex, 0, defaultValue);
+  }
+
+  // Serialize the modified table
+  const newTableContent = serializeTable(table);
+
+  // Replace the table in the content
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply a remove-table-column patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table index (number) or section ID (string) containing the table
+ * @param columnIdentifier - Column index (number) or column name (string)
+ * @returns Object with patched content and count (1 if removed, 0 if table/column not found)
+ */
+export function applyRemoveTableColumn(
+  content: string,
+  tableIdentifier: number | string,
+  columnIdentifier: number | string,
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  // Find column index
+  const columnIndex = getColumnIndex(table, columnIdentifier);
+  if (columnIndex === -1) {
+    return { content, count: 0 };
+  }
+
+  // Remove header
+  table.headers.splice(columnIndex, 1);
+
+  // Remove alignment
+  table.alignments.splice(columnIndex, 1);
+
+  // Remove column from each row
+  for (const row of table.rows) {
+    if (columnIndex < row.length) {
+      row.splice(columnIndex, 1);
+    }
+  }
+
+  // Serialize the modified table
+  const newTableContent = serializeTable(table);
+
+  // Replace the table in the content
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply a single patch operation to content.
  *
  * This function applies one patch operation to the provided content. It handles:
@@ -1264,6 +1503,32 @@ export function applySinglePatch(
       result = applyChangeSectionLevel(content, patch.id, patch.delta);
       break;
 
+    case "replace-table-cell":
+      result = applyReplaceTableCell(content, patch.table, patch.row, patch.column, patch.content);
+      break;
+
+    case "add-table-row":
+      result = applyAddTableRow(content, patch.table, patch.values, patch.position);
+      break;
+
+    case "remove-table-row":
+      result = applyRemoveTableRow(content, patch.table, patch.row);
+      break;
+
+    case "add-table-column":
+      result = applyAddTableColumn(
+        content,
+        patch.table,
+        patch.header,
+        patch.defaultValue,
+        patch.position,
+      );
+      break;
+
+    case "remove-table-column":
+      result = applyRemoveTableColumn(content, patch.table, patch.column);
+      break;
+
     case "copy-file":
     case "rename-file":
     case "delete-file":
@@ -1370,6 +1635,16 @@ function getPatchDescription(patch: PatchOperation): string {
       return `move-section '${patch.id}' after '${patch.after}'`;
     case "change-section-level":
       return `change-section-level '${patch.id}' by ${patch.delta}`;
+    case "replace-table-cell":
+      return `replace-table-cell in table '${patch.table}' at row ${typeof patch.row === "number" ? patch.row : JSON.stringify(patch.row)} column '${patch.column}'`;
+    case "add-table-row":
+      return `add-table-row to table '${patch.table}' at position ${patch.position ?? "end"}`;
+    case "remove-table-row":
+      return `remove-table-row from table '${patch.table}' at row ${typeof patch.row === "number" ? patch.row : JSON.stringify(patch.row)}`;
+    case "add-table-column":
+      return `add-table-column '${patch.header}' to table '${patch.table}' at position ${patch.position ?? "end"}`;
+    case "remove-table-column":
+      return `remove-table-column '${patch.column}' from table '${patch.table}'`;
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":
