@@ -7,6 +7,15 @@
  * - Config parsing (from other modules)
  */
 
+// Export benchmark storage functions
+export {
+  compareResults,
+  detectRegressions,
+  listBaselines,
+  loadBaseline,
+  saveBaseline,
+} from "./benchmark-storage.js";
+
 // Export build cache functions and types
 export {
   type CurrentBuildState,
@@ -202,6 +211,10 @@ export type {
   AnalyticsReport,
   AnyOfCondition,
   AppendToSectionPatch,
+  BenchmarkComparison,
+  BenchmarkConfig,
+  BenchmarkResult,
+  BenchmarkSuiteResult,
   BuildCache,
   BuildCacheEntry,
   ComplexityReport,

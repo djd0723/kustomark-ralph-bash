@@ -1029,3 +1029,72 @@ export interface DryRunAnalysis {
   /** Overall assessment message */
   assessment: string;
 }
+
+// Benchmark Types
+export interface BenchmarkConfig {
+  name: string;
+  description: string;
+  fileCount: number;
+  operations: PatchOperation[];
+  complexity: "simple" | "medium" | "complex";
+  warmupRuns: number;
+  benchmarkRuns: number;
+}
+
+export interface BenchmarkResult {
+  operation: string;
+  fileCount: number;
+  complexity: string;
+  runs: number;
+  timing: {
+    mean: number;
+    median: number;
+    min: number;
+    max: number;
+    p95: number;
+    p99: number;
+    stdDev: number;
+  };
+  memory: {
+    heapUsed: number;
+    heapTotal: number;
+    external: number;
+    rss: number;
+  };
+  throughput: {
+    filesPerSecond: number;
+    operationsPerSecond: number;
+    bytesPerSecond: number;
+  };
+}
+
+export interface BenchmarkSuiteResult {
+  timestamp: string;
+  environment: {
+    platform: string;
+    arch: string;
+    bunVersion: string;
+    cpuCount: number;
+    totalMemory: number;
+  };
+  results: BenchmarkResult[];
+  summary: {
+    totalDuration: number;
+    totalOperations: number;
+    averageThroughput: number;
+  };
+}
+
+export interface BenchmarkComparison {
+  operation: string;
+  fileCount: number;
+  baseline: BenchmarkResult;
+  current: BenchmarkResult;
+  change: {
+    meanPercent: number;
+    medianPercent: number;
+    memoryPercent: number;
+    regression: boolean;
+    improvement: boolean;
+  };
+}

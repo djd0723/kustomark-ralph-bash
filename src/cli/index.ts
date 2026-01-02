@@ -81,6 +81,7 @@ import type {
 } from "../core/types.js";
 import { runValidators } from "../core/validators.js";
 import { analyzeCommand } from "./analyze-command.js";
+import { handleBenchmarkCommand } from "./benchmark-command.js";
 import { debugCommand } from "./debug-command.js";
 import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
 import { initNonInteractive } from "./init-command.js";
@@ -4217,6 +4218,8 @@ async function main(): Promise<number> {
       return await analyzeCommand(path, options);
     case "suggest":
       return await suggestCommand(options);
+    case "benchmark":
+      return await handleBenchmarkCommand(args.slice(1));
     case "template": {
       // Handle template subcommands
       // Extract positional args (non-flags) from args

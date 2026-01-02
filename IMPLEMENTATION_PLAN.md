@@ -6,6 +6,35 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 ## Recent Enhancements
 
+**2026-01-02 (Issue #1 Resolution - Bug Fix):**
+- ✅ **VERIFIED**: Directory structure preservation is working correctly
+- ✅ Fix was already implemented in `src/cli/index.ts` lines 798-803
+- ✅ The `resolveResources` function now uses `resource.baseDir` to compute relative paths
+- ✅ Directory references now preserve nested folder structures instead of flattening
+- ✅ Tested with complex directory structure matching the issue description
+- ✅ All 2717 tests passing ✓
+- ✅ All linting checks passing (bun check) ✓
+- 📝 **Example**: `skills/create-research/SKILL.md` → `output/skills/create-research/SKILL.md`
+- 📝 **Impact**: Multiple files with the same basename no longer overwrite each other
+- 📝 **Root Cause**: Previously extracted only filename, now computes relative path from baseDir
+
+**Files Involved:**
+- `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Uses baseDir for relative path computation
+- `/home/dex/kustomark-ralph-bash/src/core/resource-resolver.ts` - Sets baseDir for all resource types
+- `/home/dex/kustomark-ralph-bash/known-issues/issue-1-cli-flattens-directory-structure.md` - Marked as RESOLVED
+
+**Testing Results:**
+- ✅ Manual test with nested directory structure confirmed fix works
+- ✅ Files: `create-research/SKILL.md` and `iterate-research/SKILL.md` both preserved
+- ✅ Nested `references/research_final_answer.md` files preserved with different content
+- ✅ All 2717 tests passing ✓
+- ✅ 8807 expect() calls successful ✓
+- ✅ Zero linting warnings ✓
+
+**Status:** Issue #1 VERIFIED AND RESOLVED! ✅
+
+----
+
 **2026-01-02 (Enhanced Error Message System - NEW FEATURE!):**
 - ✅ **NEW FEATURE**: Intelligent error messages with contextual suggestions
 - ✅ Created `/home/dex/kustomark-ralph-bash/src/core/errors.ts` with comprehensive error hierarchy
