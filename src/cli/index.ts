@@ -35,6 +35,12 @@ import {
   validateConfig as coreValidateConfig,
 } from "../core/config-parser.js";
 import { generateFileDiff } from "../core/diff-generator.js";
+import {
+  applyCopyFile,
+  applyDeleteFile,
+  applyMoveFile,
+  applyRenameFile,
+} from "../core/file-operations.js";
 import { loadLockFile, saveLockFile } from "../core/lock-file.js";
 import { applyPatches as coreApplyPatches } from "../core/patch-engine.js";
 import { resolveResources as coreResolveResources } from "../core/resource-resolver.js";
@@ -42,11 +48,15 @@ import { generateSchema } from "../core/schema.js";
 import type {
   BuildCache,
   BuildCacheEntry,
+  CopyFilePatch,
+  DeleteFilePatch,
   KustomarkConfig,
   LockFile,
   LockFileEntry,
+  MoveFilePatch,
   OnNoMatchStrategy,
   PatchOperation,
+  RenameFilePatch,
   ValidationError,
   ValidationResult,
   WatchHooks,
@@ -528,6 +538,110 @@ async function resolveResources(
   }
 
   return resultMap;
+}
+
+/**
+ * Partition patches into file operations and content operations
+ */
+function partitionPatches(patches: PatchOperation[]): {
+  fileOps: (CopyFilePatch | RenameFilePatch | DeleteFilePatch | MoveFilePatch)[];
+  contentOps: PatchOperation[];
+} {
+  const fileOps: (CopyFilePatch | RenameFilePatch | DeleteFilePatch | MoveFilePatch)[] = [];
+  const contentOps: PatchOperation[] = [];
+
+  for (const patch of patches) {
+    if (
+      patch.op === "copy-file" ||
+      patch.op === "rename-file" ||
+      patch.op === "delete-file" ||
+      patch.op === "move-file"
+    ) {
+      fileOps.push(patch);
+    } else {
+      contentOps.push(patch);
+    }
+  }
+
+  return { fileOps, contentOps };
+}
+
+/**
+ * Apply file operations to the file map
+ *
+ * File operations modify the file map structure (add/rename/delete/move files)
+ * before content patches are applied.
+ */
+function applyFileOperations(
+  fileMap: Map<string, string>,
+  fileOps: (CopyFilePatch | RenameFilePatch | DeleteFilePatch | MoveFilePatch)[],
+  basePath: string,
+  options: CLIOptions,
+): {
+  fileMap: Map<string, string>;
+  operationsApplied: number;
+  operationCounts: Record<string, number>;
+} {
+  let currentMap = fileMap;
+  let totalOperations = 0;
+  const operationCounts: Record<string, number> = {};
+
+  for (const patch of fileOps) {
+    // Check if this patch should be applied based on group filters
+    if (!shouldApplyPatchGroup(patch, options)) {
+      continue;
+    }
+
+    let result: { fileMap: Map<string, string>; count: number } | null = null;
+
+    try {
+      switch (patch.op) {
+        case "copy-file":
+          log(`  Applying copy-file: ${patch.source} -> ${patch.destination}`, 3, options);
+          result = applyCopyFile(currentMap, patch.source, patch.destination, basePath);
+          break;
+
+        case "rename-file":
+          log(
+            `  Applying rename-file: match=${patch.source}, rename=${patch.destination}`,
+            3,
+            options,
+          );
+          result = applyRenameFile(currentMap, patch.source, patch.destination, basePath);
+          break;
+
+        case "delete-file":
+          log(`  Applying delete-file: match=${patch.path}`, 3, options);
+          result = applyDeleteFile(currentMap, patch.path, basePath);
+          break;
+
+        case "move-file":
+          log(`  Applying move-file: match=${patch.source}, dest=${patch.destination}`, 3, options);
+          result = applyMoveFile(currentMap, patch.source, patch.destination, basePath);
+          break;
+      }
+
+      if (result) {
+        currentMap = result.fileMap;
+        totalOperations += result.count;
+
+        // Track operation counts
+        operationCounts[patch.op] = (operationCounts[patch.op] || 0) + result.count;
+
+        log(`    Affected ${result.count} file(s)`, 3, options);
+      }
+    } catch (error) {
+      console.error(
+        `Error applying file operation ${patch.op}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return {
+    fileMap: currentMap,
+    operationsApplied: totalOperations,
+    operationCounts,
+  };
 }
 
 /**
@@ -1484,17 +1598,34 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
     // Track build start time for stats
     const startTime = options.stats ? performance.now() : 0;
 
+    // Partition patches into file operations and content operations
+    const { fileOps, contentOps } = partitionPatches(config.patches || []);
+
+    // Apply file operations first (if any)
+    let processedResources = resources;
+    let fileOpsApplied = 0;
+    const fileOpCounts: Record<string, number> = {};
+
+    if (fileOps.length > 0) {
+      log(`Applying ${fileOps.length} file operation(s)...`, 2, options);
+      const fileOpResult = applyFileOperations(resources, fileOps, basePath, options);
+      processedResources = fileOpResult.fileMap;
+      fileOpsApplied = fileOpResult.operationsApplied;
+      Object.assign(fileOpCounts, fileOpResult.operationCounts);
+      log(`  Applied ${fileOpsApplied} file operation(s)`, 2, options);
+    }
+
     // Determine which files need rebuilding (incremental builds only)
-    let filesToRebuild = new Set<string>(resources.keys());
+    let filesToRebuild = new Set<string>(processedResources.keys());
     let filesUnchanged = 0;
 
     if (options.incremental && buildCache) {
       log("Checking for changed files...", 2, options);
       filesToRebuild = new Set();
 
-      for (const [filePath, sourceContent] of resources.entries()) {
-        // Determine which patches apply to this file
-        const applicablePatches = (config.patches || []).filter(
+      for (const [filePath, sourceContent] of processedResources.entries()) {
+        // Determine which patches apply to this file (only content operations)
+        const applicablePatches = contentOps.filter(
           (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
         );
 
@@ -1540,14 +1671,16 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       );
     }
 
-    // Apply patches (parallel or sequential)
+    // Apply content patches (parallel or sequential)
     // For incremental builds, only apply patches to files that need rebuilding
     const resourcesToProcess = options.incremental
-      ? new Map(Array.from(resources.entries()).filter(([path]) => filesToRebuild.has(path)))
-      : resources;
+      ? new Map(
+          Array.from(processedResources.entries()).filter(([path]) => filesToRebuild.has(path)),
+        )
+      : processedResources;
 
     log(
-      `Applying patches${options.incremental ? ` to ${resourcesToProcess.size} file(s)` : ""}...`,
+      `Applying content patches${options.incremental ? ` to ${resourcesToProcess.size} file(s)` : ""}...`,
       2,
       options,
     );
@@ -1557,20 +1690,23 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       patchesSkipped,
       warnings,
       validationErrors: patchValidationErrors,
-      operationCounts,
+      operationCounts: contentOpCounts,
     } = options.parallel
       ? await applyPatchesParallel(
           resourcesToProcess,
-          config.patches || [],
+          contentOps,
           config.onNoMatch || "warn",
           options,
         )
-      : applyPatches(resourcesToProcess, config.patches || [], config.onNoMatch || "warn", options);
+      : applyPatches(resourcesToProcess, contentOps, config.onNoMatch || "warn", options);
+
+    // Merge file operation counts with content operation counts
+    const operationCounts = { ...fileOpCounts, ...contentOpCounts };
 
     // For incremental builds, add unchanged files from cache
     const allPatchedResources = new Map(patchedResources);
     if (options.incremental && buildCache) {
-      for (const [filePath, sourceContent] of resources.entries()) {
+      for (const [filePath, sourceContent] of processedResources.entries()) {
         if (!filesToRebuild.has(filePath)) {
           // Use cached output (which is the source content if no patches were applied)
           allPatchedResources.set(filePath, sourceContent);
@@ -1675,7 +1811,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       const newCacheEntries = new Map<string, BuildCacheEntry>();
 
       // Create cache entries for ALL resources, not just rebuilt files
-      for (const [filePath, sourceContent] of resources.entries()) {
+      for (const [filePath, sourceContent] of processedResources.entries()) {
         // Check if this file was rebuilt
         const wasRebuilt = filesToRebuild.has(filePath);
 
@@ -1684,7 +1820,8 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           const outputContent = allPatchedResources.get(filePath);
           if (!outputContent) continue;
 
-          const applicablePatches = (config.patches || []).filter(
+          // Only use content operations for cache hashing
+          const applicablePatches = contentOps.filter(
             (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
           );
 
@@ -1709,7 +1846,8 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
             const outputContent = allPatchedResources.get(filePath);
             if (!outputContent) continue;
 
-            const applicablePatches = (config.patches || []).filter(
+            // Only use content operations for cache hashing
+            const applicablePatches = contentOps.filter(
               (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
             );
 
@@ -2862,6 +3000,20 @@ async function _fetchCommand(_path: string, options: CLIOptions): Promise<number
     return 1;
   }
 }
+
+// ============================================================================
+// Exports (for testing)
+// ============================================================================
+
+export {
+  buildCommand,
+  diffCommand,
+  validateCommand,
+  watchCommand,
+  lintCommand,
+  explainCommand,
+  initCommand,
+};
 
 // ============================================================================
 // Main Entry Point
