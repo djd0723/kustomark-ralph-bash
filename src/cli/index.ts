@@ -79,6 +79,7 @@ import type {
   ValidationWarning,
   WatchHooks,
 } from "../core/types.js";
+import { createLogger, type Logger, LogLevel, Verbosity } from "../core/utils/logger.js";
 import { runValidators } from "../core/validators.js";
 import { analyzeCommand } from "./analyze-command.js";
 import { handleBenchmarkCommand } from "./benchmark-command.js";
@@ -1446,6 +1447,34 @@ function generateDiff(
 // Utility Functions
 // ============================================================================
 
+/**
+ * Create a logger instance for the CLI
+ */
+function createCLILogger(options: CLIOptions): Logger {
+  // Map CLI verbosity to logger verbosity
+  let verbosity: Verbosity;
+  if (options.verbosity === 0) {
+    verbosity = Verbosity.QUIET;
+  } else if (options.verbosity === 1) {
+    verbosity = Verbosity.NORMAL;
+  } else if (options.verbosity >= 2 && options.verbosity < 4) {
+    verbosity = Verbosity.VERBOSE;
+  } else {
+    verbosity = Verbosity.VERY_VERBOSE;
+  }
+
+  return createLogger({
+    level: LogLevel.DEBUG,
+    format: options.format === "json" ? "json" : "text",
+    verbosity,
+    component: "cli",
+  });
+}
+
+/**
+ * Legacy log function - kept for backward compatibility
+ * New code should use the logger directly
+ */
 function log(message: string, level: number, options: CLIOptions): void {
   if (options.verbosity >= level) {
     console.error(message);
@@ -1699,24 +1728,21 @@ async function explainCommand(path: string, options: CLIOptions): Promise<number
     log(`Loading config from ${configPath}...`, 2, options);
     const config = readKustomarkConfig(inputPath);
 
+    // Create logger for this command
+    const logger = createCLILogger(options);
+
     // Validate config (output is not required for explain)
     const validation = validateConfig(config, { requireOutput: false });
     if (!validation.valid) {
       if (options.format === "json") {
-        console.log(
-          JSON.stringify(
-            {
-              error: "Invalid configuration",
-              errors: validation.errors,
-            },
-            null,
-            2,
-          ),
-        );
+        logger.error("Invalid configuration", {
+          error: "Invalid configuration",
+          errors: validation.errors,
+        });
       } else {
-        console.error("Error: Invalid configuration");
+        logger.error("Invalid configuration");
         for (const error of validation.errors) {
-          console.error(`  ${error.field}: ${error.message}`);
+          logger.error(`${error.field}: ${error.message}`);
         }
       }
       return 1;
@@ -1747,19 +1773,7 @@ async function explainCommand(path: string, options: CLIOptions): Promise<number
       }
 
       if (!found) {
-        if (options.format === "json") {
-          console.log(
-            JSON.stringify(
-              {
-                error: `File not found in resolution chain: ${targetFile}`,
-              },
-              null,
-              2,
-            ),
-          );
-        } else {
-          console.error(`Error: File not found in resolution chain: ${targetFile}`);
-        }
+        logger.error(`File not found in resolution chain: ${targetFile}`);
         return 1;
       }
 

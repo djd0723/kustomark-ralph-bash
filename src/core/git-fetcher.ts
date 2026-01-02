@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { parseGitUrl } from "./git-url-parser.js";
 import { findLockEntry } from "./lock-file.js";
 import type { LockFile, LockFileEntry, ParsedGitUrl } from "./types.js";
+import { createLogger, LogLevel, Verbosity } from "./utils/logger.js";
 
 /**
  * Error thrown when git operations fail
@@ -282,14 +283,24 @@ async function cloneRepositoryWithRetry(
   const retryMaxDelay = options.retryMaxDelay ?? 30000;
   const verbose = options.verbose ?? false;
 
+  // Create a logger for git operations
+  const logger = createLogger({
+    component: "git-fetcher",
+    level: LogLevel.DEBUG,
+    verbosity: verbose ? Verbosity.VERBOSE : Verbosity.NORMAL,
+  });
+
   let lastError: GitFetchError | undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       await cloneRepository(url, dest, options.sparsePath, options.timeout, options.authToken);
       // Success!
-      if (verbose && attempt > 0) {
-        console.log(`Successfully cloned ${url} after ${attempt} retry attempt(s)`);
+      if (attempt > 0) {
+        logger.info(`Successfully cloned ${url} after ${attempt} retry attempt(s)`, {
+          url,
+          attempts: attempt,
+        });
       }
       return;
     } catch (error) {
@@ -306,21 +317,26 @@ async function cloneRepositoryWithRetry(
 
       // Check if error is retryable
       if (!isRetryableGitError(lastError)) {
-        if (verbose) {
-          console.log(`Non-retryable error encountered: ${lastError.code}`);
-        }
+        logger.debug(`Non-retryable error encountered: ${lastError.code}`, {
+          code: lastError.code,
+          message: lastError.message,
+        });
         throw lastError;
       }
 
       // Calculate delay
       const delay = calculateRetryDelay(attempt, retryBaseDelay, retryMaxDelay);
 
-      if (verbose) {
-        console.log(
-          `Retry attempt ${attempt + 1}/${maxRetries} for cloning ${url} after ${delay}ms ` +
-            `(error: ${lastError.message})`,
-        );
-      }
+      logger.debug(
+        `Retry attempt ${attempt + 1}/${maxRetries} for cloning ${url} after ${delay}ms`,
+        {
+          attempt: attempt + 1,
+          maxRetries,
+          delay,
+          error: lastError.message,
+          url,
+        },
+      );
 
       // Wait before retrying
       await sleep(delay);
@@ -637,6 +653,13 @@ export async function fetchGitRepository(
     const retryMaxDelay = options.retryMaxDelay ?? 30000;
     const verbose = options.verbose ?? false;
 
+    // Create a logger for git operations
+    const logger = createLogger({
+      component: "git-fetcher",
+      level: LogLevel.DEBUG,
+      verbosity: verbose ? Verbosity.VERBOSE : Verbosity.NORMAL,
+    });
+
     let fetchSuccess = false;
     let lastError: GitFetchError | undefined;
 
@@ -648,8 +671,10 @@ export async function fetchGitRepository(
           authToken: options.authToken,
         });
         fetchSuccess = true;
-        if (verbose && attempt > 0) {
-          console.log(`Successfully fetched updates after ${attempt} retry attempt(s)`);
+        if (attempt > 0) {
+          logger.info(`Successfully fetched updates after ${attempt} retry attempt(s)`, {
+            attempts: attempt,
+          });
         }
       } catch (error) {
         if (!(error instanceof GitFetchError)) {
@@ -660,9 +685,9 @@ export async function fetchGitRepository(
 
         // If this was the last attempt, fall back to fresh clone
         if (attempt === maxRetries) {
-          if (verbose) {
-            console.log(`All ${maxRetries} retry attempts exhausted, falling back to fresh clone`);
-          }
+          logger.debug(`All ${maxRetries} retry attempts exhausted, falling back to fresh clone`, {
+            maxRetries,
+          });
           await rm(repoPath, { recursive: true, force: true });
           needsClone = true;
           break;
@@ -670,11 +695,13 @@ export async function fetchGitRepository(
 
         // Check if error is retryable
         if (!isRetryableGitError(lastError)) {
-          if (verbose) {
-            console.log(
-              `Non-retryable error encountered: ${lastError.code}, falling back to fresh clone`,
-            );
-          }
+          logger.debug(
+            `Non-retryable error encountered: ${lastError.code}, falling back to fresh clone`,
+            {
+              code: lastError.code,
+              message: lastError.message,
+            },
+          );
           await rm(repoPath, { recursive: true, force: true });
           needsClone = true;
           break;
@@ -683,12 +710,15 @@ export async function fetchGitRepository(
         // Calculate delay
         const delay = calculateRetryDelay(attempt, retryBaseDelay, retryMaxDelay);
 
-        if (verbose) {
-          console.log(
-            `Retry attempt ${attempt + 1}/${maxRetries} for fetching updates after ${delay}ms ` +
-              `(error: ${lastError.message})`,
-          );
-        }
+        logger.debug(
+          `Retry attempt ${attempt + 1}/${maxRetries} for fetching updates after ${delay}ms`,
+          {
+            attempt: attempt + 1,
+            maxRetries,
+            delay,
+            error: lastError.message,
+          },
+        );
 
         // Wait before retrying
         await sleep(delay);

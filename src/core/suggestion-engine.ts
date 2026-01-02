@@ -10,61 +10,19 @@
 
 import { parseFrontmatter, parseSections } from "./patch-engine.js";
 import type { PatchOperation } from "./types.js";
+import {
+  calculateLevenshteinDistance,
+  findSimilarStrings as findSimilarStringsUtil,
+} from "./utils/string-similarity.js";
 
-/**
- * Calculate Levenshtein distance between two strings
- *
- * The Levenshtein distance is the minimum number of single-character edits
- * (insertions, deletions, or substitutions) required to change one string into another.
- *
- * @param a - First string
- * @param b - Second string
- * @returns The Levenshtein distance
- */
-export function calculateLevenshteinDistance(a: string, b: string): number {
-  // Handle edge cases
-  if (a === b) return 0;
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-
-  // Create a 2D array for dynamic programming
-  const matrix: number[][] = [];
-
-  // Initialize first column (deletions from a)
-  for (let i = 0; i <= a.length; i++) {
-    matrix[i] = [i];
-  }
-
-  // Initialize first row (insertions to a)
-  for (let j = 0; j <= b.length; j++) {
-    if (matrix[0]) {
-      matrix[0][j] = j;
-    }
-  }
-
-  // Fill in the rest of the matrix
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-
-      const deletion = (matrix[i - 1]?.[j] ?? 0) + 1;
-      const insertion = (matrix[i]?.[j - 1] ?? 0) + 1;
-      const substitution = (matrix[i - 1]?.[j - 1] ?? 0) + cost;
-
-      const minValue = Math.min(deletion, insertion, substitution);
-      // matrix[i] is guaranteed to exist because we initialized it in the first loop
-      const row = matrix[i];
-      if (row) {
-        row[j] = minValue;
-      }
-    }
-  }
-
-  return matrix[a.length]?.[b.length] ?? 0;
-}
+// Re-export for backward compatibility
+export { calculateLevenshteinDistance };
 
 /**
  * Find similar strings from a list of candidates using fuzzy matching
+ *
+ * This function now delegates to the optimized string-similarity utility
+ * while maintaining backward compatibility with the original API.
  *
  * @param target - The target string to match against
  * @param candidates - Array of candidate strings to search through
@@ -76,32 +34,42 @@ export function findSimilarStrings(
   candidates: string[],
   maxDistance?: number,
 ): Array<{ value: string; distance: number }> {
-  // Auto-calculate maxDistance based on target length if not provided
-  const threshold =
-    maxDistance ?? (target.length <= 5 ? 2 : target.length <= 10 ? 3 : target.length <= 20 ? 5 : 7);
+  // Use the optimized utility with case-insensitive matching
+  // The utility checks both case-sensitive and case-insensitive distances
+  const caseSensitiveResults = findSimilarStringsUtil(target, candidates, {
+    maxDistance,
+    maxResults: 5,
+    excludeExact: true, // Don't include exact matches (distance 0)
+    caseInsensitive: false,
+  });
 
-  const results: Array<{ value: string; distance: number }> = [];
+  const caseInsensitiveResults = findSimilarStringsUtil(target, candidates, {
+    maxDistance,
+    maxResults: 5,
+    excludeExact: true,
+    caseInsensitive: true,
+  });
 
-  // Also check case-insensitive matches
-  const targetLower = target.toLowerCase();
+  // Merge results, taking the minimum distance for each candidate
+  const mergedMap = new Map<string, number>();
 
-  for (const candidate of candidates) {
-    // Calculate distance for exact case
-    const distance = calculateLevenshteinDistance(target, candidate);
+  for (const result of caseSensitiveResults) {
+    mergedMap.set(result.value, result.distance);
+  }
 
-    // Also check case-insensitive distance
-    const distanceLower = calculateLevenshteinDistance(targetLower, candidate.toLowerCase());
-
-    // Use the smaller distance
-    const finalDistance = Math.min(distance, distanceLower);
-
-    if (finalDistance <= threshold && finalDistance > 0) {
-      // Don't include exact matches (distance 0)
-      results.push({ value: candidate, distance: finalDistance });
+  for (const result of caseInsensitiveResults) {
+    const existing = mergedMap.get(result.value);
+    if (existing === undefined || result.distance < existing) {
+      mergedMap.set(result.value, result.distance);
     }
   }
 
-  // Sort by distance (closest first), then alphabetically for ties
+  // Convert back to array and sort
+  const results = Array.from(mergedMap.entries()).map(([value, distance]) => ({
+    value,
+    distance,
+  }));
+
   results.sort((a, b) => {
     if (a.distance !== b.distance) {
       return a.distance - b.distance;

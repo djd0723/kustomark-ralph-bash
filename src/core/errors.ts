@@ -6,6 +6,8 @@
  * context, and helpful suggestions.
  */
 
+import { calculateLevenshteinDistance } from "./utils/string-similarity.js";
+
 /**
  * Base error class for all Kustomark errors.
  *
@@ -429,39 +431,12 @@ export class PatchValidationError extends KustomarkError {
 /**
  * Calculate Levenshtein distance between two strings
  * Used for finding similar content when exact matches fail
+ *
+ * @deprecated Use calculateLevenshteinDistance from utils/string-similarity.js instead
+ * This function is kept for backward compatibility and delegates to the optimized implementation
  */
 export function levenshteinDistance(str1: string, str2: string): number {
-  const len1 = str1.length;
-  const len2 = str2.length;
-
-  // Create a 2D array for dynamic programming
-  const matrix: number[][] = Array.from({ length: len1 + 1 }, () =>
-    Array.from({ length: len2 + 1 }, () => 0),
-  );
-
-  // Initialize first column and row
-  for (let i = 0; i <= len1; i++) {
-    const row = matrix[i];
-    if (row) row[0] = i;
-  }
-  for (let j = 0; j <= len2; j++) {
-    const row = matrix[0];
-    if (row) row[j] = j;
-  }
-
-  // Fill in the rest of the matrix
-  for (let i = 1; i <= len1; i++) {
-    for (let j = 1; j <= len2; j++) {
-      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
-      const deletion = (matrix[i - 1]?.[j] ?? 0) + 1;
-      const insertion = (matrix[i]?.[j - 1] ?? 0) + 1;
-      const substitution = (matrix[i - 1]?.[j - 1] ?? 0) + cost;
-      const row = matrix[i];
-      if (row) row[j] = Math.min(deletion, insertion, substitution);
-    }
-  }
-
-  return matrix[len1]?.[len2] ?? 0;
+  return calculateLevenshteinDistance(str1, str2);
 }
 
 /**
