@@ -93,12 +93,12 @@ import {
   checkRegexPatternWarnings,
   validateRegexPattern,
 } from "./lint-command.js";
+import { executePreviewCommand } from "./preview-command.js";
 import { createProgressReporter } from "./progress.js";
 import { suggestCommand } from "./suggest-command.js";
 import { templateApply, templateList, templateShow } from "./template-commands.js";
 import { templateInitCommand } from "./template-init-command.js";
 import { templateInstallCommand } from "./template-install-command.js";
-import { executePreviewCommand } from "./preview-command.js";
 import { executeOnBuildHooks, executeOnChangeHooks, executeOnErrorHooks } from "./watch-hooks.js";
 import { webCommand } from "./web-command.js";
 

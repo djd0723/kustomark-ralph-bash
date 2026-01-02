@@ -1,0 +1,12 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+output: output
+resources:
+  - test.md
+patches:
+  - op: replace-section
+    id: "section-1"
+    content: "New content"
+  - op: prepend-to-section
+    id: "section-1"
+    content: "Prefix"

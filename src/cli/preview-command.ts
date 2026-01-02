@@ -3,17 +3,13 @@
  * Provides side-by-side diff visualization for kustomark builds
  */
 
-import { resolve, dirname, relative, normalize } from "node:path";
-import { existsSync, readdirSync, statSync, readFileSync } from "node:fs";
-import type { CLIOptions } from "./index.js";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, normalize, relative, resolve } from "node:path";
 import { parseConfig, validateConfig } from "../core/config-parser.js";
-import { resolveResources } from "../core/resource-resolver.js";
 import { applyPatches } from "../core/patch-engine.js";
-import {
-  generatePreview,
-  type FilePreview,
-  type LineChange,
-} from "../core/preview-generator.js";
+import { type FilePreview, generatePreview, type LineChange } from "../core/preview-generator.js";
+import { resolveResources } from "../core/resource-resolver.js";
+import type { CLIOptions } from "./index.js";
 
 /**
  * ANSI color codes for terminal output
@@ -45,8 +41,8 @@ function formatLineNumber(num: number, maxDigits: number): string {
  * Get the maximum line number digits for display formatting
  */
 function getMaxLineDigits(preview: FilePreview): number {
-  const maxOld = Math.max(...preview.changes.map(c => c.oldLineNumber));
-  const maxNew = Math.max(...preview.changes.map(c => c.newLineNumber));
+  const maxOld = Math.max(...preview.changes.map((c) => c.oldLineNumber));
+  const maxNew = Math.max(...preview.changes.map((c) => c.newLineNumber));
   return Math.max(maxOld, maxNew).toString().length;
 }
 
@@ -81,7 +77,7 @@ function renderCharDiff(change: LineChange, side: "old" | "new"): string {
 function renderSideBySideLine(
   change: LineChange,
   maxDigits: number,
-  _terminalWidth: number
+  _terminalWidth: number,
 ): string {
   const gutter = " │ ";
   const divider = " ┊ ";
@@ -133,7 +129,7 @@ function renderSideBySidePreview(preview: FilePreview, options: CLIOptions): str
   lines.push("");
   lines.push(`${colors.bold}${colors.cyan}━━━ ${preview.path} ━━━${colors.reset}`);
   lines.push(
-    `${colors.dim}+${preview.linesAdded} -${preview.linesDeleted} ~${preview.linesModified}${colors.reset}`
+    `${colors.dim}+${preview.linesAdded} -${preview.linesDeleted} ~${preview.linesModified}${colors.reset}`,
   );
   lines.push("");
 
@@ -142,10 +138,10 @@ function renderSideBySidePreview(preview: FilePreview, options: CLIOptions): str
   const gutter = " │ ";
   const divider = " ┊ ";
   lines.push(
-    `  ${colors.bold}${" ".repeat(lineNumWidth)}${gutter}Before${" ".repeat(30)}${divider}${" ".repeat(lineNumWidth)}${gutter}After${colors.reset}`
+    `  ${colors.bold}${" ".repeat(lineNumWidth)}${gutter}Before${" ".repeat(30)}${divider}${" ".repeat(lineNumWidth)}${gutter}After${colors.reset}`,
   );
   lines.push(
-    `  ${colors.dim}${"─".repeat(lineNumWidth)}${"─┴─"}${"─".repeat(36)}${"─┼─"}${"─".repeat(lineNumWidth)}${"─┴─"}${"─".repeat(36)}${colors.reset}`
+    `  ${colors.dim}${"─".repeat(lineNumWidth)}${"─┴─"}${"─".repeat(36)}${"─┼─"}${"─".repeat(lineNumWidth)}${"─┴─"}${"─".repeat(36)}${colors.reset}`,
   );
 
   // Show context lines around changes
@@ -154,7 +150,7 @@ function renderSideBySidePreview(preview: FilePreview, options: CLIOptions): str
 
   if (options.verbosity === 0) {
     // In quiet mode, only show changed lines
-    changesToShow.push(...preview.changes.filter(c => c.type !== "unchanged"));
+    changesToShow.push(...preview.changes.filter((c) => c.type !== "unchanged"));
   } else {
     // Show changes with context
     for (let i = 0; i < preview.changes.length; i++) {
@@ -193,7 +189,9 @@ function renderSideBySidePreview(preview: FilePreview, options: CLIOptions): str
 
     // Show ellipsis if we skipped lines
     if (lastLineNum >= 0 && currentLineNum - lastLineNum > 1) {
-      lines.push(`  ${colors.dim}  ${"·".repeat(lineNumWidth)}${gutter}...${divider}${"·".repeat(lineNumWidth)}${gutter}...${colors.reset}`);
+      lines.push(
+        `  ${colors.dim}  ${"·".repeat(lineNumWidth)}${gutter}...${divider}${"·".repeat(lineNumWidth)}${gutter}...${colors.reset}`,
+      );
     }
 
     lines.push(renderSideBySideLine(change, maxDigits, terminalWidth));
@@ -242,7 +240,7 @@ function buildCompleteFileMap(baseDir: string): Map<string, string> {
  */
 export async function executePreviewCommand(
   configPath: string,
-  options: CLIOptions
+  options: CLIOptions,
 ): Promise<number> {
   const verbose = options.verbosity >= 2;
   const quiet = options.verbosity === 0;
@@ -279,15 +277,10 @@ export async function executePreviewCommand(
 
     // Resolve resources to get original content
     const fileMap = buildCompleteFileMap(basePath);
-    const resolvedResources = await resolveResources(
-      config.resources,
-      basePath,
-      fileMap,
-      {
-        gitFetchOptions: { cacheDir: options.cacheDir },
-        httpFetchOptions: {},
-      }
-    );
+    const resolvedResources = await resolveResources(config.resources, basePath, fileMap, {
+      gitFetchOptions: { cacheDir: options.cacheDir },
+      httpFetchOptions: {},
+    });
 
     const originalFiles = new Map<string, string>();
     for (const resource of resolvedResources) {
@@ -337,14 +330,13 @@ export async function executePreviewCommand(
     if (!quiet) {
       console.log(
         `${colors.bold}Summary:${colors.reset} ${previewResult.filesChanged} files changed, ` +
-        `${colors.green}+${previewResult.totalLinesAdded}${colors.reset} ` +
-        `${colors.red}-${previewResult.totalLinesDeleted}${colors.reset} ` +
-        `${colors.yellow}~${previewResult.totalLinesModified}${colors.reset}`
+          `${colors.green}+${previewResult.totalLinesAdded}${colors.reset} ` +
+          `${colors.red}-${previewResult.totalLinesDeleted}${colors.reset} ` +
+          `${colors.yellow}~${previewResult.totalLinesModified}${colors.reset}`,
       );
     }
 
     return previewResult.filesChanged > 0 ? 1 : 0;
-
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
     if (verbose) {

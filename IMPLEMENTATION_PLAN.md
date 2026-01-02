@@ -6,6 +6,27 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 ## Recent Enhancements
 
+**2026-01-02 (Interactive Patch Fix Command - NEW FEATURE!):**
+- ✅ **NEW FEATURE**: Interactive patch repair tool for fixing failed patches
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/fix-engine.ts` with intelligent fix suggestion engine
+- ✅ **Fix Strategies**: Supports exact-match, fuzzy-match, and manual-edit strategies
+- ✅ **Confidence Scoring**: Calculates 0-100 confidence scores for auto-fix suggestions
+- ✅ **Smart Suggestions**: Generates intelligent fixes based on patch type and failure reason
+- ✅ **Multiple Fix Modes**: Interactive prompts or auto-apply mode with confidence threshold
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/cli/fix-command.ts` with full interactive UI
+- ✅ **Interactive Mode**: Step-through failed patches with (A)uto-fix, (S)elect, (E)dit, (S)kip, (D)elete, (Q)uit options
+- ✅ **Auto-Apply Mode**: `--auto-apply` flag with `--confidence-threshold=N` for CI/CD workflows
+- ✅ **Safe Configuration Updates**: `--save-to=FILE` option to preserve original config
+- ✅ **Case-Insensitive Matching**: Detects case mismatches with 95% confidence
+- ✅ **Fuzzy String Matching**: Uses Levenshtein distance to find similar strings
+- ✅ **Section ID Suggestions**: Leverages existing suggestion engine for section operations
+- ✅ **Frontmatter Key Suggestions**: Smart key matching for frontmatter operations
+- ✅ Added comprehensive help documentation in `src/cli/help.ts`
+- ✅ All 2672 tests passing ✓
+- ✅ All linting checks passing (bun check) ✓
+- 📝 Solves the critical user pain point of manually fixing failed patches
+- 📝 Complements existing `debug`, `preview`, and `validate` commands
+
 **2026-01-02 (Preview Command with Side-by-Side Diff - NEW FEATURE!):**
 - ✅ **NEW FEATURE**: Visual side-by-side preview command for rich diff visualization
 - ✅ Created `/home/dex/kustomark-ralph-bash/src/core/preview-generator.ts` with character-level diff engine

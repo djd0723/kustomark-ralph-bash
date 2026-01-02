@@ -92,6 +92,16 @@ describe("Help System", () => {
       expect(help).toContain("DECISION FILES");
     });
 
+    test("returns help for fix command", () => {
+      const help = getCommandHelp("fix");
+      expect(help).toContain("kustomark fix");
+      expect(help).toContain("Interactive configuration error fixing");
+      expect(help).toContain("--auto-fix");
+      expect(help).toContain("--min-confidence");
+      expect(help).toContain("--save-to");
+      expect(help).toContain("CONFIDENCE SCORING");
+    });
+
     test("returns help for all commands", () => {
       for (const command of helpCommands) {
         const help = getCommandHelp(command);
@@ -141,6 +151,7 @@ describe("Help System", () => {
         "watch",
         "init",
         "debug",
+        "fix",
         "lint",
         "explain",
         "analyze",
@@ -154,7 +165,7 @@ describe("Help System", () => {
         "preview",
       ];
       expect(helpCommands).toEqual(expect.arrayContaining(expected));
-      expect(helpCommands.length).toBe(17);
+      expect(helpCommands.length).toBe(18);
     });
 
     test("has no duplicates", () => {
@@ -244,6 +255,39 @@ describe("Help System", () => {
       expect(help).toContain("Patch Form");
       expect(help).toContain("Four View Modes");
       expect(help).toContain("File Browser");
+    });
+
+    test("fix help includes confidence scoring", () => {
+      const help = getCommandHelp("fix");
+      expect(help).toContain("CONFIDENCE SCORING");
+      expect(help).toContain("High confidence");
+      expect(help).toContain("Medium confidence");
+      expect(help).toContain("0.9-1.0");
+      expect(help).toContain("0.7-0.89");
+    });
+
+    test("fix help includes command comparison", () => {
+      const help = getCommandHelp("fix");
+      expect(help).toContain("COMMAND COMPARISON");
+      expect(help).toContain("fix vs validate");
+      expect(help).toContain("fix vs lint");
+      expect(help).toContain("fix vs debug");
+    });
+
+    test("fix help includes auto-fix mode", () => {
+      const help = getCommandHelp("fix");
+      expect(help).toContain("AUTO-FIX MODE");
+      expect(help).toContain("--auto-fix");
+      expect(help).toContain("Safety features");
+    });
+
+    test("fix help includes types of fixes", () => {
+      const help = getCommandHelp("fix");
+      expect(help).toContain("TYPES OF FIXES");
+      expect(help).toContain("Validation errors");
+      expect(help).toContain("Syntax errors");
+      expect(help).toContain("Patch errors");
+      expect(help).toContain("Resource errors");
     });
   });
 

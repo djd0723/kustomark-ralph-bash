@@ -101,15 +101,26 @@ function computeCharDiff(oldText: string, newText: string): CharDiff[] {
     const newChar = newText[newPos];
     const lcsChar = lcs[lcsPos];
 
-    if (lcsPos < lcs.length && oldPos < oldText.length && newPos < newText.length &&
-        oldChar !== undefined && newChar !== undefined && lcsChar !== undefined &&
-        oldChar === lcsChar && newChar === lcsChar) {
+    if (
+      lcsPos < lcs.length &&
+      oldPos < oldText.length &&
+      newPos < newText.length &&
+      oldChar !== undefined &&
+      newChar !== undefined &&
+      lcsChar !== undefined &&
+      oldChar === lcsChar &&
+      newChar === lcsChar
+    ) {
       // Characters match - same
       result.push({ type: "same", text: oldChar });
       oldPos++;
       newPos++;
       lcsPos++;
-    } else if (oldPos < oldText.length && oldChar !== undefined && (lcsPos >= lcs.length || oldChar !== lcsChar)) {
+    } else if (
+      oldPos < oldText.length &&
+      oldChar !== undefined &&
+      (lcsPos >= lcs.length || oldChar !== lcsChar)
+    ) {
       // Character deleted
       result.push({ type: "delete", text: oldChar });
       oldPos++;
@@ -157,7 +168,9 @@ function mergeAdjacentCharDiffs(diffs: CharDiff[]): CharDiff[] {
 function longestCommonSubsequence(a: string, b: string): string {
   const m = a.length;
   const n = b.length;
-  const dp: number[][] = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+  const dp: number[][] = Array(m + 1)
+    .fill(0)
+    .map(() => Array(n + 1).fill(0));
 
   // Build LCS table
   for (let i = 1; i <= m; i++) {
@@ -215,7 +228,7 @@ export function generateFilePreview(
   path: string,
   before: string,
   after: string,
-  patchInfo?: { patchId?: string; patchOp?: string }
+  patchInfo?: { patchId?: string; patchOp?: string },
 ): FilePreview {
   const beforeLines = before.split("\n");
   const afterLines = after.split("\n");
@@ -237,14 +250,16 @@ export function generateFilePreview(
     const newLine = afterLines[newIdx];
     const lcsLine = lcsLines[lcsIdx];
 
-    if (lcsIdx < lcsLines.length &&
-        oldIdx < beforeLines.length &&
-        newIdx < afterLines.length &&
-        oldLine !== undefined &&
-        newLine !== undefined &&
-        lcsLine !== undefined &&
-        oldLine === lcsLine &&
-        newLine === lcsLine) {
+    if (
+      lcsIdx < lcsLines.length &&
+      oldIdx < beforeLines.length &&
+      newIdx < afterLines.length &&
+      oldLine !== undefined &&
+      newLine !== undefined &&
+      lcsLine !== undefined &&
+      oldLine === lcsLine &&
+      newLine === lcsLine
+    ) {
       // Lines match - unchanged
       changes.push({
         oldLineNumber: oldIdx + 1,
@@ -258,10 +273,14 @@ export function generateFilePreview(
       oldIdx++;
       newIdx++;
       lcsIdx++;
-    } else if (oldIdx < beforeLines.length && newIdx < afterLines.length &&
-               oldLine !== undefined && newLine !== undefined &&
-               (lcsIdx >= lcsLines.length || oldLine !== lcsLine) &&
-               (lcsIdx >= lcsLines.length || newLine !== lcsLine)) {
+    } else if (
+      oldIdx < beforeLines.length &&
+      newIdx < afterLines.length &&
+      oldLine !== undefined &&
+      newLine !== undefined &&
+      (lcsIdx >= lcsLines.length || oldLine !== lcsLine) &&
+      (lcsIdx >= lcsLines.length || newLine !== lcsLine)
+    ) {
       // Line modified (both present but different)
       const charDiff = computeCharDiff(oldLine, newLine);
       changes.push({
@@ -277,7 +296,11 @@ export function generateFilePreview(
       linesModified++;
       oldIdx++;
       newIdx++;
-    } else if (oldIdx < beforeLines.length && oldLine !== undefined && (lcsIdx >= lcsLines.length || oldLine !== lcsLine)) {
+    } else if (
+      oldIdx < beforeLines.length &&
+      oldLine !== undefined &&
+      (lcsIdx >= lcsLines.length || oldLine !== lcsLine)
+    ) {
       // Line deleted
       changes.push({
         oldLineNumber: oldIdx + 1,
@@ -324,7 +347,9 @@ export function generateFilePreview(
 function longestCommonSubsequenceLines(a: string[], b: string[]): string[] {
   const m = a.length;
   const n = b.length;
-  const dp: number[][] = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+  const dp: number[][] = Array(m + 1)
+    .fill(0)
+    .map(() => Array(n + 1).fill(0));
 
   // Build LCS table
   for (let i = 1; i <= m; i++) {
@@ -375,7 +400,7 @@ function longestCommonSubsequenceLines(a: string[], b: string[]): string[] {
  * @returns Complete preview result with statistics
  */
 export function generatePreview(
-  fileMap: Map<string, { before: string; after: string }>
+  fileMap: Map<string, { before: string; after: string }>,
 ): PreviewResult {
   const files: FilePreview[] = [];
   let filesChanged = 0;

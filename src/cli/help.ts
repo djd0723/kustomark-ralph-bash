@@ -71,6 +71,7 @@ ${formatSection("CORE COMMANDS")}
 
 ${formatSection("ADVANCED COMMANDS")}
   ${formatCommand("debug")}        Interactive patch debugging mode
+  ${formatCommand("fix")}          Interactive configuration error fixing
   ${formatCommand("lint")}         Check for common issues in configuration
   ${formatCommand("explain")}      Show resolution chain and patch details
   ${formatCommand("analyze")}      Analyze patch complexity and provide insights
@@ -138,6 +139,7 @@ export function getCommandHelp(command: string): string {
     watch: getWatchHelp,
     init: getInitHelp,
     debug: getDebugHelp,
+    fix: getFixHelp,
     lint: getLintHelp,
     explain: getExplainHelp,
     analyze: getAnalyzeHelp,
@@ -810,6 +812,272 @@ ${formatSection("USE CASES")}
 ${formatSection("SEE ALSO")}
   ${formatCommand("kustomark diff")}      Preview all changes at once
   ${formatCommand("kustomark explain")}   Understand patch resolution
+`;
+}
+
+// ============================================================================
+// Fix Command Help
+// ============================================================================
+
+function getFixHelp(): string {
+  return `
+${formatTitle("kustomark fix - Interactive configuration error fixing")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark fix")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Fix provides an interactive interface for identifying and correcting errors
+  in your kustomark.yaml configuration. It validates your configuration,
+  detects common issues, and offers automated fixes with confidence scores.
+
+  Unlike 'validate' which only reports errors, and 'lint' which provides
+  warnings, fix actively helps you correct problems. Unlike 'debug' which
+  steps through patches, fix focuses on configuration-level issues.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--auto-fix")}             Automatically apply all high-confidence fixes
+  ${formatFlag("--min-confidence")} <N>   Only show fixes with confidence >= N (0.0-1.0, default: 0.5)
+  ${formatFlag("--save-to")} <file>       Save fixed config to a different file (for safety)
+  ${formatFlag("--dry-run")}              Show what would be fixed without modifying files
+  ${formatFlag("--format")} <text|json>   Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+  ${formatFlag("-q")}                     Quiet mode (errors only)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Interactive mode - review and apply fixes one by one")}
+  ${formatCommand("kustomark fix ./team/")}
+
+  ${formatExample("# Auto-fix all high-confidence issues")}
+  ${formatCommand("kustomark fix ./team/ --auto-fix")}
+
+  ${formatExample("# Preview fixes without modifying files")}
+  ${formatCommand("kustomark fix ./team/ --dry-run")}
+
+  ${formatExample("# Save to a different file for safety")}
+  ${formatCommand("kustomark fix ./team/ --save-to kustomark-fixed.yaml")}
+
+  ${formatExample("# Only show high-confidence fixes (0.8+)")}
+  ${formatCommand("kustomark fix ./team/ --min-confidence=0.8")}
+
+  ${formatExample("# Auto-fix with specific confidence threshold")}
+  ${formatCommand("kustomark fix ./team/ --auto-fix --min-confidence=0.9")}
+
+  ${formatExample("# Get fix suggestions as JSON")}
+  ${formatCommand("kustomark fix ./team/ --format=json")}
+
+${formatSection("INTERACTIVE MODE")}
+  For each detected issue, fix mode shows:
+    - Issue description and severity
+    - Current (problematic) configuration
+    - Suggested fix with confidence score
+    - Before/after diff preview
+
+  You can choose:
+    ${formatFlag("a")} - Apply this fix
+    ${formatFlag("s")} - Skip this fix
+    ${formatFlag("e")} - Edit fix manually before applying
+    ${formatFlag("q")} - Quit without saving
+    ${formatFlag("A")} - Apply all remaining high-confidence fixes
+    ${formatFlag("Q")} - Save and quit
+
+${formatSection("AUTO-FIX MODE")}
+  With ${formatFlag("--auto-fix")}, the command automatically applies all fixes that meet
+  the confidence threshold without prompting. This is useful for:
+    - CI/CD pipelines
+    - Batch processing multiple configurations
+    - Applying well-known fixes to common issues
+
+  ${formatHighlight("Safety features:")}
+    - Only applies fixes above confidence threshold
+    - Creates backup of original configuration
+    - Reports all changes made
+    - Can be combined with --dry-run for preview
+
+${formatSection("CONFIDENCE SCORING")}
+  Each suggested fix has a confidence score (0.0-1.0):
+
+  ${formatHighlight("High confidence (0.9-1.0):")}
+    - Syntax errors (missing quotes, invalid YAML)
+    - Required field violations
+    - Invalid enum values
+    - Type mismatches
+    ${formatExample("→ Safe to auto-fix")}
+
+  ${formatHighlight("Medium confidence (0.7-0.89):")}
+    - Common anti-patterns with obvious fixes
+    - Resource path corrections
+    - Pattern normalization
+    ${formatExample("→ Review recommended")}
+
+  ${formatHighlight("Lower confidence (0.5-0.69):")}
+    - Suggested optimizations
+    - Potential improvements
+    - Ambiguous corrections
+    ${formatExample("→ Manual review required")}
+
+  ${formatHighlight("Low confidence (<0.5):")}
+    - Experimental suggestions
+    - Context-dependent fixes
+    ${formatExample("→ Not shown by default (use --min-confidence to adjust)")}
+
+${formatSection("TYPES OF FIXES")}
+  ${formatHighlight("Validation errors:")}
+    - Missing required fields (apiVersion, kind, resources)
+    - Invalid field values
+    - Type errors (string vs array, etc.)
+
+  ${formatHighlight("Syntax errors:")}
+    - Malformed YAML
+    - Invalid regex patterns
+    - Invalid glob patterns
+    - Unescaped special characters
+
+  ${formatHighlight("Patch errors:")}
+    - Invalid operation types
+    - Missing required patch fields
+    - Conflicting patch operations
+    - Invalid patch targets
+
+  ${formatHighlight("Resource errors:")}
+    - Invalid URLs or paths
+    - Missing resource files
+    - Circular base references
+    - Duplicate resource entries
+
+  ${formatHighlight("Performance issues:")}
+    - Inefficient patterns
+    - Redundant operations
+    - Overlapping patches
+
+${formatSection("COMMAND COMPARISON")}
+  ${formatHighlight("fix vs validate:")}
+    ${formatCommand("validate")} - Reports errors, no fixes
+    ${formatCommand("fix")}      - Reports errors AND suggests/applies fixes
+
+  ${formatHighlight("fix vs lint:")}
+    ${formatCommand("lint")} - Checks for warnings and best practices
+    ${formatCommand("fix")}  - Fixes actual errors (can also fix some lint issues)
+
+  ${formatHighlight("fix vs debug:")}
+    ${formatCommand("debug")} - Interactive patch-by-patch execution
+    ${formatCommand("fix")}   - Configuration-level error correction
+
+${formatSection("WORKFLOW EXAMPLES")}
+  ${formatHighlight("Basic fix workflow:")}
+    1. ${formatCommand("kustomark validate .")} - Identify errors
+    2. ${formatCommand("kustomark fix .")} - Interactively fix errors
+    3. ${formatCommand("kustomark validate .")} - Verify fixes
+    4. ${formatCommand("kustomark build .")} - Build with fixed config
+
+  ${formatHighlight("Safe fix workflow:")}
+    1. ${formatCommand("kustomark fix . --dry-run")} - Preview all fixes
+    2. ${formatCommand("kustomark fix . --save-to kustomark-fixed.yaml")} - Save to new file
+    3. ${formatCommand("kustomark validate -f kustomark-fixed.yaml")} - Test new config
+    4. ${formatCommand("mv kustomark-fixed.yaml kustomark.yaml")} - Replace original
+
+  ${formatHighlight("Automated fix workflow:")}
+    1. ${formatCommand("kustomark fix . --auto-fix --min-confidence=0.9")} - Auto-fix critical errors
+    2. ${formatCommand("kustomark fix . --min-confidence=0.7")} - Review medium-confidence fixes
+    3. ${formatCommand("kustomark build .")} - Build with fixes applied
+
+  ${formatHighlight("CI/CD integration:")}
+    ${formatCommand("kustomark fix . --auto-fix --min-confidence=0.95 && kustomark build .")}
+    Automatically fix critical errors in CI pipeline
+
+${formatSection("SAVING FIXES SAFELY")}
+  ${formatHighlight("Backup original (default behavior):")}
+    ${formatCommand("kustomark fix .")}
+    Creates: kustomark.yaml.backup
+
+  ${formatHighlight("Save to different file:")}
+    ${formatCommand("kustomark fix . --save-to kustomark-fixed.yaml")}
+    Original file remains unchanged
+
+  ${formatHighlight("Preview only:")}
+    ${formatCommand("kustomark fix . --dry-run")}
+    No files modified
+
+${formatSection("JSON OUTPUT")}
+  With --format=json, outputs structured fix information:
+
+  ${formatExample("{")}
+  ${formatExample('  "issues": [')}
+  ${formatExample("    {")}
+  ${formatExample('      "severity": "error",')}
+  ${formatExample('      "message": "Missing required field: apiVersion",')}
+  ${formatExample('      "location": "root",')}
+  ${formatExample('      "fix": {')}
+  ${formatExample('        "description": "Add apiVersion: kustomark/v1",')}
+  ${formatExample('        "confidence": 1.0,')}
+  ${formatExample('        "patch": "..."')}
+  ${formatExample("      }")}
+  ${formatExample("    }")}
+  ${formatExample("  ],")}
+  ${formatExample('  "stats": {')}
+  ${formatExample('    "totalIssues": 5,')}
+  ${formatExample('    "fixedIssues": 4,')}
+  ${formatExample('    "skippedIssues": 1,')}
+  ${formatExample('    "avgConfidence": 0.92')}
+  ${formatExample("  }")}
+  ${formatExample("}")}
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    All issues fixed successfully or no issues found
+  ${formatHighlight("1")}    Some issues remain unfixed or errors occurred
+  ${formatHighlight("2")}    Configuration file not found or invalid
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Fix syntax errors after manual editing:")}
+    ${formatCommand("kustomark fix .")}
+    Catch and fix YAML formatting issues
+
+  ${formatHighlight("Migrate old configuration format:")}
+    ${formatCommand("kustomark fix . --auto-fix")}
+    Automatically update to current schema version
+
+  ${formatHighlight("Cleanup after copy-paste:")}
+    ${formatCommand("kustomark fix . --min-confidence=0.8")}
+    Fix common issues from copying examples
+
+  ${formatHighlight("Pre-commit hook:")}
+    ${formatCommand("kustomark fix . --auto-fix --min-confidence=0.95 -q")}
+    Ensure config is error-free before committing
+
+  ${formatHighlight("Team onboarding:")}
+    ${formatCommand("kustomark fix . -v")}
+    Learn from fixes with verbose explanations
+
+${formatSection("TIPS")}
+  ${formatHighlight("Start with dry-run:")}
+    Always preview fixes with --dry-run before applying
+    Understand what will change
+
+  ${formatHighlight("Use confidence thresholds wisely:")}
+    - 0.95+ for automated/unattended fixes
+    - 0.8+ for semi-automated workflows
+    - 0.5+ for interactive review
+
+  ${formatHighlight("Combine with other commands:")}
+    ${formatCommand("kustomark validate . && kustomark fix .")}
+    Validate first, then fix issues
+
+  ${formatHighlight("Review auto-fixes:")}
+    Even high-confidence fixes should be reviewed
+    Use git diff to see changes
+
+  ${formatHighlight("Save to different file when unsure:")}
+    ${formatCommand("kustomark fix . --save-to test.yaml")}
+    Test the fixed config before replacing original
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark validate")}  Validate configuration (no fixes)
+  ${formatCommand("kustomark lint")}      Check for warnings and best practices
+  ${formatCommand("kustomark debug")}     Interactive patch debugging
+  ${formatCommand("kustomark analyze")}   Analyze configuration complexity
 `;
 }
 
@@ -1922,6 +2190,7 @@ export const helpCommands = [
   "watch",
   "init",
   "debug",
+  "fix",
   "lint",
   "explain",
   "analyze",
