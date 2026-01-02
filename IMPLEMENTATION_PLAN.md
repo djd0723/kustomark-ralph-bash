@@ -2980,3 +2980,60 @@ The template system is now FULLY IMPLEMENTED and production-ready. All component
 **Next Steps:**
 To complete the integration, the CLI router (`src/cli/index.ts`) needs to be updated to route "template" commands to the template-commands.ts handlers. This is a straightforward integration following existing patterns.
 
+
+---
+
+**2026-01-02 (Template System Filesystem Discovery - Enhancement):**
+
+Enhanced the template system with filesystem-based template discovery to enable dynamic template loading.
+
+**Problem Solved:**
+- Built-in templates existed on filesystem (upstream-fork, skill-customization) but were inaccessible
+- Template manager used hardcoded template definitions instead of discovering from filesystem
+- skill-customization template could not be used despite being fully implemented
+
+**Implementation Completed:**
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/templates/manager.ts`
+  - Added `discoverBuiltinTemplates()` function to scan `src/core/templates/builtin/` directory
+  - Automatically parses `template.yaml` files and builds metadata
+  - Added `loadTemplateFiles()` to read actual template file contents from filesystem
+  - Implemented in-memory caching for discovered templates with lazy initialization
+  - Maintains backward compatibility with hardcoded templates as fallback
+  - Proper error handling for missing/invalid templates
+  - Works in both development and production (bundled) environments
+  - Added `clearCache()` method for testing and re-discovery
+- ✅ Fixed linting issues:
+  - Removed unnecessary `continue` statement (biome lint)
+  - Reorganized import statements alphabetically
+
+**Templates Now Available:**
+1. ✅ `skill-customization` - Customize Claude AI skills while tracking upstream changes (newly accessible!)
+   - 6 variables: OUTPUT_DIR, UPSTREAM_URL, ORG_NAME, ORG_PREFIX, SKILL_NAME, SKILL_DESCRIPTION
+   - 5 files: kustomark.yaml, README.md, example files
+2. ✅ `upstream-fork` - Consume markdown from upstream sources with local customizations
+   - 4 variables: UPSTREAM_URL, OUTPUT_DIR, BRANDING_OLD, BRANDING_NEW
+   - 4 files: kustomark.yaml, README.md, example files
+3. ✅ `base` - Simple base configuration (hardcoded fallback)
+4. ✅ `overlay` - Overlay configuration (hardcoded fallback)
+5. ✅ `doc-pipeline` - Multi-stage documentation pipeline (hardcoded fallback)
+
+**Testing Results:**
+- All 1794 tests passing ✓
+- 6791 expect() calls successful
+- Main project linting clean (bun check passes) ✓
+- CLI `template list` shows all 5 templates correctly
+- CLI `template show skill-customization` displays full metadata
+- Template application works end-to-end with variable substitution
+- Both development and production builds work correctly
+
+**Impact:**
+- Users can now use all built-in templates via CLI without code modifications
+- Template system is fully functional and production-ready
+- Foundation for future user-defined templates (can add discovery from ~/.config/kustomark/templates/)
+- Improved developer experience with dynamic template loading
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/templates/manager.ts` - Added filesystem discovery logic
+- `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md` - Added this completion entry
+
+**Status:** Template System Filesystem Discovery COMPLETE! ✅
