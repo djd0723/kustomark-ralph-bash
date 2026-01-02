@@ -965,6 +965,635 @@ kustomark template apply skills \
 - **Documentation Pipelines**: Set up documentation builds quickly
 - **Skill Customization**: Create custom Claude Code skills from templates
 
+### `kustomark explain [path]`
+
+Show resolution chain and patch details for understanding how configurations combine and which patches apply to files.
+
+```bash
+# Show full resolution chain
+kustomark explain ./team/
+
+# Show lineage for a specific file
+kustomark explain ./team/ --file guide.md
+
+# Get explanation as JSON
+kustomark explain ./team/ --format=json
+
+# Detailed explanation with verbose output
+kustomark explain ./team/ -v
+```
+
+**Options:**
+- `--file <filename>` - Show lineage and patches for a specific file
+- `--format <text|json>` - Output format (default: text)
+- `-v`, `-vv`, `-vvv` - Increase verbosity
+- `-q` - Quiet mode (errors only)
+
+**Use Cases:**
+- Understanding how base and overlay configurations combine
+- Troubleshooting where files come from in multi-layer setups
+- Debugging which patches apply to specific files
+- Understanding the order of patch application
+- Analyzing complex configuration hierarchies
+
+**Example Output (text):**
+```
+Config: team/kustomark.yaml
+Output: ./output
+
+Resolution Chain:
+  - base/kustomark.yaml
+    Resources: 15
+    Patches: 8
+  - team/kustomark.yaml
+    Resources: 3
+    Patches: 12
+
+Total Files: 18
+Total Patches: 20
+```
+
+**Example Output (file lineage):**
+```
+File: guide.md
+Source: base/kustomark.yaml
+
+Patches (3):
+  - [base/kustomark.yaml] replace
+    old: "upstream"
+    new: "team-name"
+  - [team/kustomark.yaml] set-frontmatter
+    key: "version"
+    value: "2.0.0"
+```
+
+---
+
+### `kustomark lint [path]`
+
+Check configuration for common issues, anti-patterns, and potential problems.
+
+```bash
+# Check for common issues
+kustomark lint ./team/
+
+# Get lint results as JSON
+kustomark lint ./team/ --format=json
+
+# Verbose lint with detailed explanations
+kustomark lint ./team/ -v
+
+# Strict mode - warnings become errors
+kustomark lint ./team/ --strict
+```
+
+**Options:**
+- `--strict` - Treat warnings as errors (affects exit code)
+- `--format <text|json>` - Output format (default: text)
+- `-v`, `-vv`, `-vvv` - Increase verbosity
+- `-q` - Quiet mode (errors only)
+
+**Checks Performed:**
+
+1. **Unreachable Patches** - Detects patches with patterns that match no files
+2. **Redundant Patches** - Identifies duplicate patches with same parameters
+3. **Overlapping Patches** - Finds patches that operate on the same targets
+4. **Regex Pattern Issues** - Validates regex syntax and flags
+5. **Destructive Operations** - Warns about potentially dangerous operations
+6. **Glob Pattern Efficiency** - Suggests more specific patterns
+
+**Example Output:**
+```
+Found 4 issue(s):
+
+WARNING [patch #3]: Patch #3 (replace) is redundant with patch #1
+INFO [patch #5]: Pattern doesn't use 'g' flag - will only replace first match
+INFO [patch #7]: remove-section will remove all children. Set 'includeChildren: false' to keep them
+INFO: Resource pattern '**/*.md' is very broad - consider being more specific
+
+Summary: 0 error(s), 1 warning(s), 3 info
+```
+
+**Exit Codes:**
+- `0` - No errors found (warnings don't fail by default)
+- `1` - Errors found, or warnings found in strict mode
+
+---
+
+### `kustomark schema`
+
+Export JSON Schema for IDE/editor integration with autocomplete and validation.
+
+```bash
+# Generate schema and save to file
+kustomark schema > kustomark.schema.json
+
+# Pretty-print schema
+kustomark schema | jq .
+```
+
+**Features:**
+- Autocomplete suggestions for all fields and operations
+- Validation of required fields and correct types
+- Inline documentation for each property
+- Enum validation for fixed values
+- Pattern validation for regex and glob patterns
+
+**Editor Integration:**
+
+For VSCode, add to `.vscode/settings.json`:
+```json
+{
+  "yaml.schemas": {
+    "./kustomark.schema.json": "kustomark.yaml"
+  }
+}
+```
+
+Or install the Kustomark VSCode extension for automatic integration.
+
+---
+
+### `kustomark fix [path]`
+
+Interactively fix failed patches with intelligent suggestions.
+
+```bash
+# Interactive mode - step through each failed patch
+kustomark fix ./kustomark.yaml
+
+# Auto-apply with default threshold (80%)
+kustomark fix ./kustomark.yaml --auto-apply
+
+# Auto-apply with custom confidence threshold
+kustomark fix ./kustomark.yaml --auto-apply --confidence-threshold=90
+
+# Save fixes to a new file
+kustomark fix ./kustomark.yaml --save-to=./kustomark-fixed.yaml
+
+# JSON output
+kustomark fix ./kustomark.yaml --format=json
+```
+
+**Options:**
+- `--auto-apply` - Automatically apply fixes that meet the confidence threshold
+- `--confidence-threshold <0-100>` - Minimum confidence score for auto-apply (default: 80)
+- `--save-to <path>` - Save fixed configuration to a different file
+- `--format <text|json>` - Output format (default: text)
+- `--verbosity <level>` - Verbosity level (0=quiet, 1=normal, 2=verbose)
+- `--quiet` - Suppress non-essential output
+
+**Features:**
+- Intelligent analysis of failed patches
+- Smart suggestions with confidence scores
+- Interactive mode with step-by-step prompts
+- Auto-apply mode for automation
+- Actions: Auto-fix, Select, Edit, Skip, or Delete patches
+
+**Use Cases:**
+- Fixing patches after source file modifications
+- Batch-updating configuration files
+- Identifying and correcting typos in patches
+- Automating patch repairs in CI/CD
+
+---
+
+### `kustomark preview [path]`
+
+Generate side-by-side diff visualization showing changes before building.
+
+```bash
+# Basic preview
+kustomark preview ./kustomark.yaml
+
+# JSON output
+kustomark preview ./kustomark.yaml --format=json
+
+# Verbose mode (more context)
+kustomark preview ./kustomark.yaml --verbosity=2
+
+# Quiet mode (changes only, no context)
+kustomark preview ./kustomark.yaml --verbosity=0
+```
+
+**Options:**
+- `--format <text|json>` - Output format (default: text)
+- `--verbosity <level>` - Context level (0=quiet, 1=normal, 2=verbose)
+- `--cache-dir <path>` - Custom cache directory for remote resources
+
+**Features:**
+- Side-by-side diff visualization
+- Character-level highlighting for modifications
+- Color-coded output (green=add, red=delete, yellow=modify)
+- Configurable context lines
+- Change statistics
+
+**Example Output:**
+```
+Preview: /path/to/kustomark.yaml
+
+━━━ docs/guide.md ━━━
++2 -1 ~1
+
+     │ Before                        ┊     │ After
+─────┴───────────────────────────────┼─────┴─────────────────────────────
+  1  │ # Getting Started             ┊  1  │ # Getting Started
+  2  │                               ┊  2  │
+  3  │ ## Installation               ┊  3  │ ## Installing
+~ 4  │ Install using npm:            ┊  4  │ Install using npm or bun:
++    │                               ┊  5  │
++    │                               ┊  6  │ ```bash
+- 5  │ ```                           ┊     │
+  6  │ npm install kustomark         ┊  7  │ npm install kustomark
+
+Summary: 1 files changed, +2 -1 ~1
+```
+
+**Exit Codes:**
+- `0` - No changes detected
+- `1` - Changes detected (or error occurred)
+
+---
+
+### `kustomark history [subcommand]`
+
+Manage build history with tracking, comparison, and rollback capabilities.
+
+**Subcommands:**
+
+#### `history list` - List Build History
+
+```bash
+# List recent builds
+kustomark history list
+
+# List last 5 successful builds
+kustomark history list --status=success --limit=5
+
+# List builds from the past week
+kustomark history list --after=2024-01-08T00:00:00Z
+
+# JSON output
+kustomark history list --format=json
+```
+
+**Options:**
+- `--limit=N` - Limit results to N builds (default: 20)
+- `--offset=N` - Skip N builds (for pagination)
+- `--status=success|error|all` - Filter by build status
+- `--after=DATE` - Show builds after this date (ISO 8601)
+- `--before=DATE` - Show builds before this date
+- `--format <text|json>` - Output format
+
+#### `history show <build-id>` - Show Build Details
+
+```bash
+# Show build details
+kustomark history show 2024-01-15_10-30-00-000
+
+# Show with partial ID
+kustomark history show 2024-01-15
+
+# Show with file details
+kustomark history show 2024-01-15 -vv
+```
+
+#### `history diff <from> <to>` - Compare Builds
+
+```bash
+# Compare two builds
+kustomark history diff 2024-01-15_10-00-00 2024-01-15_11-00-00
+
+# Compare with detailed hash info
+kustomark history diff 2024-01-15_10-00-00 2024-01-15_11-00-00 -vv
+```
+
+#### `history rollback <build-id>` - Rollback to Previous Build
+
+```bash
+# Preview rollback
+kustomark history rollback 2024-01-15_10-00-00 --dry-run
+
+# Rollback to previous build
+kustomark history rollback 2024-01-15_10-00-00
+```
+
+#### `history clean` - Clean Build History
+
+```bash
+# Preview cleanup (keep last 50 builds)
+kustomark history clean --keep-last=50 --dry-run
+
+# Clean old builds (keep last 30 days)
+kustomark history clean --keep-days=30
+
+# Show detailed cleanup info
+kustomark history clean --keep-last=10 -vv
+```
+
+**Options:**
+- `--keep-last=N` - Keep only the N most recent builds
+- `--keep-days=N` - Keep builds from the last N days
+- `--dry-run` - Preview cleanup without making changes
+
+#### `history stats` - Show Statistics
+
+```bash
+# Show build statistics
+kustomark history stats
+
+# Get stats in JSON format
+kustomark history stats --format=json
+```
+
+**Use Cases:**
+- Track build history and monitor trends
+- Compare builds to identify changes
+- Rollback to previous successful builds
+- Analyze build performance and statistics
+- Debug build issues by examining past builds
+- Clean up old build history to manage disk space
+
+---
+
+### `kustomark snapshot [path]`
+
+Capture and verify build outputs for regression testing.
+
+**Modes:**
+
+#### Create Snapshot (default)
+
+```bash
+# Create a new snapshot
+kustomark snapshot ./my-project
+
+# Create with verbose output
+kustomark snapshot ./my-project -vv
+
+# JSON format
+kustomark snapshot ./my-project --format=json
+```
+
+#### Verify Snapshot
+
+```bash
+# Verify current build matches snapshot
+kustomark snapshot --verify ./my-project
+
+# Verify with detailed diffs
+kustomark snapshot --verify ./my-project -vv
+
+# Use in CI/CD pipeline
+kustomark snapshot --verify . && echo "Build verified!" || exit 1
+```
+
+#### Update Snapshot
+
+```bash
+# Update snapshot after intentional changes
+kustomark snapshot --update ./my-project
+
+# Update in JSON format
+kustomark snapshot --update ./my-project --format=json
+```
+
+**Options:**
+- `--verify` - Verify current build against saved snapshot
+- `--update` - Update existing snapshot with current build
+- `--format <text|json>` - Output format (default: text)
+- `-v`, `-vv` - Increase verbosity (show detailed diffs)
+
+**Use Cases:**
+- Create baseline snapshots of build output
+- Verify builds haven't changed unexpectedly
+- Update snapshots when intentional changes are made
+- Integrate with CI/CD for automated testing
+- Track content changes across builds
+
+**Example Output:**
+```
+=== Snapshot Verification ===
+✗ Snapshot does not match current build
+
+Added files (2):
+  + docs/new-feature.md
+  + docs/changelog.md
+
+Modified files (3):
+  ~ docs/readme.md
+  ~ docs/api.md
+
+Total changes: +2 -1 ~3
+```
+
+**Exit Codes:**
+- `0` - Snapshot matches (verify mode) or created successfully
+- `1` - Snapshot doesn't match (verify mode) or error
+
+**Storage:** Snapshots are saved in `.kustomark/snapshots/manifest.yaml`
+
+---
+
+### `kustomark cache [subcommand]`
+
+Manage cached remote resources (Git repositories and HTTP archives).
+
+#### `cache list` - List Cached Resources
+
+```bash
+# List all cached resources
+kustomark cache list
+
+# List in JSON format
+kustomark cache list --format=json
+```
+
+#### `cache clear [pattern]` - Clear Cache
+
+```bash
+# Clear all cached resources
+kustomark cache clear
+
+# Clear specific resources (e.g., all github.com repos)
+kustomark cache clear github.com
+
+# Clear with JSON output
+kustomark cache clear github.com --format=json
+```
+
+**Use Cases:**
+- View all cached Git repositories and HTTP resources
+- Clear cache to force fresh downloads
+- Clear specific cached resources by pattern
+- Manage disk space by removing outdated cached resources
+- Troubleshoot resource resolution issues
+
+**Cache Locations:**
+- Git: `~/.cache/kustomark/git/` (Linux/macOS) or `%LOCALAPPDATA%/kustomark/git/` (Windows)
+- HTTP: `~/.cache/kustomark/http/` (Linux/macOS) or `%LOCALAPPDATA%/kustomark/http/` (Windows)
+
+---
+
+### `kustomark benchmark [subcommand]`
+
+Comprehensive performance testing with baseline comparison.
+
+#### `benchmark run` - Run Benchmarks
+
+```bash
+# Basic benchmark with defaults
+kustomark benchmark run
+
+# Benchmark specific operations
+kustomark benchmark run --operations "append,replace,regex"
+
+# Test at different scales
+kustomark benchmark run --file-counts "5,25,50,100,200"
+
+# Complex content stress test
+kustomark benchmark run --complexity complex --file-counts "10,50"
+
+# More accurate results
+kustomark benchmark run --warmup 5 --runs 50
+
+# Save results to file
+kustomark benchmark run --output results.txt
+
+# JSON format
+kustomark benchmark run --format json --output results.json
+
+# Markdown format
+kustomark benchmark run --format markdown --output BENCHMARK.md
+```
+
+**Options:**
+- `--operations <ops>` - Comma-separated operations (default: append,prepend,replace,replace-section)
+- `--file-counts <counts>` - File counts to test (default: 10,50,100)
+- `--complexity <level>` - simple|medium|complex (default: medium)
+- `--warmup <number>` - Warmup runs (default: 3)
+- `--runs <number>` - Benchmark runs (default: 10)
+- `--format <text|json|markdown>` - Output format
+- `--output <path>` - Save results to file
+- `--baseline <name>` - Compare with baseline
+- `--save-baseline <name>` - Save results as baseline
+
+#### `benchmark list` - List Baselines
+
+```bash
+# View all saved baselines
+kustomark benchmark list
+```
+
+#### Baseline Management
+
+```bash
+# Save current performance as baseline
+kustomark benchmark run --save-baseline v1.0.0
+
+# Compare against baseline
+kustomark benchmark run --baseline v1.0.0
+
+# Save new baseline while comparing with old
+kustomark benchmark run --baseline v1.0.0 --save-baseline v1.1.0
+```
+
+**Complexity Levels:**
+- `simple` - Basic markdown with minimal structure
+- `medium` - Multiple sections with nested headings, lists, code blocks
+- `complex` - Frontmatter, tables, nested sections, rich formatting (10+ sections)
+
+**Example Output:**
+```
+================================================================================
+Benchmark Results
+================================================================================
+
+Environment:
+  Platform: linux (x64)
+  Bun Version: 1.0.0
+  CPU Cores: 8
+  Total Memory: 16.00 GB
+
+Results:
+  append:
+    10 files (medium): 5.23ms (median: 5.10ms, p95: 6.50ms)
+      Throughput: 1912.05 files/s
+      Memory: 0.45 MB heap
+
+Summary:
+  Total Duration: 15.43s
+  Total Operations: 600
+  Average Throughput: 2009.25 files/s
+```
+
+**Use Cases:**
+- Measure performance of different patch operations
+- Compare performance across file counts and complexity levels
+- Track performance regressions over time
+- Identify optimization opportunities
+- Generate performance reports for documentation
+
+**Baselines Location:** `.kustomark/benchmarks/`
+
+---
+
+### `kustomark web [path]`
+
+Launch the Kustomark web interface for browser-based configuration management.
+
+```bash
+# Start web UI in production mode
+kustomark web .
+
+# Development mode with hot-reload
+kustomark web . --dev
+
+# Custom port
+kustomark web . --port=8080
+
+# Custom host (expose to network)
+kustomark web . --host=0.0.0.0 --port=3000
+
+# Verbose output
+kustomark web . --verbose
+
+# Development on custom port
+kustomark web . --dev --port=5173 --verbose
+```
+
+**Options:**
+- `--dev` - Run in development mode with hot-reload
+- `--port <number>` - Port number (default: 3000)
+- `--host <string>` - Host address (default: localhost)
+- `--open` - Automatically open browser (not yet implemented)
+- `--verbose` - Enable verbose logging
+
+**Features:**
+- Visual configuration management
+- Live preview of patch changes
+- Browser-based UI for easier onboarding
+- Team collaboration through web interface
+- Development and production modes
+
+**Requirements:**
+- Production: Built web server at `dist/web/index.js`
+- Development: Development script at `scripts/dev-web.sh`
+
+**Environment Variables:**
+- `KUSTOMARK_BASE_DIR` - Base directory for file operations
+- `KUSTOMARK_PORT` - Server port number
+- `KUSTOMARK_HOST` - Server host address
+
+**Use Cases:**
+- Visual configuration management
+- Live preview of patch changes
+- Team collaboration through web interface
+- Easier onboarding for non-CLI users
+- Development and testing of web UI features
+
+---
+
 ## Configuration
 
 ### Config File Structure
