@@ -6,6 +6,90 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 ## Recent Enhancements
 
+**2026-01-02 (Build History & Rollback System - NEW FEATURE!):**
+- ✅ **NEW FEATURE**: Comprehensive build history tracking and management system
+- ✅ **Core Module**: Implemented `/home/dex/kustomark-ralph-bash/src/core/build-history.ts` (1,081 lines)
+  - `recordBuild()` - Automatically records each build with full metadata
+  - `loadBuild()` - Load specific build by timestamp ID
+  - `loadManifest()` - Load index of all builds
+  - `listBuilds()` - List builds with filtering (status, date range, pagination)
+  - `compareBuilds()` - Compare two builds with detailed file-level diffs
+  - `rollbackToBuild()` - Restore files from previous build
+  - `pruneHistory()` - Clean up old builds (by count or date)
+  - `clearHistory()` - Delete all build history
+  - `getHistoryStats()` - Get comprehensive statistics
+- ✅ **CLI Commands**: Implemented `/home/dex/kustomark-ralph-bash/src/cli/history-command.ts` (983 lines)
+  - `kustomark history list` - List all builds with pagination
+  - `kustomark history show <id>` - Show detailed build information
+  - `kustomark history diff <from> <to>` - Compare two builds
+  - `kustomark history rollback <id>` - Rollback to previous build
+  - `kustomark history clean` - Prune old builds
+  - `kustomark history stats` - Show statistics and trends
+- ✅ **Build Integration**: Automatic history recording in `/home/dex/kustomark-ralph-bash/src/cli/index.ts`
+  - Records after each successful build
+  - Captures: config hash, file hashes, patches applied, duration, errors/warnings
+  - `--no-history` flag to disable recording
+  - Graceful error handling (warns but doesn't fail builds)
+- ✅ **Storage Structure**: `.kustomark/history/` directory
+  - `builds/{timestamp}.json` - Individual build records with SHA256 hashes
+  - `manifest.json` - Index of all builds
+  - `current.json` - Latest successful build for quick access
+- ✅ **Type Definitions**: Added to `/home/dex/kustomark-ralph-bash/src/core/types.ts`
+  - `BuildHistoryEntry` - Complete build record
+  - `BuildFileEntry` - File-level metadata
+  - `BuildHistoryManifest` - Index of builds
+  - `BuildComparisonResult` - Build comparison results
+  - `RollbackOptions` & `RollbackResult` - Rollback operations
+- ✅ **Features**:
+  - **Change Detection**: SHA256 hashing for files, configs, and patches
+  - **Filtering**: Filter by status (success/error), date range, tags
+  - **Pagination**: Limit/offset for large histories
+  - **Comparison**: Detailed diffs showing added/removed/modified files
+  - **Statistics**: Success rate, average duration, build frequency, trends
+  - **Output Formats**: JSON and colorized text output
+- ✅ All 2762 tests passing ✓
+- ✅ 8971 expect() calls successful ✓
+- ✅ All linting checks passing (bun check) ✓
+- 📝 **Use Cases**:
+  - Debug when builds started failing
+  - Compare current build against previous successful state
+  - Track build performance over time
+  - Audit configuration changes
+  - Rollback to known-good state
+- 📝 **Example Workflow**:
+  ```bash
+  # Builds automatically record history
+  kustomark build
+
+  # List recent builds
+  kustomark history list --limit 10
+
+  # Compare two builds
+  kustomark history diff build-1 build-2
+
+  # Show build statistics
+  kustomark history stats
+
+  # Clean up old builds
+  kustomark history clean --keep-last 50
+  ```
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/core/build-history.ts` - Core history manager (1,081 lines)
+- `/home/dex/kustomark-ralph-bash/src/cli/history-command.ts` - CLI commands (983 lines)
+- `/home/dex/kustomark-ralph-bash/src/cli/build-history.ts` - Build recording module (437 lines)
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added history type definitions
+- `/home/dex/kustomark-ralph-bash/src/core/index.ts` - Exported history functions and types
+- `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Integrated history recording and command routing
+
+**Status:** Build History & Rollback System COMPLETE! ✅
+
+This high-value feature enables users to track build changes over time, debug issues by comparing builds, and maintain an audit trail of all configuration changes.
+
+----
+
 **2026-01-02 (Interactive Template Variable Prompting - NEW FEATURE!):**
 - ✅ **NEW FEATURE**: Interactive prompts for missing template variables
 - ✅ Enhanced `kustomark template apply` with `--interactive` flag for guided variable input

@@ -1134,3 +1134,183 @@ export interface SnapshotVerificationResult {
   /** Total number of differences found */
   differenceCount: number;
 }
+
+// Build History System Types
+
+/**
+ * File-level build metadata tracking individual file processing
+ */
+export interface BuildFileEntry {
+  /** File path relative to project root */
+  path: string;
+  /** SHA256 hash of source content */
+  sourceHash: string;
+  /** SHA256 hash of output content */
+  outputHash: string;
+  /** Number of patches applied to this file */
+  patchesApplied: number;
+  /** Size in bytes of source file */
+  sourceSize: number;
+  /** Size in bytes of output file */
+  outputSize: number;
+  /** Timestamp when file was processed (ISO 8601) */
+  processedAt: string;
+}
+
+/**
+ * Individual build record containing complete build metadata
+ */
+export interface BuildHistoryEntry {
+  /** Unique identifier for this build (UUID v4) */
+  id: string;
+  /** Timestamp when build started (ISO 8601) */
+  timestamp: string;
+  /** Duration of build in milliseconds */
+  duration: number;
+  /** Whether the build succeeded */
+  success: boolean;
+  /** SHA256 hash of config file content at build time */
+  configHash: string;
+  /** Kustomark version used for this build */
+  version: string;
+  /** Total number of files processed */
+  fileCount: number;
+  /** Total number of patches applied across all files */
+  totalPatchesApplied: number;
+  /** File-level build metadata for each processed file */
+  files: BuildFileEntry[];
+  /** Validation errors that occurred during build */
+  errors: ValidationError[];
+  /** Validation warnings that occurred during build */
+  warnings: ValidationWarning[];
+  /** Group filters used during build (if any) */
+  groupFilters?: {
+    /** Enabled groups (whitelist mode) */
+    enabled?: string[];
+    /** Disabled groups (blacklist mode) */
+    disabled?: string[];
+  };
+  /** User-provided tags for categorizing builds */
+  tags?: string[];
+  /** Optional description or note about this build */
+  description?: string;
+}
+
+/**
+ * Index of all builds with metadata for quick lookup
+ */
+export interface BuildHistoryManifest {
+  /** Manifest version for future compatibility */
+  version: number;
+  /** Total number of builds stored */
+  totalBuilds: number;
+  /** Most recent build ID */
+  latestBuildId?: string;
+  /** Map of build ID to build entry for O(1) lookup */
+  builds: Map<string, BuildHistoryEntry>;
+  /** Maximum number of builds to retain (for cleanup) */
+  maxBuilds?: number;
+  /** Last cleanup timestamp (ISO 8601) */
+  lastCleanup?: string;
+}
+
+/**
+ * Comparison between two builds showing differences
+ */
+export interface BuildComparisonResult {
+  /** ID of the first build (baseline) */
+  baselineBuildId: string;
+  /** ID of the second build (comparison target) */
+  targetBuildId: string;
+  /** Timestamp of baseline build */
+  baselineTimestamp: string;
+  /** Timestamp of target build */
+  targetTimestamp: string;
+  /** Files that were added in target build */
+  filesAdded: string[];
+  /** Files that were removed in target build */
+  filesRemoved: string[];
+  /** Files that were modified between builds */
+  filesModified: Array<{
+    /** File path */
+    path: string;
+    /** Hash in baseline build */
+    baselineHash: string;
+    /** Hash in target build */
+    targetHash: string;
+    /** Size change in bytes (positive = growth) */
+    sizeChange: number;
+    /** Patch count change */
+    patchCountChange: number;
+  }>;
+  /** Total number of differences found */
+  differenceCount: number;
+  /** Configuration changed between builds */
+  configChanged: boolean;
+  /** Patches applied changed between builds */
+  patchesChanged: boolean;
+  /** Overall summary of comparison */
+  summary: {
+    /** Total files in baseline */
+    baselineFileCount: number;
+    /** Total files in target */
+    targetFileCount: number;
+    /** Total patches in baseline */
+    baselinePatchCount: number;
+    /** Total patches in target */
+    targetPatchCount: number;
+    /** Build time difference in milliseconds */
+    durationChange: number;
+  };
+}
+
+/**
+ * Options for rollback operation
+ */
+export interface RollbackOptions {
+  /** Build ID to rollback to */
+  buildId: string;
+  /** Whether to create a backup of current state before rollback */
+  createBackup?: boolean;
+  /** Whether to force rollback even if validation fails */
+  force?: boolean;
+  /** Specific files to rollback (if not specified, rollback all) */
+  files?: string[];
+  /** Whether to restore group filters from the target build */
+  restoreGroupFilters?: boolean;
+  /** Whether to perform a dry-run without actually modifying files */
+  dryRun?: boolean;
+}
+
+/**
+ * Result of rollback operation
+ */
+export interface RollbackResult {
+  /** Whether the rollback succeeded */
+  success: boolean;
+  /** Build ID that was rolled back to */
+  targetBuildId: string;
+  /** Backup build ID created before rollback (if backup was enabled) */
+  backupBuildId?: string;
+  /** Number of files restored */
+  filesRestored: number;
+  /** Number of files that failed to restore */
+  filesFailed: number;
+  /** List of files that were successfully restored */
+  restoredFiles: string[];
+  /** List of files that failed to restore with error messages */
+  failedFiles: Array<{
+    /** File path that failed */
+    path: string;
+    /** Error message */
+    error: string;
+  }>;
+  /** Validation errors encountered during rollback */
+  errors: ValidationError[];
+  /** Validation warnings encountered during rollback */
+  warnings: ValidationWarning[];
+  /** Duration of rollback operation in milliseconds */
+  duration: number;
+  /** Timestamp when rollback was performed (ISO 8601) */
+  timestamp: string;
+}

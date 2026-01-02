@@ -39,6 +39,19 @@ export {
   shouldRebuildFile,
   updateBuildCache,
 } from "./build-cache.js";
+
+// Export build history functions and types
+export {
+  clearHistory,
+  compareBuilds,
+  getHistoryStats,
+  listBuilds,
+  loadBuild,
+  loadManifest,
+  pruneHistory,
+  recordBuild,
+  rollbackToBuild,
+} from "./build-history.js";
 // Export condition evaluator functions
 export {
   evaluateAllOf,
@@ -228,6 +241,10 @@ export type {
   BenchmarkSuiteResult,
   BuildCache,
   BuildCacheEntry,
+  BuildComparisonResult,
+  BuildFileEntry,
+  BuildHistoryEntry,
+  BuildHistoryManifest,
   ComplexityReport,
   Condition,
   CoverageReport,
@@ -264,6 +281,8 @@ export type {
   ReplaceRegexPatch,
   ReplaceSectionPatch,
   RiskLevel,
+  RollbackOptions,
+  RollbackResult,
   SafetyReport,
   SecurityConfig,
   SetFrontmatterPatch,

@@ -82,6 +82,7 @@ import type {
 import { runValidators } from "../core/validators.js";
 import { analyzeCommand } from "./analyze-command.js";
 import { handleBenchmarkCommand } from "./benchmark-command.js";
+import { recordBuild } from "./build-history.js";
 import { debugCommand } from "./debug-command.js";
 import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
 import { initNonInteractive } from "./init-command.js";
@@ -148,6 +149,14 @@ export interface CLIOptions {
   target?: string; // For suggest --target option (target file or directory)
   minConfidence?: number; // For suggest --min-confidence option (0.0-1.0)
   var?: Record<string, string>; // For template apply --var key=value
+  // History command options
+  limit?: number; // For history list --limit N
+  offset?: number; // For history list --offset N
+  status?: "success" | "error" | "all"; // For history list --status
+  before?: string; // For history list --before (ISO date)
+  after?: string; // For history list --after (ISO date)
+  keepLast?: number; // For history clean --keep-last N
+  keepDays?: number; // For history clean --keep-days N
   overwrite?: boolean; // For template apply --overwrite option
   category?: string; // For template list --category option
   force?: boolean; // For template install --force option
@@ -157,6 +166,7 @@ export interface CLIOptions {
   sort?: "risk" | "complexity" | "impact" | "coverage" | string; // For analyze --sort option (sort by field)
   verify?: boolean; // For --verify flag (verify current build against snapshot)
   updateSnapshot?: boolean; // For --update-snapshot flag (update snapshot with current build)
+  noHistory?: boolean; // For --no-history flag (disable build history recording)
 }
 
 interface BuildStats {
@@ -303,6 +313,7 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     overwrite: false,
     category: undefined,
     progress: false,
+    noHistory: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -343,6 +354,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.update = true;
     } else if (arg === "--no-lock") {
       options.noLock = true;
+    } else if (arg === "--no-history") {
+      options.noHistory = true;
     } else if (arg === "--offline") {
       options.offline = true;
     } else if (arg === "--dry-run") {
@@ -673,6 +686,85 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.force = true;
     } else if (arg === "--non-interactive") {
       options.nonInteractive = true;
+    } else if (arg === "--limit" || arg.startsWith("--limit=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.limit = Number.parseInt(value, 10);
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.limit = Number.parseInt(nextArg, 10);
+          i++;
+        }
+      }
+    } else if (arg === "--offset" || arg.startsWith("--offset=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.offset = Number.parseInt(value, 10);
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.offset = Number.parseInt(nextArg, 10);
+          i++;
+        }
+      }
+    } else if (arg === "--status" || arg.startsWith("--status=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value && (value === "success" || value === "error" || value === "all")) {
+          options.status = value;
+        }
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && (nextArg === "success" || nextArg === "error" || nextArg === "all")) {
+          options.status = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--before" || arg.startsWith("--before=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.before = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.before = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--after" || arg.startsWith("--after=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.after = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.after = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--keep-last" || arg.startsWith("--keep-last=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.keepLast = Number.parseInt(value, 10);
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.keepLast = Number.parseInt(nextArg, 10);
+          i++;
+        }
+      }
+    } else if (arg === "--keep-days" || arg.startsWith("--keep-days=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.keepDays = Number.parseInt(value, 10);
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.keepDays = Number.parseInt(nextArg, 10);
+          i++;
+        }
+      }
     } else if (arg === "--category" || arg.startsWith("--category=")) {
       if (arg.includes("=")) {
         const value = arg.split("=")[1];
@@ -2349,6 +2441,35 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           invalidationReasons,
         };
       }
+    }
+
+    // Record build history (unless disabled or in dry-run mode)
+    if (!options.noHistory && !options.dryRun) {
+      await recordBuild({
+        config,
+        basePath,
+        configPath,
+        filesWritten,
+        totalBytes,
+        patchesApplied,
+        patchesSkipped,
+        duration: stats?.duration,
+        stats: stats
+          ? {
+              processed: stats.files.processed,
+              written: stats.files.written,
+              checked: stats.files.checked,
+              rebuilt: stats.files.rebuilt,
+              unchanged: stats.files.unchanged,
+              byOperation: stats.byOperation,
+              cache: stats.cache,
+            }
+          : undefined,
+        warnings,
+        validationErrors: allValidationErrors,
+        operationCounts,
+        success: true,
+      });
     }
 
     // Run dry-run analysis if requested
@@ -4304,6 +4425,10 @@ async function main(): Promise<number> {
     }
     case "cache":
       return await cacheCommand(args.slice(1), options);
+    case "history": {
+      const { historyCommand } = await import("./history-command.js");
+      return await historyCommand(args.slice(1), options);
+    }
     default:
       console.error(`Unknown command: ${command}`);
       console.error(`Run 'kustomark --help' for usage information`);
