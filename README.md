@@ -490,6 +490,130 @@ With `--format=json`, watch mode outputs newline-delimited JSON events:
 
 See [Watch Mode Hooks](#watch-mode-hooks) for advanced automation with shell commands.
 
+### `kustomark suggest`
+
+Generate patch configuration from differences between source and target files. This command intelligently analyzes file differences and automatically creates kustomark.yaml configurations, helping you convert manual edits into automated patch pipelines.
+
+```bash
+# Analyze differences between two files
+kustomark suggest --source original.md --target modified.md
+
+# Generate config from directory comparison
+kustomark suggest --source upstream/ --target customized/
+
+# Save generated config to file
+kustomark suggest --source docs/ --target team-docs/ --output kustomark.yaml
+
+# Get suggestions as JSON
+kustomark suggest --source old.md --target new.md --format=json
+
+# Verbose output with statistics
+kustomark suggest --source upstream/ --target custom/ -v
+
+# Filter low-confidence patches (only show high-confidence suggestions)
+kustomark suggest --source old.md --target new.md --min-confidence=0.8
+```
+
+**Options:**
+- `--source <path>` - Source file or directory (before state) - **required**
+- `--target <path>` - Target file or directory (after state) - **required**
+- `--output <path>` - Write generated config to file
+- `--min-confidence <0.0-1.0>` - Filter patches below confidence threshold (e.g., 0.8 for high-confidence only)
+- `--format <text|json>` - Output format (default: text)
+- `-v`, `-vv`, `-vvv` - Increase verbosity for more details
+- `-q` - Quiet mode (errors only)
+
+**What it detects:**
+- **Frontmatter changes** - Generates `set-frontmatter`, `remove-frontmatter` operations
+- **Section modifications** - Generates `rename-header`, `remove-section`, `replace-section` operations
+- **Pattern replacements** - Detects repeated changes and generates `replace-regex` operations
+- **Line edits** - Generates `replace`, `insert-after-line`, `delete-between` operations
+
+**Confidence scoring:**
+- **High (0.9+):** Frontmatter and section operations
+- **Medium (0.7+):** Pattern-based replacements
+- **Lower (<0.7):** Line-level edits
+
+**Example workflow - Fork upstream documentation:**
+
+```bash
+# 1. Clone upstream docs
+git clone https://github.com/vendor/docs upstream-docs/
+
+# 2. Make your customizations manually
+cp -r upstream-docs/ our-docs/
+# ... edit files in our-docs/ ...
+
+# 3. Generate patches from differences
+kustomark suggest --source upstream-docs/ --target our-docs/ --output kustomark.yaml
+
+# 4. Review generated config
+cat kustomark.yaml
+
+# 5. Build using generated config
+kustomark build
+
+# 6. When upstream updates, just pull and rebuild
+cd upstream-docs && git pull
+kustomark build
+```
+
+**Example output:**
+
+```yaml
+apiVersion: kustomark/v1
+kind: Kustomization
+output: ./output
+resources:
+  - ./upstream-docs/
+patches:
+  - op: set-frontmatter
+    key: author
+    value: Your Team
+  - op: replace-regex
+    pattern: 'vendor\.com'
+    replacement: 'yourcompany.com'
+    flags: g
+  - op: rename-header
+    header: Installation
+    newText: Getting Started
+```
+
+**Use cases:**
+
+1. **Learning kustomark syntax:** Make manual changes and see the equivalent patch operations
+2. **Migration from manual editing:** Convert existing customizations to automated patches
+3. **Quick prototyping:** Experiment with manual edits, then generate patches
+4. **Upstream forks:** Automate customization of vendor documentation
+
+**Tips:**
+
+- Review generated patches - they're starting points, not perfect solutions
+- Combine automatic suggestions with manual refinements
+- Test with `kustomark diff` to verify behavior
+- Start with single-file comparisons before scaling to directories
+
+**JSON Output:**
+
+With `--format=json`, outputs structured data with the generated config and statistics:
+
+```json
+{
+  "config": {
+    "apiVersion": "kustomark/v1",
+    "kind": "Kustomization",
+    "output": "./output",
+    "resources": ["./source"],
+    "patches": [...]
+  },
+  "stats": {
+    "filesAnalyzed": 5,
+    "patchesGenerated": 12,
+    "confidence": "high"
+  }
+}
+```
+
 ## Configuration
 
 ### Config File Structure

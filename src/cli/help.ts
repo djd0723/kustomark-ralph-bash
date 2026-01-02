@@ -72,6 +72,7 @@ ${formatSection("ADVANCED COMMANDS")}
   ${formatCommand("debug")}        Interactive patch debugging mode
   ${formatCommand("lint")}         Check for common issues in configuration
   ${formatCommand("explain")}      Show resolution chain and patch details
+  ${formatCommand("suggest")}      Generate patches from file differences
   ${formatCommand("test")}         Run patch tests against sample content
   ${formatCommand("template")}     Manage and apply configuration templates
   ${formatCommand("fetch")}        Fetch remote resources without building
@@ -142,6 +143,7 @@ export function getCommandHelp(command: string): string {
     cache: getCacheHelp,
     schema: getSchemaHelp,
     template: getTemplateHelp,
+    suggest: getSuggestHelp,
   };
 
   const helpFunc = helpFunctions[command];
@@ -1419,6 +1421,213 @@ ${formatSection("SEE ALSO")}
   ${formatCommand("kustomark init")}      Create configuration (alternative to templates)
   ${formatCommand("kustomark validate")}  Validate created configuration
   ${formatCommand("kustomark build")}     Build from template-created config
+`;
+}
+
+// ============================================================================
+// Suggest Command Help
+// ============================================================================
+
+function getSuggestHelp(): string {
+  return `
+${formatTitle("kustomark suggest - Generate patch configuration from file differences")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark suggest")} --source <path> --target <path> [options]
+
+${formatSection("DESCRIPTION")}
+  Suggest analyzes the differences between source and target files and
+  automatically generates patch operations to transform the source into
+  the target. This helps you create kustomark.yaml configurations without
+  manually writing patches.
+
+  The command intelligently detects:
+    - Frontmatter changes (set, remove, rename)
+    - Section modifications (rename, remove, replace)
+    - Pattern-based replacements (URLs, versions, repeated strings)
+    - Line-level edits (insert, delete, replace)
+
+  It assigns confidence scores to each suggestion and generates a complete
+  kustomark.yaml configuration that you can review and use.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("--source")} <path>    Source file or directory (before state)
+  ${formatFlag("--target")} <path>    Target file or directory (after state)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--output")} <path>             Write generated config to file
+  ${formatFlag("--min-confidence")} <0.0-1.0>  Filter patches below confidence threshold (0.0-1.0)
+  ${formatFlag("--format")} <text|json>        Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}              Increase verbosity for more details
+  ${formatFlag("-q")}                         Quiet mode (errors only)
+
+${formatSection("HOW IT WORKS")}
+  ${formatHighlight("1. File Matching:")}
+     For directories, files are matched by relative path
+     For single files, direct comparison is performed
+
+  ${formatHighlight("2. Diff Analysis:")}
+     Analyzes differences at multiple levels:
+     - Frontmatter fields (YAML metadata)
+     - Section structure (headers and content)
+     - Text patterns (repeated changes)
+     - Line-by-line changes
+
+  ${formatHighlight("3. Patch Generation:")}
+     Generates the most appropriate patch operations:
+     - set-frontmatter: For metadata changes
+     - rename-header: For section title changes
+     - remove-section: For deleted sections
+     - replace-regex: For pattern-based changes
+     - replace: For simple string replacements
+
+  ${formatHighlight("4. Confidence Scoring:")}
+     High (0.9+):   Frontmatter and section operations
+     Medium (0.7+): Pattern-based replacements
+     Lower (<0.7):  Line-level edits
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Analyze differences between two files")}
+  ${formatCommand("kustomark suggest --source original.md --target modified.md")}
+
+  ${formatExample("# Generate config and save to file")}
+  ${formatCommand("kustomark suggest --source docs/ --target customized/ --output kustomark.yaml")}
+
+  ${formatExample("# Analyze directories with verbose output")}
+  ${formatCommand("kustomark suggest --source upstream/ --target team-docs/ -v")}
+
+  ${formatExample("# Get suggestions as JSON")}
+  ${formatCommand("kustomark suggest --source old.md --target new.md --format=json")}
+
+  ${formatExample("# Compare entire documentation directories")}
+  ${formatCommand("kustomark suggest --source vendor-docs/ --target our-docs/")}
+
+  ${formatExample("# Filter low-confidence suggestions (only show patches with 0.8+ confidence)")}
+  ${formatCommand("kustomark suggest --source old.md --target new.md --min-confidence=0.8")}
+
+${formatSection("TEXT OUTPUT")}
+  Text format displays:
+    - Summary of files analyzed
+    - Number of patches generated
+    - Complete kustomark.yaml configuration
+    - Statistics (with -v flag)
+
+  ${formatHighlight("Example output:")}
+    ${formatExample("Analyzing differences between source and target...")}
+    ${formatExample("")}
+    ${formatExample("Found 3 suggested patches:")}
+    ${formatExample("")}
+    ${formatExample("# Suggested kustomark.yaml")}
+    ${formatExample("")}
+    ${formatExample("apiVersion: kustomark/v1")}
+    ${formatExample("kind: Kustomization")}
+    ${formatExample("output: ./output")}
+    ${formatExample("resources:")}
+    ${formatExample("  - ./original.md")}
+    ${formatExample("patches:")}
+    ${formatExample("  - op: set-frontmatter")}
+    ${formatExample("    key: version")}
+    ${formatExample("    value: 2.0.0")}
+
+${formatSection("JSON OUTPUT")}
+  With --format=json, outputs structured data:
+
+  ${formatExample("{")}
+  ${formatExample('  "config": {')}
+  ${formatExample('    "apiVersion": "kustomark/v1",')}
+  ${formatExample('    "kind": "Kustomization",')}
+  ${formatExample('    "output": "./output",')}
+  ${formatExample('    "resources": ["./source"],')}
+  ${formatExample('    "patches": [...]')}
+  ${formatExample("  },")}
+  ${formatExample('  "stats": {')}
+  ${formatExample('    "filesAnalyzed": 5,')}
+  ${formatExample('    "patchesGenerated": 12,')}
+  ${formatExample('    "confidence": "high"')}
+  ${formatExample("  }")}
+  ${formatExample("}")}
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Fork and customize documentation:")}
+    Compare upstream docs with your customized version
+    Generate patches to automate the customization
+    Apply patches when upstream updates
+
+  ${formatHighlight("Learn kustomark syntax:")}
+    Make manual changes to markdown files
+    Use suggest to see equivalent patch operations
+    Understand how different changes map to patches
+
+  ${formatHighlight("Migration from manual editing:")}
+    Already customized files manually?
+    Use suggest to convert edits to patches
+    Move to automated pipeline
+
+  ${formatHighlight("Automate repetitive tasks:")}
+    Make changes to one file
+    Generate patches automatically
+    Apply to multiple files
+
+${formatSection("WORKFLOW EXAMPLES")}
+  ${formatHighlight("Example 1: Fork upstream documentation")}
+    ${formatCommand("# 1. Clone upstream docs")}
+    ${formatCommand("git clone https://github.com/vendor/docs upstream-docs/")}
+    ${formatCommand("")}
+    ${formatCommand("# 2. Make your customizations manually")}
+    ${formatCommand("cp -r upstream-docs/ our-docs/")}
+    ${formatCommand("# ... edit files in our-docs/ ...")}
+    ${formatCommand("")}
+    ${formatCommand("# 3. Generate patches from differences")}
+    ${formatCommand("kustomark suggest --source upstream-docs/ --target our-docs/ --output kustomark.yaml")}
+    ${formatCommand("")}
+    ${formatCommand("# 4. Build using generated config")}
+    ${formatCommand("kustomark build")}
+
+  ${formatHighlight("Example 2: Update with upstream changes")}
+    ${formatCommand("# 1. Pull latest upstream")}
+    ${formatCommand("cd upstream-docs && git pull")}
+    ${formatCommand("")}
+    ${formatCommand("# 2. Rebuild with existing patches")}
+    ${formatCommand("kustomark build")}
+    ${formatCommand("")}
+    ${formatCommand("# 3. If new changes needed, regenerate patches")}
+    ${formatCommand("kustomark suggest --source upstream-docs/ --target our-docs/ --output kustomark.yaml")}
+
+${formatSection("TIPS")}
+  ${formatHighlight("Review generated patches:")}
+    Suggestions are starting points, not perfect solutions
+    Review the generated config before using in production
+    Refine patches for better patterns and fewer operations
+
+  ${formatHighlight("Combine with manual edits:")}
+    Use suggest to get 80% of patches automatically
+    Manually add specialized operations as needed
+    Test with kustomark diff to verify behavior
+
+  ${formatHighlight("Start simple:")}
+    Begin with single-file comparisons
+    Understand the generated patches
+    Scale up to directory comparisons
+
+  ${formatHighlight("Use verbosity flags:")}
+    Add -v to see statistics and confidence scores
+    Helps understand suggestion quality
+    Use -vv or -vvv for debugging
+
+${formatSection("LIMITATIONS")}
+  - Suggestions are heuristic-based, not perfect
+  - Complex structural changes may not be detected optimally
+  - May generate multiple patches where one would suffice
+  - Manual review and refinement recommended
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    Suggestions generated successfully
+  ${formatHighlight("1")}    Error (missing arguments, file not found, etc.)
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark build")}     Build using generated configuration
+  ${formatCommand("kustomark diff")}      Preview changes before building
+  ${formatCommand("kustomark validate")}  Validate generated configuration
 `;
 }
 

@@ -33,17 +33,17 @@ describe("kustomark suggest command", () => {
     writeFileSync(sourceFile, "# Hello\n\nThis is foo content.");
     writeFileSync(targetFile, "# Hello\n\nThis is bar content.");
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
     const output = JSON.parse(result);
 
-    expect(output.patches).toBeDefined();
-    expect(output.patches.length).toBeGreaterThan(0);
+    expect(output.config.patches).toBeDefined();
+    expect(output.config.patches.length).toBeGreaterThan(0);
 
     // Should suggest a replace operation
-    const replacePatch = output.patches.find((p: any) => p.op === "replace");
+    const replacePatch = output.config.patches.find((p: any) => p.op === "replace");
     expect(replacePatch).toBeDefined();
     expect(replacePatch.old).toBe("foo");
     expect(replacePatch.new).toBe("bar");
@@ -56,17 +56,17 @@ describe("kustomark suggest command", () => {
     writeFileSync(sourceFile, "# Version 1.0.0\n\nRelease date: 2024-01-15");
     writeFileSync(targetFile, "# Version 2.0.0\n\nRelease date: 2024-06-20");
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
     const output = JSON.parse(result);
 
-    expect(output.patches).toBeDefined();
-    expect(output.patches.length).toBeGreaterThan(0);
+    expect(output.config.patches).toBeDefined();
+    expect(output.config.patches.length).toBeGreaterThan(0);
 
     // Should suggest operations for version and date changes
-    const patches = output.patches;
+    const patches = output.config.patches;
     expect(patches.some((p: any) => p.op === "replace" || p.op === "replace-regex")).toBe(true);
   });
 
@@ -94,7 +94,7 @@ published: true
     writeFileSync(sourceFile, sourceContent);
     writeFileSync(targetFile, targetContent);
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
@@ -144,14 +144,14 @@ The end.`;
     writeFileSync(sourceFile, sourceContent);
     writeFileSync(targetFile, targetContent);
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
     const output = JSON.parse(result);
 
-    expect(output.patches).toBeDefined();
-    expect(output.patches.length).toBeGreaterThan(0);
+    expect(output.config.patches).toBeDefined();
+    expect(output.config.patches.length).toBeGreaterThan(0);
 
     // Should suggest section-related operations
     const sectionPatches = output.patches.filter((p: any) =>
@@ -193,15 +193,15 @@ Maximum 1000 requests per hour.`;
     writeFileSync(sourceFile, sourceContent);
     writeFileSync(targetFile, targetContent);
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
     const output = JSON.parse(result);
 
     expect(output.success).toBe(true);
-    expect(output.patches).toBeDefined();
-    expect(output.patches.length).toBeGreaterThan(0);
+    expect(output.config.patches).toBeDefined();
+    expect(output.config.patches.length).toBeGreaterThan(0);
     expect(output.sourceFile).toBe(sourceFile);
     expect(output.targetFile).toBe(targetFile);
   });
@@ -214,7 +214,7 @@ Maximum 1000 requests per hour.`;
     writeFileSync(sourceFile, content);
     writeFileSync(targetFile, content);
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
@@ -233,7 +233,7 @@ Maximum 1000 requests per hour.`;
     writeFileSync(sourceFile, "# Original\n\nCompletely different.");
     writeFileSync(targetFile, "# New Document\n\nNothing in common.");
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
@@ -263,7 +263,7 @@ Maximum 1000 requests per hour.`;
     writeFileSync(join(sourceDir, "doc2.md"), "# Doc 2\n\nVersion 1.0");
     writeFileSync(join(targetDir, "doc2.md"), "# Doc 2\n\nVersion 2.0");
 
-    const result = execSync(`${cliPath} suggest ${sourceDir} ${targetDir} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`, {
       encoding: "utf-8",
     });
 
@@ -291,7 +291,7 @@ Maximum 1000 requests per hour.`;
     writeFileSync(join(sourceDir, "subdir", "nested.md"), "# Nested\n\nOriginal.");
     writeFileSync(join(targetDir, "subdir", "nested.md"), "# Nested\n\nModified.");
 
-    const result = execSync(`${cliPath} suggest ${sourceDir} ${targetDir} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`, {
       encoding: "utf-8",
     });
 
@@ -322,7 +322,7 @@ Maximum 1000 requests per hour.`;
     writeFileSync(join(sourceDir, "both.md"), "# Both\n\nOriginal.");
     writeFileSync(join(targetDir, "both.md"), "# Both\n\nModified.");
 
-    const result = execSync(`${cliPath} suggest ${sourceDir} ${targetDir} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`, {
       encoding: "utf-8",
     });
 
@@ -367,7 +367,7 @@ Maximum 1000 requests per hour.`;
     writeFileSync(sourceFile, "# Title\n\nOld text.");
     writeFileSync(targetFile, "# Title\n\nNew text.");
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
@@ -486,7 +486,7 @@ Maximum 1000 requests per hour.`;
     writeFileSync(sourceFile, "");
     writeFileSync(targetFile, "");
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
@@ -531,15 +531,15 @@ Maximum 1000 requests per hour.`;
     writeFileSync(sourceFile, "");
     writeFileSync(targetFile, "# New Content\n\nThis was added.");
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
     const output = JSON.parse(result);
 
     expect(output.success).toBe(true);
-    expect(output.patches).toBeDefined();
-    expect(output.patches.length).toBeGreaterThan(0);
+    expect(output.config.patches).toBeDefined();
+    expect(output.config.patches.length).toBeGreaterThan(0);
   });
 
   test("handle content in source but empty target", () => {
@@ -549,7 +549,7 @@ Maximum 1000 requests per hour.`;
     writeFileSync(sourceFile, "# Original Content\n\nThis was removed.");
     writeFileSync(targetFile, "");
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 
@@ -602,7 +602,7 @@ New section added.`;
     writeFileSync(sourceFile, sourceContent);
     writeFileSync(targetFile, targetContent);
 
-    const result = execSync(`${cliPath} suggest ${sourceFile} ${targetFile} --format=json`, {
+    const result = execSync(`${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`, {
       encoding: "utf-8",
     });
 

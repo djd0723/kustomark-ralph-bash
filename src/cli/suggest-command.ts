@@ -9,7 +9,7 @@ import * as yaml from "js-yaml";
 import type { KustomarkConfig, PatchOperation } from "../core/types.js";
 import { createProgressReporter } from "./progress.js";
 
-import { suggestPatches } from "../core/patch-suggester.js";
+import { scorePatches, suggestPatches } from "../core/patch-suggester.js";
 
 // ============================================================================
 // Types
@@ -22,6 +22,7 @@ interface CLIOptions {
   format?: "text" | "json";
   verbosity?: number;
   output?: string;
+  minConfidence?: number;
 }
 
 export interface SuggestResult {
@@ -160,7 +161,25 @@ function analyzeFilePairs(
       }
 
       // Suggest patches for this file pair
-      const patches = suggestPatches(sourceContent, targetContent);
+      let patches = suggestPatches(sourceContent, targetContent);
+
+      // Filter by minimum confidence if specified
+      if (options.minConfidence !== undefined && options.minConfidence > 0) {
+        const minConf = options.minConfidence; // Store in const to satisfy TypeScript
+        const scoredPatches = scorePatches(patches, sourceContent, targetContent);
+        const filteredPatches = scoredPatches
+          .filter((sp) => sp.score >= minConf)
+          .map((sp) => sp.patch);
+
+        const filteredCount = patches.length - filteredPatches.length;
+        patches = filteredPatches;
+
+        if (options.verbosity && options.verbosity >= 2 && filteredCount > 0) {
+          console.error(
+            `  Filtered ${filteredCount} low-confidence patches from ${pair.relativePath}`,
+          );
+        }
+      }
 
       // Add include pattern if we have multiple files
       if (pairs.length > 1 && pair.relativePath !== ".") {
@@ -195,21 +214,22 @@ function calculateConfidence(patches: PatchOperation[]): "high" | "medium" | "lo
   }
 
   // Simple heuristic: fewer, simpler patches = higher confidence
-  const avgPatchComplexity = patches.reduce((sum, patch) => {
-    let complexity = 1;
-    if (patch.op === "replace-regex") complexity = 3;
-    if (patch.op.includes("section")) complexity = 2;
-    if (patch.op.includes("frontmatter")) complexity = 2;
-    return sum + complexity;
-  }, 0) / patches.length;
+  const avgPatchComplexity =
+    patches.reduce((sum, patch) => {
+      let complexity = 1;
+      if (patch.op === "replace-regex") complexity = 3;
+      if (patch.op.includes("section")) complexity = 2;
+      if (patch.op.includes("frontmatter")) complexity = 2;
+      return sum + complexity;
+    }, 0) / patches.length;
 
   if (avgPatchComplexity <= 1.5 && patches.length <= 10) {
     return "high";
-  } else if (avgPatchComplexity <= 2.5) {
-    return "medium";
-  } else {
-    return "low";
   }
+  if (avgPatchComplexity <= 2.5) {
+    return "medium";
+  }
+  return "low";
 }
 
 // ============================================================================
@@ -219,10 +239,7 @@ function calculateConfidence(patches: PatchOperation[]): "high" | "medium" | "lo
 /**
  * Generate a complete kustomark.yaml configuration
  */
-function generateConfig(
-  sourcePath: string,
-  patches: PatchOperation[],
-): KustomarkConfig {
+function generateConfig(sourcePath: string, patches: PatchOperation[]): KustomarkConfig {
   const config: KustomarkConfig = {
     apiVersion: "kustomark/v1",
     kind: "Kustomization",
@@ -258,10 +275,7 @@ function serializeConfig(config: KustomarkConfig): string {
 /**
  * Output results in text format
  */
-function outputText(
-  result: SuggestResult,
-  options: CLIOptions,
-): void {
+function outputText(result: SuggestResult, options: CLIOptions): void {
   const configYaml = serializeConfig(result.config);
 
   console.log("Analyzing differences between source and target...\n");

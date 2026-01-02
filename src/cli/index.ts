@@ -130,6 +130,7 @@ interface CLIOptions {
   showSteps?: boolean; // For test --show-steps option (show intermediate results)
   source?: string; // For suggest --source option (source file or directory)
   target?: string; // For suggest --target option (target file or directory)
+  minConfidence?: number; // For suggest --min-confidence option (0.0-1.0)
   var?: Record<string, string>; // For template apply --var key=value
   overwrite?: boolean; // For template apply --overwrite option
   category?: string; // For template list --category option
@@ -551,6 +552,39 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       }
     } else if (arg === "--show-steps") {
       options.showSteps = true;
+    } else if (arg === "--source" || arg.startsWith("--source=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.source = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith("-")) {
+          options.source = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--target" || arg.startsWith("--target=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.target = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith("-")) {
+          options.target = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--min-confidence" || arg.startsWith("--min-confidence=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.minConfidence = Number.parseFloat(value);
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith("-")) {
+          options.minConfidence = Number.parseFloat(nextArg);
+          i++;
+        }
+      }
     } else if (arg === "--overwrite") {
       options.overwrite = true;
     } else if (arg === "--category" || arg.startsWith("--category=")) {
