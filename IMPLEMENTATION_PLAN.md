@@ -4395,3 +4395,32 @@ The project now has:
 - Working React test infrastructure for web UI development
 - Professional API documentation for core library integration
 - Improved test coverage and reliability
+
+
+**2026-01-02 (Critical Bug Fix - Table Operations Validation):**
+
+- ✅ **Fixed table operations validation bug** - enabled all 5 table operations to be usable in config files
+  - **Problem**: Table operations were fully implemented in patch engine and documented in README, but missing from validOps array in config-parser.ts
+  - **Root Cause**: The validOps array in config-parser.ts (line 435) only contained 22 operations, missing the 5 table operations that were added in commit 63dd2b5
+  - **Impact**: Table operations (replace-table-cell, add-table-row, remove-table-row, add-table-column, remove-table-column) were rejected during config validation, preventing their use despite being fully implemented
+  - **Solution**:
+    - Added 5 table operation names to validOps array (lines 458-462)
+    - Added comprehensive field validation for all 5 table operations (lines 705-883)
+    - Validated required fields (table, row, column, content, values, header) with proper type checking
+    - Validated optional fields (position, defaultValue) with proper type checking
+  - **Files Modified**:
+    - `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts` - Added table ops to validOps and validation cases
+  - **Verification**:
+    - Created test config with table operations - validates successfully
+    - All 654 core tests passing ✓
+    - All linting checks passing (`bun check`) ✓
+  - **Status**: Table operations now fully functional from config validation through execution
+
+**Testing Results:**
+- **Core tests**: 654 pass, 0 fail
+- **Config parser tests**: 206 pass, 0 fail
+- **All linting checks passing**: `bun check` ✓
+
+**Key Achievement:**
+Fixed critical validation bug that prevented documented and implemented table operations from being used in production configs. Users can now utilize all 27 patch operations (22 content + 5 table) as documented.
+

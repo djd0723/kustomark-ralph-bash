@@ -297,11 +297,14 @@ async function downloadFile(
       },
       (response) => {
         // Handle redirects
-        if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        if (
+          response.statusCode &&
+          response.statusCode >= 300 &&
+          response.statusCode < 400 &&
+          response.headers.location
+        ) {
           const redirectUrl = response.headers.location;
-          downloadFile(redirectUrl, destPath, options)
-            .then(resolve)
-            .catch(reject);
+          downloadFile(redirectUrl, destPath, options).then(resolve).catch(reject);
           return;
         }
 
@@ -339,12 +342,7 @@ async function downloadFile(
         });
 
         response.on("error", (error) => {
-          reject(
-            new HttpFetchError(
-              `Response error: ${error.message}`,
-              "DOWNLOAD_FAILED",
-            ),
-          );
+          reject(new HttpFetchError(`Response error: ${error.message}`, "DOWNLOAD_FAILED"));
         });
       },
     );
@@ -355,12 +353,7 @@ async function downloadFile(
     });
 
     request.on("error", (error) => {
-      reject(
-        new HttpFetchError(
-          `Failed to download file: ${error.message}`,
-          "DOWNLOAD_FAILED",
-        ),
-      );
+      reject(new HttpFetchError(`Failed to download file: ${error.message}`, "DOWNLOAD_FAILED"));
     });
 
     request.end();

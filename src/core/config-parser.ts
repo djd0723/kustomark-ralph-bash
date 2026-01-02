@@ -455,6 +455,11 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "rename-file",
     "delete-file",
     "move-file",
+    "replace-table-cell",
+    "add-table-row",
+    "remove-table-row",
+    "add-table-column",
+    "remove-table-column",
   ];
 
   if (!validOps.includes(p.op as string)) {
@@ -693,6 +698,186 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         errors.push({
           field: `${prefix}.dest`,
           message: "'dest' must be a string",
+        });
+      }
+      break;
+
+    case "replace-table-cell":
+      if (p.table === undefined) {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "replace-table-cell operation requires 'table' field",
+        });
+      } else if (typeof p.table !== "number" && typeof p.table !== "string") {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "'table' must be a number or string",
+        });
+      }
+
+      if (p.row === undefined) {
+        errors.push({
+          field: `${prefix}.row`,
+          message: "replace-table-cell operation requires 'row' field",
+        });
+      } else if (typeof p.row !== "number" && typeof p.row !== "object") {
+        errors.push({
+          field: `${prefix}.row`,
+          message: "'row' must be a number or object",
+        });
+      }
+
+      if (p.column === undefined) {
+        errors.push({
+          field: `${prefix}.column`,
+          message: "replace-table-cell operation requires 'column' field",
+        });
+      } else if (typeof p.column !== "number" && typeof p.column !== "string") {
+        errors.push({
+          field: `${prefix}.column`,
+          message: "'column' must be a number or string",
+        });
+      }
+
+      if (!p.content) {
+        errors.push({
+          field: `${prefix}.content`,
+          message: "replace-table-cell operation requires 'content' field",
+        });
+      } else if (typeof p.content !== "string") {
+        errors.push({
+          field: `${prefix}.content`,
+          message: "'content' must be a string",
+        });
+      }
+      break;
+
+    case "add-table-row":
+      if (p.table === undefined) {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "add-table-row operation requires 'table' field",
+        });
+      } else if (typeof p.table !== "number" && typeof p.table !== "string") {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "'table' must be a number or string",
+        });
+      }
+
+      if (!p.values) {
+        errors.push({
+          field: `${prefix}.values`,
+          message: "add-table-row operation requires 'values' field",
+        });
+      } else if (!Array.isArray(p.values)) {
+        errors.push({
+          field: `${prefix}.values`,
+          message: "'values' must be an array",
+        });
+      } else if (p.values.some((v: unknown) => typeof v !== "string")) {
+        errors.push({
+          field: `${prefix}.values`,
+          message: "all elements in 'values' must be strings",
+        });
+      }
+
+      if (p.position !== undefined && typeof p.position !== "number") {
+        errors.push({
+          field: `${prefix}.position`,
+          message: "'position' must be a number",
+        });
+      }
+      break;
+
+    case "remove-table-row":
+      if (p.table === undefined) {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "remove-table-row operation requires 'table' field",
+        });
+      } else if (typeof p.table !== "number" && typeof p.table !== "string") {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "'table' must be a number or string",
+        });
+      }
+
+      if (p.row === undefined) {
+        errors.push({
+          field: `${prefix}.row`,
+          message: "remove-table-row operation requires 'row' field",
+        });
+      } else if (typeof p.row !== "number" && typeof p.row !== "object") {
+        errors.push({
+          field: `${prefix}.row`,
+          message: "'row' must be a number or object",
+        });
+      }
+      break;
+
+    case "add-table-column":
+      if (p.table === undefined) {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "add-table-column operation requires 'table' field",
+        });
+      } else if (typeof p.table !== "number" && typeof p.table !== "string") {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "'table' must be a number or string",
+        });
+      }
+
+      if (!p.header) {
+        errors.push({
+          field: `${prefix}.header`,
+          message: "add-table-column operation requires 'header' field",
+        });
+      } else if (typeof p.header !== "string") {
+        errors.push({
+          field: `${prefix}.header`,
+          message: "'header' must be a string",
+        });
+      }
+
+      if (p.defaultValue !== undefined && typeof p.defaultValue !== "string") {
+        errors.push({
+          field: `${prefix}.defaultValue`,
+          message: "'defaultValue' must be a string",
+        });
+      }
+
+      if (p.position !== undefined && typeof p.position !== "number") {
+        errors.push({
+          field: `${prefix}.position`,
+          message: "'position' must be a number",
+        });
+      }
+      break;
+
+    case "remove-table-column":
+      if (p.table === undefined) {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "remove-table-column operation requires 'table' field",
+        });
+      } else if (typeof p.table !== "number" && typeof p.table !== "string") {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "'table' must be a number or string",
+        });
+      }
+
+      if (p.column === undefined) {
+        errors.push({
+          field: `${prefix}.column`,
+          message: "remove-table-column operation requires 'column' field",
+        });
+      } else if (typeof p.column !== "number" && typeof p.column !== "string") {
+        errors.push({
+          field: `${prefix}.column`,
+          message: "'column' must be a number or string",
         });
       }
       break;
