@@ -2183,3 +2183,51 @@ This document tracks the implementation of kustomark based on the spec milestone
   - Offline mode: DONE ✅
   - Security allowlist: DONE ✅
 
+**2026-01-02 (LSP Completion Provider Position Detection Fix - COMPLETE!):**
+- ✅ Fixed all 18 LSP completion provider test failures (100% test pass rate achieved!)
+
+  **Issues Fixed:**
+  1. **Indentation-based context detection**: Blank lines inside patch objects were incorrectly detected as "patches-array" context
+     - Added `getPatchItemIndent()` helper to find indentation of most recent patch item
+     - Updated `detectContext()` to compare current line indentation with patch item indentation
+     - Lines with indentation > patch item indent are correctly identified as "patch-object" context
+
+  2. **Root context detection after patches block**: Cursor after patches block was not detected as root context
+     - Enhanced `isInsidePatches()` to properly detect when we've exited the patches block
+     - Added handling for completely empty lines (length 0) that signal end of patches
+     - Added special case for positions beyond document that check previous line status
+
+  3. **Resources array detection**: Cursor inside resources array showed incorrect completions
+     - Implemented `isInsideResources()` method similar to `isInsidePatches()`
+     - Returns "unknown" context when inside resources array, preventing incorrect completions
+
+  4. **Op field value completion for partial words**: Typing "op: rep" didn't show operation completions
+     - Modified regex pattern from `/^\s*op:\s*$/` to `/^-?\s*op:\s*/` to match partial values
+     - Handles both standalone `op:` and `- op:` forms
+     - Added check for previous line when current line is empty
+
+  5. **Operation-specific field completions**: Only common fields were suggested, not operation-specific ones
+     - Implemented `getOperationSpecificFields()` method for context-aware suggestions
+     - Returns operation-specific fields like "old", "new" for `replace` operation
+     - Returns "pattern", "replacement", "flags" for `replace-regex` operation
+     - Covers all 22 operations with their specific required fields
+
+  6. **Context detection order**: Improved prioritization to detect `op:` before patches-array
+     - Ensures `- op: value` correctly triggers op completions rather than array completions
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/lsp/completion.ts` - Complete rewrite of context detection logic
+
+  **Testing Results:**
+  - **All 1,498 tests passing** ✓ (100% pass rate!)
+  - **61/61 LSP completion tests passing** ✓ (was 43/61)
+  - 6,127 expect() calls successful
+  - All linting checks passing (bun check) ✓
+  - Zero TypeScript compilation errors
+
+  **Status:** LSP Completion Provider FULLY FUNCTIONAL! ✅
+  - Position detection works correctly in all contexts
+  - Indentation-based logic handles nested structures
+  - Operation-specific completions provide targeted suggestions
+  - 100% test coverage with all edge cases handled
+

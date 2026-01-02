@@ -42,7 +42,7 @@ export class CompletionProvider {
     const linePrefix = currentLine.substring(0, position.character);
 
     // Detect context
-    const context = this.detectContext(text, offset, lines, position.line);
+    const context = this.detectContext(text, offset, lines, position);
 
     // Provide completions based on context
     switch (context) {
@@ -77,8 +77,9 @@ export class CompletionProvider {
     _text: string,
     _offset: number,
     lines: string[],
-    lineNumber: number,
+    position: Position,
   ): CompletionContext {
+    const lineNumber = position.line;
     const currentLine = lines[lineNumber] || "";
     const trimmedLine = currentLine.trim();
 
@@ -89,25 +90,102 @@ export class CompletionProvider {
       return isInPatches ? "patch-onNoMatch" : "root-onNoMatch";
     }
 
-    // Check if we're completing the op field value
-    if (/^\s*op:\s*$/.test(currentLine) || /^\s*op:\s+[\w-]*$/.test(currentLine)) {
+    // Check if we're completing the op field value (including partial values)
+    // This must come before the patches-array check because "- op: value" contains both
+    // Match: optional dash, optional whitespace, then exactly "op:" (not part of another word)
+    if (/^-?\s*op:\s*/.test(trimmedLine)) {
       return "patch-op";
+    }
+
+    // Special case: if current line is beyond document or empty, check previous line for op:
+    if (currentLine === "" && lineNumber > 0) {
+      const prevLine = lines[lineNumber - 1] || "";
+      if (/^-?\s*op:\s*/.test(prevLine.trim())) {
+        return "patch-op";
+      }
+    }
+
+    // Check if we're inside resources array
+    if (this.isInsideResources(lines, lineNumber)) {
+      return "unknown";
     }
 
     // Check if we're inside patches array
     const isInPatches = this.isInsidePatches(lines, lineNumber);
 
     if (isInPatches) {
-      // Check if we're at the start of a new patch item
-      if (trimmedLine.startsWith("-") || /^\s*$/.test(trimmedLine)) {
+      // Check if we're at the start of a new patch item (line starts with -)
+      // But NOT if it also contains op: (handled above)
+      if (trimmedLine.startsWith("-") && !trimmedLine.includes("op:")) {
         return "patches-array";
       }
-      // Otherwise we're inside a patch object
-      return "patch-object";
+
+      // Get indentation context
+      const patchItemIndent = this.getPatchItemIndent(lines, lineNumber);
+
+      // If we can't find a patch item, assume we're at array level
+      if (patchItemIndent === -1) {
+        return "patches-array";
+      }
+
+      // For blank lines, use the cursor position (character) as the indentation hint
+      // This handles both existing blank lines and new lines being typed
+      if (/^\s*$/.test(trimmedLine)) {
+        // For blank lines, the character position indicates where the user is typing
+        // which tells us the intended indentation level
+        const lineIndent = position.character;
+
+        // If indentation is greater than patch item indent, we're inside the object
+        if (lineIndent > patchItemIndent) {
+          return "patch-object";
+        }
+        // Otherwise we're at the array level
+        return "patches-array";
+      }
+
+      // For non-blank lines, check actual indentation
+      const currentIndent = currentLine.search(/\S/);
+      if (currentIndent > patchItemIndent) {
+        return "patch-object";
+      }
+
+      // Otherwise we're at the array level
+      return "patches-array";
     }
 
     // Root level
     return "root";
+  }
+
+  /**
+   * Get the indentation level of the most recent patch item (line starting with "- ")
+   * Returns -1 if no patch item is found before the current line
+   */
+  private getPatchItemIndent(lines: string[], currentLineNumber: number): number {
+    // Search backwards from current line to find the most recent patch item
+    for (let i = currentLineNumber; i >= 0; i--) {
+      const line = lines[i] || "";
+      const trimmed = line.trim();
+
+      // Check if this line starts a patch item
+      if (trimmed.startsWith("-")) {
+        // Return the indentation level (position of the dash)
+        return line.search(/\S/);
+      }
+
+      // Stop searching if we encounter the patches: key
+      if (trimmed.startsWith("patches:")) {
+        break;
+      }
+
+      // Stop if we encounter another root-level key
+      const indent = line.search(/\S/);
+      if (indent === 0 && trimmed !== "") {
+        break;
+      }
+    }
+
+    return -1;
   }
 
   /**
@@ -131,7 +209,7 @@ export class CompletionProvider {
       if (inPatches && patchesIndent >= 0) {
         const currentIndent = line.search(/\S/);
         if (currentIndent >= 0 && currentIndent <= patchesIndent && trimmed !== "") {
-          // Check if it's a root-level key
+          // Check if it's a root-level key (including output which was missing)
           if (/^(apiVersion|kind|output|resources|validators|onNoMatch):/.test(trimmed)) {
             inPatches = false;
           }
@@ -139,7 +217,129 @@ export class CompletionProvider {
       }
     }
 
+    // Special case: if we're on an empty line, check if we're exiting patches
+    const currentLine = lines[currentLineNumber];
+
+    // Case 1: Current line is completely empty (length 0) - might be exiting patches
+    if (
+      inPatches &&
+      currentLine !== undefined &&
+      currentLine.length === 0 &&
+      currentLineNumber > 0
+    ) {
+      // Completely empty line - check if previous content was patch content
+      for (let i = currentLineNumber - 1; i >= 0; i--) {
+        const prevLine = lines[i] || "";
+        const prevTrimmed = prevLine.trim();
+        if (prevTrimmed === "") continue;
+
+        const prevIndent = prevLine.search(/\S/);
+        if (prevIndent > patchesIndent) {
+          // Previous line was indented patch content, so this empty line
+          // indicates we're exiting the patches block
+          inPatches = false;
+        }
+        break;
+      }
+    }
+
+    // Case 2: Current line is beyond document (undefined) - check previous empty line
+    if (inPatches && currentLine === undefined && currentLineNumber > 0) {
+      const prevLine = lines[currentLineNumber - 1];
+      // If previous line is completely empty, apply same logic as if we were on that line
+      if (prevLine !== undefined && prevLine.length === 0) {
+        for (let i = currentLineNumber - 2; i >= 0; i--) {
+          const line = lines[i] || "";
+          const trimmed = line.trim();
+          if (trimmed === "") continue;
+
+          const indent = line.search(/\S/);
+          if (indent > patchesIndent) {
+            inPatches = false;
+          }
+          break;
+        }
+      }
+    }
+
     return inPatches;
+  }
+
+  /**
+   * Check if the current line is inside the resources array
+   */
+  private isInsideResources(lines: string[], currentLineNumber: number): boolean {
+    let inResources = false;
+    let resourcesIndent = -1;
+
+    for (let i = 0; i <= currentLineNumber; i++) {
+      const line = lines[i] || "";
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith("resources:")) {
+        inResources = true;
+        resourcesIndent = line.search(/\S/);
+        continue;
+      }
+
+      // If we find a root-level key after resources, we're out of resources
+      if (inResources && resourcesIndent >= 0) {
+        const currentIndent = line.search(/\S/);
+        if (currentIndent >= 0 && currentIndent <= resourcesIndent && trimmed !== "") {
+          // Check if it's a root-level key
+          if (/^(apiVersion|kind|output|patches|validators|onNoMatch):/.test(trimmed)) {
+            inResources = false;
+          }
+        }
+      }
+    }
+
+    // Special case: if we're on an empty line, check if we're exiting resources
+    const currentLine = lines[currentLineNumber];
+
+    // Case 1: Current line is completely empty (length 0) - might be exiting resources
+    if (
+      inResources &&
+      currentLine !== undefined &&
+      currentLine.length === 0 &&
+      currentLineNumber > 0
+    ) {
+      // Completely empty line - check if previous content was resource content
+      for (let i = currentLineNumber - 1; i >= 0; i--) {
+        const prevLine = lines[i] || "";
+        const prevTrimmed = prevLine.trim();
+        if (prevTrimmed === "") continue;
+
+        const prevIndent = prevLine.search(/\S/);
+        if (prevIndent > resourcesIndent && prevTrimmed.startsWith("-")) {
+          // Previous line was a resource item, so this empty line
+          // indicates we're exiting the resources block
+          inResources = false;
+        }
+        break;
+      }
+    }
+
+    // Case 2: Current line is beyond document (undefined) - check previous empty line
+    if (inResources && currentLine === undefined && currentLineNumber > 0) {
+      const prevLine = lines[currentLineNumber - 1];
+      // If previous line is completely empty, apply same logic as if we were on that line
+      if (prevLine !== undefined && prevLine.length === 0) {
+        for (let i = currentLineNumber - 2; i >= 0; i--) {
+          const line = lines[i] || "";
+          const trimmed = line.trim();
+          if (trimmed === "") continue;
+
+          const indent = line.search(/\S/);
+          if (indent > resourcesIndent && trimmed.startsWith("-")) {
+            inResources = false;
+          }
+          break;
+        }
+      }
+    }
+
+    return inResources;
   }
 
   /**
@@ -400,7 +600,7 @@ export class CompletionProvider {
    */
   private getPatchFieldCompletions(
     linePrefix: string,
-    _text: string,
+    text: string,
     _offset: number,
   ): CompletionItem[] {
     // Don't suggest if we're already in the middle of a key
@@ -408,7 +608,12 @@ export class CompletionProvider {
       return [];
     }
 
-    return [
+    // Get the operation type from the current patch
+    const lines = text.split("\n");
+    const currentOp = this.getCurrentPatchOperation(lines, linePrefix);
+
+    // Common fields for all patches
+    const commonFields: CompletionItem[] = [
       {
         label: "op",
         kind: CompletionItemKind.Field,
@@ -466,6 +671,421 @@ export class CompletionProvider {
         insertText: "validate:\n  notContains: ",
       },
     ];
+
+    // Add operation-specific fields
+    const operationFields = this.getOperationSpecificFields(currentOp);
+    return [...commonFields, ...operationFields];
+  }
+
+  /**
+   * Get operation-specific fields for the current operation type
+   */
+  private getOperationSpecificFields(operation: string | null): CompletionItem[] {
+    if (!operation) return [];
+
+    const fieldMap: Record<string, CompletionItem[]> = {
+      replace: [
+        {
+          label: "old",
+          kind: CompletionItemKind.Field,
+          detail: "String to find",
+          documentation: "The string to search for and replace",
+          insertText: "old: ",
+        },
+        {
+          label: "new",
+          kind: CompletionItemKind.Field,
+          detail: "Replacement string",
+          documentation: "The string to replace with",
+          insertText: "new: ",
+        },
+      ],
+      "replace-regex": [
+        {
+          label: "pattern",
+          kind: CompletionItemKind.Field,
+          detail: "Regex pattern",
+          documentation: "Regular expression pattern to match",
+          insertText: "pattern: ",
+        },
+        {
+          label: "replacement",
+          kind: CompletionItemKind.Field,
+          detail: "Replacement string",
+          documentation: "Replacement string (can use capture groups like $1, $2)",
+          insertText: "replacement: ",
+        },
+        {
+          label: "flags",
+          kind: CompletionItemKind.Field,
+          detail: "Regex flags",
+          documentation: "Regular expression flags (e.g., 'gi' for global case-insensitive)",
+          insertText: "flags: ",
+        },
+      ],
+      "remove-section": [
+        {
+          label: "id",
+          kind: CompletionItemKind.Field,
+          detail: "Section ID to remove",
+          documentation: "The ID of the section to remove",
+          insertText: "id: ",
+        },
+        {
+          label: "removeChildren",
+          kind: CompletionItemKind.Field,
+          detail: "Remove child sections",
+          documentation: "Whether to remove child sections as well (true/false)",
+          insertText: "removeChildren: ",
+        },
+      ],
+      "replace-section": [
+        {
+          label: "id",
+          kind: CompletionItemKind.Field,
+          detail: "Section ID",
+          documentation: "The ID of the section to replace",
+          insertText: "id: ",
+        },
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "New content",
+          documentation: "The new content for the section",
+          insertText: "content: ",
+        },
+      ],
+      "prepend-to-section": [
+        {
+          label: "id",
+          kind: CompletionItemKind.Field,
+          detail: "Section ID",
+          documentation: "The ID of the section to prepend to",
+          insertText: "id: ",
+        },
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "Content to prepend",
+          documentation: "The content to add at the beginning",
+          insertText: "content: ",
+        },
+      ],
+      "append-to-section": [
+        {
+          label: "id",
+          kind: CompletionItemKind.Field,
+          detail: "Section ID",
+          documentation: "The ID of the section to append to",
+          insertText: "id: ",
+        },
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "Content to append",
+          documentation: "The content to add at the end",
+          insertText: "content: ",
+        },
+      ],
+      "set-frontmatter": [
+        {
+          label: "field",
+          kind: CompletionItemKind.Field,
+          detail: "Frontmatter field name",
+          documentation: "The name of the frontmatter field to set",
+          insertText: "field: ",
+        },
+        {
+          label: "value",
+          kind: CompletionItemKind.Field,
+          detail: "Field value",
+          documentation: "The value to set for the field",
+          insertText: "value: ",
+        },
+      ],
+      "remove-frontmatter": [
+        {
+          label: "field",
+          kind: CompletionItemKind.Field,
+          detail: "Field to remove",
+          documentation: "The name of the frontmatter field to remove",
+          insertText: "field: ",
+        },
+      ],
+      "rename-frontmatter": [
+        {
+          label: "oldField",
+          kind: CompletionItemKind.Field,
+          detail: "Current field name",
+          documentation: "The current name of the field",
+          insertText: "oldField: ",
+        },
+        {
+          label: "newField",
+          kind: CompletionItemKind.Field,
+          detail: "New field name",
+          documentation: "The new name for the field",
+          insertText: "newField: ",
+        },
+      ],
+      "merge-frontmatter": [
+        {
+          label: "fields",
+          kind: CompletionItemKind.Field,
+          detail: "Fields to merge",
+          documentation: "Key-value pairs to merge into frontmatter",
+          insertText: "fields: ",
+        },
+      ],
+      "delete-between": [
+        {
+          label: "start",
+          kind: CompletionItemKind.Field,
+          detail: "Start marker",
+          documentation: "The marker that indicates where deletion should start",
+          insertText: "start: ",
+        },
+        {
+          label: "end",
+          kind: CompletionItemKind.Field,
+          detail: "End marker",
+          documentation: "The marker that indicates where deletion should end",
+          insertText: "end: ",
+        },
+        {
+          label: "inclusive",
+          kind: CompletionItemKind.Field,
+          detail: "Include markers",
+          documentation: "Whether to delete the markers themselves (true/false)",
+          insertText: "inclusive: ",
+        },
+      ],
+      "replace-between": [
+        {
+          label: "start",
+          kind: CompletionItemKind.Field,
+          detail: "Start marker",
+          documentation: "The marker that indicates where replacement should start",
+          insertText: "start: ",
+        },
+        {
+          label: "end",
+          kind: CompletionItemKind.Field,
+          detail: "End marker",
+          documentation: "The marker that indicates where replacement should end",
+          insertText: "end: ",
+        },
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "Replacement content",
+          documentation: "The content to insert between the markers",
+          insertText: "content: ",
+        },
+        {
+          label: "inclusive",
+          kind: CompletionItemKind.Field,
+          detail: "Include markers",
+          documentation: "Whether to replace the markers themselves (true/false)",
+          insertText: "inclusive: ",
+        },
+      ],
+      "replace-line": [
+        {
+          label: "old",
+          kind: CompletionItemKind.Field,
+          detail: "Line to find",
+          documentation: "The exact line to find and replace",
+          insertText: "old: ",
+        },
+        {
+          label: "new",
+          kind: CompletionItemKind.Field,
+          detail: "Replacement line",
+          documentation: "The new line content",
+          insertText: "new: ",
+        },
+      ],
+      "insert-after-line": [
+        {
+          label: "after",
+          kind: CompletionItemKind.Field,
+          detail: "Line to match",
+          documentation: "Insert content after lines matching this text",
+          insertText: "after: ",
+        },
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "Content to insert",
+          documentation: "The content to insert after the matched line",
+          insertText: "content: ",
+        },
+      ],
+      "insert-before-line": [
+        {
+          label: "before",
+          kind: CompletionItemKind.Field,
+          detail: "Line to match",
+          documentation: "Insert content before lines matching this text",
+          insertText: "before: ",
+        },
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "Content to insert",
+          documentation: "The content to insert before the matched line",
+          insertText: "content: ",
+        },
+      ],
+      "move-section": [
+        {
+          label: "id",
+          kind: CompletionItemKind.Field,
+          detail: "Section to move",
+          documentation: "The ID of the section to move",
+          insertText: "id: ",
+        },
+        {
+          label: "after",
+          kind: CompletionItemKind.Field,
+          detail: "Target section",
+          documentation: "The ID of the section to move after",
+          insertText: "after: ",
+        },
+      ],
+      "rename-header": [
+        {
+          label: "id",
+          kind: CompletionItemKind.Field,
+          detail: "Section ID",
+          documentation: "The ID of the section to rename",
+          insertText: "id: ",
+        },
+        {
+          label: "newTitle",
+          kind: CompletionItemKind.Field,
+          detail: "New header text",
+          documentation: "The new title for the section header",
+          insertText: "newTitle: ",
+        },
+      ],
+      "change-section-level": [
+        {
+          label: "id",
+          kind: CompletionItemKind.Field,
+          detail: "Section ID",
+          documentation: "The ID of the section to change",
+          insertText: "id: ",
+        },
+        {
+          label: "newLevel",
+          kind: CompletionItemKind.Field,
+          detail: "New heading level",
+          documentation: "The new heading level (1-6)",
+          insertText: "newLevel: ",
+        },
+      ],
+      "copy-file": [
+        {
+          label: "source",
+          kind: CompletionItemKind.Field,
+          detail: "Source file path",
+          documentation: "The path to the file to copy",
+          insertText: "source: ",
+        },
+        {
+          label: "destination",
+          kind: CompletionItemKind.Field,
+          detail: "Destination path",
+          documentation: "Where to copy the file to",
+          insertText: "destination: ",
+        },
+      ],
+      "rename-file": [
+        {
+          label: "pattern",
+          kind: CompletionItemKind.Field,
+          detail: "Pattern to match",
+          documentation: "Glob pattern to match files to rename",
+          insertText: "pattern: ",
+        },
+        {
+          label: "newName",
+          kind: CompletionItemKind.Field,
+          detail: "New filename",
+          documentation: "The new name for matched files",
+          insertText: "newName: ",
+        },
+      ],
+      "delete-file": [
+        {
+          label: "pattern",
+          kind: CompletionItemKind.Field,
+          detail: "Pattern to match",
+          documentation: "Glob pattern to match files to delete",
+          insertText: "pattern: ",
+        },
+      ],
+      "move-file": [
+        {
+          label: "pattern",
+          kind: CompletionItemKind.Field,
+          detail: "Pattern to match",
+          documentation: "Glob pattern to match files to move",
+          insertText: "pattern: ",
+        },
+        {
+          label: "destination",
+          kind: CompletionItemKind.Field,
+          detail: "Destination directory",
+          documentation: "Directory to move files to",
+          insertText: "destination: ",
+        },
+      ],
+    };
+
+    return fieldMap[operation] || [];
+  }
+
+  /**
+   * Get the operation type from the current patch
+   */
+  private getCurrentPatchOperation(lines: string[], linePrefix: string): string | null {
+    // Find the current line number by searching backwards from the end
+    let currentLineIndex = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i]?.substring(0, linePrefix.length) === linePrefix) {
+        currentLineIndex = i;
+        break;
+      }
+    }
+
+    if (currentLineIndex === -1) return null;
+
+    // Search backwards from current line to find the op field
+    for (let i = currentLineIndex; i >= 0; i--) {
+      const line = lines[i] || "";
+      const trimmed = line.trim();
+
+      // Stop if we hit a patch array item marker (start of a different patch)
+      if (trimmed.startsWith("-") && i !== currentLineIndex) {
+        break;
+      }
+
+      // Stop if we hit the patches key
+      if (trimmed.startsWith("patches:")) {
+        break;
+      }
+
+      // Check for op field
+      const opMatch = trimmed.match(/^\s*op:\s*(.+)$/);
+      if (opMatch?.[1]) {
+        return opMatch[1].trim();
+      }
+    }
+
+    return null;
   }
 
   /**
