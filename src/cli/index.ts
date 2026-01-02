@@ -50,6 +50,7 @@ import type {
   ValidationResult,
 } from "../core/types.js";
 import { runValidators } from "../core/validators.js";
+import { debugCommand } from "./debug-command.js";
 import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
 import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
@@ -83,6 +84,9 @@ interface CLIOptions {
   port?: number; // For web --port option
   host?: string; // For web --host option
   open?: boolean; // For web --open option
+  autoApply?: boolean; // For debug --auto-apply option
+  saveDecisions?: string; // For debug --save-decisions option
+  loadDecisions?: string; // For debug --load-decisions option
 }
 
 interface BuildStats {
@@ -212,6 +216,9 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     port: undefined,
     host: undefined,
     open: false,
+    autoApply: false,
+    saveDecisions: undefined,
+    loadDecisions: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -396,6 +403,30 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       }
     } else if (arg === "--open" || arg === "-o") {
       options.open = true;
+    } else if (arg === "--auto-apply") {
+      options.autoApply = true;
+    } else if (arg === "--save-decisions" || arg.startsWith("--save-decisions=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.saveDecisions = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.saveDecisions = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--load-decisions" || arg.startsWith("--load-decisions=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.loadDecisions = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.loadDecisions = nextArg;
+          i++;
+        }
+      }
     }
   }
 
@@ -2740,6 +2771,14 @@ Usage:
   kustomark schema            Export JSON Schema for editor integration
   kustomark init [path]       Create a new kustomark.yaml config
   kustomark web [path]        Launch web UI for visual editing
+  kustomark debug [path]      Interactive patch debugging mode
+
+Debug Mode Flags:
+  --auto-apply                Auto-apply all patches without prompting
+  --file <filename>           Debug only patches affecting specific file
+  --save-decisions <path>     Save decisions to file for replay
+  --load-decisions <path>     Load previous decisions from file
+  --format <text|json>        Output format (default: text)
 
 Explain Flags:
   --file <filename>           Show lineage for specific file
@@ -2838,6 +2877,8 @@ Exit Codes:
         open: options.open,
         verbose: options.verbosity >= 2,
       });
+    case "debug":
+      return await debugCommand(path, options);
     default:
       console.error(`Unknown command: ${command}`);
       console.error(`Run 'kustomark --help' for usage information`);

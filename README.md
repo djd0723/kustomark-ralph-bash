@@ -14,6 +14,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark diff](#kustomark-diff-path)
   - [kustomark validate](#kustomark-validate-path)
   - [kustomark init](#kustomark-init-path)
+  - [kustomark debug](#kustomark-debug-path)
 - [Configuration](#configuration)
 - [Patch Operations](#patch-operations)
 - [Resource Resolution](#resource-resolution)
@@ -239,6 +240,98 @@ kustomark init ./base
 # Create overlay config referencing a base
 kustomark init ./team --base=../base --output=./output
 ```
+
+### `kustomark debug [path]`
+
+Interactive patch debugging mode for step-by-step inspection and decision-making.
+
+```bash
+# Interactive mode - step through each patch
+kustomark debug ./team/
+
+# Debug patches for a specific file only
+kustomark debug ./team/ --file guide.md
+
+# Auto-apply mode with saved decisions
+kustomark debug ./team/ --auto-apply --load-decisions decisions.json
+
+# Save decisions for replay
+kustomark debug ./team/ --save-decisions decisions.json
+
+# Combine: load previous decisions and save updates
+kustomark debug ./team/ --load-decisions prev.json --save-decisions updated.json
+
+# JSON output
+kustomark debug ./team/ --format=json
+```
+
+**Options:**
+- `--auto-apply` - Automatically apply all patches without prompting
+- `--file <filename>` - Debug only patches affecting a specific file
+- `--save-decisions <path>` - Save apply/skip decisions to a file
+- `--load-decisions <path>` - Load previous decisions from a file
+- `--format <text|json>` - Output format (default: text)
+- `-v`, `-vv`, `-vvv` - Increase verbosity
+
+**Interactive Mode:**
+
+When running without `--auto-apply`, debug mode presents each patch interactively:
+
+```
+============================================================
+Patch 1 of 5
+============================================================
+File: guide.md
+Operation: replace
+Patch Index: 0
+
+Patch Details:
+{
+  "op": "replace",
+  "old": "upstream",
+  "new": "local"
+}
+
+File Preview (first 10 lines):
+# Guide
+This is upstream documentation...
+
+Options:
+  a - Apply this patch
+  s - Skip this patch
+  q - Quit debug session
+
+Your choice (a/s/q):
+```
+
+**Auto-Apply Mode:**
+
+Use `--auto-apply` for non-interactive execution. Optionally load previous decisions with `--load-decisions` to replay a previous debug session.
+
+**Decision Files:**
+
+Decisions are saved in JSON format and can be replayed:
+
+```json
+[
+  {
+    "file": "guide.md",
+    "patchIndex": 0,
+    "action": "apply"
+  },
+  {
+    "file": "guide.md",
+    "patchIndex": 1,
+    "action": "skip"
+  }
+]
+```
+
+**Use Cases:**
+- Test patches interactively before committing config changes
+- Troubleshoot why specific patches aren't being applied
+- Create reproducible patch application workflows
+- Debug complex overlay configurations with many patches
 
 ## Configuration
 

@@ -358,7 +358,7 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ VSCode Extension packaging for LSP server - **COMPLETE! 2026-01-02**
 - ✅ Interactive init wizard (Low complexity from Future Candidates) - **COMPLETE! 2026-01-02**
 - ✅ Web UI (High complexity from Future Candidates) - **COMPLETE! 2026-01-02**
-- Interactive debug mode (Medium complexity from Future Candidates)
+- ✅ Interactive debug mode (Medium complexity from Future Candidates) - **COMPLETE! 2026-01-02**
 
 **2026-01-02 (Patch Groups Feature - Future Work):**
 - ✅ Implemented Patch Groups feature (Medium complexity from Future Candidates list):
@@ -1050,4 +1050,106 @@ This document tracks the implementation of kustomark based on the spec milestone
   - Main project linting clean (web UI has minor cosmetic accessibility warnings)
   - Documentation complete in README.md and WEB_UI_README.md
   - Ready for development and production use
+
+**2026-01-02 (Interactive Debug Mode - Future Work - COMPLETE!):**
+- ✅ Implemented Interactive Debug Mode feature (Medium complexity from Future Candidates list):
+
+  **Core Implementation (~522 lines of TypeScript):**
+  - Created `/home/dex/kustomark-ralph-bash/src/cli/debug-command.ts` (522 lines)
+    - `debugCommand()` - Main debug command orchestrator
+    - `createDebugSession()` - Build patch queue for debugging
+    - `runInteractiveLoop()` - Interactive step-through with readline prompts
+    - `runAutoApply()` - Non-interactive auto-apply mode
+    - `loadDecisions()` / `saveDecisions()` - Decision persistence
+    - `shouldApplyPatch()` - Patch filtering logic
+    - `buildCompleteFileMap()` - Resource scanning utility
+    - Integration with kustomark core library (parseConfig, validateConfig, resolveResources, applyPatches)
+
+  **CLI Integration:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/cli/index.ts`
+    - Added `debugCommand` import from debug-command.js
+    - Added `autoApply?: boolean`, `saveDecisions?: string`, `loadDecisions?: string` to CLIOptions interface
+    - Added argument parsing for --auto-apply, --save-decisions, --load-decisions flags
+    - Added "debug" case to main command switch
+    - Updated help text with "Debug Mode Flags" section
+    - Documented command syntax: `kustomark debug [path]`
+    - Available flags: --auto-apply, --file, --save-decisions, --load-decisions, --format
+
+  **Documentation:**
+  - Updated `/home/dex/kustomark-ralph-bash/README.md`
+    - Added "kustomark debug" to CLI Commands section in table of contents
+    - Added comprehensive debug command documentation section
+    - Documented interactive mode workflow with example output
+    - Documented auto-apply mode
+    - Documented decision file format (JSON)
+    - Added use cases (testing, troubleshooting, reproducibility, debugging)
+  - Updated `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md`
+    - Marked interactive debug mode as COMPLETE
+    - Added this completion entry with file details
+
+  **Debug Mode Features Implemented:**
+  1. Interactive patch inspection with step-through UI
+  2. Per-patch apply/skip decisions with file preview
+  3. Auto-apply mode for non-interactive execution
+  4. Decision persistence (save/load JSON files)
+  5. File-specific debugging with --file flag
+  6. Graceful cancellation (Ctrl+C) at any step
+  7. Integration with existing CLI options (--format, -v verbosity)
+  8. Comprehensive error handling and validation
+
+  **Interactive Mode UI:**
+  - Displays patch number, file, operation, and index
+  - Shows full patch details in JSON format
+  - Previews first 10 lines of current file content
+  - Prompts: (a)pply, (s)kip, (q)uit
+  - Real-time patch application in session
+
+  **Auto-Apply Mode:**
+  - Non-interactive execution for automation
+  - Load previous decisions with --load-decisions
+  - Default to "apply" for patches without saved decisions
+  - Batch processing of all queued patches
+
+  **Decision File Format:**
+  ```json
+  [
+    {
+      "file": "guide.md",
+      "patchIndex": 0,
+      "action": "apply"
+    },
+    {
+      "file": "guide.md",
+      "patchIndex": 1,
+      "action": "skip"
+    }
+  ]
+  ```
+
+  **Types and Interfaces:**
+  - `DebugDecision` - Single decision record
+  - `PatchQueueItem` - Queued patch with file and index
+  - `DebugSession` - Session state (queue, decisions, resources)
+  - `DebugResult` - Command output (JSON/text format)
+
+  **Files Created:**
+  - `/home/dex/kustomark-ralph-bash/src/cli/debug-command.ts` (522 lines)
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - CLI integration, flags, help text
+  - `/home/dex/kustomark-ralph-bash/README.md` - Debug mode documentation
+  - `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md` - Completion tracking
+
+  **Testing:**
+  - All 905 tests passing (2 skip, 0 fail)
+  - 4344 expect() calls successful
+  - Main project linting clean (web UI has cosmetic warnings only)
+
+  **Status:** COMPLETE! ✅
+  - Full interactive debug mode implemented
+  - CLI integration complete with all flags
+  - Documentation complete in README.md
+  - Non-interactive auto-apply mode working
+  - Decision persistence (save/load) working
+  - Ready for use in debugging and testing workflows
 
