@@ -32,7 +32,7 @@ import type { DependencyGraph, DependencyNode, KustomarkConfig, PatchOperation }
 export function buildDependencyGraph(
   config: KustomarkConfig,
   files: Map<string, string>,
-  configPath: string = "/kustomark.yaml",
+  configPath = "/kustomark.yaml",
 ): DependencyGraph {
   const graph: DependencyGraph = {
     nodes: new Map(),
@@ -45,8 +45,8 @@ export function buildDependencyGraph(
   const filePaths = Array.from(files.keys());
 
   // Check for config dependencies in resources field
-  const configDeps = (config.resources || []).filter((resource) =>
-    resource.endsWith("/") || resource.includes("../"),
+  const configDeps = (config.resources || []).filter(
+    (resource) => resource.endsWith("/") || resource.includes("../"),
   );
   graph.configDependencies = configDeps;
 
@@ -79,7 +79,7 @@ export function buildDependencyGraph(
     if (config.patches) {
       for (let i = 0; i < config.patches.length; i++) {
         const patch = config.patches[i];
-        if (doesPatchApplyToFile(patch, filePath, filePaths)) {
+        if (patch && doesPatchApplyToFile(patch, filePath, filePaths)) {
           node.appliedPatches.push(i);
         }
       }
@@ -177,13 +177,13 @@ export function getDependencies(
  *
  * @param patch - The patch operation
  * @param filePath - Path to the file
- * @param allFiles - All file paths in the project
+ * @param _allFiles - All file paths in the project (unused but kept for API consistency)
  * @returns True if the patch applies to this file
  */
 function doesPatchApplyToFile(
   patch: PatchOperation,
   filePath: string,
-  allFiles: string[],
+  _allFiles: string[],
 ): boolean {
   // Check include patterns
   if (patch.include) {

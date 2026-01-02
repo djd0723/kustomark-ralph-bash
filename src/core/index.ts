@@ -170,7 +170,6 @@ export {
   buildDependencyGraph,
   getAffectedFiles,
   getDependencies,
-  addDependency,
 } from "./dependency-graph.js";
 
 export type { DependencyNode, DependencyGraph } from "./types.js";
