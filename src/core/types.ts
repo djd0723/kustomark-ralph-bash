@@ -828,3 +828,140 @@ export interface TestSuiteResult {
   /** Individual test results */
   results: TestResult[];
 }
+
+/**
+ * Coverage statistics for patch analysis
+ */
+export interface CoverageReport {
+  /** Total number of patches defined */
+  totalPatches: number;
+  /** Number of patches that were applied */
+  appliedPatches: number;
+  /** Number of patches that were skipped */
+  skippedPatches: number;
+  /** Coverage percentage (0-100) */
+  coveragePercentage: number;
+  /** List of patch indices that were not applied */
+  unappliedPatchIndices: number[];
+}
+
+/**
+ * Impact data for a single patch
+ */
+export interface PatchImpact {
+  /** Index of the patch in the patches array */
+  patchIndex: number;
+  /** Patch operation type */
+  operation: string;
+  /** Number of files affected by this patch */
+  filesAffected: number;
+  /** Total number of changes made */
+  changesCount: number;
+  /** List of file paths affected */
+  affectedFiles: string[];
+}
+
+/**
+ * Overall impact analysis across all patches
+ */
+export interface ImpactReport {
+  /** Total number of files processed */
+  totalFiles: number;
+  /** Total number of changes made across all files */
+  totalChanges: number;
+  /** Impact data for each patch */
+  patchImpacts: PatchImpact[];
+  /** Files with the most changes (sorted by change count) */
+  mostImpactedFiles: Array<{ file: string; changes: number }>;
+}
+
+/**
+ * Complexity metrics for a single file
+ */
+export interface FileComplexity {
+  /** File path */
+  file: string;
+  /** Number of patches applied to this file */
+  patchCount: number;
+  /** Number of sections in the file */
+  sectionCount: number;
+  /** Number of frontmatter fields */
+  frontmatterFieldCount: number;
+  /** Whether the file has tables */
+  hasTables: boolean;
+  /** Complexity score (higher = more complex) */
+  complexityScore: number;
+}
+
+/**
+ * Overall complexity analysis
+ */
+export interface ComplexityReport {
+  /** Complexity metrics for each file */
+  fileComplexities: FileComplexity[];
+  /** Average complexity score across all files */
+  averageComplexity: number;
+  /** Maximum complexity score found */
+  maxComplexity: number;
+  /** Minimum complexity score found */
+  minComplexity: number;
+  /** Files with highest complexity (sorted by score) */
+  mostComplexFiles: FileComplexity[];
+}
+
+/**
+ * Risk level classification
+ */
+export type RiskLevel = "high" | "medium" | "low";
+
+/**
+ * Safety metrics for a single patch
+ */
+export interface PatchSafety {
+  /** Index of the patch in the patches array */
+  patchIndex: number;
+  /** Patch operation type */
+  operation: string;
+  /** Risk level of this patch */
+  riskLevel: RiskLevel;
+  /** Risk factors identified */
+  riskFactors: string[];
+  /** Whether this patch has validation rules */
+  hasValidation: boolean;
+  /** Whether this patch has conditions */
+  hasConditions: boolean;
+}
+
+/**
+ * Overall safety analysis
+ */
+export interface SafetyReport {
+  /** Safety metrics for each patch */
+  patchSafeties: PatchSafety[];
+  /** Number of high-risk patches */
+  highRiskCount: number;
+  /** Number of medium-risk patches */
+  mediumRiskCount: number;
+  /** Number of low-risk patches */
+  lowRiskCount: number;
+  /** Overall safety score (0-100, higher is safer) */
+  overallSafetyScore: number;
+  /** List of high-risk patches requiring attention */
+  highRiskPatches: PatchSafety[];
+}
+
+/**
+ * Combined analytics report with all analyses
+ */
+export interface AnalyticsReport {
+  /** Coverage analysis */
+  coverage: CoverageReport;
+  /** Impact analysis */
+  impact: ImpactReport;
+  /** Complexity analysis */
+  complexity: ComplexityReport;
+  /** Safety analysis */
+  safety: SafetyReport;
+  /** Timestamp when the analysis was generated (ISO 8601) */
+  generatedAt: string;
+}

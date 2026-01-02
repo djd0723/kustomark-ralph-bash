@@ -1675,6 +1675,7 @@ export const helpCommands = [
   "cache",
   "schema",
   "template",
+  "suggest",
 ] as const;
 
 export type HelpCommand = (typeof helpCommands)[number];

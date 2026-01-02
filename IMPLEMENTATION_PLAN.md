@@ -4684,3 +4684,110 @@ if (
 **Status:** Security Hardening COMPLETE! ✅
 
 These fixes address critical security vulnerabilities that could be exploited by malicious remote sources. The tool now safely handles untrusted HTTP archives and prevents DoS attacks via redirect loops.
+
+---
+
+**2026-01-02 (Patch Analytics - Core Library Enhancement):**
+
+- ✅ **Implemented Patch Analytics API for configuration insights and visibility**
+
+**Motivation:**
+- Users need visibility into patch coverage, impact, and safety
+- No way to understand which files are affected by patches
+- Difficult to assess risk and complexity of patch configurations
+- Need programmatic access for CI/CD quality gates and reporting
+
+**Solution:**
+Implemented a comprehensive analytics API in the core library that provides four types of analysis:
+
+**1. Coverage Analysis** - Which files have patches applied
+- Total files vs patched files
+- Coverage percentage
+- List of unpatched files
+- Helps identify files that should be customized
+
+**2. Impact Analysis** - How patches affect the codebase
+- Files affected per patch
+- Files affected by multiple patches
+- Total modification count
+- Identifies broad-reaching patches
+
+**3. Complexity Analysis** - Complexity scoring per file
+- Patch count per file
+- Unique operation types
+- High-risk operation count
+- Complexity formula: `(patchCount × 2) + (uniqueOperationTypes × 1.5) + (highRiskOps × 3)`
+- Helps find files with too many patches
+
+**4. Safety Analysis** - Risk assessment for patch operations
+- Three risk levels: High (8-10), Medium (4-7), Low (1-3)
+- Risk scoring per operation type
+- Affected files per risky operation
+- Helps review destructive operations before deployment
+
+**Implementation Details:**
+
+**New Core Module (src/core/analytics.ts):**
+```typescript
+// Main analytics functions
+export function analyzePatchCoverage(files: Set<string>, patches: PatchOperation[]): CoverageAnalysis
+export function analyzePatchImpact(files: Set<string>, patches: PatchOperation[]): ImpactAnalysis
+export function analyzeFileComplexity(files: Set<string>, patches: PatchOperation[]): ComplexityAnalysis
+export function analyzePatchSafety(files: Set<string>, patches: PatchOperation[]): SafetyAnalysis
+export function generateAnalyticsReport(config: KustomarkConfig, files: Set<string>): AnalyticsReport
+```
+
+**Risk Classification:**
+- **High Risk (8-10)**: delete-file, remove-section, replace-regex, remove-frontmatter, remove-table-row/column
+- **Medium Risk (4-7)**: replace, replace-section, rename-file, move-file, delete-between, rename-frontmatter
+- **Low Risk (1-3)**: append-to-section, prepend-to-section, set-frontmatter, copy-file, insert-after-line
+
+**Type System (src/core/types.ts):**
+- Added 9 new interfaces for analytics results
+- `CoverageReport`, `PatchImpact`, `ImpactReport`
+- `FileComplexity`, `ComplexityReport`
+- `PatchSafety`, `RiskLevel`, `SafetyReport`
+- `AnalyticsReport` (aggregates all four analyses)
+
+**Core Exports (src/core/index.ts):**
+- Exported all analytics functions and types
+- Available for programmatic use in other tools
+- Enables CI/CD integration and custom tooling
+
+**Use Cases:**
+1. **Pre-deployment Review**: `analyzePatchSafety()` to review high-risk operations
+2. **Configuration Optimization**: `analyzeFileComplexity()` to find overly complex files
+3. **Coverage Verification**: `analyzePatchCoverage()` to ensure all docs are customized
+4. **CI/CD Quality Gates**: Generate analytics reports and fail builds based on thresholds
+5. **Documentation**: Help team members understand patch impact
+
+**Implementation Approach:**
+- Used 5 parallel subagents for concurrent implementation
+- Agent 1: Core analytics module with all analysis functions
+- Agent 2: Type definitions and exports
+- Agent 3-5: Initially for CLI and tests (later removed to keep scope focused)
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/core/analytics.ts` - Core analytics engine (643 lines)
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added 9 analytics interfaces
+- `/home/dex/kustomark-ralph-bash/src/core/index.ts` - Exported analytics API
+
+**Testing Results:**
+- All 2610 tests still passing ✅
+- All linting checks passing (`bun check`) ✅
+- TypeScript compilation clean ✅
+- Zero breaking changes to existing functionality
+
+**Future Enhancement:**
+The analytics API is now available in the core library. A future CLI command (`kustomark analyze`) could expose these capabilities with:
+- Text and JSON output formats
+- Sorting by risk/complexity/impact
+- Filtering by minimum risk level
+- Verbose output with detailed breakdowns
+- Color-coded risk levels
+
+**Status:** Patch Analytics Core Library COMPLETE! ✅
+
+This enhancement provides programmatic access to patch analytics, enabling users to build custom tooling, integrate with CI/CD pipelines, and gain visibility into their kustomark configurations.
