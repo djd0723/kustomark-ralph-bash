@@ -15,6 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, normalize, relative, resolve } from "node:path";
+import * as yaml from "js-yaml";
 import micromatch from "micromatch";
 import {
   parseConfig as coreParseConfig,
@@ -24,6 +25,7 @@ import { generateFileDiff } from "../core/diff-generator.js";
 import { loadLockFile, saveLockFile } from "../core/lock-file.js";
 import { applyPatches as coreApplyPatches } from "../core/patch-engine.js";
 import { resolveResources as coreResolveResources } from "../core/resource-resolver.js";
+import { generateSchema } from "../core/schema.js";
 import type {
   KustomarkConfig,
   LockFile,
@@ -46,6 +48,9 @@ interface CLIOptions {
   verbosity: number; // 0=quiet, 1=normal, 2=-v, 3=-vv, 4=-vvv
   update: boolean;
   noLock: boolean;
+  file?: string; // For explain --file option
+  base?: string; // For init --base option
+  output?: string; // For init --output option
 }
 
 interface BuildResult {
@@ -74,6 +79,33 @@ interface FetchResult {
   }>;
 }
 
+interface ExplainResult {
+  config: string;
+  output: string;
+  chain: Array<{
+    config: string;
+    resources: number;
+    patches: number;
+  }>;
+  totalFiles: number;
+  totalPatches: number;
+}
+
+interface ExplainFileResult {
+  file: string;
+  source?: string;
+  patches: Array<{
+    config: string;
+    op: string;
+    [key: string]: unknown;
+  }>;
+}
+
+interface InitResult {
+  created: string;
+  type: "base" | "overlay";
+}
+
 // ============================================================================
 // Argument Parsing
 // ============================================================================
@@ -88,6 +120,9 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     verbosity: 1,
     update: false,
     noLock: false,
+    file: undefined,
+    base: undefined,
+    output: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -124,6 +159,39 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.update = true;
     } else if (arg === "--no-lock") {
       options.noLock = true;
+    } else if (arg === "--file" || arg.startsWith("--file=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.file = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.file = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--base" || arg.startsWith("--base=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.base = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.base = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--output" || arg.startsWith("--output=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.output = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.output = nextArg;
+          i++;
+        }
+      }
     } else if (arg === "-q") {
       options.verbosity = 0;
     } else if (arg === "-vvv") {
@@ -423,6 +491,310 @@ function cleanOutputDir(outputDir: string, sourceFiles: Set<string>): number {
   return removed;
 }
 
+// ============================================================================
+// Helper Functions for Explain Command
+// ============================================================================
+
+/**
+ * Chain entry representing one config in the resolution chain
+ */
+interface ChainEntry {
+  configPath: string;
+  config: KustomarkConfig;
+  resources: Map<string, string>;
+}
+
+/**
+ * Builds the resolution chain by recursively loading base configs
+ */
+async function buildResolutionChain(
+  configPath: string,
+  basePath: string,
+  fileMap: Map<string, string>,
+  options: CLIOptions,
+): Promise<ChainEntry[]> {
+  const chain: ChainEntry[] = [];
+  const visited = new Set<string>();
+
+  async function loadConfig(currentPath: string, currentBase: string): Promise<void> {
+    const normalizedPath = normalize(resolve(currentPath));
+
+    // Detect cycles
+    if (visited.has(normalizedPath)) {
+      return;
+    }
+    visited.add(normalizedPath);
+
+    log(`Loading config from ${normalizedPath}...`, 3, options);
+    const config = readKustomarkConfig(currentPath);
+
+    // First, recursively load base configs
+    if (config.resources && config.resources.length > 0) {
+      for (const resource of config.resources) {
+        // Check if this is a directory reference (potential base config)
+        if (isDirectoryReference(resource)) {
+          const resolvedDir = resolvePathFromBase(resource, currentBase);
+          const baseConfigPath = findKustomarkConfigHelper(resolvedDir, fileMap);
+
+          if (baseConfigPath) {
+            await loadConfig(baseConfigPath, dirname(baseConfigPath));
+          }
+        }
+      }
+    }
+
+    // Resolve resources for this config level
+    const lockFile = options.noLock ? null : loadLockFile(normalizedPath);
+    const resources = await resolveResources(config, currentBase, lockFile, false);
+
+    // Add this config to the chain
+    chain.push({
+      configPath: normalizedPath,
+      config,
+      resources,
+    });
+  }
+
+  await loadConfig(configPath, basePath);
+  return chain;
+}
+
+/**
+ * Checks if a pattern is a directory reference
+ */
+function isDirectoryReference(pattern: string): boolean {
+  // Skip glob patterns and URLs
+  if (/[*?[\]{}!]/.test(pattern)) {
+    return false;
+  }
+  if (
+    pattern.startsWith("http://") ||
+    pattern.startsWith("https://") ||
+    pattern.startsWith("git::")
+  ) {
+    return false;
+  }
+
+  // If it ends with a file extension like .md, it's a file
+  if (pattern.endsWith(".md") || /\.\w+$/.test(pattern)) {
+    return false;
+  }
+
+  // Ends with / or starts with ./ or ../
+  return pattern.endsWith("/") || pattern.startsWith("./") || pattern.startsWith("../");
+}
+
+/**
+ * Resolves a path relative to a base directory (helper for explain)
+ */
+function resolvePathFromBase(path: string, baseDir: string): string {
+  const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
+  return normalize(resolve(baseDir, cleanPath));
+}
+
+/**
+ * Finds kustomark.yaml or kustomark.yml in a directory (helper for explain)
+ */
+function findKustomarkConfigHelper(dir: string, fileMap: Map<string, string>): string | null {
+  const yamlPath = join(dir, "kustomark.yaml");
+  const ymlPath = join(dir, "kustomark.yml");
+
+  if (fileMap.has(normalize(yamlPath))) {
+    return normalize(yamlPath);
+  }
+  if (fileMap.has(normalize(ymlPath))) {
+    return normalize(ymlPath);
+  }
+
+  return null;
+}
+
+// ============================================================================
+// Commands
+// ============================================================================
+
+async function explainCommand(path: string, options: CLIOptions): Promise<number> {
+  try {
+    const inputPath = resolve(path);
+
+    // Determine the actual config file path
+    let configPath = inputPath;
+    if (existsSync(inputPath) && statSync(inputPath).isDirectory()) {
+      configPath = join(inputPath, "kustomark.yaml");
+    }
+
+    const basePath = dirname(configPath);
+
+    log(`Loading config from ${configPath}...`, 2, options);
+    const config = readKustomarkConfig(inputPath);
+
+    // Validate config (output is not required for explain)
+    const validation = validateConfig(config, { requireOutput: false });
+    if (!validation.valid) {
+      if (options.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              error: "Invalid configuration",
+              errors: validation.errors,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        console.error("Error: Invalid configuration");
+        for (const error of validation.errors) {
+          console.error(`  ${error.field}: ${error.message}`);
+        }
+      }
+      return 1;
+    }
+
+    // Build file map
+    const fileMap = buildCompleteFileMap(basePath);
+
+    // Build resolution chain
+    log("Building resolution chain...", 2, options);
+    const chain = await buildResolutionChain(configPath, basePath, fileMap, options);
+
+    // If --file is specified, show lineage for that specific file
+    if (options.file) {
+      const targetFile = options.file;
+      log(`Tracing lineage for ${targetFile}...`, 2, options);
+
+      // Find which config introduced this file
+      let sourceConfig: string | undefined;
+      let found = false;
+
+      for (const entry of chain) {
+        if (entry.resources.has(targetFile)) {
+          sourceConfig = entry.configPath;
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        if (options.format === "json") {
+          console.log(
+            JSON.stringify(
+              {
+                error: `File not found in resolution chain: ${targetFile}`,
+              },
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.error(`Error: File not found in resolution chain: ${targetFile}`);
+        }
+        return 1;
+      }
+
+      // Collect patches that apply to this file
+      const applicablePatches: Array<{ config: string; op: string; [key: string]: unknown }> = [];
+
+      for (const entry of chain) {
+        if (entry.config.patches) {
+          for (const patch of entry.config.patches) {
+            if (shouldApplyPatch(patch, targetFile)) {
+              applicablePatches.push({
+                config: relative(basePath, entry.configPath),
+                ...patch,
+              });
+            }
+          }
+        }
+      }
+
+      const result: ExplainFileResult = {
+        file: targetFile,
+        source: sourceConfig ? relative(basePath, sourceConfig) : undefined,
+        patches: applicablePatches,
+      };
+
+      if (options.format === "json") {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(`File: ${targetFile}`);
+        console.log(`Source: ${result.source || "unknown"}`);
+        console.log(`\nPatches (${result.patches.length}):`);
+        for (const patch of result.patches) {
+          const configName = patch.config;
+          const op = patch.op;
+          console.log(`  - [${configName}] ${op}`);
+
+          // Show relevant patch details
+          const patchDetails: Record<string, unknown> = { ...patch };
+          patchDetails.config = undefined;
+
+          const detailsStr = JSON.stringify(patchDetails, null, 4);
+          console.log(`    ${detailsStr.split("\n").join("\n    ")}`);
+        }
+      }
+
+      return 0;
+    }
+
+    // Show overall resolution chain
+    const chainData = chain.map((entry) => ({
+      config: relative(basePath, entry.configPath),
+      resources: entry.resources.size,
+      patches: entry.config.patches?.length || 0,
+    }));
+
+    // Calculate totals
+    const allResources = new Map<string, string>();
+    for (const entry of chain) {
+      for (const [file, content] of entry.resources.entries()) {
+        allResources.set(file, content);
+      }
+    }
+
+    const totalPatches = chain.reduce((sum, entry) => sum + (entry.config.patches?.length || 0), 0);
+
+    const result: ExplainResult = {
+      config: relative(basePath, configPath),
+      output: config.output || ".",
+      chain: chainData,
+      totalFiles: allResources.size,
+      totalPatches,
+    };
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log(`Config: ${result.config}`);
+      console.log(`Output: ${result.output}`);
+      console.log("\nResolution Chain:");
+      for (const entry of result.chain) {
+        console.log(`  - ${entry.config}`);
+        console.log(`    Resources: ${entry.resources}`);
+        console.log(`    Patches: ${entry.patches}`);
+      }
+      console.log(`\nTotal Files: ${result.totalFiles}`);
+      console.log(`Total Patches: ${result.totalPatches}`);
+    }
+
+    return 0;
+  } catch (error) {
+    if (options.format === "json") {
+      console.log(
+        JSON.stringify(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return 1;
+  }
+}
 // ============================================================================
 // Commands
 // ============================================================================
@@ -845,6 +1217,140 @@ async function validateCommand(path: string, options: CLIOptions): Promise<numbe
   }
 }
 
+async function initCommand(path: string, options: CLIOptions): Promise<number> {
+  try {
+    // Determine target directory - resolve path if provided, otherwise use cwd
+    const targetDir = resolve(path);
+    const configPath = join(targetDir, "kustomark.yaml");
+
+    // Check if config file already exists
+    if (existsSync(configPath)) {
+      const error = `Config file already exists: ${configPath}`;
+      if (options.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              created: null,
+              type: null,
+              error,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        console.error(`Error: ${error}`);
+      }
+      return 1;
+    }
+
+    // Create directory if it doesn't exist
+    if (!existsSync(targetDir)) {
+      mkdirSync(targetDir, { recursive: true });
+    }
+
+    // Determine if this is a base or overlay config
+    const isOverlay = options.base !== undefined;
+    const type: "base" | "overlay" = isOverlay ? "overlay" : "base";
+
+    // Build the config object
+    const config: KustomarkConfig = {
+      apiVersion: "kustomark/v1",
+      kind: "Kustomization",
+      resources: [],
+      patches: [],
+    };
+
+    // Set resources based on type
+    if (isOverlay && options.base) {
+      // Overlay - reference the base directory
+      config.resources = [options.base];
+    } else {
+      // Base - use glob pattern for local markdown files
+      config.resources = ["*.md"];
+    }
+
+    // Set output if provided
+    if (options.output) {
+      config.output = options.output;
+    }
+
+    // Add example patches for overlay configs
+    if (isOverlay) {
+      config.patches = [
+        {
+          op: "replace",
+          old: "example",
+          new: "replacement",
+        },
+      ];
+      config.onNoMatch = "warn";
+    }
+
+    // Serialize to YAML
+    const yamlContent = yaml.dump(config, {
+      indent: 2,
+      lineWidth: 100,
+      noRefs: true,
+      sortKeys: false,
+    });
+
+    // Write the config file
+    writeFileSync(configPath, yamlContent, "utf-8");
+
+    // Output results
+    const result: InitResult = {
+      created: configPath,
+      type,
+    };
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      if (options.verbosity > 0) {
+        console.log(`Created ${type} config: ${configPath}`);
+        if (isOverlay) {
+          console.log(`  Referencing base: ${options.base}`);
+        }
+        if (options.output) {
+          console.log(`  Output directory: ${options.output}`);
+        }
+      }
+    }
+
+    return 0;
+  } catch (error) {
+    if (options.format === "json") {
+      console.log(
+        JSON.stringify(
+          {
+            created: null,
+            type: null,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return 1;
+  }
+}
+
+function schemaCommand(_options: CLIOptions): number {
+  try {
+    // Generate and output the JSON Schema
+    const schema = generateSchema();
+    console.log(JSON.stringify(schema, null, 2));
+    return 0;
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+}
+
 // Future: Implement fetch command for M3 remote sources
 // @ts-expect-error Reserved for future implementation
 async function _fetchCommand(_path: string, options: CLIOptions): Promise<number> {
@@ -976,6 +1482,17 @@ Usage:
   kustomark build [path]      Build and write output
   kustomark diff [path]       Show what would change
   kustomark validate [path]   Validate configuration
+  kustomark explain [path]    Show resolution chain and patch details
+  kustomark schema            Export JSON Schema for editor integration
+  kustomark init [path]       Create a new kustomark.yaml config
+
+Explain Flags:
+  --file <filename>           Show lineage for specific file
+  --format <text|json>        Output format (default: text)
+
+Init Flags:
+  --base <path>               Create overlay referencing base config
+  --output <path>             Set output directory in config
 
 Flags:
   --format <text|json>        Output format (default: text)
@@ -1009,6 +1526,12 @@ Exit Codes:
       return await diffCommand(path, options);
     case "validate":
       return await validateCommand(path, options);
+    case "explain":
+      return await explainCommand(path, options);
+    case "schema":
+      return schemaCommand(options);
+    case "init":
+      return await initCommand(path, options);
     default:
       console.error(`Unknown command: ${command}`);
       console.error(`Run 'kustomark --help' for usage information`);

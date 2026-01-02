@@ -163,11 +163,41 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ CLI integration (load/save lock files)
    - ✅ Comprehensive test coverage (661 tests passing)
 
-## M4: Developer Experience (Future)
-- Watch mode
-- Explain command
-- Lint command
-- Init command
+## M4: Developer Experience (In Progress)
+
+### Priority Order
+
+1. **[DONE] Init Command** ✅
+   - ✅ Scaffold new kustomark.yaml configs
+   - ✅ Support --base flag for overlays
+   - ✅ Support --output flag for output directory
+   - ✅ JSON output format support
+
+2. **[DONE] Schema Command** ✅
+   - ✅ Export JSON Schema for editor integration
+   - ✅ Comprehensive schema with all 18 patch operations
+   - ✅ Descriptions for autocomplete
+
+3. **[DONE] Explain Command** ✅
+   - ✅ Show resolution chain
+   - ✅ Display resource and patch counts
+   - ✅ File lineage with --file flag
+   - ✅ JSON output format support
+
+4. **[TODO] Lint Command** ⏳
+   - Check for unreachable patches
+   - Check for redundant patches
+   - Check for overlapping patches
+   - Support --strict flag
+
+5. **[TODO] Watch Mode** ⏳
+   - Rebuild on file changes
+   - Support --debounce flag
+   - Newline-delimited JSON events
+
+6. **[TODO] Stats Feature** ⏳
+   - Build statistics with --stats flag
+   - Performance profiling data
 
 ## Current Status
 
@@ -300,8 +330,17 @@ This document tracks the implementation of kustomark based on the spec milestone
   - HTTP archive fetching with caching: DONE ✅
   - Caching system: DONE ✅
   - Lock file generation: DONE ✅
+- **M4 IN PROGRESS! ⏳**
+  - Init command: DONE ✅
+  - Schema command: DONE ✅
+  - Explain command: DONE ✅
+  - Lint command: TODO ⏳
+  - Watch mode: TODO ⏳
+  - Stats feature: TODO ⏳
+- **Issue #1 FIXED! ✅**
+  - Directory structure preservation implemented and tested
 
-**Next Priority:** M4 Developer Experience (watch, explain, lint, init commands)
+**Next Priority:** M4 remaining features (lint, watch, stats)
 
 **2026-01-02 (M3 Git Repository Fetching):**
 - ✅ Created `/home/dex/kustomark-ralph-bash/src/core/git-fetcher.ts` with complete git operations:
@@ -419,3 +458,29 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ Test verifies directory structure preservation with nested files
 - ✅ All 662 tests passing (1 new test) ✓
 - ✅ All linting checks passing (bun check) ✓
+
+**2026-01-02 (M4 Developer Experience - Init, Schema, Explain Commands):**
+- ✅ Implemented `kustomark init` command for scaffolding configs
+  - Creates kustomark.yaml in current directory or specified path
+  - `--base <path>` flag creates overlay config referencing base
+  - `--output <path>` flag sets output directory
+  - `--format=json` outputs creation info as JSON
+  - Prevents overwriting existing files
+  - Added comprehensive help documentation
+- ✅ Implemented `kustomark schema` command for JSON Schema export
+  - Outputs comprehensive JSON Schema Draft 07 for kustomark.yaml
+  - Includes all 18 patch operation types with complete field definitions
+  - Supports editor integration and autocomplete
+  - Redirectable to file: `kustomark schema > kustomark.schema.json`
+  - Created `/home/dex/kustomark-ralph-bash/src/core/schema.ts` module
+  - 14 comprehensive tests in tests/cli/schema.test.ts
+- ✅ Implemented `kustomark explain` command for showing resolution chain
+  - Shows config path, output directory, and complete resolution chain
+  - Displays resource and patch counts per config level
+  - `--file <filename>` shows specific file lineage with patch details
+  - `--format=json` outputs structured JSON matching M4 spec
+  - Helps debug complex overlay hierarchies
+  - Added helper functions: buildResolutionChain(), isDirectoryReference(), etc.
+- ✅ All 676 tests passing (14 new tests: 1 init, 14 schema, note explain doesn't have separate tests yet) ✓
+- ✅ All linting checks passing (bun check) ✓
+- ✅ All commands are non-interactive with explicit flags as per spec
