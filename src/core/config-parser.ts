@@ -440,6 +440,98 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
       }
       break;
 
+    case "copy-file":
+      if (!p.src) {
+        errors.push({
+          field: `${prefix}.src`,
+          message: "copy-file operation requires 'src' field",
+        });
+      } else if (typeof p.src !== "string") {
+        errors.push({
+          field: `${prefix}.src`,
+          message: "'src' must be a string",
+        });
+      }
+
+      if (!p.dest) {
+        errors.push({
+          field: `${prefix}.dest`,
+          message: "copy-file operation requires 'dest' field",
+        });
+      } else if (typeof p.dest !== "string") {
+        errors.push({
+          field: `${prefix}.dest`,
+          message: "'dest' must be a string",
+        });
+      }
+      break;
+
+    case "rename-file":
+      if (!p.match) {
+        errors.push({
+          field: `${prefix}.match`,
+          message: "rename-file operation requires 'match' field",
+        });
+      } else if (typeof p.match !== "string") {
+        errors.push({
+          field: `${prefix}.match`,
+          message: "'match' must be a string",
+        });
+      }
+
+      if (!p.rename) {
+        errors.push({
+          field: `${prefix}.rename`,
+          message: "rename-file operation requires 'rename' field",
+        });
+      } else if (typeof p.rename !== "string") {
+        errors.push({
+          field: `${prefix}.rename`,
+          message: "'rename' must be a string",
+        });
+      }
+      break;
+
+    case "delete-file":
+      if (!p.match) {
+        errors.push({
+          field: `${prefix}.match`,
+          message: "delete-file operation requires 'match' field",
+        });
+      } else if (typeof p.match !== "string") {
+        errors.push({
+          field: `${prefix}.match`,
+          message: "'match' must be a string",
+        });
+      }
+      break;
+
+    case "move-file":
+      if (!p.match) {
+        errors.push({
+          field: `${prefix}.match`,
+          message: "move-file operation requires 'match' field",
+        });
+      } else if (typeof p.match !== "string") {
+        errors.push({
+          field: `${prefix}.match`,
+          message: "'match' must be a string",
+        });
+      }
+
+      if (!p.dest) {
+        errors.push({
+          field: `${prefix}.dest`,
+          message: "move-file operation requires 'dest' field",
+        });
+      } else if (typeof p.dest !== "string") {
+        errors.push({
+          field: `${prefix}.dest`,
+          message: "'dest' must be a string",
+        });
+      }
+      break;
+
     case "remove-section":
       if (!p.id) {
         errors.push({

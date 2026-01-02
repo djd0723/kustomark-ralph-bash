@@ -3,7 +3,7 @@
  *
  * Provides intelligent autocomplete suggestions for:
  * - Root-level fields (apiVersion, kind, output, resources, patches, validators)
- * - Patch operation types (all 18 operations)
+ * - Patch operation types (all 22 operations)
  * - Common patch fields (include, exclude, onNoMatch, group, id, extends, validate)
  * - Enum values (onNoMatch: skip/warn/error)
  */
@@ -334,6 +334,34 @@ export class CompletionProvider {
         detail: "Change section level",
         documentation: "Change the heading level of a section (promote/demote)",
         insertText: "change-section-level",
+      },
+      {
+        label: "copy-file",
+        kind: CompletionItemKind.Value,
+        detail: "Copy a file from source to destination",
+        documentation: "Copy a file from source to destination",
+        insertText: "copy-file",
+      },
+      {
+        label: "rename-file",
+        kind: CompletionItemKind.Value,
+        detail: "Rename files matching a pattern",
+        documentation: "Rename files matching a pattern",
+        insertText: "rename-file",
+      },
+      {
+        label: "delete-file",
+        kind: CompletionItemKind.Value,
+        detail: "Delete files matching a pattern",
+        documentation: "Delete files matching a pattern",
+        insertText: "delete-file",
+      },
+      {
+        label: "move-file",
+        kind: CompletionItemKind.Value,
+        detail: "Move files to a destination directory",
+        documentation: "Move files to a destination directory",
+        insertText: "move-file",
       },
     ];
   }

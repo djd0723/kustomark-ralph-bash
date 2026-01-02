@@ -325,47 +325,41 @@ export interface ChangeSectionLevelPatch extends PatchCommonFields {
  */
 export interface CopyFilePatch extends PatchCommonFields {
   op: "copy-file";
-  /** Source file path (relative to project root) */
-  source: string;
-  /** Destination file path (relative to project root) */
-  destination: string;
-  /** Whether to overwrite if destination exists (default: false) */
-  overwrite?: boolean;
+  /** Source file path */
+  src: string;
+  /** Destination file path */
+  dest: string;
 }
 
 /**
- * Rename file operation - renames a file
+ * Rename file operation - renames files matching a pattern
  */
 export interface RenameFilePatch extends PatchCommonFields {
   op: "rename-file";
-  /** Source file path (relative to project root) */
-  source: string;
-  /** Destination file path (relative to project root) */
-  destination: string;
-  /** Whether to overwrite if destination exists (default: false) */
-  overwrite?: boolean;
+  /** Glob pattern to match files */
+  match: string;
+  /** New filename (basename only, not full path) */
+  rename: string;
 }
 
 /**
- * Delete file operation - deletes a file
+ * Delete file operation - deletes files matching a pattern
  */
 export interface DeleteFilePatch extends PatchCommonFields {
   op: "delete-file";
-  /** File path to delete (relative to project root) */
-  path: string;
+  /** Glob pattern to match files to delete */
+  match: string;
 }
 
 /**
- * Move file operation - moves a file to a new location
+ * Move file operation - moves files matching a pattern to a destination
  */
 export interface MoveFilePatch extends PatchCommonFields {
   op: "move-file";
-  /** Source file path (relative to project root) */
-  source: string;
-  /** Destination file path (relative to project root) */
-  destination: string;
-  /** Whether to overwrite if destination exists (default: false) */
-  overwrite?: boolean;
+  /** Glob pattern to match files */
+  match: string;
+  /** Destination directory path */
+  dest: string;
 }
 
 /**

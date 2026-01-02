@@ -18,6 +18,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark watch](#kustomark-watch-path)
 - [Configuration](#configuration)
 - [Patch Operations](#patch-operations)
+- [File Operations](#file-operations)
 - [Conditional Patches](#conditional-patches)
   - [Condition Types](#condition-types)
   - [Logical Operators](#logical-operators)
@@ -680,6 +681,194 @@ Basic usage instructions.
 
 Config instructions.
 ```
+
+## File Operations
+
+File operations allow you to manipulate files during the build process. These operations work on the file map (source files to output paths) and support glob pattern matching.
+
+### `copy-file` - Copy File to New Location
+
+Copy a source file to a destination path, creating a duplicate in the output.
+
+```yaml
+- op: copy-file
+  src: ./templates/header.md
+  dest: shared/header.md
+```
+
+**Example:**
+
+Input file map:
+```
+templates/header.md → templates/header.md
+```
+
+Output file map (after copy):
+```
+templates/header.md → shared/header.md
+```
+
+The original file still exists at its original location. The destination path is relative to the output directory.
+
+**Use cases:**
+- Copy template files to multiple locations
+- Duplicate shared content across directories
+- Create backups before applying transformations
+
+### `rename-file` - Rename Files by Pattern
+
+Rename files matching a glob pattern. Only the filename (basename) is changed, the directory path is preserved.
+
+```yaml
+- op: rename-file
+  match: "**/SKILL.md"
+  rename: "skill.md"
+```
+
+**Example:**
+
+Input file map:
+```
+tools/create-research/SKILL.md → tools/create-research/SKILL.md
+tools/task-manager/SKILL.md → tools/task-manager/SKILL.md
+```
+
+Output file map (after rename):
+```
+tools/create-research/SKILL.md → tools/create-research/skill.md
+tools/task-manager/SKILL.md → tools/task-manager/skill.md
+```
+
+**Glob pattern matching:**
+- `*` - Matches any characters except `/`
+- `**` - Matches any characters including `/`
+- `?` - Matches exactly one character
+- `[abc]` - Matches any character in the set
+
+**Use cases:**
+- Standardize filenames (e.g., UPPERCASE to lowercase)
+- Rename files from upstream sources to match your conventions
+- Bulk rename files based on patterns
+
+### `delete-file` - Delete Files by Pattern
+
+Delete files matching a glob pattern from the output.
+
+```yaml
+- op: delete-file
+  match: "**/DEPRECATED-*.md"
+```
+
+**Example:**
+
+Input file map:
+```
+docs/guide.md → docs/guide.md
+docs/DEPRECATED-old-api.md → docs/DEPRECATED-old-api.md
+examples/DEPRECATED-example.md → examples/DEPRECATED-example.md
+```
+
+Output file map (after delete):
+```
+docs/guide.md → docs/guide.md
+```
+
+Files matching the pattern are removed from the output entirely.
+
+**Use cases:**
+- Remove unwanted files from upstream sources
+- Filter out deprecated documentation
+- Clean up temporary or generated files
+
+### `move-file` - Move Files to New Directory
+
+Move files matching a glob pattern to a new directory. The filename is preserved, only the directory changes.
+
+```yaml
+- op: move-file
+  match: "**/references/*.md"
+  dest: docs/references/
+```
+
+**Example:**
+
+Input file map:
+```
+tools/references/api.md → tools/references/api.md
+skills/references/guide.md → skills/references/guide.md
+docs/index.md → docs/index.md
+```
+
+Output file map (after move):
+```
+tools/references/api.md → docs/references/api.md
+skills/references/guide.md → docs/references/guide.md
+docs/index.md → docs/index.md
+```
+
+All matching files are moved to the specified destination directory, preserving their filenames.
+
+**Use cases:**
+- Reorganize file structure from upstream sources
+- Consolidate scattered files into a single directory
+- Move files to match your preferred directory layout
+
+### Common Patterns
+
+File operations work with the same common fields as other patch operations:
+
+```yaml
+- op: delete-file
+  match: "**/test-*.md"
+  include: "docs/**/*.md"    # Only apply to files in docs/
+  exclude: "docs/tests/**"    # But not in docs/tests/
+  onNoMatch: warn             # Warn if no files match
+```
+
+### Real-World Example
+
+```yaml
+apiVersion: kustomark/v1
+kind: Kustomization
+
+output: ./output
+
+resources:
+  - github.com/org/upstream-repo//skills?ref=v1.0.0
+
+patches:
+  # Rename all SKILL.md files to skill.md
+  - op: rename-file
+    match: "**/SKILL.md"
+    rename: "skill.md"
+
+  # Remove deprecated examples
+  - op: delete-file
+    match: "**/examples/deprecated-*.md"
+
+  # Move all reference docs to a central location
+  - op: move-file
+    match: "**/references/*.md"
+    dest: docs/api-reference/
+
+  # Copy shared template to multiple locations
+  - op: copy-file
+    src: templates/footer.md
+    dest: shared/footer.md
+
+  # Apply content patches
+  - op: replace
+    old: "upstream-url"
+    new: "our-url"
+```
+
+This configuration:
+1. Fetches upstream skills from a git repository
+2. Renames all `SKILL.md` files to lowercase `skill.md`
+3. Removes deprecated examples
+4. Consolidates reference docs into `docs/api-reference/`
+5. Copies a template file
+6. Applies content transformations
 
 ## Conditional Patches
 

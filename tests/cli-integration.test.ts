@@ -501,6 +501,218 @@ describe('CLI Integration Tests', () => {
       expect(filtered[2]).toEqual(patches[4]); // ungrouped
     });
   });
+
+  describe('file operations', () => {
+    test('copy-file operation changes output destination', () => {
+      const { applyCopyFile } = require('../src/core/file-operations.js');
+
+      const fileMap = new Map([
+        ['src/file1.md', 'file1.md'],
+        ['src/file2.md', 'file2.md'],
+      ]);
+
+      const result = applyCopyFile(fileMap, 'src/file1.md', 'backup/file1.md', '/project');
+
+      expect(result.count).toBe(1);
+      expect(result.fileMap.get('src/file1.md')).toBe('backup/file1.md');
+      expect(result.fileMap.get('src/file2.md')).toBe('file2.md');
+    });
+
+    test('rename-file operation with glob patterns', () => {
+      const { applyRenameFile } = require('../src/core/file-operations.js');
+
+      const fileMap = new Map([
+        ['src/guide.md', 'guide.md'],
+        ['src/tutorial.md', 'tutorial.md'],
+        ['src/README.md', 'README.md'],
+      ]);
+
+      // Rename all .md files except README
+      const result = applyRenameFile(fileMap, 'src/{guide,tutorial}.md', 'index.md', '/project');
+
+      expect(result.count).toBe(2);
+      expect(result.fileMap.get('src/guide.md')).toBe('index.md');
+      expect(result.fileMap.get('src/tutorial.md')).toBe('index.md');
+      expect(result.fileMap.get('src/README.md')).toBe('README.md');
+    });
+
+    test('delete-file operation with glob patterns', () => {
+      const { applyDeleteFile } = require('../src/core/file-operations.js');
+
+      const fileMap = new Map([
+        ['src/temp1.txt', 'temp1.txt'],
+        ['src/temp2.txt', 'temp2.txt'],
+        ['src/keep.md', 'keep.md'],
+      ]);
+
+      const result = applyDeleteFile(fileMap, 'src/*.txt', '/project');
+
+      expect(result.count).toBe(2);
+      expect(result.fileMap.size).toBe(1);
+      expect(result.fileMap.has('src/temp1.txt')).toBe(false);
+      expect(result.fileMap.has('src/temp2.txt')).toBe(false);
+      expect(result.fileMap.get('src/keep.md')).toBe('keep.md');
+    });
+
+    test('move-file operation changes directory', () => {
+      const { applyMoveFile } = require('../src/core/file-operations.js');
+
+      const fileMap = new Map([
+        ['src/file1.md', 'file1.md'],
+        ['src/file2.md', 'file2.md'],
+      ]);
+
+      const result = applyMoveFile(fileMap, 'src/file1.md', 'docs', '/project');
+
+      expect(result.count).toBe(1);
+      expect(result.fileMap.get('src/file1.md')).toBe('docs/file1.md');
+      expect(result.fileMap.get('src/file2.md')).toBe('file2.md');
+    });
+
+    test('combination of file operations', () => {
+      const { applyCopyFile, applyMoveFile, applyRenameFile, applyDeleteFile } = require('../src/core/file-operations.js');
+
+      let fileMap = new Map([
+        ['src/a.md', 'a.md'],
+        ['src/b.md', 'b.md'],
+        ['src/temp.txt', 'temp.txt'],
+      ]);
+
+      // Step 1: Delete temp file
+      let result = applyDeleteFile(fileMap, 'src/temp.txt', '/project');
+      fileMap = result.fileMap;
+      expect(fileMap.size).toBe(2);
+
+      // Step 2: Move all .md files to docs/
+      result = applyMoveFile(fileMap, 'src/*.md', 'docs', '/project');
+      fileMap = result.fileMap;
+      expect(fileMap.get('src/a.md')).toBe('docs/a.md');
+      expect(fileMap.get('src/b.md')).toBe('docs/b.md');
+
+      // Step 3: Rename b.md to index.md
+      result = applyRenameFile(fileMap, 'src/b.md', 'index.md', '/project');
+      fileMap = result.fileMap;
+      expect(fileMap.get('src/b.md')).toBe('docs/index.md');
+
+      // Step 4: Copy a.md to backup
+      result = applyCopyFile(fileMap, 'src/a.md', 'backup/a.md', '/project');
+      fileMap = result.fileMap;
+      expect(fileMap.get('src/a.md')).toBe('backup/a.md');
+
+      // Final state
+      expect(fileMap.size).toBe(2);
+      expect(fileMap.get('src/a.md')).toBe('backup/a.md');
+      expect(fileMap.get('src/b.md')).toBe('docs/index.md');
+    });
+
+    test('file operations with content patches', () => {
+      const { applyCopyFile } = require('../src/core/file-operations.js');
+      const { applyPatches: applyContentPatches } = require('../src/core/patch-engine.js');
+
+      // Simulate a file map with content
+      const fileContent = '# Original Title\n\nSome content here.';
+
+      // File operations work on the map structure
+      let fileMap = new Map([
+        ['src/README.md', 'README.md'],
+      ]);
+
+      // Copy to backup location
+      const result = applyCopyFile(fileMap, 'src/README.md', 'docs/README.md', '/project');
+      fileMap = result.fileMap;
+
+      expect(fileMap.get('src/README.md')).toBe('docs/README.md');
+
+      // Content patches would be applied separately to the actual file content
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'Original', new: 'Updated' }
+      ];
+
+      const patchResult = applyContentPatches(fileContent, patches, 'warn');
+      expect(patchResult.content).toContain('Updated Title');
+      expect(patchResult.applied).toBe(1);
+    });
+
+    test('file operations preserve directory structure', () => {
+      const { applyMoveFile } = require('../src/core/file-operations.js');
+
+      const fileMap = new Map([
+        ['src/a/file1.md', 'a/file1.md'],
+        ['src/b/file2.md', 'b/file2.md'],
+        ['src/c/file3.md', 'c/file3.md'],
+      ]);
+
+      // Move all to consolidated directory
+      const result = applyMoveFile(fileMap, 'src/**/*.md', 'output', '/project');
+
+      expect(result.count).toBe(3);
+      // Filenames are preserved, only directory changes
+      expect(result.fileMap.get('src/a/file1.md')).toBe('output/file1.md');
+      expect(result.fileMap.get('src/b/file2.md')).toBe('output/file2.md');
+      expect(result.fileMap.get('src/c/file3.md')).toBe('output/file3.md');
+    });
+
+    test('rename-file preserves directory path', () => {
+      const { applyRenameFile } = require('../src/core/file-operations.js');
+
+      const fileMap = new Map([
+        ['src/a/b/file.md', 'output/a/b/file.md'],
+        ['src/x/y/file.md', 'output/x/y/file.md'],
+      ]);
+
+      // Rename all file.md to README.md
+      const result = applyRenameFile(fileMap, 'src/**/*.md', 'README.md', '/project');
+
+      expect(result.count).toBe(2);
+      // Directory structure preserved, only filename changes
+      expect(result.fileMap.get('src/a/b/file.md')).toBe('output/a/b/README.md');
+      expect(result.fileMap.get('src/x/y/file.md')).toBe('output/x/y/README.md');
+    });
+
+    test('file operations with include/exclude patterns', () => {
+      const { applyDeleteFile } = require('../src/core/file-operations.js');
+
+      const fileMap = new Map([
+        ['docs/guide.md', 'guide.md'],
+        ['docs/tutorial.md', 'tutorial.md'],
+        ['docs/README.md', 'README.md'],
+        ['src/code.md', 'code.md'],
+      ]);
+
+      // Delete only docs/*.md files
+      const result = applyDeleteFile(fileMap, 'docs/*.md', '/project');
+
+      expect(result.count).toBe(3);
+      expect(result.fileMap.size).toBe(1);
+      expect(result.fileMap.get('src/code.md')).toBe('code.md');
+    });
+
+    test('error handling: path traversal detection', () => {
+      const { applyCopyFile } = require('../src/core/file-operations.js');
+
+      const fileMap = new Map([
+        ['src/file.md', 'file.md'],
+      ]);
+
+      // Should throw on path traversal in destination
+      expect(() => {
+        applyCopyFile(fileMap, 'src/file.md', '../../../etc/passwd', '/project');
+      }).toThrow('Path traversal detected');
+    });
+
+    test('error handling: invalid rename with path separator', () => {
+      const { applyRenameFile } = require('../src/core/file-operations.js');
+
+      const fileMap = new Map([
+        ['src/file.md', 'file.md'],
+      ]);
+
+      // Rename should only accept filename, not path
+      expect(() => {
+        applyRenameFile(fileMap, 'src/file.md', 'dir/newname.md', '/project');
+      }).toThrow('must be a filename, not a path');
+    });
+  });
 });
 
 /**

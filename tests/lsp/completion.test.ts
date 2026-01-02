@@ -265,7 +265,7 @@ patches:
   });
 
   describe('patch operation completions', () => {
-    test('provides all 18 patch operations when completing op field', () => {
+    test('provides all 22 patch operations when completing op field', () => {
       const content = `patches:
   -
     op:`;
@@ -275,7 +275,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
       const labels = getLabels(completions);
 
-      // All 18 operations
+      // All 22 operations
       expect(labels).toContain('replace');
       expect(labels).toContain('replace-regex');
       expect(labels).toContain('remove-section');
@@ -294,8 +294,12 @@ patches:
       expect(labels).toContain('move-section');
       expect(labels).toContain('rename-header');
       expect(labels).toContain('change-section-level');
+      expect(labels).toContain('copy-file');
+      expect(labels).toContain('rename-file');
+      expect(labels).toContain('delete-file');
+      expect(labels).toContain('move-file');
 
-      expect(labels).toHaveLength(18);
+      expect(labels).toHaveLength(22);
     });
 
     test('provides operations with partial input', () => {
@@ -1102,6 +1106,10 @@ onNoMatch:`;
       'move-section',
       'rename-header',
       'change-section-level',
+      'copy-file',
+      'rename-file',
+      'delete-file',
+      'move-file',
     ];
 
     test('all operations are present exactly once', () => {

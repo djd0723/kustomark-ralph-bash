@@ -1210,13 +1210,13 @@ function getPatchDescription(patch: PatchOperation): string {
     case "change-section-level":
       return `change-section-level '${patch.id}' by ${patch.delta}`;
     case "copy-file":
-      return `copy-file '${patch.source}' to '${patch.destination}'`;
+      return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":
-      return `rename-file '${patch.source}' to '${patch.destination}'`;
+      return `rename-file match='${patch.match}' rename='${patch.rename}'`;
     case "delete-file":
-      return `delete-file '${patch.path}'`;
+      return `delete-file match='${patch.match}'`;
     case "move-file":
-      return `move-file '${patch.source}' to '${patch.destination}'`;
+      return `move-file match='${patch.match}' to '${patch.dest}'`;
     default:
       return "unknown patch";
   }

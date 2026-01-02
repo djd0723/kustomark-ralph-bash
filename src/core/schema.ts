@@ -1678,25 +1678,20 @@ export function generateSchema(): object {
             },
             {
               type: "object",
-              required: ["op", "source", "destination"],
+              required: ["op", "src", "dest"],
               properties: {
                 op: {
                   type: "string",
                   const: "copy-file",
                   description: "Copy a file to a new location",
                 },
-                source: {
+                src: {
                   type: "string",
-                  description: "Source file path (relative to project root)",
+                  description: "Source file path",
                 },
-                destination: {
+                dest: {
                   type: "string",
-                  description: "Destination file path (relative to project root)",
-                },
-                overwrite: {
-                  type: "boolean",
-                  description: "Whether to overwrite if destination exists (default: false)",
-                  default: false,
+                  description: "Destination file path",
                 },
                 include: {
                   oneOf: [
@@ -1764,25 +1759,20 @@ export function generateSchema(): object {
             },
             {
               type: "object",
-              required: ["op", "source", "destination"],
+              required: ["op", "match", "rename"],
               properties: {
                 op: {
                   type: "string",
                   const: "rename-file",
-                  description: "Rename a file",
+                  description: "Rename files matching a pattern",
                 },
-                source: {
+                match: {
                   type: "string",
-                  description: "Source file path (relative to project root)",
+                  description: "Glob pattern to match files",
                 },
-                destination: {
+                rename: {
                   type: "string",
-                  description: "Destination file path (relative to project root)",
-                },
-                overwrite: {
-                  type: "boolean",
-                  description: "Whether to overwrite if destination exists (default: false)",
-                  default: false,
+                  description: "New filename (basename only, not full path)",
                 },
                 include: {
                   oneOf: [
@@ -1850,16 +1840,16 @@ export function generateSchema(): object {
             },
             {
               type: "object",
-              required: ["op", "path"],
+              required: ["op", "match"],
               properties: {
                 op: {
                   type: "string",
                   const: "delete-file",
-                  description: "Delete a file",
+                  description: "Delete files matching a pattern",
                 },
-                path: {
+                match: {
                   type: "string",
-                  description: "File path to delete (relative to project root)",
+                  description: "Glob pattern to match files to delete",
                 },
                 include: {
                   oneOf: [
@@ -1927,25 +1917,20 @@ export function generateSchema(): object {
             },
             {
               type: "object",
-              required: ["op", "source", "destination"],
+              required: ["op", "match", "dest"],
               properties: {
                 op: {
                   type: "string",
                   const: "move-file",
-                  description: "Move a file to a new location",
+                  description: "Move files matching a pattern to a destination",
                 },
-                source: {
+                match: {
                   type: "string",
-                  description: "Source file path (relative to project root)",
+                  description: "Glob pattern to match files",
                 },
-                destination: {
+                dest: {
                   type: "string",
-                  description: "Destination file path (relative to project root)",
-                },
-                overwrite: {
-                  type: "boolean",
-                  description: "Whether to overwrite if destination exists (default: false)",
-                  default: false,
+                  description: "Destination directory path",
                 },
                 include: {
                   oneOf: [

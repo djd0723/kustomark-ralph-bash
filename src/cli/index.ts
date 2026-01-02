@@ -597,27 +597,23 @@ function applyFileOperations(
     try {
       switch (patch.op) {
         case "copy-file":
-          log(`  Applying copy-file: ${patch.source} -> ${patch.destination}`, 3, options);
-          result = applyCopyFile(currentMap, patch.source, patch.destination, basePath);
+          log(`  Applying copy-file: ${patch.src} -> ${patch.dest}`, 3, options);
+          result = applyCopyFile(currentMap, patch.src, patch.dest, basePath);
           break;
 
         case "rename-file":
-          log(
-            `  Applying rename-file: match=${patch.source}, rename=${patch.destination}`,
-            3,
-            options,
-          );
-          result = applyRenameFile(currentMap, patch.source, patch.destination, basePath);
+          log(`  Applying rename-file: match=${patch.match}, rename=${patch.rename}`, 3, options);
+          result = applyRenameFile(currentMap, patch.match, patch.rename, basePath);
           break;
 
         case "delete-file":
-          log(`  Applying delete-file: match=${patch.path}`, 3, options);
-          result = applyDeleteFile(currentMap, patch.path, basePath);
+          log(`  Applying delete-file: match=${patch.match}`, 3, options);
+          result = applyDeleteFile(currentMap, patch.match, basePath);
           break;
 
         case "move-file":
-          log(`  Applying move-file: match=${patch.source}, dest=${patch.destination}`, 3, options);
-          result = applyMoveFile(currentMap, patch.source, patch.destination, basePath);
+          log(`  Applying move-file: match=${patch.match}, dest=${patch.dest}`, 3, options);
+          result = applyMoveFile(currentMap, patch.match, patch.dest, basePath);
           break;
       }
 

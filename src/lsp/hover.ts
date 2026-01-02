@@ -339,6 +339,72 @@ Changes the heading level of a section.
 \`\`\`
 
 Adjusts heading level: -1 promotes (### → ##), +1 demotes (## → ###).`,
+
+  "copy-file": `# copy-file
+
+Copy a file from source to destination.
+
+**Fields:**
+- \`src\` (string, required): Source file path
+- \`dest\` (string, required): Destination file path
+
+**Example:**
+\`\`\`yaml
+- op: copy-file
+  src: "README.md"
+  dest: "docs/README.md"
+\`\`\`
+
+Creates a copy of the source file at the destination path.`,
+
+  "rename-file": `# rename-file
+
+Rename files matching a pattern.
+
+**Fields:**
+- \`match\` (string, required): Pattern to match files
+- \`rename\` (string, required): New name pattern
+
+**Example:**
+\`\`\`yaml
+- op: rename-file
+  match: "*.draft.md"
+  rename: "*.md"
+\`\`\`
+
+Renames all files matching the pattern.`,
+
+  "delete-file": `# delete-file
+
+Delete files matching a pattern.
+
+**Fields:**
+- \`match\` (string, required): Pattern to match files to delete
+
+**Example:**
+\`\`\`yaml
+- op: delete-file
+  match: "*.tmp.md"
+\`\`\`
+
+Deletes all files matching the pattern.`,
+
+  "move-file": `# move-file
+
+Move files to a destination directory.
+
+**Fields:**
+- \`match\` (string, required): Pattern to match files to move
+- \`dest\` (string, required): Destination directory path
+
+**Example:**
+\`\`\`yaml
+- op: move-file
+  match: "*.draft.md"
+  dest: "drafts/"
+\`\`\`
+
+Moves all matching files to the destination directory.`,
 };
 
 /**
@@ -488,6 +554,7 @@ The type of patch operation to perform.
 - Frontmatter: \`set-frontmatter\`, \`remove-frontmatter\`, \`rename-frontmatter\`, \`merge-frontmatter\`
 - Markers: \`delete-between\`, \`replace-between\`
 - Lines: \`insert-after-line\`, \`insert-before-line\`
+- File operations: \`copy-file\`, \`rename-file\`, \`delete-file\`, \`move-file\`
 
 **Example:**
 \`\`\`yaml
