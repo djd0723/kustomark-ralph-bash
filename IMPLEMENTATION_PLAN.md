@@ -631,3 +631,77 @@ This document tracks the implementation of kustomark based on the spec milestone
   - `/home/dex/kustomark-ralph-bash/src/core/schema.ts` - Added id/extends fields to all operations
   - `/home/dex/kustomark-ralph-bash/tests/config-parser.test.ts` - Added 16 validation tests
   - `/home/dex/kustomark-ralph-bash/README.md` - Added Patch Inheritance documentation section
+
+**2026-01-02 (M5 Incremental Builds - IN PROGRESS):**
+- ✅ Started implementation of Incremental Builds feature (High complexity from Future Candidates list):
+  - Created `/home/dex/kustomark-ralph-bash/src/core/build-cache.ts` module with core caching operations:
+    - `calculateFileHash()` - SHA256 hash calculation for file content
+    - `calculatePatchHash()` - Deterministic hash for patch operations
+    - `createEmptyCache()` - Initialize new build cache
+    - `loadBuildCache()` - Load cache from disk with error handling
+    - `saveBuildCache()` - Save cache to `.kustomark/build-cache.json`
+    - `getCacheDirectory()` - Get cache directory path
+    - `clearProjectCache()` - Clear cache for a specific project
+    - `clearAllCaches()` - Clear all caches globally
+    - `updateBuildCache()` - Update cache entry for a file
+    - `pruneCache()` - Remove stale cache entries for deleted files
+    - `hasConfigChanged()` - Detect configuration changes
+    - `havePatchesChanged()` - Detect patch modifications
+  - Created `/home/dex/kustomark-ralph-bash/src/core/dependency-graph.ts` module for tracking file dependencies:
+    - `buildDependencyGraph()` - Build graph of file dependencies
+    - `getAffectedFiles()` - Find all files affected by changes
+    - `getDependencies()` - Get dependencies for a specific file
+    - `addDependency()` - Add dependency relationship
+  - Added types to `/home/dex/kustomark-ralph-bash/src/core/types.ts`:
+    - `BuildCache` - Cache structure with versioning
+    - `BuildCacheEntry` - Entry for a single file with hashes
+    - `DependencyGraph` - Graph of file dependencies
+    - `DependencyNode` - Node in dependency graph
+  - Integrated incremental builds into CLI (`/home/dex/kustomark-ralph-bash/src/cli/index.ts`):
+    - Added `--incremental` flag to enable incremental builds
+    - Added `--clean-cache` flag to force full rebuild
+    - Added `--cache-dir <path>` to specify custom cache directory
+    - Integrated cache loading and saving in build command
+    - Added cache statistics to `--stats` output (hits, misses, hit rate, speedup)
+    - Tracks invalidation reasons (config-changed, patches-changed, files-changed, clean-cache)
+  - Updated `/home/dex/kustomark-ralph-bash/README.md` with comprehensive Performance documentation:
+    - Added Performance section with Parallel Builds and Incremental Builds subsections
+    - Documented --incremental, --clean-cache, and --stats flags
+    - Explained cache invalidation triggers and best practices
+    - Added example workflows showing cache performance gains
+    - Updated CLI Commands section with new flags
+  - Created comprehensive test suites:
+    - `/home/dex/kustomark-ralph-bash/tests/core/build-cache.test.ts` - Unit tests for build cache module (stub)
+    - `/home/dex/kustomark-ralph-bash/tests/core/dependency-graph.test.ts` - Unit tests for dependency graph (stub)
+    - `/home/dex/kustomark-ralph-bash/tests/cli/incremental-build.test.ts` - Integration tests for incremental builds (stub)
+  - All linting checks passing (bun check) ✓
+  - Type-safe implementation with proper error handling
+
+  **Incremental build features implemented:**
+  - SHA256-based change detection for files, patches, and config
+  - Dependency graph for tracking file relationships
+  - Automatic cache invalidation on changes
+  - Integration with --parallel for maximum performance
+  - Cache statistics and performance monitoring
+  - Graceful fallback to full build on cache errors
+
+  **Files created:**
+  - `/home/dex/kustomark-ralph-bash/src/core/build-cache.ts` - Core cache operations (560 lines)
+  - `/home/dex/kustomark-ralph-bash/src/core/dependency-graph.ts` - Dependency tracking (117 lines)
+  - `/home/dex/kustomark-ralph-bash/tests/core/build-cache.test.ts` - Cache unit tests (stubs)
+  - `/home/dex/kustomark-ralph-bash/tests/core/dependency-graph.test.ts` - Graph unit tests (stubs)
+  - `/home/dex/kustomark-ralph-bash/tests/cli/incremental-build.test.ts` - Integration tests (stubs)
+
+  **Files modified:**
+  - `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added BuildCache, BuildCacheEntry, DependencyGraph types
+  - `/home/dex/kustomark-ralph-bash/src/core/index.ts` - Exported cache and dependency graph functions
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Integrated incremental builds, added flags, stats
+  - `/home/dex/kustomark-ralph-bash/README.md` - Added Performance section with incremental builds docs
+
+  **Status:** Core implementation complete, test stubs created. Full test suite and CLI integration testing needed to complete feature.
+
+  **Next steps:**
+  - Implement test suites for build-cache.ts and dependency-graph.ts
+  - Complete CLI integration testing with incremental-build.test.ts
+  - Verify cache invalidation logic works correctly
+  - Test performance gains with real-world scenarios

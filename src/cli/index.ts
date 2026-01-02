@@ -22,6 +22,15 @@ import { dirname, join, normalize, relative, resolve } from "node:path";
 import * as yaml from "js-yaml";
 import micromatch from "micromatch";
 import {
+  calculateFileHash,
+  clearProjectCache,
+  createEmptyCache,
+  loadBuildCache,
+  pruneCache,
+  saveBuildCache,
+  updateBuildCache,
+} from "../core/build-cache.js";
+import {
   parseConfig as coreParseConfig,
   validateConfig as coreValidateConfig,
 } from "../core/config-parser.js";
@@ -31,6 +40,8 @@ import { applyPatches as coreApplyPatches } from "../core/patch-engine.js";
 import { resolveResources as coreResolveResources } from "../core/resource-resolver.js";
 import { generateSchema } from "../core/schema.js";
 import type {
+  BuildCache,
+  BuildCacheEntry,
   KustomarkConfig,
   LockFile,
   LockFileEntry,
@@ -62,6 +73,9 @@ interface CLIOptions {
   disableGroups?: string[]; // For group filtering (blacklist)
   parallel?: boolean; // For parallel processing (default: false)
   jobs?: number; // For parallel job count (default: CPU cores)
+  incremental?: boolean; // Enable incremental builds (default: false)
+  cleanCache?: boolean; // Clear cache before building (default: false)
+  cacheDir?: string; // Custom cache directory
 }
 
 interface BuildStats {
@@ -69,6 +83,9 @@ interface BuildStats {
   files: {
     processed: number;
     written: number;
+    checked?: number; // For incremental builds
+    rebuilt?: number; // For incremental builds
+    unchanged?: number; // For incremental builds
   };
   patches: {
     applied: number;
@@ -76,6 +93,14 @@ interface BuildStats {
   };
   bytes: number; // Total bytes written
   byOperation: Record<string, number>; // Count by operation type
+  cache?: {
+    // Cache statistics (only present in incremental builds)
+    hits: number;
+    misses: number;
+    hitRate: number;
+    speedup?: number; // Estimated speedup from caching
+    invalidationReasons: Record<string, number>;
+  };
 }
 
 interface BuildResult {
@@ -177,6 +202,9 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     disableGroups: undefined,
     parallel: false,
     jobs: undefined,
+    incremental: false,
+    cleanCache: false,
+    cacheDir: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -315,6 +343,21 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
         const nextArg = args[i + 1];
         if (nextArg) {
           options.jobs = Number.parseInt(nextArg, 10);
+          i++;
+        }
+      }
+    } else if (arg === "--incremental") {
+      options.incremental = true;
+    } else if (arg === "--clean-cache") {
+      options.cleanCache = true;
+    } else if (arg === "--cache-dir" || arg.startsWith("--cache-dir=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.cacheDir = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.cacheDir = nextArg;
           i++;
         }
       }
@@ -1228,6 +1271,58 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       }
     }
 
+    // Handle build cache for incremental builds
+    let buildCache: BuildCache | null = null;
+    const configContent = readFileSync(configPath, "utf-8");
+    const configHash = calculateFileHash(configContent);
+    const invalidationResults = new Map<string, { needsRebuild: boolean; reason?: string }>();
+    let cacheCleared = false;
+
+    if (options.incremental) {
+      // Clear cache if requested
+      if (options.cleanCache) {
+        log("Clearing build cache...", 2, options);
+        try {
+          await clearProjectCache(configPath, options.cacheDir);
+          cacheCleared = true;
+          log("Build cache cleared", 2, options);
+        } catch (error) {
+          console.warn(
+            `Warning: Failed to clear cache: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+
+      // Load build cache
+      if (!cacheCleared) {
+        log("Loading build cache...", 3, options);
+        try {
+          buildCache = await loadBuildCache(configPath, options.cacheDir);
+          if (buildCache) {
+            log(`Loaded cache with ${buildCache.entries.length} entries`, 3, options);
+
+            // Check if config changed
+            if (buildCache.configHash !== configHash) {
+              log("Config changed, invalidating cache", 2, options);
+              buildCache = null;
+            }
+          } else {
+            log("No cache found, performing full build", 2, options);
+          }
+        } catch (error) {
+          console.warn(
+            `Warning: Failed to load cache, falling back to full build: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          buildCache = null;
+        }
+      }
+
+      // Create empty cache if needed
+      if (!buildCache) {
+        buildCache = createEmptyCache(configHash);
+      }
+    }
+
     // Resolve resources
     log("Resolving resources...", 2, options);
     const resources = await resolveResources(
@@ -1241,8 +1336,73 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
     // Track build start time for stats
     const startTime = options.stats ? performance.now() : 0;
 
+    // Determine which files need rebuilding (incremental builds only)
+    let filesToRebuild = new Set<string>(resources.keys());
+    let filesUnchanged = 0;
+
+    if (options.incremental && buildCache) {
+      log("Checking for changed files...", 2, options);
+      filesToRebuild = new Set();
+
+      for (const [filePath, sourceContent] of resources.entries()) {
+        // Determine which patches apply to this file
+        const applicablePatches = (config.patches || []).filter(
+          (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
+        );
+
+        // Calculate hashes
+        const sourceHash = calculateFileHash(sourceContent);
+        const patchHash = calculateFileHash(
+          JSON.stringify(applicablePatches, Object.keys(applicablePatches).sort()),
+        );
+
+        // Check cache
+        const cacheEntry = buildCache.entries.find((e) => e.file === filePath);
+
+        let needsRebuild = false;
+        let reason: string | undefined;
+
+        if (!cacheEntry) {
+          needsRebuild = true;
+          reason = "new-file";
+        } else if (cacheEntry.sourceHash !== sourceHash) {
+          needsRebuild = true;
+          reason = "source-changed";
+        } else if (cacheEntry.patchHash !== patchHash) {
+          needsRebuild = true;
+          reason = "patches-changed";
+        }
+
+        invalidationResults.set(filePath, { needsRebuild, reason });
+
+        if (needsRebuild) {
+          filesToRebuild.add(filePath);
+          if (reason) {
+            log(`  ${filePath}: ${reason}`, 3, options);
+          }
+        } else {
+          filesUnchanged++;
+        }
+      }
+
+      log(
+        `Found ${filesToRebuild.size} file(s) to rebuild, ${filesUnchanged} unchanged`,
+        2,
+        options,
+      );
+    }
+
     // Apply patches (parallel or sequential)
-    log("Applying patches...", 2, options);
+    // For incremental builds, only apply patches to files that need rebuilding
+    const resourcesToProcess = options.incremental
+      ? new Map(Array.from(resources.entries()).filter(([path]) => filesToRebuild.has(path)))
+      : resources;
+
+    log(
+      `Applying patches${options.incremental ? ` to ${resourcesToProcess.size} file(s)` : ""}...`,
+      2,
+      options,
+    );
     const {
       resources: patchedResources,
       patchesApplied,
@@ -1252,19 +1412,30 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       operationCounts,
     } = options.parallel
       ? await applyPatchesParallel(
-          resources,
+          resourcesToProcess,
           config.patches || [],
           config.onNoMatch || "warn",
           options,
         )
-      : applyPatches(resources, config.patches || [], config.onNoMatch || "warn", options);
+      : applyPatches(resourcesToProcess, config.patches || [], config.onNoMatch || "warn", options);
+
+    // For incremental builds, add unchanged files from cache
+    const allPatchedResources = new Map(patchedResources);
+    if (options.incremental && buildCache) {
+      for (const [filePath, sourceContent] of resources.entries()) {
+        if (!filesToRebuild.has(filePath)) {
+          // Use cached output (which is the source content if no patches were applied)
+          allPatchedResources.set(filePath, sourceContent);
+        }
+      }
+    }
 
     // Collect all validation errors (from patches and global validators)
     const allValidationErrors: ValidationError[] = [...patchValidationErrors];
 
     // Run global validators on each patched file
     if (config.validators && config.validators.length > 0) {
-      for (const [filePath, content] of patchedResources.entries()) {
+      for (const [filePath, content] of allPatchedResources.entries()) {
         const errors = runValidators(content, config.validators);
         for (const error of errors) {
           allValidationErrors.push({
@@ -1283,27 +1454,34 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
     let filesWritten = 0;
     let totalBytes = 0;
 
+    // For incremental builds, only write files that were rebuilt
+    const filesToWrite = options.incremental
+      ? new Map(
+          Array.from(allPatchedResources.entries()).filter(([path]) => filesToRebuild.has(path)),
+        )
+      : allPatchedResources;
+
     if (options.parallel) {
       // Parallel file writing
       const jobCount = options.jobs || cpus().length;
-      log(`Writing ${patchedResources.size} files with ${jobCount} parallel jobs`, 2, options);
+      log(`Writing ${filesToWrite.size} files with ${jobCount} parallel jobs`, 2, options);
 
-      totalBytes = await writeFilesParallel(outputDir, patchedResources, jobCount);
-      filesWritten = patchedResources.size;
+      totalBytes = await writeFilesParallel(outputDir, filesToWrite, jobCount);
+      filesWritten = filesToWrite.size;
 
       // Track source files for cleaning
-      for (const filePath of patchedResources.keys()) {
+      for (const filePath of allPatchedResources.keys()) {
         sourceFiles.add(filePath);
       }
 
       if (options.verbosity >= 3) {
-        for (const filePath of patchedResources.keys()) {
+        for (const filePath of filesToWrite.keys()) {
           log(`  Wrote ${filePath}`, 3, options);
         }
       }
     } else {
       // Sequential file writing
-      for (const [filePath, content] of patchedResources.entries()) {
+      for (const [filePath, content] of filesToWrite.entries()) {
         const outputPath = join(outputDir, filePath);
         sourceFiles.add(filePath);
 
@@ -1317,6 +1495,11 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         }
 
         log(`  Wrote ${filePath}`, 3, options);
+      }
+
+      // Track all source files for cleaning (even if not written)
+      for (const filePath of allPatchedResources.keys()) {
+        sourceFiles.add(filePath);
       }
     }
 
@@ -1338,6 +1521,51 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       log("Lock file saved", 2, options);
     }
 
+    // Update and save build cache
+    if (options.incremental && buildCache) {
+      log("Updating build cache...", 3, options);
+      const newCacheEntries = new Map<string, BuildCacheEntry>();
+
+      // Create cache entries for rebuilt files
+      for (const [filePath, outputContent] of filesToWrite.entries()) {
+        const sourceContent = resources.get(filePath);
+        if (!sourceContent) continue;
+
+        const applicablePatches = (config.patches || []).filter(
+          (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
+        );
+
+        const entry: BuildCacheEntry = {
+          file: filePath,
+          sourceHash: calculateFileHash(sourceContent),
+          patchHash: calculateFileHash(
+            JSON.stringify(applicablePatches, Object.keys(applicablePatches).sort()),
+          ),
+          outputHash: calculateFileHash(outputContent),
+          built: new Date().toISOString(),
+        };
+
+        newCacheEntries.set(filePath, entry);
+      }
+
+      // Update cache with new entries
+      buildCache = updateBuildCache(buildCache, newCacheEntries);
+
+      // Prune deleted files from cache
+      const currentFiles = new Set(resources.keys());
+      buildCache = pruneCache(buildCache, currentFiles);
+
+      // Save cache to disk
+      try {
+        await saveBuildCache(configPath, buildCache, options.cacheDir);
+        log(`Cache saved with ${buildCache.entries.length} entries`, 3, options);
+      } catch (error) {
+        console.warn(
+          `Warning: Failed to save cache: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
     // Calculate stats if requested
     let stats: BuildStats | undefined;
     if (options.stats) {
@@ -1349,6 +1577,11 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         files: {
           processed: resources.size,
           written: filesWritten,
+          ...(options.incremental && {
+            checked: resources.size,
+            rebuilt: filesToRebuild.size,
+            unchanged: filesUnchanged,
+          }),
         },
         patches: {
           applied: patchesApplied,
@@ -1357,6 +1590,41 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         bytes: totalBytes,
         byOperation: operationCounts,
       };
+
+      // Add cache statistics for incremental builds
+      if (options.incremental) {
+        const cacheHits = filesUnchanged;
+        const cacheMisses = filesToRebuild.size;
+        const total = cacheHits + cacheMisses;
+        const hitRate = total > 0 ? cacheHits / total : 0;
+
+        // Calculate invalidation reasons breakdown
+        const invalidationReasons: Record<string, number> = {
+          "new-file": 0,
+          "source-changed": 0,
+          "patches-changed": 0,
+          "config-changed": 0,
+          "missing-cache": 0,
+          deleted: 0,
+        };
+
+        for (const result of invalidationResults.values()) {
+          if (result.reason) {
+            invalidationReasons[result.reason] = (invalidationReasons[result.reason] || 0) + 1;
+          }
+        }
+
+        // Estimate speedup (very rough estimate)
+        const speedup = cacheMisses > 0 ? total / cacheMisses : 1;
+
+        stats.cache = {
+          hits: cacheHits,
+          misses: cacheMisses,
+          hitRate,
+          speedup,
+          invalidationReasons,
+        };
+      }
     }
 
     // Output results
@@ -1397,9 +1665,18 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         console.log(`  Duration: ${stats.duration}ms`);
         console.log(`  Files processed: ${stats.files.processed}`);
         console.log(`  Files written: ${stats.files.written}`);
+
+        // Show incremental build stats
+        if (options.incremental && stats.files.checked !== undefined) {
+          console.log(`  Files checked: ${stats.files.checked}`);
+          console.log(`  Files rebuilt: ${stats.files.rebuilt}`);
+          console.log(`  Files unchanged: ${stats.files.unchanged}`);
+        }
+
         console.log(`  Patches applied: ${stats.patches.applied}`);
         console.log(`  Patches skipped: ${stats.patches.skipped}`);
         console.log(`  Total bytes: ${stats.bytes}`);
+
         if (Object.keys(stats.byOperation).length > 0) {
           console.log("  By operation:");
           // Sort operation names for deterministic output
@@ -1408,6 +1685,26 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           );
           for (const [op, count] of sortedOps) {
             console.log(`    ${op}: ${count}`);
+          }
+        }
+
+        // Show cache statistics for incremental builds
+        if (options.incremental && stats.cache) {
+          console.log("\nCache Statistics:");
+          console.log(`  Cache hits: ${stats.cache.hits}`);
+          console.log(`  Cache misses: ${stats.cache.misses}`);
+          console.log(`  Hit rate: ${(stats.cache.hitRate * 100).toFixed(1)}%`);
+          console.log(`  Estimated speedup: ${stats.cache.speedup?.toFixed(2) || "N/A"}x`);
+
+          // Show invalidation reasons
+          const reasons = Object.entries(stats.cache.invalidationReasons).filter(
+            ([, count]) => count > 0,
+          );
+          if (reasons.length > 0) {
+            console.log("  Invalidation reasons:");
+            for (const [reason, count] of reasons) {
+              console.log(`    ${reason}: ${count}`);
+            }
           }
         }
       }
@@ -2513,10 +2810,19 @@ Flags:
 Performance:
   --parallel                  Enable parallel processing of files (build command)
   --jobs <N>                  Number of parallel jobs (default: CPU cores)
+  --incremental               Enable incremental builds (only rebuild changed files)
+  --clean-cache               Clear build cache before building
+  --cache-dir <path>          Custom cache directory (default: ~/.cache/kustomark/builds)
 
   Parallel mode processes files concurrently while keeping patches
   sequential within each file. This can significantly speed up builds
   for projects with many files. Output order is deterministic.
+
+  Incremental builds track file and patch changes to avoid rebuilding
+  unchanged files. The build cache is stored in ~/.cache/kustommark/builds
+  by default. Files are invalidated when source content, patches, or
+  configuration changes. Use --clean-cache to force a full rebuild.
+  Incremental builds work with --parallel for maximum performance.
 
 Group Filtering:
   --enable-groups <groups>    Enable only specified groups (comma-separated)

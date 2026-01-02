@@ -138,3 +138,39 @@ export type { LockFile, LockFileEntry } from "./types.js";
 
 // Export patch inheritance functions
 export { resolveInheritance } from "./patch-inheritance.js";
+
+// Export build cache functions and types
+export {
+  calculateFileHash,
+  calculatePatchHash,
+  createEmptyCache,
+  loadBuildCache,
+  saveBuildCache,
+  getCacheDirectory,
+  clearProjectCache,
+  clearAllCaches,
+  updateBuildCache,
+  pruneCache,
+  detectChangedFiles,
+  hasConfigChanged,
+  computePatchesHash,
+  havePatchesChanged,
+  shouldRebuildFile,
+  determineFilesToRebuild,
+  type CurrentBuildState,
+  type ShouldRebuildResult,
+  type RebuildDetermination,
+  type FileChanges,
+} from "./build-cache.js";
+
+export type { BuildCache, BuildCacheEntry } from "./types.js";
+
+// Export dependency graph functions and types
+export {
+  buildDependencyGraph,
+  getAffectedFiles,
+  getDependencies,
+  addDependency,
+} from "./dependency-graph.js";
+
+export type { DependencyNode, DependencyGraph } from "./types.js";

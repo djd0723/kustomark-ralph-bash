@@ -429,3 +429,53 @@ export interface LockFile {
   /** Locked resources */
   resources: LockFileEntry[];
 }
+
+/**
+ * Build cache entry for a single file
+ */
+export interface BuildCacheEntry {
+  /** File path relative to project root */
+  file: string;
+  /** SHA256 hash of source content */
+  sourceHash: string;
+  /** SHA256 hash of patches applied to this file */
+  patchHash: string;
+  /** SHA256 hash of output content */
+  outputHash: string;
+  /** Timestamp when built (ISO 8601) */
+  built: string;
+}
+
+/**
+ * Build cache structure
+ */
+export interface BuildCache {
+  /** Cache version */
+  version: number;
+  /** SHA256 hash of config file content */
+  configHash: string;
+  /** Cached build entries */
+  entries: BuildCacheEntry[];
+}
+
+/**
+ * A node in the dependency graph representing a file
+ */
+export interface DependencyNode {
+  /** Absolute path to the file */
+  path: string;
+  /** Set of absolute paths this file depends on */
+  dependencies: Set<string>;
+  /** Set of absolute paths that depend on this file */
+  dependents: Set<string>;
+}
+
+/**
+ * Dependency graph for tracking file relationships
+ */
+export interface DependencyGraph {
+  /** Map of file path to dependency node */
+  nodes: Map<string, DependencyNode>;
+  /** Path to the config file that created this graph */
+  configPath: string;
+}
