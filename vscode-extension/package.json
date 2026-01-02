@@ -1,0 +1,95 @@
+{
+  "name": "kustomark-vscode",
+  "displayName": "Kustomark",
+  "description": "Language support for Kustomark configuration files with LSP-powered autocomplete, validation, and hover documentation",
+  "version": "0.1.0",
+  "publisher": "kustomark",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "kustomark",
+    "markdown",
+    "yaml",
+    "lsp",
+    "language-server"
+  ],
+  "activationEvents": [
+    "onLanguage:yaml",
+    "workspaceContains:**/kustomark.yaml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "yaml",
+        "extensions": [
+          ".yaml",
+          ".yml"
+        ],
+        "filenames": [
+          "kustomark.yaml",
+          "kustomark.yml"
+        ]
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "kustomark.yaml",
+        "url": "./schemas/kustomark.schema.json"
+      },
+      {
+        "fileMatch": "kustomark.yml",
+        "url": "./schemas/kustomark.schema.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Kustomark",
+      "properties": {
+        "kustomark.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the Kustomark language server."
+        },
+        "kustomark.lsp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable the Kustomark LSP server."
+        },
+        "kustomark.validation.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable real-time validation of Kustomark configuration files."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

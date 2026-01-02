@@ -23,6 +23,10 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [Incremental Builds](#incremental-builds)
 - [Exit Codes](#exit-codes)
 - [JSON Output](#json-output)
+- [IDE Integration](#ide-integration)
+  - [VSCode Extension](#vscode-extension)
+  - [JSON Schema](#json-schema)
+- [Design Principles](#design-principles)
 - [Contributing](#contributing)
 
 ## Problem Statement
@@ -1315,6 +1319,79 @@ else
   echo "$result" | jq -r '.errors[].message'
   exit 1
 fi
+```
+
+## IDE Integration
+
+Kustomark provides a VSCode extension with full Language Server Protocol (LSP) support for enhanced editing experience.
+
+### VSCode Extension
+
+The Kustomark VSCode extension provides:
+
+- **Autocomplete**: Intelligent suggestions for patch operations, fields, and enum values
+- **Real-time Validation**: Instant feedback on configuration errors and warnings
+- **Hover Documentation**: Rich markdown documentation for all fields and operations
+- **JSON Schema Integration**: Editor validation for `kustomark.yaml` files
+
+#### Installation
+
+**From VSIX (Local Development)**:
+
+```bash
+# Build the extension
+cd vscode-extension
+npm install
+npm run compile
+npm run package
+
+# Install in VSCode:
+# 1. Open VSCode
+# 2. Press Ctrl+Shift+P (Cmd+Shift+P on Mac)
+# 3. Type "Extensions: Install from VSIX"
+# 4. Select kustomark-vscode-0.1.0.vsix
+```
+
+Or use the build script:
+
+```bash
+./vscode-extension/build-extension.sh
+```
+
+**From VSCode Marketplace**: Coming soon!
+
+#### Configuration
+
+The extension contributes the following settings:
+
+- `kustomark.trace.server`: Trace LSP communication (off/messages/verbose)
+- `kustomark.lsp.enabled`: Enable/disable the LSP server (default: true)
+- `kustomark.validation.enabled`: Enable/disable real-time validation (default: true)
+
+#### Features
+
+1. **Autocomplete**: Start typing in a `kustomark.yaml` file to see suggestions for:
+   - Root fields: `apiVersion`, `kind`, `output`, `resources`, `patches`, `validators`
+   - Patch operations: All 18 operations (replace, remove-section, etc.)
+   - Common fields: `include`, `exclude`, `onNoMatch`, `group`, `id`, `extends`, `validate`
+
+2. **Validation**: Real-time error and warning messages as you type:
+   - Missing required fields
+   - Invalid field values
+   - Malformed git URLs
+   - Schema validation errors
+
+3. **Hover Documentation**: Hover over any field or operation to see detailed documentation with examples
+
+### JSON Schema
+
+For editors that support JSON Schema validation for YAML files, you can use the generated schema:
+
+```bash
+# Generate the schema
+kustomark schema > kustomark.schema.json
+
+# Configure your editor to use it for kustomark.yaml files
 ```
 
 ## Design Principles
