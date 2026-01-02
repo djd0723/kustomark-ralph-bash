@@ -216,10 +216,12 @@ describe("HTTP Archive Fetcher", () => {
       await clearHttpCache(TEST_CACHE_DIR);
 
       // Set very short timeout to force timeout error
+      // Disable retries to ensure test completes quickly
       await expect(
         fetchHttpArchive(TEST_URLS.tarGz, {
           cacheDir: TEST_CACHE_DIR,
           timeout: 1, // 1ms timeout
+          maxRetries: 0, // No retries for timeout test
         }),
       ).rejects.toThrow();
     });

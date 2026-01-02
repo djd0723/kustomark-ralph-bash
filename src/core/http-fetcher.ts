@@ -64,6 +64,14 @@ export interface HttpFetchOptions {
   updateLock?: boolean;
   /** Offline mode - fail if remote fetch is needed */
   offline?: boolean;
+  /** Maximum number of retry attempts for transient failures (default: 3) */
+  maxRetries?: number;
+  /** Base delay in milliseconds for exponential backoff (default: 1000) */
+  retryBaseDelay?: number;
+  /** Maximum delay in milliseconds between retries (default: 30000) */
+  retryMaxDelay?: number;
+  /** Enable verbose logging of retry attempts (default: false) */
+  verbose?: boolean;
 }
 
 /**
@@ -293,6 +301,110 @@ async function readFilesRecursively(
 }
 
 /**
+ * Determine if an error is retryable based on error code and HTTP status
+ *
+ * Retryable errors include:
+ * - Network errors (ECONNRESET, ECONNREFUSED, etc.)
+ * - HTTP 5xx server errors
+ * - HTTP 429 (rate limiting)
+ * - Timeout errors
+ *
+ * Non-retryable errors include:
+ * - HTTP 4xx client errors (except 429)
+ * - Redirect loop errors
+ * - File system write errors
+ * - Checksum/integrity validation errors
+ */
+function isRetryableError(error: HttpFetchError): boolean {
+  // Network errors (retryable)
+  const retryableErrorCodes = [
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "ETIMEDOUT",
+    "ECONNABORTED",
+    "ENETUNREACH",
+    "EAI_AGAIN",
+  ];
+
+  // Check for network error codes in error message
+  if (retryableErrorCodes.some((code) => error.message.includes(code))) {
+    return true;
+  }
+
+  // Timeout errors
+  if (error.code === "TIMEOUT") {
+    return true;
+  }
+
+  // HTTP status codes
+  if (error.statusCode !== undefined) {
+    // Rate limiting (429) is retryable
+    if (error.statusCode === 429) {
+      return true;
+    }
+
+    // Server errors (5xx) are retryable
+    if (error.statusCode >= 500 && error.statusCode < 600) {
+      return true;
+    }
+
+    // Client errors (4xx) are not retryable
+    if (error.statusCode >= 400 && error.statusCode < 500) {
+      return false;
+    }
+  }
+
+  // Download failures might be network-related
+  if (error.code === "DOWNLOAD_FAILED") {
+    return true;
+  }
+
+  // These errors are never retryable
+  const nonRetryableCodes = [
+    "TOO_MANY_REDIRECTS",
+    "REDIRECT_LOOP",
+    "WRITE_FAILED",
+    "UNSUPPORTED_FORMAT",
+    "CHECKSUM_MISMATCH",
+    "INTEGRITY_MISMATCH",
+  ];
+
+  return !nonRetryableCodes.includes(error.code);
+}
+
+/**
+ * Calculate retry delay with exponential backoff and jitter
+ *
+ * Formula: min(maxDelay, baseDelay * 2^attempt) + jitter
+ * Jitter is a random value between 0-1000ms to prevent thundering herd
+ *
+ * @param attempt - Current retry attempt number (0-indexed)
+ * @param baseDelay - Base delay in milliseconds (default: 1000)
+ * @param maxDelay - Maximum delay in milliseconds (default: 30000)
+ * @returns Delay in milliseconds before next retry
+ */
+function calculateRetryDelay(attempt: number, baseDelay = 1000, maxDelay = 30000): number {
+  // Exponential backoff: baseDelay * 2^attempt
+  const exponentialDelay = baseDelay * 2 ** attempt;
+
+  // Cap at max delay
+  const cappedDelay = Math.min(exponentialDelay, maxDelay);
+
+  // Add jitter (0-1000ms) to prevent thundering herd
+  const jitter = Math.random() * 1000;
+
+  return Math.floor(cappedDelay + jitter);
+}
+
+/**
+ * Sleep for specified milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Download a file from a URL using Node.js http/https modules
  * This avoids CORS issues that occur with Bun's fetch() implementation
  */
@@ -423,6 +535,99 @@ async function downloadFile(
 }
 
 /**
+ * Download file with retry logic for transient failures
+ *
+ * Wraps the downloadFile function with exponential backoff retry logic.
+ * Automatically retries on network errors, timeouts, and server errors.
+ * Does not retry on client errors (4xx) or file system errors.
+ *
+ * @param url - URL to download
+ * @param destPath - Destination file path
+ * @param options - Download options including retry configuration
+ * @returns Promise that resolves when download succeeds
+ * @throws HttpFetchError if all retry attempts fail or error is non-retryable
+ */
+async function downloadFileWithRetry(
+  url: string,
+  destPath: string,
+  options: {
+    authToken?: string;
+    headers?: Record<string, string>;
+    timeout?: number;
+    maxRetries?: number;
+    retryBaseDelay?: number;
+    retryMaxDelay?: number;
+    verbose?: boolean;
+  } = {},
+): Promise<void> {
+  const maxRetries = options.maxRetries ?? 3;
+  const retryBaseDelay = options.retryBaseDelay ?? 1000;
+  const retryMaxDelay = options.retryMaxDelay ?? 30000;
+  const verbose = options.verbose ?? false;
+
+  let lastError: HttpFetchError | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // Log retry attempts (but not the first attempt)
+      if (verbose && attempt > 0) {
+        console.log(`Retry attempt ${attempt}/${maxRetries} for ${url}`);
+      }
+
+      await downloadFile(url, destPath, {
+        authToken: options.authToken,
+        headers: options.headers,
+        timeout: options.timeout,
+      });
+
+      // Success!
+      if (verbose && attempt > 0) {
+        console.log(`Request succeeded on attempt ${attempt + 1}`);
+      }
+
+      return;
+    } catch (error) {
+      lastError =
+        error instanceof HttpFetchError
+          ? error
+          : new HttpFetchError(
+              error instanceof Error ? error.message : String(error),
+              "DOWNLOAD_FAILED",
+            );
+
+      // Check if this is the last attempt
+      if (attempt >= maxRetries) {
+        break;
+      }
+
+      // Check if error is retryable
+      if (!isRetryableError(lastError)) {
+        if (verbose) {
+          console.log(`Non-retryable error encountered: ${lastError.code}`);
+        }
+        throw lastError;
+      }
+
+      // Calculate delay
+      const delay = calculateRetryDelay(attempt, retryBaseDelay, retryMaxDelay);
+
+      if (verbose) {
+        console.log(
+          `Retry attempt ${attempt + 1}/${maxRetries} for ${url} after ${delay}ms ` +
+            `(error: ${lastError.message})`,
+        );
+      }
+
+      // Wait before retrying
+      await sleep(delay);
+    }
+  }
+
+  // All retries exhausted
+  throw lastError;
+}
+
+/**
  * Fetch an HTTP archive and extract its contents
  *
  * Downloads and extracts an archive file from a URL to the local cache. Supports
@@ -439,6 +644,10 @@ async function downloadFile(
  *   - subpath: Subpath to extract from the archive (e.g., "docs/")
  *   - update: Whether to update an existing cached archive
  *   - timeout: Timeout in milliseconds for HTTP requests
+ *   - maxRetries: Maximum retry attempts for transient failures (default: 3)
+ *   - retryBaseDelay: Base delay in ms for exponential backoff (default: 1000)
+ *   - retryMaxDelay: Maximum delay in ms between retries (default: 30000)
+ *   - verbose: Enable logging of retry attempts (default: false)
  *   - headers: Additional HTTP headers
  *   - lockFile: Lock file to use for pinned versions
  *   - updateLock: Whether to update the lock file (fetch latest)
@@ -554,10 +763,14 @@ export async function fetchHttpArchive(
 
   // Download if needed
   if (needsDownload) {
-    await downloadFile(url, archivePath, {
+    await downloadFileWithRetry(url, archivePath, {
       authToken,
       headers: options.headers,
       timeout: options.timeout,
+      maxRetries: options.maxRetries,
+      retryBaseDelay: options.retryBaseDelay,
+      retryMaxDelay: options.retryMaxDelay,
+      verbose: options.verbose,
     });
   }
 
@@ -585,10 +798,14 @@ export async function fetchHttpArchive(
         }
 
         // Re-download
-        await downloadFile(url, archivePath, {
+        await downloadFileWithRetry(url, archivePath, {
           authToken,
           headers: options.headers,
           timeout: options.timeout,
+          maxRetries: options.maxRetries,
+          retryBaseDelay: options.retryBaseDelay,
+          retryMaxDelay: options.retryMaxDelay,
+          verbose: options.verbose,
         });
 
         // Recalculate checksum
