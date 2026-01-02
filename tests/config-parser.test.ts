@@ -2728,4 +2728,923 @@ describe('validateConfig', () => {
       });
     });
   });
+
+  describe('Conditional Patch Validation (when field)', () => {
+    describe('fileContains condition', () => {
+      test('passes for valid fileContains condition', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'fileContains', value: 'test string' },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('fails when fileContains value is missing', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'fileContains' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.value',
+            message: "fileContains condition requires 'value' field",
+          })
+        );
+      });
+
+      test('fails when fileContains value is not a string', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'fileContains', value: 123 },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.value',
+            message: "fileContains 'value' must be a string",
+          })
+        );
+      });
+
+      test('fails when fileContains has extra fields', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'fileContains', value: 'test', extra: 'field' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when',
+            message: expect.stringContaining('Unexpected field(s)'),
+          })
+        );
+      });
+    });
+
+    describe('fileMatches condition', () => {
+      test('passes for valid fileMatches condition', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'fileMatches', pattern: 'test\\s+\\w+' },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('fails when fileMatches pattern is missing', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'fileMatches' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.pattern',
+            message: "fileMatches condition requires 'pattern' field",
+          })
+        );
+      });
+
+      test('fails when fileMatches pattern is not a string', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'fileMatches', pattern: 123 },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.pattern',
+            message: "fileMatches 'pattern' must be a string",
+          })
+        );
+      });
+
+      test('fails when fileMatches pattern is invalid regex', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'fileMatches', pattern: '[invalid(regex' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.pattern',
+            message: expect.stringContaining('Invalid regex pattern'),
+          })
+        );
+      });
+    });
+
+    describe('frontmatterEquals condition', () => {
+      test('passes for valid frontmatterEquals condition with string value', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'frontmatterEquals', key: 'status', value: 'published' },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('passes for frontmatterEquals with different value types', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'frontmatterEquals', key: 'count', value: 42 },
+            },
+            {
+              op: 'replace',
+              old: 'baz',
+              new: 'qux',
+              when: { type: 'frontmatterEquals', key: 'enabled', value: true },
+            },
+            {
+              op: 'replace',
+              old: 'a',
+              new: 'b',
+              when: { type: 'frontmatterEquals', key: 'tags', value: ['tag1', 'tag2'] },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('fails when frontmatterEquals key is missing', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'frontmatterEquals', value: 'test' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.key',
+            message: "frontmatterEquals condition requires 'key' field",
+          })
+        );
+      });
+
+      test('fails when frontmatterEquals value is missing', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'frontmatterEquals', key: 'status' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.value',
+            message: "frontmatterEquals condition requires 'value' field",
+          })
+        );
+      });
+
+      test('fails when frontmatterEquals key is not a string', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'frontmatterEquals', key: 123, value: 'test' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.key',
+            message: "frontmatterEquals 'key' must be a string",
+          })
+        );
+      });
+    });
+
+    describe('frontmatterExists condition', () => {
+      test('passes for valid frontmatterExists condition', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'frontmatterExists', key: 'author' },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('fails when frontmatterExists key is missing', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'frontmatterExists' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.key',
+            message: "frontmatterExists condition requires 'key' field",
+          })
+        );
+      });
+
+      test('fails when frontmatterExists key is not a string', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'frontmatterExists', key: true },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.key',
+            message: "frontmatterExists 'key' must be a string",
+          })
+        );
+      });
+    });
+
+    describe('not condition', () => {
+      test('passes for valid not condition', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: {
+                type: 'not',
+                condition: { type: 'fileContains', value: 'draft' },
+              },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('fails when not condition is missing', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'not' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.condition',
+            message: "not condition requires 'condition' field",
+          })
+        );
+      });
+
+      test('validates nested condition in not', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: {
+                type: 'not',
+                condition: { type: 'fileContains' }, // missing value
+              },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.condition.value',
+            message: "fileContains condition requires 'value' field",
+          })
+        );
+      });
+    });
+
+    describe('anyOf condition', () => {
+      test('passes for valid anyOf condition', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: {
+                type: 'anyOf',
+                conditions: [
+                  { type: 'fileContains', value: 'draft' },
+                  { type: 'frontmatterEquals', key: 'status', value: 'pending' },
+                ],
+              },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('fails when anyOf conditions field is missing', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'anyOf' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.conditions',
+            message: "anyOf condition requires 'conditions' field",
+          })
+        );
+      });
+
+      test('fails when anyOf conditions is not an array', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'anyOf', conditions: 'not-an-array' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.conditions',
+            message: "anyOf 'conditions' must be an array",
+          })
+        );
+      });
+
+      test('fails when anyOf conditions is empty', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'anyOf', conditions: [] },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.conditions',
+            message: "anyOf 'conditions' array cannot be empty",
+          })
+        );
+      });
+
+      test('validates each condition in anyOf array', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: {
+                type: 'anyOf',
+                conditions: [
+                  { type: 'fileContains', value: 'test' }, // valid
+                  { type: 'fileMatches' }, // missing pattern
+                ],
+              },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.conditions[1].pattern',
+            message: "fileMatches condition requires 'pattern' field",
+          })
+        );
+      });
+    });
+
+    describe('allOf condition', () => {
+      test('passes for valid allOf condition', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: {
+                type: 'allOf',
+                conditions: [
+                  { type: 'fileContains', value: 'test' },
+                  { type: 'frontmatterExists', key: 'author' },
+                ],
+              },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('fails when allOf conditions field is missing', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'allOf' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.conditions',
+            message: "allOf condition requires 'conditions' field",
+          })
+        );
+      });
+
+      test('fails when allOf conditions is empty', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'allOf', conditions: [] },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.conditions',
+            message: "allOf 'conditions' array cannot be empty",
+          })
+        );
+      });
+    });
+
+    describe('general condition validation', () => {
+      test('fails when condition is not an object', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: 'not-an-object',
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when',
+            message: 'condition must be an object',
+          })
+        );
+      });
+
+      test('fails when condition type is missing', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { value: 'test' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when',
+            message: "condition must have a 'type' field (string)",
+          })
+        );
+      });
+
+      test('fails when condition type is invalid', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'invalidType', value: 'test' },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.type',
+            message: expect.stringContaining('Invalid condition type'),
+          })
+        );
+      });
+    });
+
+    describe('complex nested conditions', () => {
+      test('passes for deeply nested valid conditions', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: {
+                type: 'allOf',
+                conditions: [
+                  { type: 'frontmatterExists', key: 'author' },
+                  {
+                    type: 'anyOf',
+                    conditions: [
+                      { type: 'fileContains', value: 'draft' },
+                      {
+                        type: 'not',
+                        condition: { type: 'frontmatterEquals', key: 'published', value: true },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('validates errors in deeply nested conditions', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: {
+                type: 'allOf',
+                conditions: [
+                  { type: 'frontmatterExists', key: 'author' },
+                  {
+                    type: 'anyOf',
+                    conditions: [
+                      { type: 'fileContains' }, // missing value
+                      {
+                        type: 'not',
+                        condition: { type: 'frontmatterEquals', key: 'published' }, // missing value
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.conditions[1].conditions[0].value',
+            message: "fileContains condition requires 'value' field",
+          })
+        );
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].when.conditions[1].conditions[1].condition.value',
+            message: "frontmatterEquals condition requires 'value' field",
+          })
+        );
+      });
+    });
+
+    describe('when condition with different patch operations', () => {
+      test('validates when field for different patch operations', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            {
+              op: 'replace',
+              old: 'foo',
+              new: 'bar',
+              when: { type: 'fileContains', value: 'test' },
+            },
+            {
+              op: 'replace-regex',
+              pattern: 'test',
+              replacement: 'example',
+              when: { type: 'frontmatterExists', key: 'author' },
+            },
+            {
+              op: 'remove-section',
+              id: 'section-id',
+              when: { type: 'fileMatches', pattern: 'draft' },
+            },
+            {
+              op: 'set-frontmatter',
+              key: 'status',
+              value: 'published',
+              when: { type: 'frontmatterEquals', key: 'draft', value: false },
+            },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+    });
+  });
 });

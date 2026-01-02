@@ -359,6 +359,12 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     }
   }
 
+  // Validate when condition
+  if (p.when !== undefined) {
+    const conditionErrors = validateCondition(p.when, `${prefix}.when`);
+    errors.push(...conditionErrors);
+  }
+
   // Validate operation-specific fields
   switch (p.op) {
     case "replace":
@@ -765,4 +771,242 @@ function detectCircularInheritance(
   }
 
   return null;
+}
+
+/**
+ * Validates a condition recursively
+ *
+ * @param condition - The condition to validate
+ * @param fieldPath - Field path for error messages
+ * @returns Array of validation errors
+ */
+function validateCondition(condition: unknown, fieldPath: string): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  if (!condition || typeof condition !== "object") {
+    errors.push({
+      field: fieldPath,
+      message: "condition must be an object",
+    });
+    return errors;
+  }
+
+  const c = condition as Record<string, unknown>;
+
+  // Check if type field exists
+  if (!c.type || typeof c.type !== "string") {
+    errors.push({
+      field: fieldPath,
+      message: "condition must have a 'type' field (string)",
+    });
+    return errors;
+  }
+
+  const validTypes = [
+    "fileContains",
+    "fileMatches",
+    "frontmatterEquals",
+    "frontmatterExists",
+    "not",
+    "anyOf",
+    "allOf",
+  ];
+
+  if (!validTypes.includes(c.type)) {
+    errors.push({
+      field: `${fieldPath}.type`,
+      message: `Invalid condition type "${c.type}". Must be one of: ${validTypes.join(", ")}`,
+    });
+    return errors;
+  }
+
+  // Validate specific condition types
+  switch (c.type) {
+    case "fileContains":
+      if (c.value === undefined) {
+        errors.push({
+          field: `${fieldPath}.value`,
+          message: "fileContains condition requires 'value' field",
+        });
+      } else if (typeof c.value !== "string") {
+        errors.push({
+          field: `${fieldPath}.value`,
+          message: "fileContains 'value' must be a string",
+        });
+      }
+      // Check for extra fields
+      validateConditionFields(c, ["type", "value"], fieldPath, errors);
+      break;
+
+    case "fileMatches":
+      if (c.pattern === undefined) {
+        errors.push({
+          field: `${fieldPath}.pattern`,
+          message: "fileMatches condition requires 'pattern' field",
+        });
+      } else if (typeof c.pattern !== "string") {
+        errors.push({
+          field: `${fieldPath}.pattern`,
+          message: "fileMatches 'pattern' must be a string",
+        });
+      } else {
+        // Validate regex pattern
+        try {
+          new RegExp(c.pattern);
+        } catch (e) {
+          errors.push({
+            field: `${fieldPath}.pattern`,
+            message: `Invalid regex pattern: ${e instanceof Error ? e.message : String(e)}`,
+          });
+        }
+      }
+      // Check for extra fields
+      validateConditionFields(c, ["type", "pattern"], fieldPath, errors);
+      break;
+
+    case "frontmatterEquals":
+      if (c.key === undefined) {
+        errors.push({
+          field: `${fieldPath}.key`,
+          message: "frontmatterEquals condition requires 'key' field",
+        });
+      } else if (typeof c.key !== "string") {
+        errors.push({
+          field: `${fieldPath}.key`,
+          message: "frontmatterEquals 'key' must be a string",
+        });
+      }
+
+      if (c.value === undefined) {
+        errors.push({
+          field: `${fieldPath}.value`,
+          message: "frontmatterEquals condition requires 'value' field",
+        });
+      }
+      // value can be any type, so no type validation needed
+
+      // Check for extra fields
+      validateConditionFields(c, ["type", "key", "value"], fieldPath, errors);
+      break;
+
+    case "frontmatterExists":
+      if (c.key === undefined) {
+        errors.push({
+          field: `${fieldPath}.key`,
+          message: "frontmatterExists condition requires 'key' field",
+        });
+      } else if (typeof c.key !== "string") {
+        errors.push({
+          field: `${fieldPath}.key`,
+          message: "frontmatterExists 'key' must be a string",
+        });
+      }
+      // Check for extra fields
+      validateConditionFields(c, ["type", "key"], fieldPath, errors);
+      break;
+
+    case "not":
+      if (c.condition === undefined) {
+        errors.push({
+          field: `${fieldPath}.condition`,
+          message: "not condition requires 'condition' field",
+        });
+      } else {
+        // Recursively validate nested condition
+        const nestedErrors = validateCondition(c.condition, `${fieldPath}.condition`);
+        errors.push(...nestedErrors);
+      }
+      // Check for extra fields
+      validateConditionFields(c, ["type", "condition"], fieldPath, errors);
+      break;
+
+    case "anyOf":
+      if (c.conditions === undefined) {
+        errors.push({
+          field: `${fieldPath}.conditions`,
+          message: "anyOf condition requires 'conditions' field",
+        });
+      } else if (!Array.isArray(c.conditions)) {
+        errors.push({
+          field: `${fieldPath}.conditions`,
+          message: "anyOf 'conditions' must be an array",
+        });
+      } else {
+        if (c.conditions.length === 0) {
+          errors.push({
+            field: `${fieldPath}.conditions`,
+            message: "anyOf 'conditions' array cannot be empty",
+          });
+        }
+        // Recursively validate each nested condition
+        c.conditions.forEach((nestedCondition: unknown, index: number) => {
+          const nestedErrors = validateCondition(
+            nestedCondition,
+            `${fieldPath}.conditions[${index}]`,
+          );
+          errors.push(...nestedErrors);
+        });
+      }
+      // Check for extra fields
+      validateConditionFields(c, ["type", "conditions"], fieldPath, errors);
+      break;
+
+    case "allOf":
+      if (c.conditions === undefined) {
+        errors.push({
+          field: `${fieldPath}.conditions`,
+          message: "allOf condition requires 'conditions' field",
+        });
+      } else if (!Array.isArray(c.conditions)) {
+        errors.push({
+          field: `${fieldPath}.conditions`,
+          message: "allOf 'conditions' must be an array",
+        });
+      } else {
+        if (c.conditions.length === 0) {
+          errors.push({
+            field: `${fieldPath}.conditions`,
+            message: "allOf 'conditions' array cannot be empty",
+          });
+        }
+        // Recursively validate each nested condition
+        c.conditions.forEach((nestedCondition: unknown, index: number) => {
+          const nestedErrors = validateCondition(
+            nestedCondition,
+            `${fieldPath}.conditions[${index}]`,
+          );
+          errors.push(...nestedErrors);
+        });
+      }
+      // Check for extra fields
+      validateConditionFields(c, ["type", "conditions"], fieldPath, errors);
+      break;
+  }
+
+  return errors;
+}
+
+/**
+ * Helper function to validate that a condition object only has expected fields
+ *
+ * @param condition - The condition object to check
+ * @param allowedFields - List of allowed field names
+ * @param fieldPath - Field path for error messages
+ * @param errors - Array to append errors to
+ */
+function validateConditionFields(
+  condition: Record<string, unknown>,
+  allowedFields: string[],
+  fieldPath: string,
+  errors: ValidationError[],
+): void {
+  const actualFields = Object.keys(condition);
+  const extraFields = actualFields.filter((f) => !allowedFields.includes(f));
+
+  if (extraFields.length > 0) {
+    errors.push({
+      field: fieldPath,
+      message: `Unexpected field(s) in ${condition.type} condition: ${extraFields.join(", ")}. Allowed fields: ${allowedFields.join(", ")}`,
+    });
+  }
 }

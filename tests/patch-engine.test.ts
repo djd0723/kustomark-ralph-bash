@@ -1636,3 +1636,669 @@ line 2`;
     expect(result.content).toContain('REPLACED');
   });
 });
+
+describe('Conditional Patches - when field', () => {
+  describe('fileContains condition', () => {
+    test('applies patch when content contains value', () => {
+      const content = 'This is production environment documentation.';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'production',
+          new: 'PRODUCTION',
+          when: { type: 'fileContains', value: 'production' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('PRODUCTION');
+    });
+
+    test('skips patch when content does not contain value', () => {
+      const content = 'This is development environment documentation.';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'development',
+          new: 'DEVELOPMENT',
+          when: { type: 'fileContains', value: 'production' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content); // Unchanged
+    });
+
+    test('is case-sensitive by default', () => {
+      const content = 'Production environment';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Production',
+          new: 'PRODUCTION',
+          when: { type: 'fileContains', value: 'production' }, // lowercase
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+  });
+
+  describe('fileMatches condition', () => {
+    test('applies patch when content matches regex pattern', () => {
+      const content = 'Version 2.0.1 documentation';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: '2.0.1',
+          new: '2.1.0',
+          when: { type: 'fileMatches', pattern: '\\d+\\.\\d+\\.\\d+' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('2.1.0');
+    });
+
+    test('skips patch when content does not match pattern', () => {
+      const content = 'No version here';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'version',
+          new: 'VERSION',
+          when: { type: 'fileMatches', pattern: '\\d+\\.\\d+\\.\\d+' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test('supports regex flags', () => {
+      const content = 'UPPERCASE TEXT';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'UPPERCASE',
+          new: 'lowercase',
+          when: { type: 'fileMatches', pattern: '/uppercase/i' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('lowercase');
+    });
+  });
+
+  describe('frontmatterEquals condition', () => {
+    test('applies patch when frontmatter key equals value', () => {
+      const content = `---
+environment: production
+version: 2.0
+---
+# Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Documentation',
+          new: 'Production Documentation',
+          when: { type: 'frontmatterEquals', key: 'environment', value: 'production' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('Production Documentation');
+    });
+
+    test('skips patch when frontmatter key has different value', () => {
+      const content = `---
+environment: development
+---
+# Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Documentation',
+          new: 'Production Documentation',
+          when: { type: 'frontmatterEquals', key: 'environment', value: 'production' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test('supports nested frontmatter keys with dot notation', () => {
+      const content = `---
+config:
+  server:
+    mode: production
+---
+# Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Documentation',
+          new: 'Production Documentation',
+          when: { type: 'frontmatterEquals', key: 'config.server.mode', value: 'production' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('Production Documentation');
+    });
+
+    test('compares complex values with deep equality', () => {
+      const content = `---
+platforms: [windows, linux, macos]
+---
+# Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Documentation',
+          new: 'Cross-platform Documentation',
+          when: { type: 'frontmatterEquals', key: 'platforms', value: ['windows', 'linux', 'macos'] },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('Cross-platform Documentation');
+    });
+  });
+
+  describe('frontmatterExists condition', () => {
+    test('applies patch when frontmatter key exists', () => {
+      const content = `---
+beta: true
+---
+# Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'prepend-to-section',
+          id: 'documentation',
+          content: '\n> **Beta**: This feature is experimental\n',
+          when: { type: 'frontmatterExists', key: 'beta' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('Beta');
+      expect(result.content).toContain('experimental');
+    });
+
+    test('skips patch when frontmatter key does not exist', () => {
+      const content = `---
+stable: true
+---
+# Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'prepend-to-section',
+          id: 'documentation',
+          content: '\n> **Beta**: This feature is experimental\n',
+          when: { type: 'frontmatterExists', key: 'beta' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+    });
+
+    test('returns true even if value is false', () => {
+      const content = `---
+enabled: false
+---
+# Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Documentation',
+          new: 'Disabled Feature Documentation',
+          when: { type: 'frontmatterExists', key: 'enabled' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('Disabled Feature');
+    });
+  });
+
+  describe('not condition', () => {
+    test('applies patch when negated condition is false', () => {
+      const content = 'Development documentation';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Development',
+          new: 'Non-production',
+          when: { type: 'not', condition: { type: 'fileContains', value: 'production' } },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('Non-production');
+    });
+
+    test('skips patch when negated condition is true', () => {
+      const content = 'production documentation';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'production',
+          new: 'non-production',
+          when: { type: 'not', condition: { type: 'fileContains', value: 'production' } },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+  });
+
+  describe('anyOf condition', () => {
+    test('applies patch when any condition matches', () => {
+      const content = 'Development environment';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'environment',
+          new: 'ENVIRONMENT',
+          when: {
+            type: 'anyOf',
+            conditions: [
+              { type: 'fileContains', value: 'production' },
+              { type: 'fileContains', value: 'Development' },
+            ],
+          },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('ENVIRONMENT');
+    });
+
+    test('skips patch when no condition matches', () => {
+      const content = 'Staging environment';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Staging',
+          new: 'STAGING',
+          when: {
+            type: 'anyOf',
+            conditions: [
+              { type: 'fileContains', value: 'production' },
+              { type: 'fileContains', value: 'development' },
+            ],
+          },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+  });
+
+  describe('allOf condition', () => {
+    test('applies patch when all conditions match', () => {
+      const content = `---
+published: true
+---
+# Production Guide
+Live in production.`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Guide',
+          new: 'GUIDE',
+          when: {
+            type: 'allOf',
+            conditions: [
+              { type: 'frontmatterEquals', key: 'published', value: true },
+              { type: 'fileContains', value: 'production' },
+            ],
+          },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('GUIDE');
+    });
+
+    test('skips patch when any condition fails', () => {
+      const content = `---
+published: false
+---
+# Production Guide`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Guide',
+          new: 'GUIDE',
+          when: {
+            type: 'allOf',
+            conditions: [
+              { type: 'frontmatterEquals', key: 'published', value: true },
+              { type: 'fileContains', value: 'production' },
+            ],
+          },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+  });
+
+  describe('nested conditions', () => {
+    test('handles complex nested conditions', () => {
+      const content = `---
+environment: production
+version: 2.0
+published: true
+---
+# API Documentation
+Current version live in production.`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'API',
+          new: 'Production API',
+          when: {
+            type: 'allOf',
+            conditions: [
+              {
+                type: 'anyOf',
+                conditions: [
+                  { type: 'frontmatterEquals', key: 'environment', value: 'production' },
+                  { type: 'frontmatterEquals', key: 'environment', value: 'staging' },
+                ],
+              },
+              { type: 'frontmatterEquals', key: 'published', value: true },
+              { type: 'fileMatches', pattern: '\\d+\\.\\d+' },
+            ],
+          },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('Production API');
+    });
+
+    test('skips patch with complex condition when inner condition fails', () => {
+      const content = `---
+environment: development
+published: true
+---
+# API Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'API',
+          new: 'Production API',
+          when: {
+            type: 'allOf',
+            conditions: [
+              {
+                type: 'anyOf',
+                conditions: [
+                  { type: 'frontmatterEquals', key: 'environment', value: 'production' },
+                  { type: 'frontmatterEquals', key: 'environment', value: 'staging' },
+                ],
+              },
+              { type: 'frontmatterEquals', key: 'published', value: true },
+            ],
+          },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+  });
+
+  describe('conditional patches with different operations', () => {
+    test('works with remove-section operation', () => {
+      const content = `---
+internal: true
+---
+# Public Documentation
+## Internal Notes
+For employees only
+## Features`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'remove-section',
+          id: 'internal-notes',
+          when: { type: 'not', condition: { type: 'frontmatterEquals', key: 'internal', value: true } },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      // Should NOT remove because internal is true
+      expect(result.applied).toBe(0);
+      expect(result.content).toContain('Internal Notes');
+    });
+
+    test('works with replace-section operation', () => {
+      const content = `---
+environment: production
+---
+# Installation
+## Steps
+Development steps here
+## Configuration`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace-section',
+          id: 'steps',
+          content: '\nProduction installation steps here\n',
+          when: { type: 'frontmatterEquals', key: 'environment', value: 'production' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain('Production installation');
+      expect(result.content).not.toContain('Development steps');
+    });
+
+    test('works with frontmatter operations', () => {
+      const content = `---
+draft: true
+---
+# Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'set-frontmatter',
+          key: 'published',
+          value: true,
+          when: { type: 'not', condition: { type: 'frontmatterExists', key: 'draft' } },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      // Should NOT apply because draft exists
+      expect(result.applied).toBe(0);
+      expect(result.content).not.toContain('published: true');
+    });
+  });
+
+  describe('multiple conditional patches', () => {
+    test('applies only patches with matching conditions', () => {
+      const content = `---
+environment: production
+version: 2.0
+---
+# Documentation`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'set-frontmatter',
+          key: 'env_type',
+          value: 'production',
+          when: { type: 'frontmatterEquals', key: 'environment', value: 'production' },
+        },
+        {
+          op: 'set-frontmatter',
+          key: 'env_type',
+          value: 'development',
+          when: { type: 'frontmatterEquals', key: 'environment', value: 'development' },
+        },
+        {
+          op: 'set-frontmatter',
+          key: 'version_string',
+          value: 'v2.0',
+          when: { type: 'frontmatterEquals', key: 'version', value: 2.0 },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(2);
+      expect(result.content).toContain('env_type: production');
+      expect(result.content).not.toContain('env_type: development');
+      expect(result.content).toContain('version_string: v2.0');
+    });
+
+    test('sequentially evaluates conditions for each patch', () => {
+      const content = 'Initial content';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Initial',
+          new: 'Modified',
+          when: { type: 'fileContains', value: 'Initial' },
+        },
+        {
+          op: 'replace',
+          old: 'Modified',
+          new: 'Final',
+          when: { type: 'fileContains', value: 'Modified' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(2);
+      expect(result.content).toBe('Final content');
+    });
+  });
+
+  describe('edge cases', () => {
+    test('handles missing frontmatter gracefully', () => {
+      const content = '# No frontmatter here';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'No',
+          new: 'Has',
+          when: { type: 'frontmatterExists', key: 'any-key' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test('handles invalid regex in fileMatches gracefully', () => {
+      const content = 'Some content';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Some',
+          new: 'Any',
+          when: { fileMatches: '[invalid(regex' },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      // Invalid regex should evaluate to false
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test('empty anyOf condition evaluates to false', () => {
+      const content = 'Content';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Content',
+          new: 'Modified',
+          when: { type: 'anyOf', conditions: [] },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test('empty allOf condition evaluates to true', () => {
+      const content = 'Content';
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'Content',
+          new: 'Modified',
+          when: { type: 'allOf', conditions: [] },
+        },
+      ];
+
+      const result = applyPatches(content, patches);
+
+      expect(result.applied).toBe(1);
+      expect(result.content).toBe('Modified');
+    });
+  });
+});

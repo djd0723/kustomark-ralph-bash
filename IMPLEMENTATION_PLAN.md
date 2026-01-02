@@ -1410,3 +1410,153 @@ This document tracks the implementation of kustomark based on the spec milestone
   - Complete documentation in README.md
   - Security features (--no-hooks flag, timeout protection)
   - Ready for production use in watch mode workflows
+
+**2026-01-02 (Conditional Patches Feature - Future Work - COMPLETE!):**
+- ✅ Implemented Conditional Patches feature (Medium complexity from Deferred: Complexity list):
+
+  **Core Implementation (~700 lines of TypeScript):**
+  - Created `/home/dex/kustomark-ralph-bash/src/core/condition-evaluator.ts` (260 lines)
+    - `evaluateCondition()` - Main dispatcher for all condition types
+    - `evaluateFileContains()` - Check if content contains substring
+    - `evaluateFileMatches()` - Check if content matches regex pattern with flag support
+    - `evaluateFrontmatterEquals()` - Check frontmatter field value with deep equality
+    - `evaluateFrontmatterExists()` - Check if frontmatter key exists
+    - `evaluateNot()` - Logical NOT operation
+    - `evaluateAnyOf()` - Logical OR operation (any condition matches)
+    - `evaluateAllOf()` - Logical AND operation (all conditions match)
+    - Supports dot notation for nested frontmatter keys
+    - Deterministic and pure (no side effects)
+
+  **Type System and Schema:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/types.ts`
+    - Added 7 condition type interfaces with discriminated union
+    - Added `when?: Condition` to `PatchCommonFields` interface
+    - Added `conditionSkipped: number` to `PatchResult` interface
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/schema.ts`
+    - Added recursive `conditionSchema` definition
+    - Added `when` field to all 18 patch operation schemas
+    - Full JSON Schema support for editor integration
+
+  **Patch Engine Integration:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/patch-engine.ts`
+    - Added condition evaluation before applying patches
+    - Patches with unmet conditions are skipped (count: 0, conditionSkipped: true)
+    - Tracks condition-skipped patches separately from applied patches
+    - Verbose logging for condition evaluation
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts`
+    - Added comprehensive validation for `when` field
+    - Validates all 7 condition types recursively
+    - Validates regex patterns are compilable
+    - Clear error messages for malformed conditions
+
+  **CLI Integration:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/cli/index.ts`
+    - Passes verbose flag to patch engine for condition logging
+    - Accounts for condition-skipped patches in statistics
+  - Updated `/home/dex/kustomark-ralph-bash/src/cli/debug-command.ts`
+    - Debug mode shows condition evaluation results
+  - Updated `/home/dex/kustomark-ralph-bash/src/web/server/services/build-service.ts`
+    - Web service integration for conditional patches
+
+  **Comprehensive Testing (~500 lines):**
+  - Created `/home/dex/kustomark-ralph-bash/tests/core/condition-evaluator.test.ts` (50+ tests)
+    - Tests for all 7 condition evaluators
+    - Tests for nested and complex conditions
+    - Edge cases and error handling
+    - Real-world use case scenarios
+  - Updated `/home/dex/kustomark-ralph-bash/tests/patch-engine.test.ts` (26+ new tests)
+    - Tests for conditional patch application
+    - Tests across all patch operation types
+    - Tests for condition skipping behavior
+  - Updated `/home/dex/kustomark-ralph-bash/tests/config-parser.test.ts` (33+ new tests)
+    - Validation tests for all condition types
+    - Tests for invalid structures and field types
+    - Tests for deeply nested conditions
+
+  **Documentation:**
+  - Updated `/home/dex/kustomark-ralph-bash/README.md`
+    - Added comprehensive "Conditional Patches" section
+    - Documentation for all condition types with examples
+    - Real-world use cases (environment-specific, content-aware, security-based)
+    - Updated Table of Contents
+  - Updated `/home/dex/kustomark-ralph-bash/specs/out-of-scope.md`
+    - Moved Conditional Patches to "Recently Implemented" section
+    - Documented deterministic evaluation approach
+
+  **Conditional Patch Features Implemented:**
+  1. Seven condition types (fileContains, fileMatches, frontmatterEquals, frontmatterExists, not, anyOf, allOf)
+  2. Deterministic evaluation based on file content only
+  3. Support for complex nested logical expressions
+  4. Regex pattern matching with flag support
+  5. Deep frontmatter comparison with dot notation
+  6. Comprehensive validation and error reporting
+  7. Integration with all 18 patch operations
+  8. Verbose logging for debugging conditions
+
+  **Condition Types:**
+  - `fileContains: { type: "fileContains", value: string }` - Substring search
+  - `fileMatches: { type: "fileMatches", pattern: string }` - Regex pattern with flags
+  - `frontmatterEquals: { type: "frontmatterEquals", key: string, value: unknown }` - Exact frontmatter value match
+  - `frontmatterExists: { type: "frontmatterExists", key: string }` - Frontmatter key existence
+  - `not: { type: "not", condition: Condition }` - Logical negation
+  - `anyOf: { type: "anyOf", conditions: Condition[] }` - Logical OR
+  - `allOf: { type: "allOf", conditions: Condition[] }` - Logical AND
+
+  **Example Usage:**
+  ```yaml
+  patches:
+    # Only apply to API documentation files
+    - op: replace
+      old: "v1.0"
+      new: "v2.0"
+      when:
+        type: fileContains
+        value: "API"
+
+    # Complex condition: frontmatter + content
+    - op: set-frontmatter
+      key: reviewed
+      value: true
+      when:
+        type: allOf
+        conditions:
+          - type: frontmatterExists
+            key: author
+          - type: not
+            condition:
+              type: frontmatterEquals
+              key: draft
+              value: true
+  ```
+
+  **Files Created:**
+  - `/home/dex/kustomark-ralph-bash/src/core/condition-evaluator.ts` (260 lines)
+  - `/home/dex/kustomark-ralph-bash/tests/core/condition-evaluator.test.ts` (50+ tests)
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added Condition types and conditionSkipped field
+  - `/home/dex/kustomark-ralph-bash/src/core/schema.ts` - Added condition schema and when field
+  - `/home/dex/kustomark-ralph-bash/src/core/patch-engine.ts` - Integrated condition evaluation
+  - `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts` - Added condition validation
+  - `/home/dex/kustomark-ralph-bash/src/core/index.ts` - Exported condition evaluators
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - CLI integration
+  - `/home/dex/kustomark-ralph-bash/src/cli/debug-command.ts` - Debug mode support
+  - `/home/dex/kustomark-ralph-bash/src/web/server/services/build-service.ts` - Web service integration
+  - `/home/dex/kustomark-ralph-bash/src/lsp/document-symbols.ts` - Auto-fixed formatting
+  - `/home/dex/kustomark-ralph-bash/tests/patch-engine.test.ts` - Added 26+ conditional patch tests
+  - `/home/dex/kustomark-ralph-bash/tests/config-parser.test.ts` - Added 33+ validation tests
+  - `/home/dex/kustomark-ralph-bash/README.md` - Added Conditional Patches documentation
+  - `/home/dex/kustomark-ralph-bash/specs/out-of-scope.md` - Moved to Recently Implemented
+
+  **Testing Results:**
+  - All 1105 tests passing (115 new tests, up from 990)
+  - 4725 expect() calls successful (up from 4500)
+  - Main project linting clean for core/cli/lsp
+  - Web UI has cosmetic warnings only (as noted before)
+
+  **Status:** COMPLETE! ✅
+  - Full conditional patches implementation with 7 condition types
+  - Deterministic evaluation maintaining kustomark design principles
+  - Comprehensive test coverage (unit, integration, validation)
+  - Complete documentation with real-world examples
+  - Ready for production use in all build workflows

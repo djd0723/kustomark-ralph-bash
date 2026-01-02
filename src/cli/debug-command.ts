@@ -285,10 +285,12 @@ async function runInteractiveLoop(session: DebugSession, options: CLIOptions): P
 
       if (action === "apply") {
         // Apply the patch immediately to update the session
+        const verbose = options.verbosity >= 2;
         const result = applyPatches(
           session.resources.get(item.file) || "",
           [item.patch],
           item.patch.onNoMatch || "warn",
+          verbose,
         );
         session.resources.set(item.file, result.content);
         if (options.verbosity >= 2) {
@@ -333,10 +335,12 @@ function runAutoApply(session: DebugSession, options: CLIOptions): void {
     });
 
     if (action === "apply") {
+      const verbose = options.verbosity >= 2;
       const result = applyPatches(
         session.resources.get(item.file) || "",
         [item.patch],
         item.patch.onNoMatch || "warn",
+        verbose,
       );
       session.resources.set(item.file, result.content);
     }

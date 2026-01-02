@@ -10,6 +10,7 @@
  */
 
 import * as yaml from "js-yaml";
+import { evaluateCondition } from "./condition-evaluator.js";
 import { resolveInheritance } from "./patch-inheritance.js";
 import type {
   MarkdownSection,
@@ -987,13 +988,39 @@ export function applyChangeSectionLevel(
  * @param content - The content to patch
  * @param patch - The patch operation to apply
  * @param defaultOnNoMatch - Default behavior when patch doesn't match
- * @returns Object with patched content, count, optional warning, and validation errors
+ * @param verbose - Whether to log verbose messages (for condition skipping)
+ * @returns Object with patched content, count, optional warning, validation errors, and conditionSkipped flag
  */
 export function applySinglePatch(
   content: string,
   patch: PatchOperation,
   defaultOnNoMatch: OnNoMatchStrategy = "warn",
-): { content: string; count: number; warning?: string; validationErrors: ValidationError[] } {
+  verbose = false,
+): {
+  content: string;
+  count: number;
+  warning?: string;
+  validationErrors: ValidationError[];
+  conditionSkipped: boolean;
+} {
+  // Check if patch has a condition
+  if (patch.when) {
+    const conditionMet = evaluateCondition(content, patch.when);
+    if (!conditionMet) {
+      // Condition not met - skip patch
+      if (verbose) {
+        const patchDesc = getPatchDescription(patch);
+        console.log(`Skipping patch '${patchDesc}' due to condition not being met`);
+      }
+      return {
+        content,
+        count: 0,
+        validationErrors: [],
+        conditionSkipped: true,
+      };
+    }
+  }
+
   const onNoMatch = patch.onNoMatch ?? defaultOnNoMatch;
   let result: { content: string; count: number };
 
@@ -1125,6 +1152,7 @@ export function applySinglePatch(
     count: result.count,
     warning,
     validationErrors,
+    conditionSkipped: false,
   };
 }
 
@@ -1186,26 +1214,31 @@ function getPatchDescription(patch: PatchOperation): string {
  * @param content - The content to patch
  * @param patches - Array of patch operations to apply
  * @param defaultOnNoMatch - Default behavior when patches don't match (default: 'warn')
- * @returns PatchResult with patched content, count of applied patches, warnings, and validation errors
+ * @param verbose - Whether to log verbose messages (for condition skipping)
+ * @returns PatchResult with patched content, count of applied patches, warnings, validation errors, and condition-skipped count
  */
 export function applyPatches(
   content: string,
   patches: PatchOperation[],
   defaultOnNoMatch: OnNoMatchStrategy = "warn",
+  verbose = false,
 ): PatchResult {
   // Resolve inheritance before applying patches
   const resolvedPatches = resolveInheritance(patches);
 
   let currentContent = content;
   let appliedCount = 0;
+  let conditionSkippedCount = 0;
   const warnings: string[] = [];
   const validationErrors: ValidationError[] = [];
 
   for (const patch of resolvedPatches) {
-    const result = applySinglePatch(currentContent, patch, defaultOnNoMatch);
+    const result = applySinglePatch(currentContent, patch, defaultOnNoMatch, verbose);
     currentContent = result.content;
 
-    if (result.count > 0) {
+    if (result.conditionSkipped) {
+      conditionSkippedCount++;
+    } else if (result.count > 0) {
       appliedCount++;
     }
 
@@ -1224,5 +1257,6 @@ export function applyPatches(
     applied: appliedCount,
     warnings,
     validationErrors,
+    conditionSkipped: conditionSkippedCount,
   };
 }

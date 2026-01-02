@@ -235,7 +235,9 @@ export class DocumentSymbolsProvider {
       case "replace":
       case "replace-regex":
         if (patch.old) {
-          parts.push(`"${String(patch.old).substring(0, 30)}${String(patch.old).length > 30 ? "..." : ""}"`);
+          parts.push(
+            `"${String(patch.old).substring(0, 30)}${String(patch.old).length > 30 ? "..." : ""}"`,
+          );
         }
         break;
       case "remove-section":
@@ -367,12 +369,12 @@ export class DocumentSymbolsProvider {
   private findFieldRange(fieldName: string, lines: string[]): Range | null {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (line && line.match(new RegExp(`^${fieldName}:`))) {
+      if (line?.match(new RegExp(`^${fieldName}:`))) {
         // Find the end of this field (next field at same level or EOF)
         let endLine = i;
         for (let j = i + 1; j < lines.length; j++) {
           const nextLine = lines[j];
-          if (nextLine && nextLine.match(/^[a-zA-Z_]/)) {
+          if (nextLine?.match(/^[a-zA-Z_]/)) {
             // Found next top-level field
             endLine = j - 1;
             break;
@@ -397,7 +399,7 @@ export class DocumentSymbolsProvider {
     let fieldLine = -1;
     for (let i = 0; i < lines.length; i++) {
       const currentLine = lines[i];
-      if (currentLine && currentLine.match(new RegExp(`^${fieldName}:`))) {
+      if (currentLine?.match(new RegExp(`^${fieldName}:`))) {
         fieldLine = i;
         break;
       }

@@ -469,10 +469,7 @@ function validateConfig(
  * Find all kustomark config files referenced in the resources
  * Returns absolute paths to all base config files
  */
-function findReferencedConfigs(
-  resources: string[],
-  basePath: string,
-): string[] {
+function findReferencedConfigs(resources: string[], basePath: string): string[] {
   const configPaths: string[] = [];
 
   for (const resource of resources) {
@@ -570,12 +567,13 @@ function applyPatches(
     }
 
     // Apply all applicable patches using the core patch engine
-    const result = coreApplyPatches(content, applicablePatches, onNoMatch);
+    const verbose = options.verbosity >= 2;
+    const result = coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
     patchedResources.set(filePath, result.content);
     totalPatchesApplied += result.applied;
 
-    // Track skipped patches (patches that didn't match)
-    const skipped = applicablePatches.length - result.applied;
+    // Track skipped patches (patches that didn't match + condition-skipped patches)
+    const skipped = applicablePatches.length - result.applied - result.conditionSkipped;
     totalPatchesSkipped += skipped;
 
     // Count patches by operation type
@@ -687,10 +685,11 @@ async function applyPatchesParallel(
         }
 
         // Apply all applicable patches sequentially for this file
-        const result = coreApplyPatches(content, applicablePatches, onNoMatch);
+        const verbose = options.verbosity >= 2;
+        const result = coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
 
-        // Calculate skipped patches
-        const skipped = applicablePatches.length - result.applied;
+        // Calculate skipped patches (patches that didn't match + condition-skipped patches)
+        const skipped = applicablePatches.length - result.applied - result.conditionSkipped;
 
         // Count patches by operation type
         const operations: Record<string, number> = {};
@@ -2470,11 +2469,10 @@ async function watchCommand(path: string, options: CLIOptions): Promise<number> 
 
             // Execute onChange hooks
             if (config.watch && filename) {
-              await executeOnChangeHooks(
-                config.watch,
-                filename,
-                { verbosity: options.verbosity, disabled: options.noHooks ?? false }
-              );
+              await executeOnChangeHooks(config.watch, filename, {
+                verbosity: options.verbosity,
+                disabled: options.noHooks ?? false,
+              });
             }
 
             performWatchBuild(inputPath, options, basePath, config.watch).catch((error) => {
@@ -2699,11 +2697,10 @@ async function performWatchBuild(
 
     // Execute onBuild hooks after successful build
     if (watchHooks) {
-      await executeOnBuildHooks(
-        watchHooks,
-        filesWritten,
-        { verbosity: options.verbosity, disabled: options.noHooks ?? false }
-      );
+      await executeOnBuildHooks(watchHooks, filesWritten, {
+        verbosity: options.verbosity,
+        disabled: options.noHooks ?? false,
+      });
     }
 
     // Output results
@@ -2730,11 +2727,10 @@ async function performWatchBuild(
 
     // Execute onError hooks
     if (watchHooks) {
-      await executeOnErrorHooks(
-        watchHooks,
-        errorMessage,
-        { verbosity: options.verbosity, disabled: options.noHooks ?? false }
-      );
+      await executeOnErrorHooks(watchHooks, errorMessage, {
+        verbosity: options.verbosity,
+        disabled: options.noHooks ?? false,
+      });
     }
 
     if (options.format === "json") {

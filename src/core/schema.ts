@@ -7,6 +7,135 @@
  * Generates a comprehensive JSON Schema for kustomark.yaml files
  */
 export function generateSchema(): object {
+  // Condition schema definition (recursive structure)
+  const conditionSchema = {
+    oneOf: [
+      {
+        type: "object",
+        required: ["type", "value"],
+        properties: {
+          type: {
+            type: "string",
+            const: "fileContains",
+            description: "Check if file content contains a string",
+          },
+          value: {
+            type: "string",
+            description: "String to search for in file content",
+          },
+        },
+        additionalProperties: false,
+      },
+      {
+        type: "object",
+        required: ["type", "pattern"],
+        properties: {
+          type: {
+            type: "string",
+            const: "fileMatches",
+            description: "Check if file content matches a regex pattern",
+          },
+          pattern: {
+            type: "string",
+            description: "Regex pattern to match against file content",
+          },
+        },
+        additionalProperties: false,
+      },
+      {
+        type: "object",
+        required: ["type", "key", "value"],
+        properties: {
+          type: {
+            type: "string",
+            const: "frontmatterEquals",
+            description: "Check if frontmatter field equals a value",
+          },
+          key: {
+            type: "string",
+            description: "Frontmatter key to check",
+          },
+          value: {
+            description: "Expected value (can be string, number, boolean, array, or object)",
+          },
+        },
+        additionalProperties: false,
+      },
+      {
+        type: "object",
+        required: ["type", "key"],
+        properties: {
+          type: {
+            type: "string",
+            const: "frontmatterExists",
+            description: "Check if frontmatter key exists",
+          },
+          key: {
+            type: "string",
+            description: "Frontmatter key to check for existence",
+          },
+        },
+        additionalProperties: false,
+      },
+      {
+        type: "object",
+        required: ["type", "condition"],
+        properties: {
+          type: {
+            type: "string",
+            const: "not",
+            description: "Logical NOT - negates another condition",
+          },
+          condition: {
+            $ref: "#/$defs/condition",
+            description: "Condition to negate",
+          },
+        },
+        additionalProperties: false,
+      },
+      {
+        type: "object",
+        required: ["type", "conditions"],
+        properties: {
+          type: {
+            type: "string",
+            const: "anyOf",
+            description: "Logical OR - matches if any sub-condition matches",
+          },
+          conditions: {
+            type: "array",
+            description: "List of conditions to check (matches if any is true)",
+            items: {
+              $ref: "#/$defs/condition",
+            },
+            minItems: 1,
+          },
+        },
+        additionalProperties: false,
+      },
+      {
+        type: "object",
+        required: ["type", "conditions"],
+        properties: {
+          type: {
+            type: "string",
+            const: "allOf",
+            description: "Logical AND - matches if all sub-conditions match",
+          },
+          conditions: {
+            type: "array",
+            description: "List of conditions to check (matches if all are true)",
+            items: {
+              $ref: "#/$defs/condition",
+            },
+            minItems: 1,
+          },
+        },
+        additionalProperties: false,
+      },
+    ],
+  };
+
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
     $id: "https://kustomark.dev/schema/v1/kustomark.json",
@@ -14,6 +143,9 @@ export function generateSchema(): object {
     description: "Configuration file for Kustomark - declarative markdown patching pipeline",
     type: "object",
     required: ["apiVersion", "kind", "resources"],
+    $defs: {
+      condition: conditionSchema,
+    },
     properties: {
       apiVersion: {
         type: "string",
@@ -127,6 +259,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -208,6 +345,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -286,6 +428,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -361,6 +508,11 @@ export function generateSchema(): object {
                   description:
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
                 },
               },
               additionalProperties: false,
@@ -438,6 +590,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -514,6 +671,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -589,6 +751,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -660,6 +827,11 @@ export function generateSchema(): object {
                   description:
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
                 },
               },
               additionalProperties: false,
@@ -737,6 +909,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -808,6 +985,11 @@ export function generateSchema(): object {
                   description:
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
                 },
               },
               additionalProperties: false,
@@ -889,6 +1071,11 @@ export function generateSchema(): object {
                   description:
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
                 },
               },
               additionalProperties: false,
@@ -975,6 +1162,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -1050,6 +1242,11 @@ export function generateSchema(): object {
                   description:
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
                 },
               },
               additionalProperties: false,
@@ -1136,6 +1333,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -1221,6 +1423,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -1298,6 +1505,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -1373,6 +1585,11 @@ export function generateSchema(): object {
                   description:
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
                 },
               },
               additionalProperties: false,
@@ -1451,6 +1668,11 @@ export function generateSchema(): object {
                     "Optional group name for selective patch application via --enable-groups or --disable-groups",
                   pattern: "^[a-zA-Z0-9_-]+$",
                 },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
               },
               additionalProperties: false,
             },
@@ -1492,7 +1714,8 @@ export function generateSchema(): object {
             description: "Commands to execute after successful build (run sequentially)",
             items: {
               type: "string",
-              description: "Shell command with optional template variables: {{file}}, {{exitCode}}, {{timestamp}}",
+              description:
+                "Shell command with optional template variables: {{file}}, {{exitCode}}, {{timestamp}}",
             },
           },
           onError: {
@@ -1500,7 +1723,8 @@ export function generateSchema(): object {
             description: "Commands to execute when build fails",
             items: {
               type: "string",
-              description: "Shell command with optional template variables: {{error}}, {{exitCode}}, {{timestamp}}",
+              description:
+                "Shell command with optional template variables: {{error}}, {{exitCode}}, {{timestamp}}",
             },
           },
           onChange: {
@@ -1508,7 +1732,8 @@ export function generateSchema(): object {
             description: "Commands to execute when file changes are detected (before build)",
             items: {
               type: "string",
-              description: "Shell command with optional template variables: {{file}}, {{timestamp}}",
+              description:
+                "Shell command with optional template variables: {{file}}, {{timestamp}}",
             },
           },
         },

@@ -16,6 +16,83 @@ export interface PatchValidation {
 }
 
 /**
+ * Condition for checking if file content contains a string
+ */
+export interface FileContainsCondition {
+  type: "fileContains";
+  /** String to search for in file content */
+  value: string;
+}
+
+/**
+ * Condition for checking if file content matches a regex pattern
+ */
+export interface FileMatchesCondition {
+  type: "fileMatches";
+  /** Regex pattern to match against file content */
+  pattern: string;
+}
+
+/**
+ * Condition for checking if frontmatter field equals a value
+ */
+export interface FrontmatterEqualsCondition {
+  type: "frontmatterEquals";
+  /** Frontmatter key to check */
+  key: string;
+  /** Expected value (can be string, number, boolean, array, or object) */
+  value: unknown;
+}
+
+/**
+ * Condition for checking if frontmatter key exists
+ */
+export interface FrontmatterExistsCondition {
+  type: "frontmatterExists";
+  /** Frontmatter key to check for existence */
+  key: string;
+}
+
+/**
+ * Logical NOT condition - negates another condition
+ */
+export interface NotCondition {
+  type: "not";
+  /** Condition to negate */
+  condition: Condition;
+}
+
+/**
+ * Logical OR condition - matches if any sub-condition matches
+ */
+export interface AnyOfCondition {
+  type: "anyOf";
+  /** List of conditions to check (matches if any is true) */
+  conditions: Condition[];
+}
+
+/**
+ * Logical AND condition - matches if all sub-conditions match
+ */
+export interface AllOfCondition {
+  type: "allOf";
+  /** List of conditions to check (matches if all are true) */
+  conditions: Condition[];
+}
+
+/**
+ * Union type of all supported condition types
+ */
+export type Condition =
+  | FileContainsCondition
+  | FileMatchesCondition
+  | FrontmatterEqualsCondition
+  | FrontmatterExistsCondition
+  | NotCondition
+  | AnyOfCondition
+  | AllOfCondition;
+
+/**
  * Common fields shared by all patch operations
  */
 export interface PatchCommonFields {
@@ -33,6 +110,8 @@ export interface PatchCommonFields {
   validate?: PatchValidation;
   /** Optional group name for selective patch application */
   group?: string;
+  /** Optional condition - patch only applies if condition evaluates to true */
+  when?: Condition;
 }
 
 /**
@@ -376,6 +455,8 @@ export interface PatchResult {
   warnings: string[];
   /** Validation errors from per-patch validation */
   validationErrors: ValidationError[];
+  /** Number of patches skipped due to condition evaluation */
+  conditionSkipped: number;
 }
 
 /**

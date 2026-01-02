@@ -173,3 +173,27 @@ export {
 } from "./dependency-graph.js";
 
 export type { DependencyNode, DependencyGraph } from "./types.js";
+
+// Export condition evaluator functions
+export {
+  evaluateCondition,
+  evaluateFileContains,
+  evaluateFileMatches,
+  evaluateFrontmatterEquals,
+  evaluateFrontmatterExists,
+  evaluateNot,
+  evaluateAnyOf,
+  evaluateAllOf,
+} from "./condition-evaluator.js";
+
+// Export condition types
+export type {
+  Condition,
+  FileContainsCondition,
+  FileMatchesCondition,
+  FrontmatterEqualsCondition,
+  FrontmatterExistsCondition,
+  NotCondition,
+  AnyOfCondition,
+  AllOfCondition,
+} from "./types.js";

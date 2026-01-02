@@ -2,6 +2,41 @@
 
 Features not in the current roadmap, with rationale.
 
+## Recently Implemented
+
+These features were previously deferred but have now been implemented.
+
+### Conditional Patches
+
+**Status**: Implemented
+
+Apply patches based on file content and frontmatter conditions.
+
+```yaml
+- op: replace
+  old: "foo"
+  new: "bar"
+  when:
+    fileContains: "production"
+```
+
+**Implementation Details**:
+- Deterministic evaluation based on file content only
+- Per-file condition evaluation (no global state)
+- Supports: `fileContains`, `fileMatches`, `frontmatterEquals`, `frontmatterExists`
+- Logical operators: `not`, `anyOf`, `allOf`
+- Fully tested with 50+ test cases
+- Documented in README with comprehensive examples
+
+**Use Cases**:
+- Environment-specific patches (production, staging, development)
+- Content-aware transformations
+- Security level based content masking
+- Version-specific documentation
+- Platform-specific instructions
+
+See [README - Conditional Patches](../README.md#conditional-patches) for full documentation.
+
 ## Deferred: Interactive Features
 
 Current focus is non-interactive CLI for automation. Interactive features may come later.
@@ -19,20 +54,6 @@ Prompt-based config creation.
 **Current alternative**: Use explicit flags: `kustomark init --base ../company/`
 
 ## Deferred: Complexity
-
-### Conditional Patches
-
-```yaml
-- op: replace
-  old: "foo"
-  new: "bar"
-  when:
-    fileContains: "production"
-```
-
-**Rationale**: Hard to debug, combinatorial testing burden.
-
-**Current alternative**: Use `include`/`exclude` globs. Use multiple configs.
 
 ### Script Hooks
 

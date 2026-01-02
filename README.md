@@ -18,6 +18,10 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark watch](#kustomark-watch-path)
 - [Configuration](#configuration)
 - [Patch Operations](#patch-operations)
+- [Conditional Patches](#conditional-patches)
+  - [Condition Types](#condition-types)
+  - [Logical Operators](#logical-operators)
+  - [Real-World Examples](#real-world-examples)
 - [Resource Resolution](#resource-resolution)
 - [Advanced Usage](#advanced-usage)
   - [Patch Groups](#patch-groups)
@@ -676,6 +680,377 @@ Basic usage instructions.
 
 Config instructions.
 ```
+
+## Conditional Patches
+
+Apply patches selectively based on file content and frontmatter using the `when` field. Conditions are evaluated per-file, making patch application deterministic and predictable.
+
+### Overview
+
+Conditional patches allow you to:
+- Apply patches only to files matching specific conditions
+- Create environment-specific transformations
+- Build content-aware documentation pipelines
+- Maintain a single configuration for multiple contexts
+
+All condition evaluation is deterministic - the same file content always produces the same result.
+
+### Basic Syntax
+
+Add a `when` field to any patch operation:
+
+```yaml
+patches:
+  - op: replace
+    old: "development"
+    new: "PRODUCTION"
+    when:
+      fileContains: "environment: production"
+```
+
+### Condition Types
+
+#### `fileContains` - Content Substring Match
+
+Checks if file content contains a specific substring (case-sensitive).
+
+```yaml
+when:
+  fileContains: "production"
+```
+
+**Example:**
+```yaml
+patches:
+  # Add production warning banner
+  - op: prepend-to-section
+    id: overview
+    content: "\n> **Production**: Handle with care\n"
+    when:
+      fileContains: "production environment"
+```
+
+#### `fileMatches` - Regex Pattern Match
+
+Checks if file content matches a regular expression pattern.
+
+```yaml
+when:
+  fileMatches: "version\\s+\\d+\\.\\d+\\.\\d+"
+```
+
+**With regex flags:**
+```yaml
+when:
+  fileMatches: "/production/i"  # Case-insensitive
+```
+
+**Example:**
+```yaml
+patches:
+  # Update version numbers
+  - op: replace-regex
+    pattern: "v(\\d+)\\.(\\d+)\\.(\\d+)"
+    replacement: "v$1.$2.0"
+    when:
+      fileMatches: "\\bv\\d+\\.\\d+\\.\\d+\\b"
+```
+
+#### `frontmatterEquals` - Frontmatter Value Match
+
+Checks if a frontmatter key equals a specific value (supports deep equality).
+
+```yaml
+when:
+  frontmatterEquals:
+    key: "environment"
+    value: "production"
+```
+
+**Nested keys with dot notation:**
+```yaml
+when:
+  frontmatterEquals:
+    key: "config.server.mode"
+    value: "production"
+```
+
+**Complex values:**
+```yaml
+when:
+  frontmatterEquals:
+    key: "platforms"
+    value: ["windows", "linux", "macos"]
+```
+
+**Example:**
+```yaml
+patches:
+  # Production-specific API endpoint
+  - op: replace
+    old: "http://localhost:3000"
+    new: "https://api.example.com"
+    when:
+      frontmatterEquals:
+        key: "environment"
+        value: "production"
+```
+
+#### `frontmatterExists` - Frontmatter Key Existence
+
+Checks if a frontmatter key exists (regardless of value).
+
+```yaml
+when:
+  frontmatterExists: "beta"
+```
+
+**Example:**
+```yaml
+patches:
+  # Add beta warning to experimental features
+  - op: prepend-to-section
+    id: features
+    content: "\n> **Beta**: This feature is experimental\n"
+    when:
+      frontmatterExists: "beta"
+```
+
+### Logical Operators
+
+#### `not` - Logical Negation
+
+Negates a condition.
+
+```yaml
+when:
+  not:
+    fileContains: "draft"
+```
+
+**Example:**
+```yaml
+patches:
+  # Remove internal notes from published docs
+  - op: remove-section
+    id: internal-notes
+    when:
+      not:
+        frontmatterEquals:
+          key: "internal"
+          value: true
+```
+
+#### `anyOf` - Logical OR
+
+Matches if **any** sub-condition is true.
+
+```yaml
+when:
+  anyOf:
+    - fileContains: "production"
+    - fileContains: "staging"
+```
+
+**Example:**
+```yaml
+patches:
+  # Apply to both production and staging
+  - op: replace
+    old: "development endpoint"
+    new: "live endpoint"
+    when:
+      anyOf:
+        - frontmatterEquals:
+            key: "environment"
+            value: "production"
+        - frontmatterEquals:
+            key: "environment"
+            value: "staging"
+```
+
+#### `allOf` - Logical AND
+
+Matches if **all** sub-conditions are true.
+
+```yaml
+when:
+  allOf:
+    - frontmatterEquals:
+        key: "published"
+        value: true
+    - fileContains: "API documentation"
+```
+
+**Example:**
+```yaml
+patches:
+  # Only apply to published production docs
+  - op: append-to-section
+    id: footer
+    content: "\n---\nLast updated: 2024-01-15"
+    when:
+      allOf:
+        - frontmatterEquals:
+            key: "environment"
+            value: "production"
+        - frontmatterEquals:
+            key: "published"
+            value: true
+```
+
+### Nested Conditions
+
+Combine logical operators for complex conditions:
+
+```yaml
+when:
+  allOf:
+    # Must be production OR staging
+    - anyOf:
+        - frontmatterEquals:
+            key: "environment"
+            value: "production"
+        - frontmatterEquals:
+            key: "environment"
+            value: "staging"
+    # Must be published
+    - frontmatterEquals:
+        key: "published"
+        value: true
+    # Must NOT be a draft
+    - not:
+        frontmatterExists: "draft"
+    # Must mention version number
+    - fileMatches: "\\d+\\.\\d+\\.\\d+"
+```
+
+### Real-World Examples
+
+#### Environment-Specific API Documentation
+
+```yaml
+patches:
+  # Development environment
+  - op: replace
+    old: "{{API_URL}}"
+    new: "http://localhost:3000"
+    when:
+      frontmatterEquals:
+        key: "environment"
+        value: "development"
+
+  # Production environment
+  - op: replace
+    old: "{{API_URL}}"
+    new: "https://api.example.com"
+    when:
+      frontmatterEquals:
+        key: "environment"
+        value: "production"
+```
+
+#### Content-Aware Transformations
+
+```yaml
+patches:
+  # Add installation steps only for docs mentioning "install"
+  - op: append-to-section
+    id: getting-started
+    content: |
+
+      ## Installation
+
+      ```bash
+      npm install awesome-project
+      ```
+    when:
+      allOf:
+        - fileMatches: "\\binstall\\b"
+        - not:
+            fileContains: "Installation"
+```
+
+#### Security Level Based Content Masking
+
+```yaml
+patches:
+  # Remove confidential sections from public docs
+  - op: remove-section
+    id: internal-implementation
+    when:
+      not:
+        frontmatterEquals:
+          key: "security_level"
+          value: "confidential"
+
+  # Add confidential warning banner
+  - op: prepend-to-section
+    id: overview
+    content: "\n> **Confidential**: Internal use only\n"
+    when:
+      frontmatterEquals:
+        key: "security_level"
+        value: "confidential"
+```
+
+#### Version-Specific Documentation
+
+```yaml
+patches:
+  # v2.x specific content
+  - op: replace-section
+    id: api-reference
+    content: |
+      ## API Reference (v2.x)
+
+      The v2 API uses REST endpoints...
+    when:
+      allOf:
+        - frontmatterEquals:
+            key: "version"
+            value: "2.x"
+        - fileMatches: "\\bv2\\b"
+
+  # v1.x deprecation notice
+  - op: prepend-to-section
+    id: api-reference
+    content: "\n> **Deprecated**: v1 API is deprecated\n"
+    when:
+      frontmatterEquals:
+        key: "version"
+        value: "1.x"
+```
+
+### Use Cases
+
+1. **Multi-Environment Documentation**: Maintain one set of docs with environment-specific content
+2. **Feature Flags**: Show/hide documentation sections based on feature availability
+3. **Localization**: Apply language-specific transformations
+4. **Security Levels**: Redact sensitive content for different audiences
+5. **Version Management**: Customize docs for different product versions
+6. **Platform-Specific Instructions**: Tailor content for Windows/Linux/macOS
+7. **Beta Features**: Add warnings or special formatting for experimental features
+
+### Important Notes
+
+**Deterministic Evaluation:**
+- Conditions are evaluated per-file based on content and frontmatter only
+- No environment variables or external state
+- Same file always produces same result
+
+**Evaluation Order:**
+- Patches are applied sequentially in order
+- Each patch's condition is evaluated against the **current** content (after previous patches)
+- This allows cascading transformations
+
+**Performance:**
+- Condition evaluation is fast and happens in-memory
+- No impact on build performance for most use cases
+
+**Debugging:**
+- Use `kustomark debug` to step through conditional patches
+- Use `kustomark diff -v` to see which patches matched
 
 ## Resource Resolution
 

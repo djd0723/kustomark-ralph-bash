@@ -181,7 +181,7 @@ function applyPatchesToResources(
     }
 
     // Apply all applicable patches
-    const result = applyPatches(content, applicablePatches, onNoMatch);
+    const result = applyPatches(content, applicablePatches, onNoMatch, false);
     patchedResources.set(filePath, result.content);
     totalPatchesApplied += result.applied;
 

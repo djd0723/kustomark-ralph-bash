@@ -313,7 +313,9 @@ describe("parseGitUrl", () => {
     });
 
     test("when ref appears twice in git::https:// URL, last occurrence wins", () => {
-      const result = parseGitUrl("git::https://github.com/facebook/react.git?ref=v1.0.0//docs?ref=v2.0.0");
+      const result = parseGitUrl(
+        "git::https://github.com/facebook/react.git?ref=v1.0.0//docs?ref=v2.0.0",
+      );
 
       expect(result?.ref).toBe("v2.0.0");
       expect(result?.path).toBe("docs");
