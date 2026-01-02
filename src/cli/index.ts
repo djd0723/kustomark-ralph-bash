@@ -83,6 +83,7 @@ import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
 import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
 import { createProgressReporter } from "./progress.js";
+import { suggestCommand } from "./suggest-command.js";
 import { templateApply, templateList, templateShow } from "./template-commands.js";
 import { executeOnBuildHooks, executeOnChangeHooks, executeOnErrorHooks } from "./watch-hooks.js";
 import { webCommand } from "./web-command.js";
@@ -127,6 +128,8 @@ interface CLIOptions {
   input?: string; // For test --input option (input markdown file)
   content?: string; // For test --content option (inline markdown content)
   showSteps?: boolean; // For test --show-steps option (show intermediate results)
+  source?: string; // For suggest --source option (source file or directory)
+  target?: string; // For suggest --target option (target file or directory)
   var?: Record<string, string>; // For template apply --var key=value
   overwrite?: boolean; // For template apply --overwrite option
   category?: string; // For template list --category option
@@ -3996,6 +3999,8 @@ async function main(): Promise<number> {
       return await debugCommand(path, options);
     case "test":
       return await testCommand(path, options);
+    case "suggest":
+      return await suggestCommand(options);
     case "template": {
       // Handle template subcommands
       // Extract positional args (non-flags) from args
