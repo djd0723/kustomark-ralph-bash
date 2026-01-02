@@ -106,6 +106,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -166,6 +172,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -223,6 +235,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -277,6 +295,12 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
                 },
               },
               additionalProperties: false,
@@ -333,6 +357,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -388,6 +418,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -442,6 +478,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -492,6 +534,12 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
                 },
               },
               additionalProperties: false,
@@ -548,6 +596,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -598,6 +652,12 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
                 },
               },
               additionalProperties: false,
@@ -658,6 +718,12 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
                 },
               },
               additionalProperties: false,
@@ -723,6 +789,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -777,6 +849,12 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
                 },
               },
               additionalProperties: false,
@@ -842,6 +920,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -906,6 +990,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -962,6 +1052,12 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
               },
               additionalProperties: false,
             },
@@ -1016,6 +1112,12 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
                 },
               },
               additionalProperties: false,
@@ -1072,6 +1174,12 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
                 },
               },
               additionalProperties: false,

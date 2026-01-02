@@ -563,6 +563,62 @@ patches:
       - "quickstart.md"
 ```
 
+### Patch Groups
+
+Organize patches into groups and selectively enable/disable them:
+
+```yaml
+patches:
+  # Branding patches
+  - op: replace
+    old: "CompanyName"
+    new: "AcmeCorp"
+    group: "branding"
+
+  - op: replace
+    old: "support@company.com"
+    new: "support@acme.com"
+    group: "branding"
+
+  # Feature flags
+  - op: replace-section
+    id: beta-features
+    content: "# Beta Features\n\nNow available!"
+    group: "beta"
+
+  # Always applies (no group)
+  - op: replace
+    old: "TODO"
+    new: "DONE"
+```
+
+Control which groups are applied:
+
+```bash
+# Apply only branding patches (+ ungrouped patches)
+kustomark build . --enable-groups=branding
+
+# Apply all except beta patches
+kustomark build . --disable-groups=beta
+
+# Apply multiple groups
+kustomark build . --enable-groups=branding,docs
+
+# If both flags specified, --enable-groups takes precedence
+kustomark build . --enable-groups=branding --disable-groups=branding
+# Result: branding patches ARE applied (whitelist wins)
+```
+
+**Group naming rules:**
+- Alphanumeric characters, hyphens, and underscores only
+- Example: `my-group`, `group_123`, `FeatureX`
+
+**Behavior:**
+- Patches without a `group` field are always applied
+- `--enable-groups`: whitelist mode (only specified groups + ungrouped)
+- `--disable-groups`: blacklist mode (exclude specified groups)
+- If both flags specified, `--enable-groups` takes precedence
+
 ### Error Handling Strategies
 
 Control what happens when a patch doesn't match:

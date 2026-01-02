@@ -252,6 +252,25 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     });
   }
 
+  if (p.group !== undefined) {
+    if (typeof p.group !== "string") {
+      errors.push({
+        field: `${prefix}.group`,
+        message: "'group' must be a string",
+      });
+    } else if (p.group.trim() === "") {
+      errors.push({
+        field: `${prefix}.group`,
+        message: "'group' cannot be an empty string",
+      });
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(p.group)) {
+      errors.push({
+        field: `${prefix}.group`,
+        message: "'group' must contain only alphanumeric characters, hyphens, and underscores",
+      });
+    }
+  }
+
   // Validate operation-specific fields
   switch (p.op) {
     case "replace":

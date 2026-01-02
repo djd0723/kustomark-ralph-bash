@@ -349,6 +349,34 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 **Next Priority:** Any remaining features from out-of-scope or future work
 
+**2026-01-02 (Patch Groups Feature - Future Work):**
+- ✅ Implemented Patch Groups feature (Medium complexity from Future Candidates list):
+  - Added `group?: string` field to `PatchCommonFields` interface in types.ts
+  - Implemented group field validation in config-parser.ts (alphanumeric, hyphens, underscores only)
+  - Added `--enable-groups` and `--disable-groups` CLI flags
+  - Implemented `shouldApplyPatchGroup()` function for group filtering logic
+  - Updated `applyPatches()` to filter patches by group before applying
+  - Added group field to all 18 patch operation schemas in schema.ts
+  - Updated README.md with comprehensive Patch Groups documentation and examples
+  - Added 28 comprehensive unit tests (17 config validation, 11 CLI integration)
+  - All 717 tests passing ✓
+  - All linting checks passing (bun check) ✓
+
+  **Group filtering rules:**
+  - Patches without a `group` field are always enabled
+  - `--enable-groups`: whitelist mode (only listed groups + ungrouped)
+  - `--disable-groups`: blacklist mode (all except listed groups)
+  - If both specified, `--enable-groups` takes precedence
+
+  **Files modified:**
+  - `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added group field
+  - `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts` - Added validation
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Added CLI flags and filtering logic
+  - `/home/dex/kustomark-ralph-bash/src/core/schema.ts` - Updated all 18 operation schemas
+  - `/home/dex/kustomark-ralph-bash/README.md` - Added Patch Groups section
+  - `/home/dex/kustomark-ralph-bash/tests/config-parser.test.ts` - Added 17 tests
+  - `/home/dex/kustomark-ralph-bash/tests/cli-integration.test.ts` - Added 11 tests
+
 **2026-01-02 (M3 Git Repository Fetching):**
 - ✅ Created `/home/dex/kustomark-ralph-bash/src/core/git-fetcher.ts` with complete git operations:
   - `fetchGitRepository()` - Clone and cache git repositories with sparse checkout support

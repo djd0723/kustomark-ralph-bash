@@ -1379,6 +1379,317 @@ describe('validateConfig', () => {
     });
   });
 
+  describe('patch validation - group field', () => {
+    test('passes for valid group name with alphanumeric characters', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: 'group123' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('passes for valid group name with hyphens', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: 'my-group' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+    });
+
+    test('passes for valid group name with underscores', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: 'my_group' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+    });
+
+    test('passes for valid group name with mixed alphanumeric, hyphens, and underscores', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: 'my-group_v2' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+    });
+
+    test('fails when group is an empty string', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: '' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'patches[0].group',
+        message: "'group' cannot be an empty string",
+      });
+    });
+
+    test('fails when group is whitespace only', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: '   ' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'patches[0].group',
+        message: "'group' cannot be an empty string",
+      });
+    });
+
+    test('fails when group contains special characters', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: 'my-group!' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'patches[0].group',
+        message: "'group' must contain only alphanumeric characters, hyphens, and underscores",
+      });
+    });
+
+    test('fails when group contains spaces', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: 'my group' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'patches[0].group',
+        message: "'group' must contain only alphanumeric characters, hyphens, and underscores",
+      });
+    });
+
+    test('fails when group contains dots', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: 'my.group' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'patches[0].group',
+        message: "'group' must contain only alphanumeric characters, hyphens, and underscores",
+      });
+    });
+
+    test('fails when group is not a string', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: 123 },
+        ],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'patches[0].group',
+        message: "'group' must be a string",
+      });
+    });
+
+    test('fails when group is a boolean', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: true },
+        ],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'patches[0].group',
+        message: "'group' must be a string",
+      });
+    });
+
+    test('fails when group is an array', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: ['group1', 'group2'] },
+        ],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'patches[0].group',
+        message: "'group' must be a string",
+      });
+    });
+
+    test('fails when group is an object', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: { name: 'mygroup' } },
+        ],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'patches[0].group',
+        message: "'group' must be a string",
+      });
+    });
+
+    test('passes when group field is not present', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('passes when group is undefined', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: undefined },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('validates group field for multiple patch types', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          { op: 'replace', old: 'foo', new: 'bar', group: 'text-replacements' },
+          { op: 'replace-regex', pattern: 'test', replacement: 'example', group: 'regex-ops' },
+          { op: 'remove-section', id: 'section-id', group: 'section-ops' },
+          { op: 'replace-section', id: 'section-id', content: 'New content', group: 'section-ops' },
+          { op: 'prepend-to-section', id: 'section-id', content: 'Prepend', group: 'section-ops' },
+          { op: 'append-to-section', id: 'section-id', content: 'Append', group: 'section-ops' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('validates group alongside other patch fields', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        patches: [
+          {
+            op: 'replace',
+            old: 'foo',
+            new: 'bar',
+            group: 'my-group',
+            include: 'docs/**/*.md',
+            exclude: 'docs/draft/*.md',
+            onNoMatch: 'skip',
+          },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+  });
+
   describe('complex validation scenarios', () => {
     test('accumulates multiple errors across different fields', () => {
       const config = {

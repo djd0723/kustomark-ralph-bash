@@ -27,6 +27,8 @@ export interface PatchCommonFields {
   onNoMatch?: OnNoMatchStrategy;
   /** Per-patch validation rules */
   validate?: PatchValidation;
+  /** Optional group name for selective patch application */
+  group?: string;
 }
 
 /**

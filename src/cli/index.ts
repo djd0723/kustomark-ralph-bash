@@ -56,6 +56,8 @@ interface CLIOptions {
   base?: string; // For init --base option
   output?: string; // For init --output option
   debounce?: number; // For watch --debounce option (in milliseconds)
+  enableGroups?: string[]; // For group filtering (whitelist)
+  disableGroups?: string[]; // For group filtering (blacklist)
 }
 
 interface BuildStats {
@@ -167,6 +169,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     base: undefined,
     output: undefined,
     debounce: undefined,
+    enableGroups: undefined,
+    disableGroups: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -248,6 +252,44 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
         const nextArg = args[i + 1];
         if (nextArg) {
           options.debounce = Number.parseInt(nextArg, 10);
+          i++;
+        }
+      }
+    } else if (arg === "--enable-groups" || arg.startsWith("--enable-groups=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) {
+          options.enableGroups = value
+            .split(",")
+            .map((g) => g.trim())
+            .filter((g) => g.length > 0);
+        }
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith("-")) {
+          options.enableGroups = nextArg
+            .split(",")
+            .map((g) => g.trim())
+            .filter((g) => g.length > 0);
+          i++;
+        }
+      }
+    } else if (arg === "--disable-groups" || arg.startsWith("--disable-groups=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) {
+          options.disableGroups = value
+            .split(",")
+            .map((g) => g.trim())
+            .filter((g) => g.length > 0);
+        }
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith("-")) {
+          options.disableGroups = nextArg
+            .split(",")
+            .map((g) => g.trim())
+            .filter((g) => g.length > 0);
           i++;
         }
       }
@@ -334,6 +376,7 @@ function applyPatches(
   resources: Map<string, string>,
   patches: PatchOperation[],
   onNoMatch: OnNoMatchStrategy,
+  options: CLIOptions,
 ): {
   resources: Map<string, string>;
   patchesApplied: number;
@@ -351,8 +394,10 @@ function applyPatches(
 
   // Apply patches to each file
   for (const [filePath, content] of resources.entries()) {
-    // Filter patches that apply to this file
-    const applicablePatches = patches.filter((patch) => shouldApplyPatch(patch, filePath));
+    // Filter patches by group first, then by file patterns
+    const applicablePatches = patches.filter(
+      (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
+    );
 
     if (applicablePatches.length === 0) {
       // No patches for this file, keep original content
@@ -394,6 +439,43 @@ function applyPatches(
     validationErrors: allValidationErrors,
     operationCounts,
   };
+}
+
+/**
+ * Check if a patch should be applied based on group filtering options
+ *
+ * Rules:
+ * - Patches without a group are always enabled
+ * - If enableGroups is specified: only those groups + ungrouped patches
+ * - If disableGroups is specified: all except those groups
+ * - If both specified: enableGroups takes precedence (whitelist mode)
+ *
+ * @param patch - The patch to check
+ * @param options - CLI options containing group filters
+ * @returns true if patch should be applied based on groups
+ */
+function shouldApplyPatchGroup(patch: PatchOperation, options: CLIOptions): boolean {
+  const patchGroup = patch.group;
+
+  // Patches without a group are always enabled
+  if (!patchGroup) {
+    return true;
+  }
+
+  const { enableGroups, disableGroups } = options;
+
+  // If both are specified, enableGroups takes precedence
+  if (enableGroups && enableGroups.length > 0) {
+    return enableGroups.includes(patchGroup);
+  }
+
+  // If only disableGroups is specified
+  if (disableGroups && disableGroups.length > 0) {
+    return !disableGroups.includes(patchGroup);
+  }
+
+  // No group filtering specified, allow all
+  return true;
 }
 
 /**
@@ -958,7 +1040,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       warnings,
       validationErrors: patchValidationErrors,
       operationCounts,
-    } = applyPatches(resources, config.patches || [], config.onNoMatch || "warn");
+    } = applyPatches(resources, config.patches || [], config.onNoMatch || "warn", options);
 
     // Collect all validation errors (from patches and global validators)
     const allValidationErrors: ValidationError[] = [...patchValidationErrors];
@@ -1178,6 +1260,7 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
       originalResources,
       config.patches || [],
       config.onNoMatch || "warn",
+      options,
     );
 
     // Collect all validation errors (from patches and global validators)
@@ -1942,7 +2025,7 @@ async function performWatchBuild(
       patchesApplied,
       warnings,
       validationErrors: patchValidationErrors,
-    } = applyPatches(resources, config.patches || [], config.onNoMatch || "warn");
+    } = applyPatches(resources, config.patches || [], config.onNoMatch || "warn", options);
 
     // Collect all validation errors (from patches and global validators)
     const allValidationErrors: ValidationError[] = [...patchValidationErrors];
@@ -2184,6 +2267,16 @@ Flags:
   --stats                     Show build statistics (build command)
   -v, -vv, -vvv              Increase verbosity
   -q                         Quiet mode (errors only)
+
+Group Filtering:
+  --enable-groups <groups>    Enable only specified groups (comma-separated)
+  --disable-groups <groups>   Disable specified groups (comma-separated)
+
+  Group filtering rules:
+  - Patches without a group are always enabled
+  - --enable-groups: whitelist mode (only listed groups + ungrouped)
+  - --disable-groups: blacklist mode (all except listed groups)
+  - If both specified, --enable-groups takes precedence
 
 Lock File:
   --update                    Update kustomark.lock with latest refs

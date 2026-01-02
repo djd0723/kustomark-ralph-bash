@@ -296,7 +296,249 @@ describe('CLI Integration Tests', () => {
       }
     }
   });
+
+  describe('group filtering', () => {
+    test('--enable-groups flag: only specified groups and ungrouped patches apply', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
+        { op: 'replace', old: 'baz', new: 'BAZ', group: 'group-c' },
+        { op: 'replace', old: 'qux', new: 'QUX' }, // ungrouped
+      ];
+
+      const options = { enableGroups: ['group-a', 'group-c'] };
+      const filtered = filterPatchesByGroup(patches, options);
+
+      expect(filtered).toHaveLength(3);
+      expect(filtered[0]).toEqual(patches[0]); // group-a
+      expect(filtered[1]).toEqual(patches[2]); // group-c
+      expect(filtered[2]).toEqual(patches[3]); // ungrouped
+    });
+
+    test('--disable-groups flag: all except specified groups apply', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
+        { op: 'replace', old: 'baz', new: 'BAZ', group: 'group-c' },
+        { op: 'replace', old: 'qux', new: 'QUX' }, // ungrouped
+      ];
+
+      const options = { disableGroups: ['group-b'] };
+      const filtered = filterPatchesByGroup(patches, options);
+
+      expect(filtered).toHaveLength(3);
+      expect(filtered[0]).toEqual(patches[0]); // group-a
+      expect(filtered[1]).toEqual(patches[2]); // group-c
+      expect(filtered[2]).toEqual(patches[3]); // ungrouped
+    });
+
+    test('--enable-groups takes precedence over --disable-groups', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
+        { op: 'replace', old: 'baz', new: 'BAZ', group: 'group-c' },
+        { op: 'replace', old: 'qux', new: 'QUX' }, // ungrouped
+      ];
+
+      // Both specified, enable takes precedence
+      const options = {
+        enableGroups: ['group-a'],
+        disableGroups: ['group-b', 'group-c'],
+      };
+      const filtered = filterPatchesByGroup(patches, options);
+
+      // Only group-a and ungrouped should be included (enable-groups wins)
+      expect(filtered).toHaveLength(2);
+      expect(filtered[0]).toEqual(patches[0]); // group-a
+      expect(filtered[1]).toEqual(patches[3]); // ungrouped
+    });
+
+    test('multiple groups in comma-separated list', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO', group: 'text-ops' },
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'section-ops' },
+        { op: 'replace', old: 'baz', new: 'BAZ', group: 'frontmatter-ops' },
+        { op: 'replace', old: 'qux', new: 'QUX', group: 'advanced-ops' },
+      ];
+
+      const options = { enableGroups: ['text-ops', 'section-ops', 'advanced-ops'] };
+      const filtered = filterPatchesByGroup(patches, options);
+
+      expect(filtered).toHaveLength(3);
+      expect(filtered.map(p => p.group)).toEqual(['text-ops', 'section-ops', 'advanced-ops']);
+    });
+
+    test('ungrouped patches always apply regardless of group filtering', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO' }, // ungrouped
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'group-a' },
+        { op: 'replace', old: 'baz', new: 'BAZ' }, // ungrouped
+        { op: 'replace', old: 'qux', new: 'QUX', group: 'group-b' },
+      ];
+
+      // Enable only group-a
+      const optionsEnable = { enableGroups: ['group-a'] };
+      const filteredEnable = filterPatchesByGroup(patches, optionsEnable);
+
+      expect(filteredEnable).toHaveLength(3);
+      expect(filteredEnable[0]).toEqual(patches[0]); // ungrouped
+      expect(filteredEnable[1]).toEqual(patches[1]); // group-a
+      expect(filteredEnable[2]).toEqual(patches[2]); // ungrouped
+
+      // Disable group-a
+      const optionsDisable = { disableGroups: ['group-a'] };
+      const filteredDisable = filterPatchesByGroup(patches, optionsDisable);
+
+      expect(filteredDisable).toHaveLength(3);
+      expect(filteredDisable[0]).toEqual(patches[0]); // ungrouped
+      expect(filteredDisable[1]).toEqual(patches[2]); // ungrouped
+      expect(filteredDisable[2]).toEqual(patches[3]); // group-b
+    });
+
+    test('group filtering works with include/exclude patterns', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a', include: 'docs/**/*.md' },
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b', exclude: 'test/**/*.md' },
+        { op: 'replace', old: 'baz', new: 'BAZ', group: 'group-c' },
+      ];
+
+      const options = { enableGroups: ['group-a', 'group-c'] };
+      const filtered = filterPatchesByGroup(patches, options);
+
+      // Should filter by group first
+      expect(filtered).toHaveLength(2);
+      expect(filtered[0]).toEqual(patches[0]); // group-a
+      expect(filtered[1]).toEqual(patches[2]); // group-c
+
+      // Now also filter by file patterns
+      const fileName = 'docs/guide.md';
+      const fileFiltered = filterPatchesForFile(filtered, fileName);
+
+      // Only group-a patch matches the file pattern
+      expect(fileFiltered).toHaveLength(2);
+      expect(fileFiltered[0]).toEqual(patches[0]); // has include: 'docs/**/*.md'
+      expect(fileFiltered[1]).toEqual(patches[2]); // no include/exclude
+    });
+
+    test('no group filtering when neither flag is specified', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
+        { op: 'replace', old: 'baz', new: 'BAZ' },
+      ];
+
+      const options = {}; // No group filters
+      const filtered = filterPatchesByGroup(patches, options);
+
+      // All patches should pass through
+      expect(filtered).toHaveLength(3);
+      expect(filtered).toEqual(patches);
+    });
+
+    test('empty enable-groups list allows only ungrouped patches', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
+        { op: 'replace', old: 'baz', new: 'BAZ' }, // ungrouped
+      ];
+
+      const options = { enableGroups: [] };
+      const filtered = filterPatchesByGroup(patches, options);
+
+      // Only ungrouped patches
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]).toEqual(patches[2]);
+    });
+
+    test('empty disable-groups list allows all patches', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
+        { op: 'replace', old: 'baz', new: 'BAZ' },
+      ];
+
+      const options = { disableGroups: [] };
+      const filtered = filterPatchesByGroup(patches, options);
+
+      // All patches allowed
+      expect(filtered).toHaveLength(3);
+      expect(filtered).toEqual(patches);
+    });
+
+    test('group names are case-sensitive', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'foo', new: 'FOO', group: 'MyGroup' },
+        { op: 'replace', old: 'bar', new: 'BAR', group: 'mygroup' },
+        { op: 'replace', old: 'baz', new: 'BAZ', group: 'MYGROUP' },
+      ];
+
+      const options = { enableGroups: ['MyGroup'] };
+      const filtered = filterPatchesByGroup(patches, options);
+
+      // Only exact case match
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]).toEqual(patches[0]);
+    });
+
+    test('group filtering with complex real-world scenario', () => {
+      const patches: PatchOperation[] = [
+        { op: 'replace', old: 'rpi', new: 'thoughts', group: 'branding' },
+        { op: 'replace-regex', pattern: '\\[\\[(.+?)\\]\\]', replacement: '[$1]($1.md)', group: 'wikilinks' },
+        { op: 'remove-section', id: 'draft', group: 'cleanup' },
+        { op: 'replace', old: 'TODO', new: 'NOTE', group: 'cleanup' },
+        { op: 'append-to-section', id: 'footer', content: '\nCopyright 2024' }, // ungrouped
+        { op: 'set-frontmatter', key: 'published', value: true, group: 'metadata' },
+      ];
+
+      // Enable only branding and wikilinks groups
+      const options = { enableGroups: ['branding', 'wikilinks'] };
+      const filtered = filterPatchesByGroup(patches, options);
+
+      // Should have: branding, wikilinks, and ungrouped (footer)
+      expect(filtered).toHaveLength(3);
+      expect(filtered[0]).toEqual(patches[0]); // branding
+      expect(filtered[1]).toEqual(patches[1]); // wikilinks
+      expect(filtered[2]).toEqual(patches[4]); // ungrouped
+    });
+  });
 });
+
+/**
+ * Filter patches by group based on CLI options
+ */
+interface GroupOptions {
+  enableGroups?: string[];
+  disableGroups?: string[];
+}
+
+function filterPatchesByGroup(
+  patches: PatchOperation[],
+  options: GroupOptions
+): PatchOperation[] {
+  return patches.filter(patch => {
+    const patchGroup = patch.group;
+
+    // Ungrouped patches always pass through
+    if (!patchGroup) {
+      return true;
+    }
+
+    const { enableGroups, disableGroups } = options;
+
+    // If both are specified, enableGroups takes precedence
+    if (enableGroups !== undefined) {
+      return enableGroups.includes(patchGroup);
+    }
+
+    // If only disableGroups is specified
+    if (disableGroups !== undefined) {
+      return !disableGroups.includes(patchGroup);
+    }
+
+    // No group filtering specified, allow all
+    return true;
+  });
+}
 
 /**
  * Filter patches to only those that apply to a specific file
