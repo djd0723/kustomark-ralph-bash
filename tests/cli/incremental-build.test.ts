@@ -64,10 +64,12 @@ describe("Incremental Build Integration Tests", () => {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
 
+    // Ensure fixture directory exists
     mkdirSync(fixtureRoot, { recursive: true });
   });
 
   afterEach(() => {
+    // Clean up fixture directory
     if (existsSync(fixtureRoot)) {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
@@ -971,7 +973,7 @@ output: output
       await runCLI(["build", fixtureRoot, "--incremental"]);
 
       const cacheFile = getCacheFilePath(join(fixtureRoot, "kustomark.yaml"));
-      const cacheDir = join(cacheFile, "..");
+      const cacheDir = dirname(cacheFile);
 
       // Delete cache directory
       rmSync(cacheDir, { recursive: true, force: true });

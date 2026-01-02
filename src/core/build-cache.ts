@@ -212,7 +212,9 @@ async function parseBuildCache(content: string | Promise<string>): Promise<Build
  */
 function serializeBuildCache(cache: BuildCache): string {
   // Ensure entries is an array (defensive check)
-  const entries = Array.isArray(cache.entries) ? cache.entries : Array.from(cache.entries as any);
+  const entries: BuildCacheEntry[] = Array.isArray(cache.entries)
+    ? cache.entries
+    : Array.from(cache.entries as Iterable<BuildCacheEntry>);
 
   // Sort entries by file path for consistent output
   const sortedCache: BuildCache = {

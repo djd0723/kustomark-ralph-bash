@@ -464,10 +464,12 @@ export interface BuildCache {
 export interface DependencyNode {
   /** Absolute path to the file */
   path: string;
-  /** Set of absolute paths this file depends on */
-  dependencies: Set<string>;
+  /** List of dependency types (e.g., "config" for config dependencies) */
+  dependencies: string[];
   /** Set of absolute paths that depend on this file */
   dependents: Set<string>;
+  /** Indices of patches applied to this file */
+  appliedPatches: number[];
 }
 
 /**
@@ -478,4 +480,8 @@ export interface DependencyGraph {
   nodes: Map<string, DependencyNode>;
   /** Path to the config file that created this graph */
   configPath: string;
+  /** List of referenced config paths from resources field */
+  configDependencies: string[];
+  /** List of unique patch group names */
+  patchGroups: string[];
 }

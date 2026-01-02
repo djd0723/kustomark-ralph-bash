@@ -13,108 +13,126 @@ import micromatch from "micromatch";
 import type { DependencyGraph, DependencyNode, KustomarkConfig, PatchOperation } from "./types.js";
 
 /**
- * Build a dependency graph from resources, patches, and config
+ * Build a dependency graph from config and files
  *
- * @param resources - Map of absolute file paths to their content
- * @param patches - Array of patch operations
  * @param config - Kustomark configuration
- * @param configPath - Absolute path to the config file
+ * @param files - Map of file paths to their content
+ * @param configPath - Absolute path to the config file (default: "/kustomark.yaml")
  * @returns Dependency graph showing relationships between files
  *
  * @example
  * ```typescript
- * const resources = new Map([
- *   ['/project/docs/api.md', '# API'],
- *   ['/project/docs/guide.md', '# Guide']
+ * const files = new Map([
+ *   ['docs/api.md', '# API'],
+ *   ['docs/guide.md', '# Guide']
  * ]);
- * const patches = [
- *   { op: 'replace', old: 'foo', new: 'bar', include: '**\/api.md' }
- * ];
- * const graph = buildDependencyGraph(
- *   resources,
- *   patches,
- *   config,
- *   '/project/kustomark.yaml'
- * );
+ * const graph = buildDependencyGraph(config, files, '/project/kustomark.yaml');
  * ```
  */
 export function buildDependencyGraph(
-  resources: Map<string, string>,
-  patches: PatchOperation[],
-  _config: KustomarkConfig,
-  configPath: string,
+  config: KustomarkConfig,
+  files: Map<string, string>,
+  configPath: string = "/kustomark.yaml",
 ): DependencyGraph {
   const graph: DependencyGraph = {
     nodes: new Map(),
     configPath: normalize(configPath),
+    configDependencies: [],
+    patchGroups: [],
   };
 
-  // Get all resource file paths
-  const resourcePaths = Array.from(resources.keys()).map((path) => normalize(path));
+  // Get all file paths
+  const filePaths = Array.from(files.keys());
 
-  // Create nodes for all resource files
-  for (const filePath of resourcePaths) {
-    ensureNode(graph, filePath);
-  }
+  // Check for config dependencies in resources field
+  const configDeps = (config.resources || []).filter((resource) =>
+    resource.endsWith("/") || resource.includes("../"),
+  );
+  graph.configDependencies = configDeps;
 
-  // Add dependency from config to all output files
-  // The config file affects all outputs
-  ensureNode(graph, graph.configPath);
-  for (const filePath of resourcePaths) {
-    addDependency(graph, filePath, graph.configPath);
-  }
-
-  // Add dependencies based on patches
-  for (const patch of patches) {
-    const affectedFiles = getFilesAffectedByPatch(patch, resourcePaths);
-
-    // Each affected file depends on the config (where the patch is defined)
-    for (const filePath of affectedFiles) {
-      addDependency(graph, filePath, graph.configPath);
+  // Collect unique patch groups
+  const patchGroups = new Set<string>();
+  if (config.patches) {
+    for (const patch of config.patches) {
+      if (patch.group) {
+        patchGroups.add(patch.group);
+      }
     }
+  }
+  graph.patchGroups = Array.from(patchGroups);
+
+  // Create nodes for all files
+  for (const filePath of filePaths) {
+    const node: DependencyNode = {
+      path: filePath,
+      dependencies: [],
+      dependents: new Set(),
+      appliedPatches: [],
+    };
+
+    // If there are config dependencies, all files depend on the config
+    if (graph.configDependencies.length > 0) {
+      node.dependencies.push("config");
+    }
+
+    // Determine which patches apply to this file
+    if (config.patches) {
+      for (let i = 0; i < config.patches.length; i++) {
+        const patch = config.patches[i];
+        if (doesPatchApplyToFile(patch, filePath, filePaths)) {
+          node.appliedPatches.push(i);
+        }
+      }
+    }
+
+    graph.nodes.set(filePath, node);
   }
 
   return graph;
 }
 
 /**
- * Get all files affected by changes to the given files
- *
- * This performs a transitive closure to find all files that directly or
- * indirectly depend on the changed files.
+ * Get all files affected by changes to patches or configs
  *
  * @param graph - The dependency graph
- * @param changedFiles - Set of absolute paths to changed files
- * @returns Set of absolute paths to all affected files (including changed files)
+ * @param changedPatchIndices - Indices of patches that changed
+ * @param changedConfigs - Optional array of config paths that changed
+ * @returns Set of file paths affected by the changes
  *
  * @example
  * ```typescript
- * const affected = getAffectedFiles(graph, new Set(['/project/kustomark.yaml']));
- * // Returns all output files since they all depend on the config
+ * const affected = getAffectedFiles(graph, [0, 1]); // Patches 0 and 1 changed
+ * const affected2 = getAffectedFiles(graph, [], ["../base/"]); // Base config changed
  * ```
  */
-export function getAffectedFiles(graph: DependencyGraph, changedFiles: Set<string>): Set<string> {
+export function getAffectedFiles(
+  graph: DependencyGraph,
+  changedPatchIndices: number[],
+  changedConfigs: string[] = [],
+): Set<string> {
   const affected = new Set<string>();
-  const queue: string[] = Array.from(changedFiles).map((path) => normalize(path));
 
-  // Use BFS to traverse the dependency graph
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) continue;
-
-    // Skip if already processed
-    if (affected.has(current)) continue;
-
-    affected.add(current);
-
-    // Find all files that depend on the current file
-    const node = graph.nodes.get(current);
-    if (node) {
-      // Add all dependents to the queue
-      for (const dependent of node.dependents) {
-        if (!affected.has(dependent)) {
-          queue.push(dependent);
+  // If configs changed, all files that depend on configs are affected
+  if (changedConfigs.length > 0) {
+    for (const [filePath, node] of graph.nodes) {
+      // Check if this file depends on any of the changed configs
+      if (node.dependencies.includes("config")) {
+        const hasChangedConfig = changedConfigs.some((changedConfig) =>
+          graph.configDependencies.includes(changedConfig),
+        );
+        if (hasChangedConfig) {
+          affected.add(filePath);
         }
+      }
+    }
+  }
+
+  // Check which files are affected by the changed patches
+  for (const [filePath, node] of graph.nodes) {
+    for (const patchIndex of changedPatchIndices) {
+      if (node.appliedPatches.includes(patchIndex)) {
+        affected.add(filePath);
+        break;
       }
     }
   }
@@ -123,160 +141,85 @@ export function getAffectedFiles(graph: DependencyGraph, changedFiles: Set<strin
 }
 
 /**
- * Get direct dependencies for a file based on patches
+ * Get dependencies for a specific file
  *
- * This is a helper function that determines which files a given file depends on
- * based on the patches that affect it.
- *
- * @param filePath - Absolute path to the file
- * @param patches - Array of patch operations
- * @returns Set of absolute paths to direct dependencies
+ * @param graph - The dependency graph
+ * @param filePath - Path to the file
+ * @returns Object with patches and configs that affect this file
  *
  * @example
  * ```typescript
- * const deps = getDependencies('/project/docs/api.md', patches);
- * // Returns paths to files that api.md depends on (typically the config)
+ * const deps = getDependencies(graph, "docs/api.md");
+ * console.log(deps.patches); // [0, 1, 2] - patch indices
+ * console.log(deps.configs); // ["../base/"] - config paths
  * ```
  */
-export function getDependencies(filePath: string, patches: PatchOperation[]): Set<string> {
-  const dependencies = new Set<string>();
-  const normalizedPath = normalize(filePath);
+export function getDependencies(
+  graph: DependencyGraph,
+  filePath: string,
+): { patches: number[]; configs: string[] } {
+  const node = graph.nodes.get(filePath);
 
-  // Check each patch to see if it affects this file
-  for (const patch of patches) {
-    if (doesPatchAffectFile(patch, normalizedPath)) {
-      // For now, we track that the file depends on patches being applied
-      // In a more complete implementation, we might track specific dependency relationships
-      // based on patch content (e.g., if a patch references another file)
+  if (!node) {
+    return { patches: [], configs: [] };
+  }
+
+  const configs = node.dependencies.includes("config") ? graph.configDependencies : [];
+
+  return {
+    patches: node.appliedPatches,
+    configs,
+  };
+}
+
+/**
+ * Check if a patch applies to a specific file
+ *
+ * @param patch - The patch operation
+ * @param filePath - Path to the file
+ * @param allFiles - All file paths in the project
+ * @returns True if the patch applies to this file
+ */
+function doesPatchApplyToFile(
+  patch: PatchOperation,
+  filePath: string,
+  allFiles: string[],
+): boolean {
+  // Check include patterns
+  if (patch.include) {
+    const includePatterns = Array.isArray(patch.include) ? patch.include : [patch.include];
+    const matchesInclude = includePatterns.some((pattern) => matchesPattern(filePath, pattern));
+    if (!matchesInclude) {
+      return false;
     }
   }
 
-  return dependencies;
-}
-
-/**
- * Add a dependency edge to the graph
- *
- * Creates an edge from 'from' to 'to', indicating that 'from' depends on 'to'.
- * Automatically ensures both nodes exist in the graph.
- *
- * @param graph - The dependency graph to modify
- * @param from - Absolute path to the dependent file
- * @param to - Absolute path to the dependency file
- *
- * @example
- * ```typescript
- * addDependency(graph, '/project/output/api.md', '/project/kustomark.yaml');
- * // api.md now depends on kustomark.yaml
- * ```
- */
-export function addDependency(graph: DependencyGraph, from: string, to: string): void {
-  const normalizedFrom = normalize(from);
-  const normalizedTo = normalize(to);
-
-  // Ensure both nodes exist
-  const fromNode = ensureNode(graph, normalizedFrom);
-  const toNode = ensureNode(graph, normalizedTo);
-
-  // Add the dependency relationship
-  fromNode.dependencies.add(normalizedTo);
-  toNode.dependents.add(normalizedFrom);
-}
-
-/**
- * Ensure a node exists in the graph, creating it if necessary
- *
- * @param graph - The dependency graph
- * @param filePath - Absolute path to the file
- * @returns The node for the file
- */
-function ensureNode(graph: DependencyGraph, filePath: string): DependencyNode {
-  const normalizedPath = normalize(filePath);
-
-  let node = graph.nodes.get(normalizedPath);
-  if (!node) {
-    node = {
-      path: normalizedPath,
-      dependencies: new Set(),
-      dependents: new Set(),
-    };
-    graph.nodes.set(normalizedPath, node);
-  }
-
-  return node;
-}
-
-/**
- * Get all files affected by a patch operation
- *
- * @param patch - The patch operation
- * @param allFiles - Array of all file paths to consider
- * @returns Array of file paths affected by this patch
- */
-function getFilesAffectedByPatch(patch: PatchOperation, allFiles: string[]): string[] {
-  const normalizedFiles = allFiles.map((path) => normalize(path));
-
-  // If patch has include patterns, only include matching files
-  if (patch.include) {
-    const includePatterns = Array.isArray(patch.include) ? patch.include : [patch.include];
-    return normalizedFiles.filter((filePath) => {
-      return includePatterns.some((pattern) => matchesPattern(filePath, pattern));
-    });
-  }
-
-  // If patch has exclude patterns, include all files except those matching
+  // Check exclude patterns
   if (patch.exclude) {
     const excludePatterns = Array.isArray(patch.exclude) ? patch.exclude : [patch.exclude];
-    return normalizedFiles.filter((filePath) => {
-      return !excludePatterns.some((pattern) => matchesPattern(filePath, pattern));
-    });
+    const matchesExclude = excludePatterns.some((pattern) => matchesPattern(filePath, pattern));
+    if (matchesExclude) {
+      return false;
+    }
   }
 
-  // If neither include nor exclude, patch affects all files
-  return normalizedFiles;
-}
-
-/**
- * Check if a patch affects a specific file
- *
- * @param patch - The patch operation
- * @param filePath - Absolute path to the file
- * @returns True if the patch affects this file
- */
-function doesPatchAffectFile(patch: PatchOperation, filePath: string): boolean {
-  const normalizedPath = normalize(filePath);
-
-  // If patch has include patterns, check if file matches
-  if (patch.include) {
-    const includePatterns = Array.isArray(patch.include) ? patch.include : [patch.include];
-    return includePatterns.some((pattern) => matchesPattern(normalizedPath, pattern));
-  }
-
-  // If patch has exclude patterns, file is affected if it doesn't match exclude
-  if (patch.exclude) {
-    const excludePatterns = Array.isArray(patch.exclude) ? patch.exclude : [patch.exclude];
-    return !excludePatterns.some((pattern) => matchesPattern(normalizedPath, pattern));
-  }
-
-  // If neither include nor exclude, patch affects this file
+  // If no include/exclude patterns, or file passed all checks, patch applies
   return true;
 }
 
 /**
  * Check if a file path matches a glob pattern
  *
- * @param filePath - Absolute path to check
+ * @param filePath - Path to check
  * @param pattern - Glob pattern to match against
  * @returns True if the file matches the pattern
  */
 function matchesPattern(filePath: string, pattern: string): boolean {
-  const normalizedPath = normalize(filePath);
-
-  // Use micromatch for glob matching
-  // We need to extract just the filename part for pattern matching
-  // since patterns might be relative (like '**/*.md')
-  return micromatch.isMatch(normalizedPath, pattern, {
+  return micromatch.isMatch(filePath, pattern, {
     dot: true,
-    matchBase: true,
+    matchBase: false,
+    bash: true,
+    nobrace: false,
+    noextglob: false,
   });
 }

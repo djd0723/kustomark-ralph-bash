@@ -36,7 +36,7 @@ describe("Dependency Graph Module", () => {
         ["file2.md", "# Content 2"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.size).toBe(2);
       expect(graph.nodes.has("file1.md")).toBe(true);
@@ -66,7 +66,7 @@ describe("Dependency Graph Module", () => {
         ["file2.md", "# Content without match"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.size).toBe(2);
       expect(graph.nodes.get("file1.md")?.appliedPatches).toHaveLength(1);
@@ -100,7 +100,7 @@ describe("Dependency Graph Module", () => {
 
       const files = new Map([["file1.md", "# Content"]]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       const node = graph.nodes.get("file1.md");
       expect(node?.appliedPatches).toHaveLength(3);
@@ -131,7 +131,7 @@ describe("Dependency Graph Module", () => {
         ["docs/api/reference.md", "# API docs"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.get("README.md")?.appliedPatches).toHaveLength(0);
       expect(graph.nodes.get("docs/guide.md")?.appliedPatches).toHaveLength(1);
@@ -159,7 +159,7 @@ describe("Dependency Graph Module", () => {
         ["GUIDE.md", "# Included"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.get("README.md")?.appliedPatches).toHaveLength(0);
       expect(graph.nodes.get("GUIDE.md")?.appliedPatches).toHaveLength(1);
@@ -188,7 +188,7 @@ describe("Dependency Graph Module", () => {
         ["docs/internal/notes.md", "# Internal notes"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.get("README.md")?.appliedPatches).toHaveLength(0);
       expect(graph.nodes.get("docs/guide.md")?.appliedPatches).toHaveLength(1);
@@ -208,7 +208,7 @@ describe("Dependency Graph Module", () => {
         ["file2.md", "# Another local"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       // All files should depend on the config that references base
       expect(graph.configDependencies).toContain("../base/");
@@ -239,7 +239,7 @@ describe("Dependency Graph Module", () => {
         ["other/file.md", "# Other"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.get("README.md")?.appliedPatches).toHaveLength(0);
       expect(graph.nodes.get("docs/api.md")?.appliedPatches).toHaveLength(1);
@@ -270,7 +270,7 @@ describe("Dependency Graph Module", () => {
         ["docs/public.md", "# Public"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.get("README.md")?.appliedPatches).toHaveLength(0);
       expect(graph.nodes.get("GUIDE.md")?.appliedPatches).toHaveLength(1);
@@ -299,7 +299,7 @@ describe("Dependency Graph Module", () => {
         ["file3.md", "# File 3"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.get("file1.md")?.appliedPatches).toHaveLength(1);
       expect(graph.nodes.get("file2.md")?.appliedPatches).toHaveLength(1);
@@ -330,7 +330,7 @@ describe("Dependency Graph Module", () => {
 
       const files = new Map([["file1.md", "# Content"]]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.patchGroups).toContain("formatting");
       expect(graph.patchGroups).toContain("content");
@@ -359,7 +359,7 @@ describe("Dependency Graph Module", () => {
         ["file2.md", "# File 2"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const affected = getAffectedFiles(graph, [0]); // Patch index 0 changed
 
       expect(affected.size).toBe(1);
@@ -386,7 +386,7 @@ describe("Dependency Graph Module", () => {
         ["file2.md", "# File 2"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       // If base config changes, all files that depend on it are affected
       const affected = getAffectedFiles(graph, [], ["../base/"]);
@@ -424,7 +424,7 @@ describe("Dependency Graph Module", () => {
         ["file3.md", "# File 3"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const affected = getAffectedFiles(graph, [0, 1]); // Both patches changed
 
       expect(affected.size).toBe(2);
@@ -461,7 +461,7 @@ describe("Dependency Graph Module", () => {
         ["file3.md", "# File 3"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const affected = getAffectedFiles(graph, [0, 1]);
 
       expect(affected.size).toBe(3);
@@ -487,7 +487,7 @@ describe("Dependency Graph Module", () => {
 
       const files = new Map([["file1.md", "# File 1"]]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const affected = getAffectedFiles(graph, []);
 
       expect(affected.size).toBe(0);
@@ -506,7 +506,7 @@ describe("Dependency Graph Module", () => {
         ["file2.md", "# File 2"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const affected = getAffectedFiles(graph, [0]);
 
       expect(affected.size).toBe(0);
@@ -540,7 +540,7 @@ describe("Dependency Graph Module", () => {
         ["file2.md", "# File 2"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const deps = getDependencies(graph, "file1.md");
 
       expect(deps.patches).toHaveLength(2);
@@ -558,7 +558,7 @@ describe("Dependency Graph Module", () => {
 
       const files = new Map([["file1.md", "# File 1"]]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const deps = getDependencies(graph, "file1.md");
 
       expect(deps.configs).toContain("../base/");
@@ -574,7 +574,7 @@ describe("Dependency Graph Module", () => {
 
       const files = new Map([["file1.md", "# File 1"]]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const deps = getDependencies(graph, "nonexistent.md");
 
       expect(deps.patches).toHaveLength(0);
@@ -602,7 +602,7 @@ describe("Dependency Graph Module", () => {
         ["other.md", "# Other"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const deps = getDependencies(graph, "file1.md");
 
       expect(deps.patches).toHaveLength(0);
@@ -640,7 +640,7 @@ describe("Dependency Graph Module", () => {
         ["docs/guide.md", "# Guide"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const rootDeps = getDependencies(graph, "README.md");
       const docsDeps = getDependencies(graph, "docs/guide.md");
 
@@ -667,7 +667,7 @@ describe("Dependency Graph Module", () => {
 
       const files = new Map<string, string>();
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.size).toBe(0);
     });
@@ -682,7 +682,7 @@ describe("Dependency Graph Module", () => {
 
       const files = new Map([["file1.md", "# File 1"]]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.size).toBe(1);
     });
@@ -698,7 +698,8 @@ describe("Dependency Graph Module", () => {
             op: "replace",
             old: "foo",
             new: "bar",
-            include: ["docs/**/!(internal)/*.md"],
+            include: "docs/**/*.md",
+            exclude: "**/internal/**",
           },
         ],
       };
@@ -709,11 +710,12 @@ describe("Dependency Graph Module", () => {
         ["docs/internal/notes.md", "# Internal"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       // Pattern should match docs/** but not internal
       expect(graph.nodes.get("docs/guide.md")?.appliedPatches.length).toBeGreaterThan(0);
       expect(graph.nodes.get("docs/api/reference.md")?.appliedPatches.length).toBeGreaterThan(0);
+      expect(graph.nodes.get("docs/internal/notes.md")?.appliedPatches.length).toBe(0);
     });
 
     test("should handle patches with inheritance", () => {
@@ -739,7 +741,7 @@ describe("Dependency Graph Module", () => {
 
       const files = new Map([["file1.md", "# File 1"]]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       // Both patches should be tracked
       expect(graph.nodes.get("file1.md")?.appliedPatches).toHaveLength(2);
@@ -765,7 +767,7 @@ describe("Dependency Graph Module", () => {
         files.set(`file${i}.md`, `# File ${i}`);
       }
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.size).toBe(1000);
       for (const [, node] of graph.nodes) {
@@ -793,7 +795,7 @@ describe("Dependency Graph Module", () => {
 
       const files = new Map([["file1.md", "# File 1"]]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       expect(graph.nodes.get("file1.md")?.appliedPatches).toHaveLength(100);
     });
@@ -819,7 +821,7 @@ describe("Dependency Graph Module", () => {
         ["docs/123.md", "# Numbers"],
       ]);
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       // Should handle bracket patterns correctly
       expect(graph.nodes.size).toBe(2);
@@ -848,7 +850,7 @@ describe("Dependency Graph Module", () => {
       }
 
       const startTime = performance.now();
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
       const endTime = performance.now();
 
       expect(graph.nodes.size).toBe(10000);
@@ -874,7 +876,7 @@ describe("Dependency Graph Module", () => {
         files.set(`group${i % 5}/file${i}.md`, `# File ${i}`);
       }
 
-      const graph = buildDependencyGraph(config, files);
+      const graph = buildDependencyGraph(config, files, "/test/kustomark.yaml");
 
       const startTime = performance.now();
       const affected = getAffectedFiles(graph, [0, 1, 2, 3, 4]); // 5 patches changed
