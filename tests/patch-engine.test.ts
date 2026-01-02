@@ -310,7 +310,7 @@ describe('applyPatches', () => {
       { op: 'replace', old: 'foo', new: 'bar' },
     ];
 
-    expect(() => applyPatches(content, patches, 'error')).toThrow('matched 0 times');
+    expect(() => applyPatches(content, patches, 'error')).toThrow('Replace patch failed');
   });
 
   test('respects per-patch onNoMatch override', () => {
@@ -886,7 +886,7 @@ Content`;
       { op: 'rename-frontmatter', old: 'nonexistent', new: 'new' },
     ];
 
-    expect(() => applyPatches(content, patches, 'error')).toThrow('matched 0 times');
+    expect(() => applyPatches(content, patches, 'error')).toThrow('Frontmatter patch failed');
   });
 
   test('combines frontmatter and section operations', () => {

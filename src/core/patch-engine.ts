@@ -12,6 +12,7 @@
 
 import * as yaml from "js-yaml";
 import { evaluateCondition } from "./condition-evaluator.js";
+import { extractSnippet, findFailurePosition, findSimilarContent, PatchError } from "./errors.js";
 import { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
 import { resolveInheritance } from "./patch-inheritance.js";
 import { generatePatchSuggestions } from "./suggestion-engine.js";
@@ -1334,6 +1335,311 @@ export function applyRemoveTableColumn(
 }
 
 /**
+ * Enhanced wrapper functions that throw PatchError on failure
+ * These maintain backward compatibility while providing better error messages
+ */
+
+/**
+ * Apply a replace patch with enhanced error reporting
+ */
+function applyReplacePatch(
+  content: string,
+  old: string,
+  newStr: string,
+  patchIndex?: number,
+): { content: string; count: number } {
+  const result = applyReplace(content, old, newStr);
+
+  if (result.count === 0) {
+    // Find where the patch tried to match
+    const position = findFailurePosition(content, old);
+    const snippet = extractSnippet(content, position);
+
+    // Find similar content
+    const similar = findSimilarContent(content, old, 3, 15);
+    const suggestions: string[] = [];
+
+    if (similar.length > 0) {
+      suggestions.push("Did you mean one of these?");
+      for (const item of similar) {
+        suggestions.push(`  Line ${item.line}: "${item.text}"`);
+      }
+    } else {
+      suggestions.push("The text to replace was not found in the content");
+      suggestions.push("Check if the text exists or use onNoMatch: 'skip' to ignore");
+    }
+
+    throw new PatchError(
+      `Replace patch failed: text "${old}" not found`,
+      "PATCH_NO_MATCH",
+      {
+        operation: "replace",
+        patchIndex,
+        position,
+        snippet,
+      },
+      suggestions,
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Apply a replace-regex patch with enhanced error reporting
+ */
+function applyReplaceRegexPatch(
+  content: string,
+  pattern: string,
+  replacement: string,
+  flags?: string,
+  patchIndex?: number,
+): { content: string; count: number } {
+  const result = applyReplaceRegex(content, pattern, replacement, flags);
+
+  if (result.count === 0) {
+    // Try to create the regex to check if it's valid
+    let regexValid = true;
+    try {
+      new RegExp(pattern, flags);
+    } catch {
+      regexValid = false;
+    }
+
+    const suggestions: string[] = [];
+    if (!regexValid) {
+      suggestions.push("The regex pattern is invalid");
+      suggestions.push("Check your regex syntax");
+    } else {
+      suggestions.push("The regex pattern did not match any content");
+      suggestions.push("Try testing your regex pattern with a regex tester");
+      suggestions.push("Use onNoMatch: 'skip' to ignore if this is expected");
+    }
+
+    const position = 1;
+    const snippet = extractSnippet(content, position);
+
+    throw new PatchError(
+      `Replace-regex patch failed: pattern "${pattern}" did not match`,
+      "PATCH_NO_MATCH",
+      {
+        operation: "replace-regex",
+        patchIndex,
+        position,
+        snippet,
+      },
+      suggestions,
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Apply a section-based patch with enhanced error reporting
+ */
+function applySectionPatch(
+  content: string,
+  sectionId: string,
+  operation: "remove" | "replace" | "prepend" | "append",
+  newContent?: string,
+  patchIndex?: number,
+): { content: string; count: number } {
+  let result: { content: string; count: number };
+
+  switch (operation) {
+    case "remove":
+      result = applyRemoveSection(content, sectionId);
+      break;
+    case "replace":
+      result = applyReplaceSection(content, sectionId, newContent ?? "");
+      break;
+    case "prepend":
+      result = applyPrependToSection(content, sectionId, newContent ?? "");
+      break;
+    case "append":
+      result = applyAppendToSection(content, sectionId, newContent ?? "");
+      break;
+  }
+
+  if (result.count === 0) {
+    // Section not found - provide helpful context
+    const sections = parseSections(content);
+    const suggestions: string[] = [];
+
+    if (sections.length === 0) {
+      suggestions.push("No sections found in the content");
+      suggestions.push("Make sure your content has markdown headers (# Header)");
+    } else {
+      suggestions.push("Available sections:");
+      for (const section of sections.slice(0, 10)) {
+        suggestions.push(`  - ${section.id} (${section.headerText})`);
+      }
+      if (sections.length > 10) {
+        suggestions.push(`  ... and ${sections.length - 10} more`);
+      }
+
+      // Try to find similar section IDs
+      const similar = sections
+        .map((s) => ({ id: s.id, distance: levenshteinDistance(sectionId, s.id) }))
+        .filter((s) => s.distance <= 5)
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 3);
+
+      if (similar.length > 0) {
+        suggestions.push("Did you mean:");
+        for (const s of similar) {
+          suggestions.push(`  - ${s.id}`);
+        }
+      }
+    }
+
+    const position = sections.length > 0 ? (sections[0]?.startLine ?? 0) + 1 : 1;
+    const snippet = extractSnippet(content, position);
+
+    throw new PatchError(
+      `Section patch failed: section "${sectionId}" not found`,
+      "PATCH_SECTION_NOT_FOUND",
+      {
+        operation: `${operation}-section`,
+        patchIndex,
+        position,
+        snippet,
+      },
+      suggestions,
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Apply a frontmatter patch with enhanced error reporting
+ */
+function applyFrontmatterPatch(
+  content: string,
+  operation: "set" | "remove" | "rename",
+  key?: string,
+  value?: unknown,
+  oldKey?: string,
+  newKey?: string,
+  patchIndex?: number,
+): { content: string; count: number } {
+  let result: { content: string; count: number };
+
+  switch (operation) {
+    case "set":
+      result = applySetFrontmatter(content, key ?? "", value);
+      break;
+    case "remove":
+      result = applyRemoveFrontmatter(content, key ?? "");
+      break;
+    case "rename":
+      result = applyRenameFrontmatter(content, oldKey ?? "", newKey ?? "");
+      break;
+  }
+
+  if (result.count === 0) {
+    const { data, hasFrontmatter } = parseFrontmatter(content);
+    const suggestions: string[] = [];
+
+    if (!hasFrontmatter) {
+      suggestions.push("No frontmatter found in the content");
+      suggestions.push("Add frontmatter at the top of the file:");
+      suggestions.push("---");
+      suggestions.push("key: value");
+      suggestions.push("---");
+    } else {
+      suggestions.push("Available frontmatter keys:");
+      const keys = Object.keys(data);
+      if (keys.length === 0) {
+        suggestions.push("  (frontmatter is empty)");
+      } else {
+        for (const k of keys.slice(0, 10)) {
+          suggestions.push(`  - ${k}`);
+        }
+        if (keys.length > 10) {
+          suggestions.push(`  ... and ${keys.length - 10} more`);
+        }
+      }
+
+      // For remove/rename operations, try to find similar keys
+      if (operation === "remove" || operation === "rename") {
+        const searchKey = operation === "remove" ? key : oldKey;
+        if (searchKey) {
+          const similar = keys
+            .map((k) => ({ key: k, distance: levenshteinDistance(searchKey, k) }))
+            .filter((s) => s.distance <= 5)
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, 3);
+
+          if (similar.length > 0) {
+            suggestions.push("Did you mean:");
+            for (const s of similar) {
+              suggestions.push(`  - ${s.key}`);
+            }
+          }
+        }
+      }
+    }
+
+    const position = hasFrontmatter ? 1 : 1;
+    const snippet = extractSnippet(content, position, 5);
+
+    const keyInfo = operation === "rename" ? `"${oldKey}" to "${newKey}"` : `"${key}"`;
+    throw new PatchError(
+      `Frontmatter patch failed: ${operation} key ${keyInfo}`,
+      "PATCH_FRONTMATTER_FAILED",
+      {
+        operation: `${operation}-frontmatter`,
+        patchIndex,
+        position,
+        snippet,
+      },
+      suggestions,
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Levenshtein distance helper (imported from errors.ts but re-used here)
+ */
+function levenshteinDistance(str1: string, str2: string): number {
+  const len1 = str1.length;
+  const len2 = str2.length;
+  const matrix: number[][] = Array.from({ length: len1 + 1 }, () =>
+    Array.from({ length: len2 + 1 }, () => 0),
+  );
+
+  for (let i = 0; i <= len1; i++) {
+    const row = matrix[i];
+    if (row) row[0] = i;
+  }
+  for (let j = 0; j <= len2; j++) {
+    const row = matrix[0];
+    if (row) row[j] = j;
+  }
+
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      const row = matrix[i];
+      if (row) {
+        row[j] = Math.min(
+          (matrix[i - 1]?.[j] ?? 0) + 1,
+          (matrix[i]?.[j - 1] ?? 0) + 1,
+          (matrix[i - 1]?.[j - 1] ?? 0) + cost,
+        );
+      }
+    }
+  }
+
+  return matrix[len1]?.[len2] ?? 0;
+}
+
+/**
  * Apply a single patch operation to content.
  *
  * This function applies one patch operation to the provided content. It handles:
@@ -1418,41 +1724,110 @@ export function applySinglePatch(
   const onNoMatch = patch.onNoMatch ?? defaultOnNoMatch;
   let result: { content: string; count: number };
 
+  // Get patch index from context if available (will be undefined in most cases)
+  const patchIndex = undefined; // This would be set by the caller if tracking indices
+
   switch (patch.op) {
     case "replace":
-      result = applyReplace(content, patch.old, patch.new);
+      if (onNoMatch === "error") {
+        result = applyReplacePatch(content, patch.old, patch.new, patchIndex);
+      } else {
+        result = applyReplace(content, patch.old, patch.new);
+      }
       break;
 
     case "replace-regex":
-      result = applyReplaceRegex(content, patch.pattern, patch.replacement, patch.flags);
+      if (onNoMatch === "error") {
+        result = applyReplaceRegexPatch(
+          content,
+          patch.pattern,
+          patch.replacement,
+          patch.flags,
+          patchIndex,
+        );
+      } else {
+        result = applyReplaceRegex(content, patch.pattern, patch.replacement, patch.flags);
+      }
       break;
 
     case "remove-section":
-      result = applyRemoveSection(content, patch.id, patch.includeChildren);
+      if (onNoMatch === "error") {
+        result = applySectionPatch(content, patch.id, "remove", undefined, patchIndex);
+      } else {
+        result = applyRemoveSection(content, patch.id, patch.includeChildren);
+      }
       break;
 
     case "replace-section":
-      result = applyReplaceSection(content, patch.id, patch.content);
+      if (onNoMatch === "error") {
+        result = applySectionPatch(content, patch.id, "replace", patch.content, patchIndex);
+      } else {
+        result = applyReplaceSection(content, patch.id, patch.content);
+      }
       break;
 
     case "prepend-to-section":
-      result = applyPrependToSection(content, patch.id, patch.content);
+      if (onNoMatch === "error") {
+        result = applySectionPatch(content, patch.id, "prepend", patch.content, patchIndex);
+      } else {
+        result = applyPrependToSection(content, patch.id, patch.content);
+      }
       break;
 
     case "append-to-section":
-      result = applyAppendToSection(content, patch.id, patch.content);
+      if (onNoMatch === "error") {
+        result = applySectionPatch(content, patch.id, "append", patch.content, patchIndex);
+      } else {
+        result = applyAppendToSection(content, patch.id, patch.content);
+      }
       break;
 
     case "set-frontmatter":
-      result = applySetFrontmatter(content, patch.key, patch.value);
+      if (onNoMatch === "error") {
+        result = applyFrontmatterPatch(
+          content,
+          "set",
+          patch.key,
+          patch.value,
+          undefined,
+          undefined,
+          patchIndex,
+        );
+      } else {
+        result = applySetFrontmatter(content, patch.key, patch.value);
+      }
       break;
 
     case "remove-frontmatter":
-      result = applyRemoveFrontmatter(content, patch.key);
+      if (onNoMatch === "error") {
+        result = applyFrontmatterPatch(
+          content,
+          "remove",
+          patch.key,
+          undefined,
+          undefined,
+          undefined,
+          patchIndex,
+        );
+      } else {
+        result = applyRemoveFrontmatter(content, patch.key);
+      }
       break;
 
     case "rename-frontmatter":
-      result = applyRenameFrontmatter(content, patch.old, patch.new);
+      if (onNoMatch === "error") {
+        result = applyFrontmatterPatch(
+          content,
+          "rename",
+          undefined,
+          undefined,
+          patch.old,
+          patch.new,
+          patchIndex,
+        );
+      } else {
+        result = applyRenameFrontmatter(content, patch.old, patch.new);
+      }
       break;
 
     case "merge-frontmatter":

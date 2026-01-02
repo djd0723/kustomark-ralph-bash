@@ -59,6 +59,19 @@ export {
   generateDiff,
   generateFileDiff,
 } from "./diff-generator.js";
+// Export error classes and helper functions
+export {
+  ConfigurationError,
+  extractSnippet,
+  FileSystemError,
+  findFailurePosition,
+  findSimilarContent,
+  KustomarkError,
+  levenshteinDistance,
+  PatchError,
+  PatchValidationError,
+  ResourceError,
+} from "./errors.js";
 // Export file operations functions and types
 export {
   applyCopyFile,
