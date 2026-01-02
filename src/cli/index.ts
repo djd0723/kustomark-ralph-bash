@@ -1526,26 +1526,58 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       log("Updating build cache...", 3, options);
       const newCacheEntries = new Map<string, BuildCacheEntry>();
 
-      // Create cache entries for rebuilt files
-      for (const [filePath, outputContent] of filesToWrite.entries()) {
-        const sourceContent = resources.get(filePath);
-        if (!sourceContent) continue;
+      // Create cache entries for ALL resources, not just rebuilt files
+      for (const [filePath, sourceContent] of resources.entries()) {
+        // Check if this file was rebuilt
+        const wasRebuilt = filesToRebuild.has(filePath);
 
-        const applicablePatches = (config.patches || []).filter(
-          (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
-        );
+        if (wasRebuilt) {
+          // File was rebuilt - create new cache entry with output content
+          const outputContent = allPatchedResources.get(filePath);
+          if (!outputContent) continue;
 
-        const entry: BuildCacheEntry = {
-          file: filePath,
-          sourceHash: calculateFileHash(sourceContent),
-          patchHash: calculateFileHash(
-            JSON.stringify(applicablePatches, Object.keys(applicablePatches).sort()),
-          ),
-          outputHash: calculateFileHash(outputContent),
-          built: new Date().toISOString(),
-        };
+          const applicablePatches = (config.patches || []).filter(
+            (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
+          );
 
-        newCacheEntries.set(filePath, entry);
+          const entry: BuildCacheEntry = {
+            file: filePath,
+            sourceHash: calculateFileHash(sourceContent),
+            patchHash: calculateFileHash(
+              JSON.stringify(applicablePatches, Object.keys(applicablePatches).sort()),
+            ),
+            outputHash: calculateFileHash(outputContent),
+            built: new Date().toISOString(),
+          };
+
+          newCacheEntries.set(filePath, entry);
+        } else {
+          // File wasn't rebuilt - preserve existing cache entry if it exists
+          const existingEntry = buildCache.entries.find((e) => e.file === filePath);
+          if (existingEntry) {
+            newCacheEntries.set(filePath, existingEntry);
+          } else {
+            // File wasn't rebuilt and has no cache entry - create one from current state
+            const outputContent = allPatchedResources.get(filePath);
+            if (!outputContent) continue;
+
+            const applicablePatches = (config.patches || []).filter(
+              (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
+            );
+
+            const entry: BuildCacheEntry = {
+              file: filePath,
+              sourceHash: calculateFileHash(sourceContent),
+              patchHash: calculateFileHash(
+                JSON.stringify(applicablePatches, Object.keys(applicablePatches).sort()),
+              ),
+              outputHash: calculateFileHash(outputContent),
+              built: new Date().toISOString(),
+            };
+
+            newCacheEntries.set(filePath, entry);
+          }
+        }
       }
 
       // Update cache with new entries
@@ -1555,7 +1587,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       const currentFiles = new Set(resources.keys());
       buildCache = pruneCache(buildCache, currentFiles);
 
-      // Save cache to disk
+      // Save cache to disk (even if no files were rebuilt)
       try {
         await saveBuildCache(configPath, buildCache, options.cacheDir);
         log(`Cache saved with ${buildCache.entries.length} entries`, 3, options);

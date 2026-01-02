@@ -7,9 +7,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
-import * as yaml from "js-yaml";
+import { dirname, join, resolve } from "node:path";
 import type {
   BuildCache,
   BuildCacheEntry,
@@ -63,18 +61,19 @@ export function createEmptyCache(configHash: string): BuildCache {
 /**
  * Gets the cache directory for a project
  *
- * Cache is stored at ~/.cache/kustomark/builds/{hash}/cache.yaml
- * where hash is SHA256 of the absolute config path
+ * Cache is stored at .kustomark/ directory relative to the config file's directory.
+ * If cacheDir parameter is provided, uses that instead.
  *
  * @param configPath - Path to the kustomark config file
- * @param cacheDir - Optional custom cache directory (defaults to ~/.cache/kustomark/builds)
+ * @param cacheDir - Optional custom cache directory (overrides default .kustomark location)
  * @returns Path to the cache directory for this project
  */
 export function getCacheDirectory(configPath: string, cacheDir?: string): string {
-  const baseDir = cacheDir ?? join(homedir(), ".cache", "kustomark", "builds");
-  const absolutePath = resolve(configPath);
-  const pathHash = calculateFileHash(absolutePath);
-  return join(baseDir, pathHash);
+  if (cacheDir) {
+    return cacheDir;
+  }
+  const configDir = dirname(resolve(configPath));
+  return join(configDir, ".kustomark");
 }
 
 /**
@@ -89,7 +88,7 @@ export async function loadBuildCache(
   cacheDir?: string,
 ): Promise<BuildCache | null> {
   const cacheDirPath = getCacheDirectory(configPath, cacheDir);
-  const cacheFilePath = join(cacheDirPath, "cache.yaml");
+  const cacheFilePath = join(cacheDirPath, "build-cache.json");
 
   if (!existsSync(cacheFilePath)) {
     return null;
@@ -109,20 +108,20 @@ export async function loadBuildCache(
 }
 
 /**
- * Parses YAML cache content into a BuildCache object
+ * Parses JSON cache content into a BuildCache object
  *
- * @param content - YAML content as string (awaitable)
+ * @param content - JSON content as string (awaitable)
  * @returns Parsed BuildCache object
- * @throws Error if YAML is malformed or structure is invalid
+ * @throws Error if JSON is malformed or structure is invalid
  */
 async function parseBuildCache(content: string | Promise<string>): Promise<BuildCache> {
   const resolvedContent = await content;
 
   try {
-    const parsed = yaml.load(resolvedContent);
+    const parsed = JSON.parse(resolvedContent);
 
     if (!parsed || typeof parsed !== "object") {
-      throw new Error("Build cache must be a YAML object");
+      throw new Error("Build cache must be a JSON object");
     }
 
     const cache = parsed as Record<string, unknown>;
@@ -198,33 +197,31 @@ async function parseBuildCache(content: string | Promise<string>): Promise<Build
       entries: validatedEntries,
     };
   } catch (error) {
-    if (error instanceof yaml.YAMLException) {
-      throw new Error(`YAML parsing error: ${error.message}`);
+    if (error instanceof SyntaxError) {
+      throw new Error(`JSON parsing error: ${error.message}`);
     }
     throw error;
   }
 }
 
 /**
- * Serializes a BuildCache object to YAML string format
+ * Serializes a BuildCache object to JSON string format
  *
  * @param cache - BuildCache object to serialize
- * @returns YAML string representation
+ * @returns JSON string representation
  */
 function serializeBuildCache(cache: BuildCache): string {
+  // Ensure entries is an array (defensive check)
+  const entries = Array.isArray(cache.entries) ? cache.entries : Array.from(cache.entries as any);
+
   // Sort entries by file path for consistent output
   const sortedCache: BuildCache = {
     version: cache.version,
     configHash: cache.configHash,
-    entries: [...cache.entries].sort((a, b) => a.file.localeCompare(b.file)),
+    entries: [...entries].sort((a, b) => a.file.localeCompare(b.file)),
   };
 
-  return yaml.dump(sortedCache, {
-    indent: 2,
-    lineWidth: 120,
-    noRefs: true,
-    sortKeys: false, // Keep our manual sort order
-  });
+  return JSON.stringify(sortedCache, null, 2);
 }
 
 /**
@@ -240,7 +237,7 @@ export async function saveBuildCache(
   cacheDir?: string,
 ): Promise<void> {
   const cacheDirPath = getCacheDirectory(configPath, cacheDir);
-  const cacheFilePath = join(cacheDirPath, "cache.yaml");
+  const cacheFilePath = join(cacheDirPath, "build-cache.json");
 
   // Ensure cache directory exists
   await mkdir(cacheDirPath, { recursive: true });
@@ -319,48 +316,38 @@ export async function clearProjectCache(configPath: string, cacheDir?: string): 
 }
 
 /**
- * Clears all build caches
+ * Clears all build caches in the current project
  *
- * @param cacheDir - Optional custom cache directory (defaults to ~/.cache/kustomark/builds)
+ * Note: This function clears the .kustomark cache directory for the specified project.
+ * Since caches are now project-local, this is equivalent to clearProjectCache.
+ *
+ * @param cacheDir - Cache directory to clear
  * @returns Object with count of cleared caches and total bytes freed
  */
 export async function clearAllCaches(
   cacheDir?: string,
 ): Promise<{ cleared: number; bytes: number }> {
-  const baseDir = cacheDir ?? join(homedir(), ".cache", "kustomark", "builds");
-
-  if (!existsSync(baseDir)) {
+  if (!cacheDir) {
+    // Without a cache directory specified, we can't clear anything
+    // since caches are now project-local
     return { cleared: 0, bytes: 0 };
   }
 
-  const entries = await readdir(baseDir);
-  let cleared = 0;
-  let bytes = 0;
-
-  for (const entry of entries) {
-    const entryPath = join(baseDir, entry);
-
-    try {
-      // Calculate size before deletion
-      const stats = await stat(entryPath);
-      if (stats.isDirectory()) {
-        // Recursively calculate directory size
-        bytes += await calculateDirectorySize(entryPath);
-      } else {
-        bytes += stats.size;
-      }
-
-      await rm(entryPath, { recursive: true, force: true });
-      cleared++;
-    } catch (error) {
-      // Skip entries that can't be deleted
-      console.warn(
-        `Warning: Could not clear cache at ${entryPath}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+  if (!existsSync(cacheDir)) {
+    return { cleared: 0, bytes: 0 };
   }
 
-  return { cleared, bytes };
+  try {
+    // Calculate size before deletion
+    const bytes = await calculateDirectorySize(cacheDir);
+    await rm(cacheDir, { recursive: true, force: true });
+    return { cleared: 1, bytes };
+  } catch (error) {
+    console.warn(
+      `Warning: Could not clear cache at ${cacheDir}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return { cleared: 0, bytes: 0 };
+  }
 }
 
 /**
