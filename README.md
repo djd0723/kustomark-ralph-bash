@@ -20,6 +20,8 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark init](#kustomark-init-path)
   - [kustomark debug](#kustomark-debug-path)
   - [kustomark watch](#kustomark-watch-path)
+  - [kustomark suggest](#kustomark-suggest)
+  - [kustomark analyze](#kustomark-analyze-path)
 - [Configuration](#configuration)
 - [Patch Operations](#patch-operations)
 - [Table Operations](#table-operations)
@@ -618,6 +620,175 @@ With `--format=json`, outputs structured data with the generated config and stat
   }
 }
 ```
+
+### `kustomark analyze [path]`
+
+Analyze patch configuration for coverage, impact, complexity, and safety metrics. This command provides comprehensive insights into your kustomark configuration, helping you understand patch effectiveness, identify potential issues, and optimize your configuration.
+
+```bash
+# Basic usage - analyze current directory
+kustomark analyze .
+
+# JSON output for programmatic processing
+kustomark analyze . --format=json
+
+# Filter to show only high-risk operations
+kustomark analyze . --min-risk=high
+
+# Sort by complexity with verbose output
+kustomark analyze . --sort=complexity -vv
+
+# Quiet mode (errors only)
+kustomark analyze . -q
+
+# Maximum verbosity for detailed insights
+kustomark analyze . -vvv
+```
+
+**Options:**
+- `--format <text|json>` - Output format (default: text)
+- `--min-risk <low|medium|high>` - Filter to minimum risk level
+- `--sort <risk|complexity|impact|coverage>` - Sort results by field
+- `-v`, `-vv`, `-vvv` - Increase verbosity (show more details)
+- `-q` - Quiet mode (errors only)
+
+**Analysis Types:**
+
+The analyze command provides four types of analysis:
+
+1. **Coverage Analysis** - Measures how many files are affected by patches
+   - Total files in configuration
+   - Files with patches vs. files without patches
+   - Coverage percentage
+   - Lists of patched and unpatched files (with `-vv` and `-vvv`)
+
+2. **Impact Analysis** - Evaluates the scope of patch operations
+   - Total number of patches
+   - Total affected files
+   - Files with multiple patches (potential conflicts)
+   - Per-patch impact details (with `-vvv`)
+
+3. **Complexity Analysis** - Assesses configuration complexity
+   - Average, minimum, and maximum complexity scores
+   - Top most complex files
+   - Patch count and operation types per file
+   - High-risk operation counts
+
+4. **Safety Analysis** - Identifies potentially risky patches
+   - Risk level distribution (high/medium/low)
+   - Average risk score
+   - Detailed risk reasons and affected files (with `-vv`)
+   - Recommendations for safer alternatives
+
+**Filtering and Sorting:**
+
+Use `--min-risk` to focus on patches above a certain risk threshold:
+- `--min-risk=high` - Show only high-risk patches
+- `--min-risk=medium` - Show medium and high-risk patches
+- `--min-risk=low` - Show all patches (default)
+
+Use `--sort` to order results by different criteria:
+- `--sort=risk` - Sort by risk score (highest first)
+- `--sort=complexity` - Sort by complexity score (most complex first)
+- `--sort=impact` - Sort by number of affected files
+- `--sort=coverage` - Sort by coverage metrics
+
+**Verbosity Levels:**
+
+- Default: Summary statistics and overall assessment
+- `-v`: Add lists of top complex files and high-risk patches
+- `-vv`: Add detailed patch-by-patch breakdown
+- `-vvv`: Add complete file lists and operation details
+- `-q`: Suppress all output except errors
+
+**Example Output:**
+
+```
+=== COVERAGE ANALYSIS ===
+Total files: 42
+Files with patches: 38 (90.5%)
+Files without patches: 4
+
+=== IMPACT ANALYSIS ===
+Total patches: 15
+Total affected files: 38
+Files with multiple patches: 5
+
+=== COMPLEXITY ANALYSIS ===
+Total files: 42
+Average complexity: 4.2
+Max complexity: 12.5
+Min complexity: 1.0
+
+=== SAFETY ANALYSIS ===
+Total patches: 15
+High-risk patches: 2
+Medium-risk patches: 5
+Low-risk patches: 8
+Average risk score: 4.3/10
+
+=== SUMMARY ===
+Coverage: GOOD (90.5%)
+Overall risk: MEDIUM (2 high-risk patches)
+Complexity: LOW (avg: 4.2)
+
+Warning: 5 file(s) have multiple patches - consider reviewing for conflicts
+```
+
+**JSON Output:**
+
+With `--format=json`, outputs structured data for programmatic analysis:
+
+```json
+{
+  "success": true,
+  "coverage": {
+    "totalFiles": 42,
+    "filesWithPatches": 38,
+    "filesWithoutPatches": 4,
+    "coveragePercentage": 90.5,
+    "unpatchedFiles": ["file1.md", "file2.md"],
+    "patchedFiles": ["file3.md", "file4.md"]
+  },
+  "impact": {
+    "totalPatches": 15,
+    "totalAffectedFiles": 38,
+    "patches": [...],
+    "multiPatchFiles": {
+      "guide.md": 3,
+      "readme.md": 2
+    }
+  },
+  "complexity": {
+    "totalFiles": 42,
+    "averageComplexity": 4.2,
+    "maxComplexity": 12.5,
+    "minComplexity": 1.0,
+    "files": [...],
+    "topComplexFiles": [...]
+  },
+  "safety": {
+    "totalPatches": 15,
+    "highRiskPatches": 2,
+    "mediumRiskPatches": 5,
+    "lowRiskPatches": 8,
+    "averageRiskScore": 4.3,
+    "patches": [...],
+    "highestRiskPatches": [...]
+  }
+}
+```
+
+**Use Cases:**
+
+- **Configuration Review:** Understand the impact of your patches before deployment
+- **Risk Assessment:** Identify high-risk operations that need careful testing
+- **Optimization:** Find overly complex configurations that could be simplified
+- **Coverage Gaps:** Discover files that should have patches but don't
+- **CI/CD Integration:** Automate configuration quality checks with JSON output
+- **Documentation:** Generate reports on configuration characteristics
+
+**Exit Code:** Returns 0 on success, 1 on error (e.g., config file not found).
 
 ## Configuration
 

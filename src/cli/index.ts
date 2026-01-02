@@ -78,6 +78,7 @@ import type {
   WatchHooks,
 } from "../core/types.js";
 import { runValidators } from "../core/validators.js";
+import { analyzeCommand } from "./analyze-command.js";
 import { debugCommand } from "./debug-command.js";
 import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
 import { initNonInteractive } from "./init-command.js";
@@ -147,6 +148,8 @@ interface CLIOptions {
   force?: boolean; // For template install --force option
   nonInteractive?: boolean; // For template init --non-interactive option
   progress?: boolean; // For --progress option (show progress feedback)
+  minRisk?: "low" | "medium" | "high"; // For analyze --min-risk option (minimum risk level to show)
+  sort?: "risk" | "complexity" | "impact" | "coverage"; // For analyze --sort option (sort by field)
 }
 
 interface BuildStats {
@@ -594,6 +597,41 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
         const nextArg = args[i + 1];
         if (nextArg && !nextArg.startsWith("-")) {
           options.minConfidence = Number.parseFloat(nextArg);
+          i++;
+        }
+      }
+    } else if (arg === "--min-risk" || arg.startsWith("--min-risk=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value && (value === "low" || value === "medium" || value === "high")) {
+          options.minRisk = value;
+        }
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && (nextArg === "low" || nextArg === "medium" || nextArg === "high")) {
+          options.minRisk = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--sort" || arg.startsWith("--sort=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (
+          value &&
+          (value === "risk" || value === "complexity" || value === "impact" || value === "coverage")
+        ) {
+          options.sort = value;
+        }
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (
+          nextArg &&
+          (nextArg === "risk" ||
+            nextArg === "complexity" ||
+            nextArg === "impact" ||
+            nextArg === "coverage")
+        ) {
+          options.sort = nextArg;
           i++;
         }
       }
@@ -4103,6 +4141,8 @@ async function main(): Promise<number> {
       return await debugCommand(path, options);
     case "test":
       return await testCommand(path, options);
+    case "analyze":
+      return await analyzeCommand(path, options);
     case "suggest":
       return await suggestCommand(options);
     case "template": {
