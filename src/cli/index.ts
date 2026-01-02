@@ -74,6 +74,7 @@ import type {
 } from "../core/types.js";
 import { runValidators } from "../core/validators.js";
 import { debugCommand } from "./debug-command.js";
+import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
 import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
 import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
@@ -3288,114 +3289,34 @@ export {
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
 
-  if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
-    console.log(
-      `
-Kustomark - Declarative markdown patching pipeline
-
-Usage:
-  kustomark build [path]      Build and write output
-  kustomark diff [path]       Show what would change
-  kustomark fetch [path]      Fetch remote resources only (no build)
-  kustomark validate [path]   Validate configuration
-  kustomark watch [path]      Watch and rebuild on file changes
-  kustomark lint [path]       Check for common issues in config
-  kustomark explain [path]    Show resolution chain and patch details
-  kustomark schema            Export JSON Schema for editor integration
-  kustomark init [path]       Create a new kustomark.yaml config
-  kustomark web [path]        Launch web UI for visual editing
-  kustomark debug [path]      Interactive patch debugging mode
-  kustomark cache <cmd>       Manage cache for remote resources
-
-Cache Commands:
-  kustomark cache list              List all cached resources (git and HTTP)
-  kustomark cache clear             Clear all caches
-  kustomark cache clear <pattern>   Clear specific resources matching pattern
-
-  All cache commands support --format=json for machine-readable output.
-
-Debug Mode Flags:
-  --auto-apply                Auto-apply all patches without prompting
-  --file <filename>           Debug only patches affecting specific file
-  --save-decisions <path>     Save decisions to file for replay
-  --load-decisions <path>     Load previous decisions from file
-  --format <text|json>        Output format (default: text)
-
-Explain Flags:
-  --file <filename>           Show lineage for specific file
-  --format <text|json>        Output format (default: text)
-
-Watch Flags:
-  --debounce <ms>             Debounce delay in milliseconds (default: 300)
-  --no-hooks                  Disable watch hooks (for security)
-  --format <text|json>        Output format (default: text)
-
-Init Flags:
-  -i, --interactive           Interactive wizard mode
-  --base <path>               Create overlay referencing base config
-  --output <path>             Set output directory in config
-
-Web Flags:
-  --dev, -d                   Run in development mode with hot reload
-  --port <port>               Server port (default: 3000)
-  --host <host>               Server host (default: localhost)
-  --open, -o                  Open browser automatically
-
-Flags:
-  --format <text|json>        Output format (default: text)
-  --clean                     Remove output files not in source
-  --strict                    Enable strict validation (validate command)
-  --stats                     Show build statistics (build command)
-  -v, -vv, -vvv              Increase verbosity
-  -q                         Quiet mode (errors only)
-
-Performance:
-  --parallel                  Enable parallel processing of files (build command)
-  --jobs <N>                  Number of parallel jobs (default: CPU cores)
-  --incremental               Enable incremental builds (only rebuild changed files)
-  --clean-cache               Clear build cache before building
-  --cache-dir <path>          Custom cache directory (default: ~/.cache/kustomark/builds)
-
-  Parallel mode processes files concurrently while keeping patches
-  sequential within each file. This can significantly speed up builds
-  for projects with many files. Output order is deterministic.
-
-  Incremental builds track file and patch changes to avoid rebuilding
-  unchanged files. The build cache is stored in ~/.cache/kustommark/builds
-  by default. Files are invalidated when source content, patches, or
-  configuration changes. Use --clean-cache to force a full rebuild.
-  Incremental builds work with --parallel for maximum performance.
-
-Group Filtering:
-  --enable-groups <groups>    Enable only specified groups (comma-separated)
-  --disable-groups <groups>   Disable specified groups (comma-separated)
-
-  Group filtering rules:
-  - Patches without a group are always enabled
-  - --enable-groups: whitelist mode (only listed groups + ungrouped)
-  - --disable-groups: blacklist mode (all except listed groups)
-  - If both specified, --enable-groups takes precedence
-
-Lock File:
-  --update                    Update kustomark.lock with latest refs
-  --no-lock                   Ignore lock file (fetch latest versions)
-  --offline                   Fail if remote fetch is needed (use cached resources only)
-  --dry-run                   Preview changes without writing files (build command)
-
-Remote Resources:
-  Git URLs: github.com/org/repo//path?ref=v1.0, git::https://..., git::git@...
-  HTTP Archives: https://example.com/archive.tar.gz//path?checksum=sha256:...
-  All remote resources are cached in ~/.cache/kustomark/ for performance
-
-Exit Codes:
-  0    Success (for diff: no changes)
-  1    Error or changes detected
-    `.trim(),
-    );
+  // Handle help command
+  if (args.length === 0 || args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
+    if (args[0] === "help" && args.length > 1) {
+      // kustomark help <command>
+      const commandName = args[1];
+      if (commandName && isValidHelpCommand(commandName)) {
+        console.log(getCommandHelp(commandName));
+      } else {
+        console.error(`Unknown command: ${commandName || "(none)"}`);
+        console.log("\nAvailable commands:");
+        console.log(getMainHelp());
+      }
+    } else {
+      // kustomark --help or kustomark help
+      console.log(getMainHelp());
+    }
     return 0;
   }
 
   const { command, path, options } = parseArgs(args);
+
+  // Check if --help or -h is in args for specific command help
+  if (args.includes("--help") || args.includes("-h")) {
+    if (command && isValidHelpCommand(command)) {
+      console.log(getCommandHelp(command));
+      return 0;
+    }
+  }
 
   switch (command) {
     case "build":

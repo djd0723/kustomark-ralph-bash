@@ -1,0 +1,1161 @@
+/**
+ * Help Command System for Kustomark CLI
+ * Provides comprehensive documentation for all commands with examples
+ */
+
+// ============================================================================
+// ANSI Color Codes for Terminal Output
+// ============================================================================
+
+const colors = {
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+
+  // Foreground colors
+  cyan: "\x1b[36m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  magenta: "\x1b[35m",
+  white: "\x1b[37m",
+  gray: "\x1b[90m",
+};
+
+// ============================================================================
+// Formatting Helpers
+// ============================================================================
+
+function formatTitle(text: string): string {
+  return `${colors.bold}${colors.cyan}${text}${colors.reset}`;
+}
+
+function formatCommand(text: string): string {
+  return `${colors.green}${text}${colors.reset}`;
+}
+
+function formatFlag(text: string): string {
+  return `${colors.yellow}${text}${colors.reset}`;
+}
+
+function formatExample(text: string): string {
+  return `${colors.dim}${text}${colors.reset}`;
+}
+
+function formatSection(text: string): string {
+  return `${colors.bold}${colors.blue}${text}${colors.reset}`;
+}
+
+function formatHighlight(text: string): string {
+  return `${colors.magenta}${text}${colors.reset}`;
+}
+
+// ============================================================================
+// Main Help (Overview)
+// ============================================================================
+
+export function getMainHelp(): string {
+  return formatHelp(`
+${formatTitle("Kustomark - Declarative markdown patching pipeline")}
+
+${formatSection("USAGE")}
+  ${formatCommand("kustomark")} ${formatFlag("<command>")} [path] [options]
+
+${formatSection("CORE COMMANDS")}
+  ${formatCommand("build")}        Build and write output files
+  ${formatCommand("diff")}         Show what would change without writing files
+  ${formatCommand("validate")}     Validate configuration without building
+  ${formatCommand("watch")}        Monitor files and rebuild on changes
+  ${formatCommand("init")}         Create a new kustomark.yaml config
+
+${formatSection("ADVANCED COMMANDS")}
+  ${formatCommand("debug")}        Interactive patch debugging mode
+  ${formatCommand("lint")}         Check for common issues in configuration
+  ${formatCommand("explain")}      Show resolution chain and patch details
+  ${formatCommand("fetch")}        Fetch remote resources without building
+  ${formatCommand("web")}          Launch web UI for visual editing
+  ${formatCommand("cache")}        Manage cache for remote resources
+  ${formatCommand("schema")}       Export JSON Schema for editor integration
+
+${formatSection("GETTING HELP")}
+  ${formatCommand("kustomark help")}                Show this help message
+  ${formatCommand("kustomark help")} ${formatFlag("<command>")}     Show detailed help for a command
+  ${formatCommand("kustomark")} ${formatFlag("<command>")} ${formatFlag("--help")}  Show detailed help for a command
+
+${formatSection("COMMON FLAGS")}
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+  ${formatFlag("-q")}                     Quiet mode (errors only)
+  ${formatFlag("--help, -h")}             Show help for a command
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    Success (for diff: no changes detected)
+  ${formatHighlight("1")}    Error or changes detected (for diff)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Build from a directory containing kustomark.yaml")}
+  ${formatCommand("kustomark build ./team/")}
+
+  ${formatExample("# Preview changes before building")}
+  ${formatCommand("kustomark diff ./team/")}
+
+  ${formatExample("# Create a new configuration interactively")}
+  ${formatCommand("kustomark init -i")}
+
+  ${formatExample("# Get detailed help for the build command")}
+  ${formatCommand("kustomark help build")}
+
+${formatSection("QUICK START")}
+  1. Create a directory with markdown files
+  2. Run ${formatCommand("kustomark init -i")} to create a config
+  3. Run ${formatCommand("kustomark build .")} to apply patches
+  4. Use ${formatCommand("kustomark watch .")} for development
+
+${formatSection("DOCUMENTATION")}
+  For full documentation, visit:
+  ${formatHighlight("https://github.com/yourusername/kustomark")}
+
+  For more help on a specific command:
+  ${formatCommand("kustomark help")} ${formatFlag("<command>")}
+`);
+}
+
+// ============================================================================
+// Command-Specific Help
+// ============================================================================
+
+export function getCommandHelp(command: string): string {
+  const helpFunctions: Record<string, () => string> = {
+    build: getBuildHelp,
+    diff: getDiffHelp,
+    validate: getValidateHelp,
+    watch: getWatchHelp,
+    init: getInitHelp,
+    debug: getDebugHelp,
+    lint: getLintHelp,
+    explain: getExplainHelp,
+    fetch: getFetchHelp,
+    web: getWebHelp,
+    cache: getCacheHelp,
+    schema: getSchemaHelp,
+  };
+
+  const helpFunc = helpFunctions[command];
+  if (!helpFunc) {
+    return `Unknown command: ${command}\n\nRun 'kustomark help' for a list of available commands.`;
+  }
+
+  return formatHelp(helpFunc());
+}
+
+// ============================================================================
+// Build Command Help
+// ============================================================================
+
+function getBuildHelp(): string {
+  return `
+${formatTitle("kustomark build - Build and write output files")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark build")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Build processes markdown files through your patch pipeline and writes
+  the output to the configured output directory. It resolves resources,
+  applies patches, and generates the final customized markdown files.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("--clean")}                Remove output files not in source
+  ${formatFlag("--dry-run")}              Preview changes without writing files
+  ${formatFlag("--stats")}                Show detailed build statistics
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+  ${formatFlag("-q")}                     Quiet mode (errors only)
+
+${formatSection("PERFORMANCE OPTIONS")}
+  ${formatFlag("--parallel")}             Enable parallel processing of files
+  ${formatFlag("--jobs")} <N>             Number of parallel jobs (default: CPU count)
+  ${formatFlag("--incremental")}          Only rebuild changed files
+  ${formatFlag("--clean-cache")}          Clear build cache before building
+  ${formatFlag("--cache-dir")} <path>     Custom cache directory
+
+${formatSection("GROUP FILTERING")}
+  ${formatFlag("--enable-groups")} <list>   Enable only specified groups (comma-separated)
+  ${formatFlag("--disable-groups")} <list>  Disable specified groups (comma-separated)
+
+  Patches without a group are always enabled. If both flags are specified,
+  --enable-groups takes precedence (whitelist mode).
+
+${formatSection("LOCK FILE OPTIONS")}
+  ${formatFlag("--update")}               Update kustomark.lock with latest refs
+  ${formatFlag("--no-lock")}              Ignore lock file (fetch latest versions)
+  ${formatFlag("--offline")}              Fail if remote fetch is needed
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Basic build")}
+  ${formatCommand("kustomark build ./team/")}
+
+  ${formatExample("# Build with JSON output")}
+  ${formatCommand("kustomark build ./team/ --format=json")}
+
+  ${formatExample("# Preview changes without writing files")}
+  ${formatCommand("kustomark build ./team/ --dry-run")}
+
+  ${formatExample("# Build and clean extra files")}
+  ${formatCommand("kustomark build ./team/ --clean")}
+
+  ${formatExample("# Fast parallel build")}
+  ${formatCommand("kustomark build ./team/ --parallel --incremental")}
+
+  ${formatExample("# Build with specific patch groups only")}
+  ${formatCommand("kustomark build ./team/ --enable-groups=branding,security")}
+
+  ${formatExample("# Build excluding certain patch groups")}
+  ${formatCommand("kustomark build ./team/ --disable-groups=experimental")}
+
+${formatSection("WORKFLOWS")}
+  ${formatHighlight("Development workflow:")}
+    1. ${formatCommand("kustomark build . --dry-run")} - Preview changes
+    2. ${formatCommand("kustomark build .")} - Build output
+    3. ${formatCommand("kustomark build . --clean")} - Clean build
+
+  ${formatHighlight("Production workflow:")}
+    1. ${formatCommand("kustomark build . --offline")} - Use locked versions
+    2. ${formatCommand("kustomark validate .")} - Verify config
+    3. ${formatCommand("kustomark build . --stats")} - Build with metrics
+
+  ${formatHighlight("Performance workflow:")}
+    1. ${formatCommand("kustomark build . --parallel --incremental")} - Fast first build
+    2. Make changes to source files
+    3. ${formatCommand("kustomark build . --incremental")} - Fast incremental rebuild
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    Build succeeded
+  ${formatHighlight("1")}    Build failed or validation error
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark diff")}     Preview changes before building
+  ${formatCommand("kustomark watch")}    Auto-rebuild on file changes
+  ${formatCommand("kustomark validate")} Validate configuration
+`;
+}
+
+// ============================================================================
+// Diff Command Help
+// ============================================================================
+
+function getDiffHelp(): string {
+  return `
+${formatTitle("kustomark diff - Show what would change")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark diff")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Diff shows what changes would be made without writing any files. This is
+  useful for previewing the effects of your patches before committing to a
+  build. The command compares current files with what would be generated.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+  ${formatFlag("-q")}                     Quiet mode (errors only)
+
+  All build options (--parallel, --incremental, --enable-groups, etc.) are
+  also supported for diff to ensure accurate preview.
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Show diff in text format")}
+  ${formatCommand("kustomark diff ./team/")}
+
+  ${formatExample("# Show diff with details")}
+  ${formatCommand("kustomark diff ./team/ -v")}
+
+  ${formatExample("# Get diff as JSON")}
+  ${formatCommand("kustomark diff ./team/ --format=json")}
+
+  ${formatExample("# Check if changes exist (use exit code)")}
+  ${formatCommand("kustomark diff ./team/ -q && echo 'No changes' || echo 'Changes detected'")}
+
+${formatSection("OUTPUT FORMAT")}
+  ${formatHighlight("Text format:")}
+    Shows unified diff format with + and - for changes
+    Lists added, modified, and deleted files
+
+  ${formatHighlight("JSON format:")}
+    {
+      "hasChanges": true,
+      "files": [
+        {
+          "path": "guide.md",
+          "status": "modified",
+          "diff": "--- a/guide.md\\n+++ b/guide.md\\n..."
+        }
+      ]
+    }
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    No changes detected
+  ${formatHighlight("1")}    Changes detected or error
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Pre-commit checks:")}
+    ${formatCommand("kustomark diff . -q")}
+    Verify patches before committing configuration changes
+
+  ${formatHighlight("CI/CD validation:")}
+    ${formatCommand("kustomark diff . --format=json > diff.json")}
+    Capture changes for automated testing
+
+  ${formatHighlight("Review workflow:")}
+    ${formatCommand("kustomark diff . | less")}
+    Review all changes before building
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark build")}     Build and write files
+  ${formatCommand("kustomark debug")}     Interactive patch debugging
+`;
+}
+
+// ============================================================================
+// Validate Command Help
+// ============================================================================
+
+function getValidateHelp(): string {
+  return `
+${formatTitle("kustomark validate - Validate configuration")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark validate")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Validate checks your kustomark.yaml configuration for errors without
+  building or writing any files. It verifies syntax, required fields,
+  patch operations, and resource references.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("--strict")}               Enable strict validation mode
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+  ${formatFlag("-q")}                     Quiet mode (errors only)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Validate configuration")}
+  ${formatCommand("kustomark validate ./team/")}
+
+  ${formatExample("# Get validation results as JSON")}
+  ${formatCommand("kustomark validate ./team/ --format=json")}
+
+  ${formatExample("# Strict validation (treat warnings as errors)")}
+  ${formatCommand("kustomark validate ./team/ --strict")}
+
+${formatSection("VALIDATION CHECKS")}
+  ${formatHighlight("Required fields:")}
+    - apiVersion must be 'kustomark/v1'
+    - kind must be 'Kustomization'
+    - resources must be a non-empty array
+
+  ${formatHighlight("Patch validation:")}
+    - Valid operation types
+    - Required fields for each operation
+    - Valid glob patterns
+    - Valid regex patterns
+    - Valid frontmatter keys
+
+  ${formatHighlight("Resource validation:")}
+    - Valid glob patterns
+    - Valid file paths
+    - Valid git URLs
+    - Valid HTTP URLs
+
+${formatSection("OUTPUT FORMAT")}
+  ${formatHighlight("Text format:")}
+    ✓ Valid configuration
+    Or lists errors and warnings
+
+  ${formatHighlight("JSON format:")}
+    {
+      "valid": true|false,
+      "errors": [...],
+      "warnings": [...]
+    }
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    Configuration is valid
+  ${formatHighlight("1")}    Configuration has errors
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark lint")}      Check for common issues
+  ${formatCommand("kustomark build")}     Build after validating
+`;
+}
+
+// ============================================================================
+// Watch Command Help
+// ============================================================================
+
+function getWatchHelp(): string {
+  return `
+${formatTitle("kustomark watch - Monitor and rebuild on changes")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark watch")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Watch monitors your source files and configuration for changes and
+  automatically rebuilds the output. This is useful during development
+  for immediate feedback. Watch mode can also execute custom hooks on
+  build events.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--debounce")} <ms>         Debounce interval in milliseconds (default: 300)
+  ${formatFlag("--no-hooks")}             Disable watch hooks for security
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+  ${formatFlag("-q")}                     Quiet mode (errors only)
+
+  All build options are also supported for watch mode.
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Start watch mode")}
+  ${formatCommand("kustomark watch ./team/")}
+
+  ${formatExample("# Watch with custom debounce interval")}
+  ${formatCommand("kustomark watch ./team/ --debounce=500")}
+
+  ${formatExample("# Watch with JSON output for integration")}
+  ${formatCommand("kustomark watch ./team/ --format=json")}
+
+  ${formatExample("# Disable watch hooks for security")}
+  ${formatCommand("kustomark watch ./team/ --no-hooks")}
+
+  ${formatExample("# Watch with verbose logging")}
+  ${formatCommand("kustomark watch ./team/ -vv")}
+
+${formatSection("WATCH HOOKS")}
+  Configure hooks in your kustomark.yaml to execute commands on events:
+
+  watch:
+    onBuild:
+      - echo "Build completed at {{timestamp}}"
+      - ./deploy.sh
+    onError:
+      - echo "Build failed: {{error}}"
+    onChange:
+      - echo "File changed: {{file}}"
+
+  ${formatHighlight("Available template variables:")}
+    {{file}}       - Changed file path (onChange only)
+    {{error}}      - Error message (onError only)
+    {{exitCode}}   - Build exit code
+    {{timestamp}}  - ISO 8601 timestamp
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Development workflow:")}
+    ${formatCommand("kustomark watch . --debounce=100")}
+    Fast rebuilds during active development
+
+  ${formatHighlight("Documentation server:")}
+    Configure onBuild hook to restart doc server
+    Auto-deploy on successful builds
+
+  ${formatHighlight("Testing workflow:")}
+    Configure onBuild hook to run tests
+    Get immediate feedback on changes
+
+${formatSection("JSON OUTPUT")}
+  With --format=json, watch outputs newline-delimited JSON events:
+
+  {"event":"build","success":true,"filesWritten":5,...}
+  {"event":"build","success":false,"error":"..."}
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark build")}     Manual build
+  ${formatCommand("kustomark web")}       Visual editing interface
+`;
+}
+
+// ============================================================================
+// Init Command Help
+// ============================================================================
+
+function getInitHelp(): string {
+  return `
+${formatTitle("kustomark init - Create a new configuration")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark init")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Init creates a new kustomark.yaml configuration file. It can run
+  interactively with a guided wizard or non-interactively with flags
+  for automation. Choose between creating a base configuration or an
+  overlay that extends another configuration.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path where kustomark.yaml will be created (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("-i, --interactive")}      Launch interactive wizard with prompts
+  ${formatFlag("--base")} <path>          Create overlay config referencing base
+  ${formatFlag("--output")} <path>        Set output directory (non-interactive)
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+
+${formatSection("MODES")}
+  ${formatHighlight("Interactive mode (recommended for beginners):")}
+    Guided wizard with prompts for all configuration options
+    Explains each choice and provides examples
+    Ideal for first-time users
+
+  ${formatHighlight("Non-interactive mode (for automation):")}
+    Use flags to create configurations programmatically
+    Without --base: creates a base configuration
+    With --base: creates an overlay configuration
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Interactive mode - guided wizard")}
+  ${formatCommand("kustomark init -i")}
+
+  ${formatExample("# Create base config with defaults")}
+  ${formatCommand("kustomark init ./base")}
+
+  ${formatExample("# Create overlay config referencing a base")}
+  ${formatCommand("kustomark init ./team --base=../base --output=./output")}
+
+  ${formatExample("# Create config in current directory")}
+  ${formatCommand("kustomark init .")}
+
+${formatSection("INTERACTIVE WIZARD")}
+  The wizard guides you through:
+    1. Configuration type (base or overlay)
+    2. Output directory
+    3. Resource patterns (for base configs)
+    4. Base configuration path (for overlays)
+    5. Starter patches with detailed options
+    6. Error handling strategy
+
+${formatSection("CONFIGURATION TYPES")}
+  ${formatHighlight("Base configuration:")}
+    - Contains actual markdown files
+    - Defines resources as glob patterns
+    - Can be referenced by overlays
+
+  ${formatHighlight("Overlay configuration:")}
+    - References a base configuration
+    - Adds or overrides patches
+    - Used for team/environment customization
+
+${formatSection("WORKFLOW")}
+  ${formatHighlight("Single project:")}
+    1. ${formatCommand("kustomark init -i")} in your docs directory
+    2. Add patches to customize content
+    3. ${formatCommand("kustomark build .")}
+
+  ${formatHighlight("Multi-layer setup:")}
+    1. ${formatCommand("kustomark init base/")} - Create base
+    2. ${formatCommand("kustomark init team/ --base=../base")} - Create overlay
+    3. ${formatCommand("kustomark build team/")} - Build with overlays
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark validate")} Validate created configuration
+  ${formatCommand("kustomark build")}    Build from configuration
+`;
+}
+
+// ============================================================================
+// Debug Command Help
+// ============================================================================
+
+function getDebugHelp(): string {
+  return `
+${formatTitle("kustomark debug - Interactive patch debugging")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark debug")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Debug provides an interactive mode for stepping through patch operations
+  one by one. You can inspect each patch, see how it would modify files,
+  and choose to apply or skip it. This is invaluable for troubleshooting
+  patch configurations and understanding patch behavior.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--auto-apply")}           Automatically apply all patches without prompting
+  ${formatFlag("--file")} <filename>      Debug only patches affecting a specific file
+  ${formatFlag("--save-decisions")} <path> Save apply/skip decisions to a file
+  ${formatFlag("--load-decisions")} <path> Load previous decisions from a file
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Interactive mode - step through each patch")}
+  ${formatCommand("kustomark debug ./team/")}
+
+  ${formatExample("# Debug patches for a specific file only")}
+  ${formatCommand("kustomark debug ./team/ --file guide.md")}
+
+  ${formatExample("# Auto-apply mode with saved decisions")}
+  ${formatCommand("kustomark debug ./team/ --auto-apply --load-decisions decisions.json")}
+
+  ${formatExample("# Save decisions for replay")}
+  ${formatCommand("kustomark debug ./team/ --save-decisions decisions.json")}
+
+  ${formatExample("# Combine: load previous decisions and save updates")}
+  ${formatCommand("kustomark debug ./team/ --load-decisions prev.json --save-decisions updated.json")}
+
+${formatSection("INTERACTIVE MODE")}
+  For each patch, debug mode shows:
+    - Patch details (operation, fields)
+    - Target file name
+    - File preview (first 10 lines)
+    - Progress indicator
+
+  You can choose:
+    ${formatFlag("a")} - Apply this patch
+    ${formatFlag("s")} - Skip this patch
+    ${formatFlag("q")} - Quit debug session
+
+${formatSection("DECISION FILES")}
+  Decisions are saved in JSON format:
+
+  [
+    {
+      "file": "guide.md",
+      "patchIndex": 0,
+      "action": "apply"
+    },
+    {
+      "file": "guide.md",
+      "patchIndex": 1,
+      "action": "skip"
+    }
+  ]
+
+  Use these to replay debugging sessions or create test cases.
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Troubleshooting:")}
+    ${formatCommand("kustomark debug . --file problematic.md")}
+    See exactly which patches affect a file and how
+
+  ${formatHighlight("Testing new patches:")}
+    ${formatCommand("kustomark debug .")}
+    Verify patches work as expected before committing
+
+  ${formatHighlight("Creating test scenarios:")}
+    ${formatCommand("kustomark debug . --save-decisions test-case.json")}
+    Save decisions for automated testing
+
+  ${formatHighlight("Reproducing issues:")}
+    ${formatCommand("kustomark debug . --load-decisions issue-123.json")}
+    Replay exact sequence that caused a problem
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark diff")}      Preview all changes at once
+  ${formatCommand("kustomark explain")}   Understand patch resolution
+`;
+}
+
+// ============================================================================
+// Lint Command Help
+// ============================================================================
+
+function getLintHelp(): string {
+  return `
+${formatTitle("kustomark lint - Check for common issues")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark lint")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Lint analyzes your configuration for common issues, anti-patterns,
+  and potential problems that aren't strict errors but could cause
+  unexpected behavior. It provides recommendations for improving your
+  configuration.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+  ${formatFlag("-q")}                     Quiet mode (errors only)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Check for common issues")}
+  ${formatCommand("kustomark lint ./team/")}
+
+  ${formatExample("# Get lint results as JSON")}
+  ${formatCommand("kustomark lint ./team/ --format=json")}
+
+  ${formatExample("# Verbose lint with detailed explanations")}
+  ${formatCommand("kustomark lint ./team/ -v")}
+
+${formatSection("CHECKS PERFORMED")}
+  ${formatHighlight("Overlapping patches:")}
+    Detects patches that might conflict or overlap
+    Warns about duplicate replacements
+
+  ${formatHighlight("Redundant patches:")}
+    Identifies patches that have no effect
+    Detects patches that cancel each other out
+
+  ${formatHighlight("Resource issues:")}
+    Warns about missing resources
+    Detects unreachable configurations
+
+  ${formatHighlight("Performance issues:")}
+    Suggests using --parallel for large projects
+    Recommends --incremental for development
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Pre-commit check:")}
+    ${formatCommand("kustomark lint . && git commit")}
+    Catch issues before committing
+
+  ${formatHighlight("CI/CD validation:")}
+    ${formatCommand("kustomark lint . --format=json")}
+    Automated quality checks
+
+  ${formatHighlight("Configuration review:")}
+    ${formatCommand("kustomark lint . -v")}
+    Understand potential issues in detail
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark validate")} Check for errors
+  ${formatCommand("kustomark explain")}  Understand configuration
+`;
+}
+
+// ============================================================================
+// Explain Command Help
+// ============================================================================
+
+function getExplainHelp(): string {
+  return `
+${formatTitle("kustomark explain - Show resolution chain")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark explain")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Explain shows how kustomark resolves your configuration, including
+  the full chain of overlays, resource resolution, and which patches
+  apply to which files. This helps you understand complex multi-layer
+  configurations and troubleshoot unexpected behavior.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--file")} <filename>      Show lineage for a specific file
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+  ${formatFlag("-q")}                     Quiet mode (errors only)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Show full resolution chain")}
+  ${formatCommand("kustomark explain ./team/")}
+
+  ${formatExample("# Show lineage for a specific file")}
+  ${formatCommand("kustomark explain ./team/ --file guide.md")}
+
+  ${formatExample("# Get explanation as JSON")}
+  ${formatCommand("kustomark explain ./team/ --format=json")}
+
+  ${formatExample("# Detailed explanation with verbose output")}
+  ${formatCommand("kustomark explain ./team/ -v")}
+
+${formatSection("OUTPUT INFORMATION")}
+  ${formatHighlight("Configuration chain:")}
+    Shows the order configurations are loaded
+    Displays resource and patch counts per config
+
+  ${formatHighlight("File lineage (with --file):")}
+    Shows which config introduced the file
+    Lists all patches that apply to the file
+    Shows patch details and order
+
+  ${formatHighlight("Resolution details:")}
+    Total files processed
+    Total patches applied
+    Output directory
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Understanding overlays:")}
+    ${formatCommand("kustomark explain .")}
+    See how base and overlay configs combine
+
+  ${formatHighlight("Troubleshooting files:")}
+    ${formatCommand("kustomark explain . --file mystery.md")}
+    Find out where a file comes from
+
+  ${formatHighlight("Patch debugging:")}
+    ${formatCommand("kustomark explain . --file guide.md -v")}
+    See all patches affecting a file in order
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark debug")}     Interactive patch debugging
+  ${formatCommand("kustomark lint")}      Check for issues
+`;
+}
+
+// ============================================================================
+// Fetch Command Help
+// ============================================================================
+
+function getFetchHelp(): string {
+  return `
+${formatTitle("kustomark fetch - Fetch remote resources")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark fetch")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Fetch downloads remote resources (git repositories, HTTP archives) and
+  caches them locally without building. This is useful for pre-downloading
+  dependencies, updating caches, or verifying remote resource availability.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--update")}               Update kustomark.lock with latest refs
+  ${formatFlag("--no-lock")}              Ignore lock file (fetch latest versions)
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Fetch all remote resources")}
+  ${formatCommand("kustomark fetch ./team/")}
+
+  ${formatExample("# Update lock file with latest versions")}
+  ${formatCommand("kustomark fetch ./team/ --update")}
+
+  ${formatExample("# Fetch latest versions (ignore lock)")}
+  ${formatCommand("kustomark fetch ./team/ --no-lock")}
+
+${formatSection("REMOTE RESOURCE TYPES")}
+  ${formatHighlight("Git repositories:")}
+    github.com/org/repo//path?ref=v1.0.0
+    git::https://github.com/org/repo.git//path?ref=main
+    git::git@github.com:org/repo.git//path?ref=v2.0
+
+  ${formatHighlight("HTTP archives:")}
+    https://example.com/archive.tar.gz//path
+    https://example.com/file.zip//path?checksum=sha256:abc123...
+
+${formatSection("CACHE LOCATIONS")}
+  ${formatHighlight("Git cache:")}      ~/.cache/kustomark/git/
+  ${formatHighlight("HTTP cache:")}     ~/.cache/kustomark/http/
+  ${formatHighlight("Build cache:")}    ~/.cache/kustomark/builds/
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Pre-download dependencies:")}
+    ${formatCommand("kustomark fetch .")}
+    Download all remotes before offline work
+
+  ${formatHighlight("Update dependencies:")}
+    ${formatCommand("kustomark fetch . --update")}
+    Get latest versions and update lock file
+
+  ${formatHighlight("CI/CD caching:")}
+    ${formatCommand("kustomark fetch . && kustomark build . --offline")}
+    Separate fetch and build steps for better caching
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark cache")}    Manage cache
+  ${formatCommand("kustomark build")}    Build with fetched resources
+`;
+}
+
+// ============================================================================
+// Web Command Help
+// ============================================================================
+
+function getWebHelp(): string {
+  return `
+${formatTitle("kustomark web - Visual editing interface")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark web")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Web launches a visual interface for editing kustomark configurations,
+  previewing changes, and managing patches through a GUI. It provides
+  an alternative to editing YAML files directly and includes real-time
+  diff viewing and markdown preview.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--dev, -d")}              Run in development mode with hot reload
+  ${formatFlag("--port")} <port>          Server port (default: 3000)
+  ${formatFlag("--host")} <host>          Server host (default: localhost)
+  ${formatFlag("--open, -o")}             Open browser automatically
+  ${formatFlag("-v")}                     Verbose logging
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Start web UI (production mode)")}
+  ${formatCommand("kustomark web")}
+
+  ${formatExample("# Development mode with hot reload")}
+  ${formatCommand("kustomark web --dev")}
+
+  ${formatExample("# Custom port and auto-open browser")}
+  ${formatCommand("kustomark web --port 8080 --open")}
+
+  ${formatExample("# Listen on all interfaces")}
+  ${formatCommand("kustomark web --host 0.0.0.0")}
+
+${formatSection("FEATURES")}
+  ${formatHighlight("Visual Config Editor:")}
+    - YAML configuration preview
+    - Add, edit, delete, reorder patches
+    - Drag-and-drop patch reordering
+
+  ${formatHighlight("Patch Form:")}
+    - Support for all 22 patch operations
+    - Context-aware field rendering
+    - Real-time validation
+    - Common fields (id, extends, include, exclude, etc.)
+
+  ${formatHighlight("Four View Modes:")}
+    - Editor: Manage configuration and patches
+    - Diff: Side-by-side diff viewer
+    - Preview: Rendered markdown preview
+    - Files: File browser with content viewer
+
+  ${formatHighlight("Build Integration:")}
+    - Execute builds with flags
+    - View build results and statistics
+    - See validation errors and warnings
+
+  ${formatHighlight("File Browser:")}
+    - Tree view of project structure
+    - Expand/collapse directories
+    - View file contents with syntax highlighting
+    - Copy file contents to clipboard
+
+${formatSection("DEVELOPMENT MODE")}
+  With --dev flag:
+    - Backend API server: http://localhost:3000
+    - Frontend dev server: http://localhost:5173 (Vite)
+    - Hot reload for instant feedback
+    - Source maps for debugging
+
+${formatSection("PRODUCTION MODE")}
+  Default mode:
+    - Single server at http://localhost:3000
+    - Serves both API and static assets
+    - Optimized and bundled frontend
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Beginners:")}
+    Visual interface is easier than editing YAML
+    See immediate feedback on changes
+
+  ${formatHighlight("Complex configurations:")}
+    Manage many patches with drag-and-drop
+    Preview changes before building
+
+  ${formatHighlight("Team collaboration:")}
+    Share web UI on network for team editing
+    Visual tool accessible to non-technical users
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark watch")}    Auto-rebuild on changes
+  ${formatCommand("kustomark debug")}    Interactive debugging
+`;
+}
+
+// ============================================================================
+// Cache Command Help
+// ============================================================================
+
+function getCacheHelp(): string {
+  return `
+${formatTitle("kustommark cache - Manage resource cache")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark cache")} <command> [pattern] [options]
+
+${formatSection("DESCRIPTION")}
+  Cache manages the local cache for remote resources (git repositories
+  and HTTP archives). Use it to list cached resources, clear the cache,
+  or remove specific cached items.
+
+${formatSection("COMMANDS")}
+  ${formatFlag("list")}              List all cached resources (git and HTTP)
+  ${formatFlag("clear")}             Clear all caches
+  ${formatFlag("clear")} <pattern>   Clear specific resources matching pattern
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# List all cached resources")}
+  ${formatCommand("kustomark cache list")}
+
+  ${formatExample("# List with JSON output")}
+  ${formatCommand("kustomark cache list --format=json")}
+
+  ${formatExample("# Clear all caches")}
+  ${formatCommand("kustomark cache clear")}
+
+  ${formatExample("# Clear specific repository cache")}
+  ${formatCommand("kustomark cache clear github.com/org/repo")}
+
+  ${formatExample("# Clear all github.com caches")}
+  ${formatCommand("kustomark cache clear github.com")}
+
+${formatSection("CACHE STRUCTURE")}
+  ${formatHighlight("Git cache (~/.cache/kustomark/git/):")}
+    Stores cloned repositories by URL hash
+    Includes refs and checkouts
+
+  ${formatHighlight("HTTP cache (~/.cache/kustomark/http/):")}
+    Stores downloaded archives by URL hash
+    Includes extracted contents
+
+  ${formatHighlight("Build cache (~/.cache/kustomark/builds/):")}
+    Stores incremental build state
+    Tracks file hashes and patch changes
+
+${formatSection("WHEN TO CLEAR CACHE")}
+  ${formatHighlight("Troubleshooting:")}
+    ${formatCommand("kustomark cache clear")}
+    Clear all caches if seeing stale content
+
+  ${formatHighlight("Freeing disk space:")}
+    ${formatCommand("kustomark cache clear")}
+    Remove cached resources no longer needed
+
+  ${formatHighlight("Updating specific resource:")}
+    ${formatCommand("kustomark cache clear github.com/org/repo")}
+    Clear one resource to re-fetch latest
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark fetch")}    Fetch remote resources
+  ${formatCommand("kustomark build")}    Build (uses cache)
+`;
+}
+
+// ============================================================================
+// Schema Command Help
+// ============================================================================
+
+function getSchemaHelp(): string {
+  return `
+${formatTitle("kustomark schema - Export JSON Schema")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark schema")} [options]
+
+${formatSection("DESCRIPTION")}
+  Schema generates a JSON Schema definition for kustomark.yaml files.
+  This schema can be used by editors like VSCode for autocomplete,
+  validation, and documentation while editing configurations.
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--format")} <json>    Output format (always JSON for schema)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Generate schema and save to file")}
+  ${formatCommand("kustomark schema > kustomark.schema.json")}
+
+  ${formatExample("# Pretty-print schema")}
+  ${formatCommand("kustomark schema | jq .")}
+
+${formatSection("EDITOR INTEGRATION")}
+  ${formatHighlight("VSCode:")}
+    Install the Kustomark extension for built-in support
+    Or configure schema manually in settings.json:
+
+    {
+      "yaml.schemas": {
+        "./kustomark.schema.json": "kustomark.yaml"
+      }
+    }
+
+  ${formatHighlight("Other editors:")}
+    Most YAML-aware editors support JSON Schema
+    Reference the generated schema for your files
+
+${formatSection("SCHEMA FEATURES")}
+  - Autocomplete for all fields and operations
+  - Validation for required fields
+  - Documentation for each property
+  - Enum validation for fixed values
+  - Pattern validation for regex and globs
+
+${formatSection("USE CASES")}
+  ${formatHighlight("IDE setup:")}
+    ${formatCommand("kustomark schema > schema.json")}
+    Configure editor for autocomplete
+
+  ${formatHighlight("Documentation generation:")}
+    Generate schema to create API documentation
+    Use tools like json-schema-to-markdown
+
+  ${formatHighlight("Validation in CI/CD:")}
+    Validate configs against schema in pipelines
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark validate")} Validate configuration
+  ${formatCommand("kustomark web")}      Visual editor with validation
+`;
+}
+
+// ============================================================================
+// Format Helper
+// ============================================================================
+
+/**
+ * Apply final formatting to help text
+ */
+function formatHelp(content: string): string {
+  // Remove leading/trailing empty lines
+  return content.trim();
+}
+
+// ============================================================================
+// Export all help functions
+// ============================================================================
+
+export const helpCommands = [
+  "build",
+  "diff",
+  "validate",
+  "watch",
+  "init",
+  "debug",
+  "lint",
+  "explain",
+  "fetch",
+  "web",
+  "cache",
+  "schema",
+] as const;
+
+export type HelpCommand = (typeof helpCommands)[number];
+
+export function isValidHelpCommand(command: string): command is HelpCommand {
+  return helpCommands.includes(command as HelpCommand);
+}
