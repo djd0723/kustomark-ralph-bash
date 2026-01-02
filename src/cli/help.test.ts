@@ -143,6 +143,7 @@ describe("Help System", () => {
         "debug",
         "lint",
         "explain",
+        "analyze",
         "fetch",
         "web",
         "cache",
@@ -152,7 +153,7 @@ describe("Help System", () => {
         "suggest",
       ];
       expect(helpCommands).toEqual(expect.arrayContaining(expected));
-      expect(helpCommands.length).toBe(15);
+      expect(helpCommands.length).toBe(16);
     });
 
     test("has no duplicates", () => {

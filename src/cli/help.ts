@@ -72,6 +72,7 @@ ${formatSection("ADVANCED COMMANDS")}
   ${formatCommand("debug")}        Interactive patch debugging mode
   ${formatCommand("lint")}         Check for common issues in configuration
   ${formatCommand("explain")}      Show resolution chain and patch details
+  ${formatCommand("analyze")}      Analyze patch complexity and provide insights
   ${formatCommand("suggest")}      Generate patches from file differences
   ${formatCommand("test")}         Run patch tests against sample content
   ${formatCommand("template")}     Manage and apply configuration templates
@@ -137,6 +138,7 @@ export function getCommandHelp(command: string): string {
     debug: getDebugHelp,
     lint: getLintHelp,
     explain: getExplainHelp,
+    analyze: getAnalyzeHelp,
     test: getTestHelp,
     fetch: getFetchHelp,
     web: getWebHelp,
@@ -819,6 +821,125 @@ ${formatSection("USE CASES")}
 ${formatSection("SEE ALSO")}
   ${formatCommand("kustomark debug")}     Interactive patch debugging
   ${formatCommand("kustomark lint")}      Check for issues
+`;
+}
+
+// ============================================================================
+// Analyze Command Help
+// ============================================================================
+
+function getAnalyzeHelp(): string {
+  return `
+${formatTitle("kustomark analyze - Analyze patch configuration")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark analyze")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Analyze provides insights into your patch configuration by examining
+  complexity, patterns, and potential optimizations. It helps you understand
+  the maintainability of your configuration and suggests improvements.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("--show-patterns")}        Show detailed pattern analysis
+  ${formatFlag("--show-recommendations")} Show optimization recommendations
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
+  ${formatFlag("-q")}                     Quiet mode (errors only)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Analyze configuration")}
+  ${formatCommand("kustomark analyze ./team/")}
+
+  ${formatExample("# Get analysis as JSON")}
+  ${formatCommand("kustomark analyze ./team/ --format=json")}
+
+  ${formatExample("# Show detailed pattern analysis")}
+  ${formatCommand("kustomark analyze ./team/ --show-patterns")}
+
+  ${formatExample("# Get recommendations for optimization")}
+  ${formatCommand("kustomark analyze ./team/ --show-recommendations")}
+
+${formatSection("ANALYSIS METRICS")}
+  ${formatHighlight("Complexity Score:")}
+    Overall complexity (0-100) based on:
+    - Number of patches
+    - Operation diversity
+    - Pattern complexity
+    - Conditional logic depth
+
+  ${formatHighlight("Maintainability Score:")}
+    Ease of understanding and modifying (0-100)
+    Higher scores indicate simpler, clearer configs
+
+  ${formatHighlight("Pattern Detection:")}
+    Identifies common patterns like:
+    - Repeated replacements (suggest regex)
+    - Similar patches (suggest inheritance)
+    - Overlapping operations (suggest merge)
+
+  ${formatHighlight("Recommendations:")}
+    Actionable suggestions to improve config:
+    - Use patch groups for organization
+    - Consolidate similar operations
+    - Add validation rules
+    - Optimize resource patterns
+
+${formatSection("OUTPUT FORMAT")}
+  ${formatHighlight("Text format:")}
+    Human-readable summary with scores
+    Lists patterns and recommendations
+    Color-coded severity levels
+
+  ${formatHighlight("JSON format:")}
+    {
+      "complexity": 35,
+      "maintainability": 82,
+      "patches": {
+        "total": 15,
+        "byOperation": {...}
+      },
+      "patterns": [...],
+      "recommendations": [...]
+    }
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Configuration review:")}
+    ${formatCommand("kustomark analyze .")}
+    Understand config complexity before making changes
+
+  ${formatHighlight("Optimization:")}
+    ${formatCommand("kustomark analyze . --show-recommendations")}
+    Find ways to simplify and improve configuration
+
+  ${formatHighlight("Team onboarding:")}
+    ${formatCommand("kustomark analyze . --show-patterns")}
+    Help new team members understand config structure
+
+  ${formatHighlight("CI/CD metrics:")}
+    ${formatCommand("kustomark analyze . --format=json")}
+    Track configuration complexity over time
+
+${formatSection("INTERPRETATION")}
+  ${formatHighlight("Complexity Scores:")}
+    0-25:   Simple configuration
+    26-50:  Moderate complexity
+    51-75:  Complex configuration
+    76-100: Very complex (consider refactoring)
+
+  ${formatHighlight("Maintainability Scores:")}
+    80-100: Highly maintainable
+    60-79:  Moderately maintainable
+    40-59:  Challenging to maintain
+    0-39:   Difficult to maintain (needs refactoring)
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark lint")}      Check for issues
+  ${formatCommand("kustomark explain")}   Understand resolution
+  ${formatCommand("kustomark validate")}  Validate configuration
 `;
 }
 
@@ -1669,6 +1790,7 @@ export const helpCommands = [
   "debug",
   "lint",
   "explain",
+  "analyze",
   "test",
   "fetch",
   "web",
