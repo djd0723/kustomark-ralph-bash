@@ -116,6 +116,17 @@ export {
 } from "./lock-file.js";
 // Export nested value utilities
 export { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
+// Export preview generator functions and types
+export {
+  type CharDiff,
+  type CharDiffType,
+  type FilePreview,
+  generateFilePreview,
+  generatePreview,
+  type LineChange,
+  type LineChangeType,
+  type PreviewResult,
+} from "./preview-generator.js";
 // Export all patch engine functions
 export {
   applyAppendToSection,

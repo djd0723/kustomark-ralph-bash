@@ -98,6 +98,7 @@ import { suggestCommand } from "./suggest-command.js";
 import { templateApply, templateList, templateShow } from "./template-commands.js";
 import { templateInitCommand } from "./template-init-command.js";
 import { templateInstallCommand } from "./template-install-command.js";
+import { executePreviewCommand } from "./preview-command.js";
 import { executeOnBuildHooks, executeOnChangeHooks, executeOnErrorHooks } from "./watch-hooks.js";
 import { webCommand } from "./web-command.js";
 
@@ -105,7 +106,7 @@ import { webCommand } from "./web-command.js";
 // Types
 // ============================================================================
 
-interface CLIOptions {
+export interface CLIOptions {
   format: "text" | "json";
   clean: boolean;
   strict: boolean;
@@ -4184,6 +4185,8 @@ async function main(): Promise<number> {
       return await buildCommand(path, options);
     case "diff":
       return await diffCommand(path, options);
+    case "preview":
+      return await executePreviewCommand(path, options);
     case "fetch":
       return await fetchCommand(path, options);
     case "validate":

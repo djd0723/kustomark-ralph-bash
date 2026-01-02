@@ -6,6 +6,22 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 ## Recent Enhancements
 
+**2026-01-02 (Preview Command with Side-by-Side Diff - NEW FEATURE!):**
+- ✅ **NEW FEATURE**: Visual side-by-side preview command for rich diff visualization
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/preview-generator.ts` with character-level diff engine
+- ✅ **Character-Level Diffs**: Computes character-by-character differences using LCS algorithm
+- ✅ **Line-Level Analysis**: Tracks insertions, deletions, modifications, and unchanged context
+- ✅ **Side-by-Side Rendering**: Terminal-based visual comparison with ANSI color coding
+- ✅ **Rich Color Coding**: Red background for deletions, green for insertions, yellow for modifications
+- ✅ **Context Control**: `-v` for more context, `-q` for changes-only mode
+- ✅ **JSON Export**: Complete preview data structure for tooling and automation
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/cli/preview-command.ts` with terminal renderer
+- ✅ Added `kustomark preview [path]` command with full CLI integration
+- ✅ Comprehensive help documentation in `src/cli/help.ts`
+- ✅ All 2667 tests passing ✓
+- ✅ All linting checks passing (bun check) ✓
+- 📝 Provides the most user-friendly way to understand patch changes before building
+
 **2026-01-02 (Enhanced Dry-Run Analysis - NEW FEATURE!):**
 - ✅ **NEW FEATURE**: Enhanced dry-run mode with comprehensive build analysis
 - ✅ Created `/home/dex/kustomark-ralph-bash/src/core/dry-run-analyzer.ts` with full analysis engine

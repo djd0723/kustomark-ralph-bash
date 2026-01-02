@@ -151,9 +151,10 @@ describe("Help System", () => {
         "test",
         "template",
         "suggest",
+        "preview",
       ];
       expect(helpCommands).toEqual(expect.arrayContaining(expected));
-      expect(helpCommands.length).toBe(16);
+      expect(helpCommands.length).toBe(17);
     });
 
     test("has no duplicates", () => {

@@ -64,6 +64,7 @@ ${formatSection("USAGE")}
 ${formatSection("CORE COMMANDS")}
   ${formatCommand("build")}        Build and write output files
   ${formatCommand("diff")}         Show what would change without writing files
+  ${formatCommand("preview")}      Visual side-by-side preview of changes
   ${formatCommand("validate")}     Validate configuration without building
   ${formatCommand("watch")}        Monitor files and rebuild on changes
   ${formatCommand("init")}         Create a new kustomark.yaml config
@@ -132,6 +133,7 @@ export function getCommandHelp(command: string): string {
   const helpFunctions: Record<string, () => string> = {
     build: getBuildHelp,
     diff: getDiffHelp,
+    preview: getPreviewHelp,
     validate: getValidateHelp,
     watch: getWatchHelp,
     init: getInitHelp,
@@ -328,7 +330,138 @@ ${formatSection("USE CASES")}
 
 ${formatSection("SEE ALSO")}
   ${formatCommand("kustomark build")}     Build and write files
+  ${formatCommand("kustomark preview")}   Visual side-by-side preview
   ${formatCommand("kustomark debug")}     Interactive patch debugging
+`;
+}
+
+// ============================================================================
+// Preview Command Help
+// ============================================================================
+
+function getPreviewHelp(): string {
+  return `
+${formatTitle("kustomark preview - Visual side-by-side preview of changes")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark preview")} [path] [options]
+
+${formatSection("DESCRIPTION")}
+  Preview shows a side-by-side visual comparison of what changes will be made
+  to your files. It displays before/after columns with character-level diff
+  highlighting, making it easy to see exactly what your patches will do.
+
+  This is the most user-friendly way to understand your changes before
+  committing to a build. Unlike 'diff' which shows unified diffs, preview
+  gives you a rich, color-coded visual comparison.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to directory containing kustomark.yaml (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}          Increase verbosity (more context lines)
+  ${formatFlag("-q")}                     Quiet mode (only show changes, no unchanged lines)
+
+  All build options (--parallel, --incremental, --enable-groups, etc.) are
+  also supported for preview to ensure accurate comparison.
+
+${formatSection("VISUAL FORMAT")}
+  ${formatHighlight("Side-by-side columns:")}
+    Left column shows original content
+    Right column shows modified content
+    Line numbers for easy reference
+
+  ${formatHighlight("Color coding:")}
+    ${formatCommand("Red background")}     Deleted text (character-level)
+    ${formatCommand("Green background")}   Inserted text (character-level)
+    ${formatCommand("Yellow")}             Modified lines
+    ${formatCommand("Gray (dim)")}         Unchanged context lines
+
+  ${formatHighlight("Change markers:")}
+    ${formatCommand("-")}  Line deletion
+    ${formatCommand("+")}  Line insertion
+    ${formatCommand("~")}  Line modification
+    ${formatCommand(" ")}  Unchanged (context)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Basic preview")}
+  ${formatCommand("kustomark preview ./team/")}
+
+  ${formatExample("# Preview with more context")}
+  ${formatCommand("kustomark preview ./team/ -v")}
+
+  ${formatExample("# Preview only changes (no context)")}
+  ${formatCommand("kustomark preview ./team/ -q")}
+
+  ${formatExample("# Get preview data as JSON")}
+  ${formatCommand("kustomark preview ./team/ --format=json")}
+
+  ${formatExample("# Preview specific patch groups")}
+  ${formatCommand("kustomark preview ./team/ --enable-groups=branding")}
+
+${formatSection("JSON OUTPUT")}
+  ${formatHighlight("Structure:")}
+    {
+      "files": [
+        {
+          "path": "guide.md",
+          "before": "original content",
+          "after": "modified content",
+          "hasChanges": true,
+          "linesAdded": 5,
+          "linesDeleted": 2,
+          "linesModified": 3,
+          "changes": [
+            {
+              "oldLineNumber": 10,
+              "newLineNumber": 10,
+              "type": "modify",
+              "oldText": "old line",
+              "newText": "new line",
+              "charDiff": [...]
+            }
+          ]
+        }
+      ],
+      "filesChanged": 1,
+      "totalLinesAdded": 5,
+      "totalLinesDeleted": 2,
+      "totalLinesModified": 3
+    }
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Patch development:")}
+    ${formatCommand("kustomark preview .")}
+    See exactly what your patches do while developing
+
+  ${formatHighlight("Code review:")}
+    ${formatCommand("kustomark preview . -v | less -R")}
+    Review changes thoroughly before merging
+
+  ${formatHighlight("Debugging:")}
+    ${formatCommand("kustomark preview . -q")}
+    Quickly identify what's changing without context noise
+
+  ${formatHighlight("Documentation:")}
+    ${formatCommand("kustomark preview . --format=json > preview.json")}
+    Export preview data for documentation or tooling
+
+${formatSection("COMPARISON WITH OTHER COMMANDS")}
+  ${formatHighlight("diff")}      Shows unified diff format (like git diff)
+  ${formatHighlight("preview")}   Shows side-by-side visual comparison (this command)
+  ${formatHighlight("build")}     Actually writes files to output directory
+  ${formatHighlight("debug")}     Interactive step-through patch debugging
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    No changes detected
+  ${formatHighlight("1")}    Changes detected or error
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark diff")}      Unified diff format
+  ${formatCommand("kustomark build")}     Build and write files
+  ${formatCommand("kustomark debug")}     Interactive debugging
+  ${formatCommand("kustomark analyze")}   Build complexity analysis
 `;
 }
 
@@ -1784,6 +1917,7 @@ function formatHelp(content: string): string {
 export const helpCommands = [
   "build",
   "diff",
+  "preview",
   "validate",
   "watch",
   "init",
