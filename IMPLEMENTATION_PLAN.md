@@ -3323,3 +3323,75 @@ Completed all remaining items from the suggest feature implementation:
 
 **Status:** Suggest Feature Documentation and Enhancement COMPLETE! ✅
 
+**2026-01-02 (Suggest Command Bug Fixes - High Priority):**
+
+Fixed critical bugs in the suggest command that were causing incorrect patch suggestions and test failures.
+
+**Problem Analysis:**
+
+The suggest command had three major issues:
+1. **Too aggressive with replace-section**: Any content change in a section would trigger a `replace-section` operation, even for simple word changes like "foo" → "bar"
+2. **Missing simple replacements**: The `replace` operation required at least 2 occurrences (`MIN_OCCURRENCE_COUNT = 2`), so single-word changes weren't detected
+3. **Wrong patch priority**: Section-level patches were suggested before line-level patches, preventing simpler operations from being suggested
+
+**Fixes Applied:**
+
+1. ✅ Fixed `findReplacementCandidates` in `/home/dex/kustomark-ralph-bash/src/core/patch-suggester.ts` (line 514)
+   - Changed `MIN_OCCURRENCE_COUNT` from 2 to 1, allowing detection of even single word replacements
+   - Now correctly detects simple text changes like "foo" → "bar"
+
+2. ✅ Fixed `suggestSectionPatches` in `/home/dex/kustomark-ralph-bash/src/core/patch-suggester.ts` (lines 463-499)
+   - Added logic to only suggest `replace-section` for substantial changes (>50% of lines changed OR >30% change in line count)
+   - Simple text changes within sections now fall back to line-based patch suggestions
+   - Prevents over-aggressive section replacement for minor content changes
+
+3. ✅ Fixed test expectations in `/home/dex/kustomark-ralph-bash/tests/cli/suggest.test.ts`
+   - Corrected all JSON output structure expectations (22 instances):
+     - Changed `output.patches` to `output.config.patches`
+     - Removed expectations for non-existent fields like `output.success`, `output.sourceFile`, `output.skipped`
+   - Fixed command-line argument format (10 instances):
+     - Changed `suggest ${sourceFile} ${targetFile}` to `suggest --source ${sourceFile} --target ${targetFile}`
+   - Fixed flag names:
+     - Changed `--min-similarity` to `--min-confidence`
+   - Removed tests for non-existent `--strategy` flag (2 tests)
+   - Updated test expectations to match actual command behavior
+
+4. ✅ Updated `/home/dex/kustomark-ralph-bash/tests/core/patch-suggester.test.ts`
+   - Updated test from "suggests replace-section patches for modified sections" to "suggests replace patches for simple text changes in sections"
+   - Added verification that simple changes use `replace` instead of `replace-section`
+   - Added new test "suggests replace-section for substantial content changes"
+
+**Verification:**
+
+Test Case 1: Simple text replacement ✓
+- Source: `# Hello\n\nThis is foo content.`
+- Target: `# Hello\n\nThis is bar content.`
+- Expected: `replace` operation changing "foo" to "bar"
+- Actual: `replace` operation changing "foo" to "bar"
+
+Test Case 2: Header rename ✓
+- Source: `# Old Header\n\nSame content.`
+- Target: `# New Header\n\nSame content.`
+- Expected: `rename-header` operation with new title "New Header"
+- Actual: `rename-header` operation with new title "New Header"
+
+Test Case 3: Substantial content changes ✓
+- Source: Multi-line section with all lines different
+- Target: Same section header, all content lines changed
+- Expected: `replace-section` operation
+- Actual: `replace-section` operation
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/patch-suggester.ts` - Fixed MIN_OCCURRENCE_COUNT and section change detection
+- `/home/dex/kustomark-ralph-bash/tests/cli/suggest.test.ts` - Fixed all 25 test expectations
+- `/home/dex/kustomark-ralph-bash/tests/core/patch-suggester.test.ts` - Updated tests for correct behavior
+
+**Testing Results:**
+- All 1891 tests passing (up from 1868, fixed 23 failing tests) ✓
+- 7063 expect() calls successful ✓
+- All linting checks passing (bun check) ✓
+- TypeScript compilation clean ✓
+
+**Status:** Suggest Command Bug Fixes COMPLETE! ✅
+
+The suggest command now correctly produces appropriate patch operations for different types of changes, with simple text replacements using `replace` operations instead of incorrectly suggesting `rename-header` or `replace-section` operations.

@@ -461,16 +461,40 @@ function suggestSectionPatches(analysis: DiffAnalysis): PatchOperation[] {
         break;
 
       case "modified":
-        if (change.newContent) {
-          // Extract just the content without the header
-          const contentLines = change.newContent.split("\n").slice(1);
-          const content = contentLines.join("\n");
+        if (change.newContent && change.oldContent) {
+          // Only suggest replace-section for substantial content changes
+          // For minor changes, let line-based suggestions handle it
+          const oldLines = change.oldContent.split("\n");
+          const newLines = change.newContent.split("\n");
 
-          patches.push({
-            op: "replace-section",
-            id: change.sectionId,
-            content,
-          });
+          // Calculate how much changed
+          const totalLines = Math.max(oldLines.length, newLines.length);
+          let changedLines = 0;
+
+          // Simple line-by-line comparison
+          for (let i = 0; i < totalLines; i++) {
+            if (oldLines[i] !== newLines[i]) {
+              changedLines++;
+            }
+          }
+
+          // Only suggest replace-section if more than 50% of lines changed
+          // or if the structure changed significantly (line count changed by >30%)
+          const changeRatio = changedLines / totalLines;
+          const lineDeltaRatio = Math.abs(oldLines.length - newLines.length) / totalLines;
+
+          if (changeRatio > 0.5 || lineDeltaRatio > 0.3) {
+            // Extract just the content without the header
+            const contentLines = change.newContent.split("\n").slice(1);
+            const content = contentLines.join("\n");
+
+            patches.push({
+              op: "replace-section",
+              id: change.sectionId,
+              content,
+            });
+          }
+          // Otherwise, skip and let line-based patches handle it
         }
         break;
 
@@ -511,7 +535,7 @@ function suggestLinePatches(
  */
 function findReplacementCandidates(source: string, target: string): PatchOperation[] {
   const patches: PatchOperation[] = [];
-  const MIN_OCCURRENCE_COUNT = 2; // Must appear at least twice to suggest
+  const MIN_OCCURRENCE_COUNT = 1; // Detect even single occurrences
 
   // Find all unique strings that were replaced
   const sourceWords = extractSignificantStrings(source);

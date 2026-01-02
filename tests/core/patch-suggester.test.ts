@@ -120,14 +120,33 @@ describe("patch-suggester", () => {
       }
     });
 
-    test("suggests replace-section patches for modified sections", () => {
+    test("suggests replace patches for simple text changes in sections", () => {
       const source = "## Introduction\nOld intro text\n## Next Section\nContent";
       const target = "## Introduction\nNew intro text\n## Next Section\nContent";
 
       const patches = suggestPatches(source, target);
 
+      // Simple text changes should be handled by replace, not replace-section
+      const replacePatch = patches.find((p) => p.op === "replace");
+      expect(replacePatch).toBeDefined();
+      if (replacePatch?.op === "replace") {
+        expect(replacePatch.old).toBe("Old");
+        expect(replacePatch.new).toBe("New");
+      }
+    });
+
+    test("suggests replace-section for substantial content changes", () => {
+      const source = "## Introduction\nLine 1\nLine 2\nLine 3\nLine 4";
+      const target = "## Introduction\nCompletely different line 1\nTotally new line 2\nBrand new line 3\nAll changed line 4";
+
+      const patches = suggestPatches(source, target);
+
+      // Substantial changes should use replace-section
       const replaceSectionPatch = patches.find((p) => p.op === "replace-section");
       expect(replaceSectionPatch).toBeDefined();
+      if (replaceSectionPatch?.op === "replace-section") {
+        expect(replaceSectionPatch.id).toBe("introduction");
+      }
     });
   });
 
