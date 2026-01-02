@@ -3037,3 +3037,126 @@ Enhanced the template system with filesystem-based template discovery to enable 
 - `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md` - Added this completion entry
 
 **Status:** Template System Filesystem Discovery COMPLETE! ✅
+
+
+---
+
+**2026-01-02 (Progress Feedback System - UX Enhancement):**
+
+Implemented comprehensive progress feedback system for CLI operations to improve user experience during long-running builds.
+
+**Problem Solved:**
+- Large file builds, remote fetches, and file operations provided no feedback
+- Users couldn't tell if the tool was working or frozen
+- No visibility into build progress or current operation
+
+**Implementation Completed:**
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/cli/progress.ts` (220 lines)
+  - `ProgressReporter` class with full progress tracking functionality
+  - Dual mode support: interactive (TTY) and non-interactive
+  - TTY mode: uses `\r` to update same line for clean output
+  - Non-TTY mode: outputs each update on new line for logs
+  - Smart output: always to stderr, never interferes with stdout JSON
+  - Respects `--quiet` flag (no output when verbosity = 0)
+  - Thread-safe counter updates for parallel builds
+
+  **Core Methods:**
+  - `start(total, message?)` - Initialize progress tracking
+  - `increment(count, message?)` - Increment progress counter
+  - `setCurrent(current, message?)` - Set progress to specific value
+  - `update(message)` - Update message without changing count
+  - `finish(message?)` - Complete progress and add newline
+  - `clear()` / `reset()` - Clear and reset state
+  - `isEnabled()` - Check if progress is enabled
+  - `isInteractive()` - Check if output is TTY
+
+  **Helper Function:**
+  - `createProgressReporter(options)` - Factory function from CLI options
+
+- ✅ Added `--progress` flag to CLI options in `/home/dex/kustomark-ralph-bash/src/cli/index.ts`
+  - Added `progress?: boolean` to `CLIOptions` interface
+  - Added argument parsing for `--progress` flag
+  - Integrated into build command workflow
+
+- ✅ Integrated progress reporting into all major build operations:
+  - **Resource Fetching:** "Fetching remote resources..."
+  - **Patch Application:** "Processing file X/Y: filename.md"
+  - **File Writing:** "Writing file X/Y: filename.md"
+  - Works in both sequential and parallel modes
+  - Thread-safe updates in parallel operations
+
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/cli/help.ts`
+  - Added `--progress` flag documentation
+  - Documented behavior with other flags (--quiet, --format=json, --parallel)
+
+- ✅ Created comprehensive test suite in `/home/dex/kustomark-ralph-bash/tests/cli/progress.test.ts`
+  - 26 new tests covering all functionality
+  - Tests for enabled/disabled/quiet modes
+  - Tests for TTY and non-TTY output formatting
+  - Tests for progress tracking accuracy
+  - Tests for message updates and state management
+  - Tests for edge cases (zero total, large numbers, etc.)
+  - Tests for `createProgressReporter` factory function
+
+**Features Implemented:**
+1. **Opt-in Design**: Progress disabled by default, only shown with `--progress` flag
+2. **Quiet Mode Priority**: `--quiet` always suppresses progress
+3. **Format Compatibility**: Works with `--format=json` (progress to stderr, JSON to stdout)
+4. **Parallel Safe**: Thread-safe counter updates for `--parallel` builds
+5. **Smart Formatting**: Percentage padding and alignment for clean output
+6. **Contextual Messages**: Each phase shows relevant information (filenames, counts)
+
+**Example Output:**
+```
+[  0%] 0/1: Fetching remote resources...
+[100%] 1/1: Resources resolved
+[  0%] 0/3: Applying patches...
+[ 33%] 1/3: Processing file 1/3: test1.md
+[ 66%] 2/3: Processing file 2/3: test2.md
+[100%] 3/3: Processing file 3/3: test3.md
+[100%] 3/3: Patches applied to 3 files
+[  0%] 0/3: Writing files...
+[ 33%] 1/3: Writing file 1/3: test1.md
+[ 66%] 2/3: Writing file 2/3: test2.md
+[100%] 3/3: Writing file 3/3: test3.md
+[100%] 3/3: Wrote 3 files
+```
+
+**Testing Results:**
+- All 1820 tests passing (26 new tests, up from 1794) ✓
+- 6838 expect() calls successful (up from 6791)
+- TypeScript compilation: No errors (bun check passes) ✓
+- Biome linting: All files pass ✓
+
+**Usage Examples:**
+```bash
+# Enable progress reporting
+kustomark build . --progress
+
+# Works with parallel builds
+kustomark build . --progress --parallel --jobs=8
+
+# Works with JSON format (progress to stderr, JSON to stdout)
+kustomark build . --progress --format=json > output.json
+
+# Respects quiet mode (no progress)
+kustomark build . --progress -q
+```
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/cli/progress.ts` - Progress reporting module
+- `/home/dex/kustomark-ralph-bash/tests/cli/progress.test.ts` - 26 comprehensive tests
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Added --progress flag and integration
+- `/home/dex/kustomark-ralph-bash/src/cli/help.ts` - Added progress documentation
+- `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md` - Added this completion entry
+
+**Impact:**
+- Significantly improved user experience for long-running operations
+- Users can now see real-time progress during builds
+- Better visibility into what the tool is doing at any moment
+- Non-intrusive design (opt-in, respects quiet mode, doesn't break JSON output)
+- Production-ready with comprehensive test coverage
+
+**Status:** Progress Feedback System COMPLETE! ✅

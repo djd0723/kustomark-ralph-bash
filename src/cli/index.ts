@@ -81,6 +81,7 @@ import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
 import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
 import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
+import { createProgressReporter } from "./progress.js";
 import { templateApply, templateList, templateShow } from "./template-commands.js";
 import { executeOnBuildHooks, executeOnChangeHooks, executeOnErrorHooks } from "./watch-hooks.js";
 import { webCommand } from "./web-command.js";
@@ -128,6 +129,7 @@ interface CLIOptions {
   var?: Record<string, string>; // For template apply --var key=value
   overwrite?: boolean; // For template apply --overwrite option
   category?: string; // For template list --category option
+  progress?: boolean; // For --progress option (show progress feedback)
 }
 
 interface BuildStats {
@@ -271,6 +273,7 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     var: undefined,
     overwrite: false,
     category: undefined,
+    progress: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -305,6 +308,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.strict = true;
     } else if (arg === "--stats") {
       options.stats = true;
+    } else if (arg === "--progress") {
+      options.progress = true;
     } else if (arg === "--update") {
       options.update = true;
     } else if (arg === "--no-lock") {
@@ -789,6 +794,7 @@ function applyPatches(
   patches: PatchOperation[],
   onNoMatch: OnNoMatchStrategy,
   options: CLIOptions,
+  progressReporter?: ReturnType<typeof createProgressReporter>,
 ): {
   resources: Map<string, string>;
   patchesApplied: number;
@@ -804,8 +810,25 @@ function applyPatches(
   const allValidationErrors: ValidationError[] = [];
   const operationCounts: Record<string, number> = {};
 
+  // Initialize progress if provided
+  if (progressReporter) {
+    progressReporter.start(resources.size, "Applying patches...");
+  }
+
+  let fileIndex = 0;
+
   // Apply patches to each file
   for (const [filePath, content] of resources.entries()) {
+    fileIndex++;
+
+    // Update progress
+    if (progressReporter) {
+      progressReporter.setCurrent(
+        fileIndex,
+        `Processing file ${fileIndex}/${resources.size}: ${filePath}`,
+      );
+    }
+
     // Filter patches by group first, then by file patterns
     const applicablePatches = patches.filter(
       (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
@@ -842,6 +865,11 @@ function applyPatches(
         file: filePath,
       });
     }
+  }
+
+  // Finish progress
+  if (progressReporter) {
+    progressReporter.finish(`Patches applied to ${resources.size} files`);
   }
 
   return {
@@ -896,6 +924,7 @@ async function applyPatchesParallel(
   patches: PatchOperation[],
   onNoMatch: OnNoMatchStrategy,
   options: CLIOptions,
+  progressReporter?: ReturnType<typeof createProgressReporter>,
 ): Promise<{
   resources: Map<string, string>;
   patchesApplied: number;
@@ -909,6 +938,13 @@ async function applyPatchesParallel(
   const limit = createConcurrencyLimiter(jobCount);
 
   log(`Processing ${resources.size} files with ${jobCount} parallel jobs`, 2, options);
+
+  // Initialize progress if provided
+  if (progressReporter) {
+    progressReporter.start(resources.size, "Applying patches...");
+  }
+
+  let completedFiles = 0;
 
   // Sort file paths for deterministic processing order
   const sortedEntries = Array.from(resources.entries()).sort(([a], [b]) => a.localeCompare(b));
@@ -924,6 +960,14 @@ async function applyPatchesParallel(
 
         if (applicablePatches.length === 0) {
           // No patches for this file, return original content
+          completedFiles++;
+          if (progressReporter) {
+            progressReporter.setCurrent(
+              completedFiles,
+              `Processing file ${completedFiles}/${resources.size}: ${filePath}`,
+            );
+          }
+
           return {
             filePath,
             content,
@@ -954,6 +998,14 @@ async function applyPatchesParallel(
           ...error,
           file: filePath,
         }));
+
+        completedFiles++;
+        if (progressReporter) {
+          progressReporter.setCurrent(
+            completedFiles,
+            `Processing file ${completedFiles}/${resources.size}: ${filePath}`,
+          );
+        }
 
         return {
           filePath,
@@ -989,6 +1041,11 @@ async function applyPatchesParallel(
     }
   }
 
+  // Finish progress
+  if (progressReporter) {
+    progressReporter.finish(`Patches applied to ${resources.size} files`);
+  }
+
   return {
     resources: patchedResources,
     patchesApplied: totalPatchesApplied,
@@ -1011,9 +1068,16 @@ async function writeFilesParallel(
   outputDir: string,
   resources: Map<string, string>,
   concurrency: number,
+  progressReporter?: ReturnType<typeof createProgressReporter>,
 ): Promise<number> {
   const limit = createConcurrencyLimiter(concurrency);
   let totalBytes = 0;
+  let filesWritten = 0;
+
+  // Initialize progress if provided
+  if (progressReporter) {
+    progressReporter.start(resources.size, "Writing files...");
+  }
 
   // Sort file paths for deterministic order
   const sortedEntries = Array.from(resources.entries()).sort(([a], [b]) => a.localeCompare(b));
@@ -1039,9 +1103,23 @@ async function writeFilesParallel(
 
         // Track bytes written
         totalBytes += Buffer.byteLength(content, "utf-8");
+
+        // Update progress
+        filesWritten++;
+        if (progressReporter) {
+          progressReporter.setCurrent(
+            filesWritten,
+            `Writing file ${filesWritten}/${resources.size}: ${filePath}`,
+          );
+        }
       }),
     ),
   );
+
+  // Finish progress
+  if (progressReporter) {
+    progressReporter.finish(`Wrote ${resources.size} files`);
+  }
 
   return totalBytes;
 }
@@ -1722,8 +1800,12 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       }
     }
 
+    // Create progress reporter
+    const progress = createProgressReporter(options);
+
     // Resolve resources
     log("Resolving resources...", 2, options);
+    progress.start(1, "Fetching remote resources...");
     const resources = await resolveResources(
       config,
       basePath,
@@ -1732,6 +1814,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       lockEntries,
       options.offline,
     );
+    progress.finish("Resources resolved");
 
     // Track build start time for stats
     const startTime = options.stats ? performance.now() : 0;
@@ -1835,8 +1918,9 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           contentOps,
           config.onNoMatch || "warn",
           options,
+          progress,
         )
-      : applyPatches(resourcesToProcess, contentOps, config.onNoMatch || "warn", options);
+      : applyPatches(resourcesToProcess, contentOps, config.onNoMatch || "warn", options, progress);
 
     // Merge file operation counts with content operation counts
     const operationCounts = { ...fileOpCounts, ...contentOpCounts };
@@ -1910,7 +1994,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       const jobCount = options.jobs || cpus().length;
       log(`Writing ${filesToWrite.size} files with ${jobCount} parallel jobs`, 2, options);
 
-      totalBytes = await writeFilesParallel(outputDir, filesToWrite, jobCount);
+      totalBytes = await writeFilesParallel(outputDir, filesToWrite, jobCount, progress);
       filesWritten = filesToWrite.size;
 
       // Track source files for cleaning
@@ -1925,6 +2009,8 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       }
     } else {
       // Sequential file writing
+      progress.start(filesToWrite.size, "Writing files...");
+
       for (const [filePath, content] of filesToWrite.entries()) {
         const outputPath = join(outputDir, filePath);
         sourceFiles.add(filePath);
@@ -1938,8 +2024,16 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           totalBytes += Buffer.byteLength(content, "utf-8");
         }
 
+        // Update progress
+        progress.setCurrent(
+          filesWritten,
+          `Writing file ${filesWritten}/${filesToWrite.size}: ${filePath}`,
+        );
+
         log(`  Wrote ${filePath}`, 3, options);
       }
+
+      progress.finish(`Wrote ${filesToWrite.size} files`);
 
       // Track all source files for cleaning (even if not written)
       for (const filePath of allPatchedResources.keys()) {

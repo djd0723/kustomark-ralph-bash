@@ -176,6 +176,7 @@ ${formatSection("OPTIONS")}
   ${formatFlag("--clean")}                Remove output files not in source
   ${formatFlag("--dry-run")}              Preview changes without writing files
   ${formatFlag("--stats")}                Show detailed build statistics
+  ${formatFlag("--progress")}             Show progress feedback during build
   ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
   ${formatFlag("-q")}                     Quiet mode (errors only)
 
