@@ -237,7 +237,7 @@ export async function initInteractive(path: string, _options: CLIOptions): Promi
           if (patchDetails) {
             patches.push(patchDetails as unknown as PatchOperation);
           }
-        } catch (error) {
+        } catch (_error) {
           // User cancelled this patch, skip it
         }
       }
@@ -574,7 +574,7 @@ async function collectPatchDetails(op: string): Promise<PatchDetails | null> {
         clack.log.warn(`Unknown operation: ${op}`);
         return null;
     }
-  } catch (error) {
+  } catch (_error) {
     // User cancelled this patch
     return null;
   }

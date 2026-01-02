@@ -4,8 +4,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import * as yaml from "js-yaml";
+import { dirname, resolve } from "node:path";
 import { parseConfig, validateConfig } from "../../../core/config-parser.js";
 import type { KustomarkConfig, ValidationResult } from "../../../core/types.js";
 import { HttpError } from "../middleware/error-handler.js";

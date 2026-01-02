@@ -25,9 +25,9 @@ export class HttpError extends Error {
  */
 export function errorHandler(
   err: Error | HttpError,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction,
+  _next: NextFunction,
 ): void {
   // Determine status code
   let statusCode = 500;

@@ -2,15 +2,10 @@
  * Config CRUD API endpoints
  */
 
-import { Router } from "express";
 import type { Response } from "express";
+import { Router } from "express";
 import { validateRequiredFields, validateString } from "../middleware/validation.js";
-import {
-  getConfigSchema,
-  loadConfig,
-  saveConfig,
-  validateConfigFile,
-} from "../services/config-service.js";
+import { getConfigSchema, saveConfig, validateConfigFile } from "../services/config-service.js";
 import { readFile } from "../services/file-service.js";
 import type {
   ConfigSaveRequest,
@@ -118,7 +113,7 @@ export function createConfigRoutes(config: ServerConfig): Router {
    * GET /api/config/schema
    * Get JSON schema for kustomark config
    */
-  router.get("/schema", (req: TypedRequest, res: Response) => {
+  router.get("/schema", (_req: TypedRequest, res: Response) => {
     const schema = getConfigSchema();
     res.json(schema);
   });

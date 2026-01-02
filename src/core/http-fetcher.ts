@@ -5,7 +5,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { findLockEntry } from "./lock-file.js";

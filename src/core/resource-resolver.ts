@@ -1,10 +1,10 @@
 import { existsSync } from "node:fs";
-import { readFile, readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { isAbsolute, join, normalize, resolve } from "node:path";
 import micromatch from "micromatch";
-import { type GitFetchOptions, fetchGitRepository } from "./git-fetcher.js";
+import { fetchGitRepository, type GitFetchOptions } from "./git-fetcher.js";
 import { isGitUrl, parseGitUrl } from "./git-url-parser.js";
-import { type HttpFetchOptions, fetchHttpArchive } from "./http-fetcher.js";
+import { fetchHttpArchive, type HttpFetchOptions } from "./http-fetcher.js";
 import { isHttpArchiveUrl, parseHttpArchiveUrl } from "./http-url-parser.js";
 import { SecurityValidationError, validateResourceSecurity } from "./security.js";
 import type { LockFile, LockFileEntry, SecurityConfig } from "./types.js";

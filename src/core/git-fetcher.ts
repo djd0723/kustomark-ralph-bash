@@ -5,7 +5,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseGitUrl } from "./git-url-parser.js";
@@ -452,7 +452,7 @@ export async function fetchGitRepository(
         timeout: options.timeout,
         authToken: options.authToken,
       });
-    } catch (error) {
+    } catch (_error) {
       // If fetch fails, remove the cached repo and clone fresh
       await rm(repoPath, { recursive: true, force: true });
       needsClone = true;

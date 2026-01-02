@@ -2,8 +2,8 @@
  * Build API endpoint
  */
 
-import { Router } from "express";
 import type { Response } from "express";
+import { Router } from "express";
 import {
   validateBoolean,
   validateRequiredFields,

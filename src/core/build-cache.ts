@@ -6,7 +6,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type {
   BuildCache,
@@ -569,7 +569,7 @@ export function hasConfigChanged(
             // Config file has changed
             return true;
           }
-        } catch (error) {
+        } catch (_error) {
           // If we can't read the config file, assume it has changed
           return true;
         }
@@ -577,7 +577,7 @@ export function hasConfigChanged(
     }
 
     return false;
-  } catch (error) {
+  } catch (_error) {
     // If we can't read the main config file, assume it has changed
     return true;
   }

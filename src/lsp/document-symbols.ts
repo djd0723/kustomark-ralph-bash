@@ -64,7 +64,7 @@ export class DocumentSymbolsProvider {
 
       // Build symbols from parsed config
       return this.buildSymbolsFromConfig(config, lines);
-    } catch (error) {
+    } catch (_error) {
       // Fall back to basic structure parsing on any error
       return this.parseBasicYamlStructure(lines);
     }

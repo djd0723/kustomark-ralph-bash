@@ -2,7 +2,7 @@
  * API client for communicating with the Kustomark web server
  */
 
-import type { BuildResult, FileNode, KustomarkConfig, ValidationResult } from "../types/config";
+import type { BuildResult, FileNode, ValidationResult } from "../types/config";
 
 const API_BASE = "/api";
 

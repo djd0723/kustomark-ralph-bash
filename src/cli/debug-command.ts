@@ -3,7 +3,7 @@
  * Allows step-by-step inspection and decision-making for patches
  */
 
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import micromatch from "micromatch";
@@ -142,7 +142,7 @@ function buildCompleteFileMap(basePath: string): Map<string, string> {
     let entries;
     try {
       entries = readdirSync(dir, { withFileTypes: true });
-    } catch (error) {
+    } catch (_error) {
       // Skip directories we can't read (permission denied, etc.)
       return;
     }
@@ -168,7 +168,7 @@ function buildCompleteFileMap(basePath: string): Map<string, string> {
             const content = readFileSync(fullPath, "utf-8");
             const normalizedPath = normalize(fullPath);
             fileMap.set(normalizedPath, content);
-          } catch (error) {
+          } catch (_error) {
             // Skip files we can't read
           }
         }

@@ -7,7 +7,6 @@ import { createServer } from "node:http";
 import { resolve } from "node:path";
 import cors from "cors";
 import express from "express";
-import type { Application } from "express";
 import { WebSocketServer } from "ws";
 import { errorHandler } from "./middleware/error-handler.js";
 import { createBuildRoutes } from "./routes/build.js";

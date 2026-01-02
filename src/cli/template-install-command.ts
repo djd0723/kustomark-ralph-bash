@@ -4,11 +4,11 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { type GitFetchResult, fetchGitRepository } from "../core/git-fetcher.js";
-import { type HttpFetchResult, fetchHttpArchive } from "../core/http-fetcher.js";
+import { fetchGitRepository, type GitFetchResult } from "../core/git-fetcher.js";
+import { fetchHttpArchive, type HttpFetchResult } from "../core/http-fetcher.js";
 import { parseTemplate, validateTemplate } from "../core/templates/parser.js";
 import type { Template as TemplateYaml } from "../core/templates/types.js";
 
@@ -101,7 +101,7 @@ async function findAndValidateTemplate(dir: string): Promise<TemplateYaml> {
         );
       }
     }
-  } catch (error) {
+  } catch (_error) {
     // Directory read failed, continue with existing paths
   }
 

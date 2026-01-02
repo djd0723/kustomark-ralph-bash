@@ -38,14 +38,14 @@ export function createApp(config: ServerConfig): express.Application {
 
   // Request logging
   if (config.verbose) {
-    app.use((req, res, next) => {
+    app.use((req, _res, next) => {
       console.log(`${req.method} ${req.path}`);
       next();
     });
   }
 
   // Health check endpoint
-  app.get("/health", (req, res) => {
+  app.get("/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 

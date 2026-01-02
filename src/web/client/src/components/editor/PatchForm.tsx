@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useState } from "react";
-import { OnNoMatchStrategy, type PatchOperation } from "../../types/config";
+import type { PatchOperation } from "../../types/config";
 
 export interface PatchFormProps {
   patch: PatchOperation | null;

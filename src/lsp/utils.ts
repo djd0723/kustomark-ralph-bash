@@ -2,8 +2,7 @@
  * LSP utility functions for position mapping and field extraction
  */
 
-import { fileURLToPath } from "node:url";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Position, Range } from "vscode-languageserver";
 import type { TextDocument } from "vscode-languageserver-textdocument";
 

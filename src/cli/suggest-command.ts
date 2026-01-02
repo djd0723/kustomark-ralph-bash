@@ -3,13 +3,12 @@
  * Analyzes differences and generates kustomark.yaml configuration with suggested patches
  */
 
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import * as yaml from "js-yaml";
+import { scorePatches, suggestPatches } from "../core/patch-suggester.js";
 import type { KustomarkConfig, PatchOperation } from "../core/types.js";
 import { createProgressReporter } from "./progress.js";
-
-import { scorePatches, suggestPatches } from "../core/patch-suggester.js";
 
 // ============================================================================
 // Types

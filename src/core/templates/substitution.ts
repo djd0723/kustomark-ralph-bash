@@ -243,7 +243,7 @@ function validateVariablePattern(
         message: `Variable '${variable.name}' value '${value}' does not match required pattern: ${variable.pattern}`,
       };
     }
-  } catch (error) {
+  } catch (_error) {
     // Invalid regex pattern in template definition
     return {
       field: `variables.${variable.name}`,

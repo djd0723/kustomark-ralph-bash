@@ -119,7 +119,7 @@ export class TemplateApplier {
       // Validate output path to prevent path traversal
       try {
         validatePath(file.path, absoluteOutputDir);
-      } catch (error) {
+      } catch (_error) {
         throw new TemplateApplyError(`Invalid file path in template: ${file.path}`, "INVALID_PATH");
       }
 

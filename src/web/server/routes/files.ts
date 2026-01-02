@@ -3,11 +3,11 @@
  */
 
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { join, normalize, relative, resolve } from "node:path";
-import { Router } from "express";
+import { normalize, relative, resolve } from "node:path";
 import type { Response } from "express";
-import { HttpError, asyncHandler } from "../middleware/error-handler.js";
-import { fileExists, listDirectory, readFile } from "../services/file-service.js";
+import { Router } from "express";
+import { asyncHandler, HttpError } from "../middleware/error-handler.js";
+import { listDirectory, readFile } from "../services/file-service.js";
 import type { FileContent, ServerConfig, TypedRequest } from "../types.js";
 
 /**
@@ -161,7 +161,7 @@ function buildFileTree(baseDir: string, relativePath: string, currentDepth = 0):
       try {
         const childNode = buildFileTree(baseDir, childRelativePath, currentDepth + 1);
         children.push(childNode);
-      } catch (error) {}
+      } catch (_error) {}
     }
 
     // Sort children: directories first, then alphabetically
@@ -257,7 +257,7 @@ export function createFileRoutes(config: ServerConfig): Router {
         try {
           const node = getFileNode(config.baseDir, entryPath);
           files.push(node);
-        } catch (error) {}
+        } catch (_error) {}
       }
 
       // Sort files: directories first, then alphabetically

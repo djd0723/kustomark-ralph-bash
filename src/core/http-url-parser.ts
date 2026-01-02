@@ -211,7 +211,7 @@ export function parseHttpArchiveUrl(url: string): ParsedHttpArchiveUrl | null {
       archiveType,
       queryParams,
     };
-  } catch (error) {
+  } catch (_error) {
     // Return null for any parsing errors
     return null;
   }

@@ -2,9 +2,9 @@
  * File service for safe file operations
  */
 
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
-import { dirname, join, normalize, relative, resolve } from "node:path";
+import { dirname, normalize, relative, resolve } from "node:path";
 import { HttpError } from "../middleware/error-handler.js";
 import type { FileContent } from "../types.js";
 

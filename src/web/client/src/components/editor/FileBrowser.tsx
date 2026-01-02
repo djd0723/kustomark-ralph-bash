@@ -60,7 +60,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         style={{ paddingLeft: `${level * 16 + (isSelected ? 12 : 16)}px` }}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
-        // biome-ignore lint/a11y/useSemanticElements: Using div for layout flexibility with keyboard events
         role="button"
         tabIndex={0}
       >

@@ -145,7 +145,7 @@ export function parseGitUrl(url: string): ParsedGitUrl | null {
     }
 
     return null;
-  } catch (error) {
+  } catch (_error) {
     // Return null for any parsing errors
     return null;
   }

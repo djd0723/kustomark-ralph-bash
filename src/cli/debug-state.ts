@@ -501,7 +501,7 @@ export class DebugSession {
       }
 
       return true;
-    } catch (error) {
+    } catch (_error) {
       // Failed to load decisions
       return false;
     }

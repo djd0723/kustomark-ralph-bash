@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+
 /**
  * Kustomark Language Server
  *
@@ -10,9 +11,9 @@
  * - Document symbols (outline view)
  */
 
-import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   type CompletionItem,
+  createConnection,
   type Hover,
   type InitializeParams,
   type InitializeResult,
@@ -20,8 +21,8 @@ import {
   type TextDocumentPositionParams,
   TextDocumentSyncKind,
   TextDocuments,
-  createConnection,
 } from "vscode-languageserver/node";
+import { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionProvider } from "./completion.js";
 import { DefinitionProvider } from "./definition.js";
 import { DiagnosticsProvider } from "./diagnostics.js";

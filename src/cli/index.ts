@@ -10,8 +10,8 @@ import {
   existsSync,
   watch as fsWatch,
   mkdirSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -1304,7 +1304,7 @@ function buildCompleteFileMap(basePath: string): Map<string, string> {
     let entries: Dirent[];
     try {
       entries = readdirSync(dir, { withFileTypes: true });
-    } catch (error) {
+    } catch (_error) {
       // Skip directories we can't read (permission denied, etc.)
       return;
     }
@@ -1773,7 +1773,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       try {
         const refConfigContent = readFileSync(refConfigPath, "utf-8");
         allConfigHashes[refConfigPath] = calculateFileHash(refConfigContent);
-      } catch (error) {
+      } catch (_error) {
         // If we can't read a referenced config, skip it (will be caught later)
         console.warn(`Warning: Could not read referenced config at ${refConfigPath}`);
       }

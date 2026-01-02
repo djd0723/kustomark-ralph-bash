@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as YAML from "yaml";
 import { Button } from "./components/common/Button";
 import FileBrowser from "./components/editor/FileBrowser";
@@ -27,15 +27,10 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [originalContent, setOriginalContent] = useState("");
-  const [previewContent, setPreviewContent] = useState("");
+  const [_previewContent, _setPreviewContent] = useState("");
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
 
-  // Load config on mount
-  useEffect(() => {
-    loadConfig();
-  }, []);
-
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -58,7 +53,12 @@ export const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [configPath]);
+
+  // Load config on mount
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
 
   const saveConfig = async () => {
     if (!config) return;

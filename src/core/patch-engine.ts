@@ -1024,9 +1024,9 @@ export function applyMoveSection(
 
   // Recalculate target position after removal
   // If target was after source, its position shifted up
-  let insertAfterLine = targetSection.startLine;
+  let _insertAfterLine = targetSection.startLine;
   if (targetSection.startLine > sourceSection.startLine) {
-    insertAfterLine -= sourceSection.endLine - sourceSection.startLine;
+    _insertAfterLine -= sourceSection.endLine - sourceSection.startLine;
   }
 
   // Find the end of the target section after the removal

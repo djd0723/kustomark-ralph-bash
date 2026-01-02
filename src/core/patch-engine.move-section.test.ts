@@ -26,9 +26,9 @@ Content C`;
 
     // Verify order: B, C, A
     const lines = result.content.split("\n");
-    const bIndex = lines.findIndex((line) => line === "# Section B");
-    const cIndex = lines.findIndex((line) => line === "# Section C");
-    const aIndex = lines.findIndex((line) => line === "# Section A");
+    const bIndex = lines.indexOf("# Section B");
+    const cIndex = lines.indexOf("# Section C");
+    const aIndex = lines.indexOf("# Section A");
 
     expect(bIndex).toBeLessThan(cIndex);
     expect(cIndex).toBeLessThan(aIndex);
@@ -59,11 +59,11 @@ Content C`;
 
     // Verify order: B, C, A (with all children)
     const lines = result.content.split("\n");
-    const bIndex = lines.findIndex((line) => line === "# Section B");
-    const cIndex = lines.findIndex((line) => line === "# Section C");
-    const aIndex = lines.findIndex((line) => line === "# Section A");
-    const a1Index = lines.findIndex((line) => line === "## Child A1");
-    const a2Index = lines.findIndex((line) => line === "## Child A2");
+    const bIndex = lines.indexOf("# Section B");
+    const cIndex = lines.indexOf("# Section C");
+    const aIndex = lines.indexOf("# Section A");
+    const a1Index = lines.indexOf("## Child A1");
+    const a2Index = lines.indexOf("## Child A2");
 
     expect(bIndex).toBeLessThan(cIndex);
     expect(cIndex).toBeLessThan(aIndex);
@@ -87,9 +87,9 @@ Content C`;
 
     // Verify order: A, C, B
     const lines = result.content.split("\n");
-    const aIndex = lines.findIndex((line) => line === "# Section A");
-    const bIndex = lines.findIndex((line) => line === "# Section B");
-    const cIndex = lines.findIndex((line) => line === "# Section C");
+    const aIndex = lines.indexOf("# Section A");
+    const bIndex = lines.indexOf("# Section B");
+    const cIndex = lines.indexOf("# Section C");
 
     expect(aIndex).toBeLessThan(cIndex);
     expect(cIndex).toBeLessThan(bIndex);
@@ -111,9 +111,9 @@ Content C`;
 
     // Verify order: B, A, C
     const lines = result.content.split("\n");
-    const aIndex = lines.findIndex((line) => line === "# Section A");
-    const bIndex = lines.findIndex((line) => line === "# Section B");
-    const cIndex = lines.findIndex((line) => line === "# Section C");
+    const aIndex = lines.indexOf("# Section A");
+    const bIndex = lines.indexOf("# Section B");
+    const cIndex = lines.indexOf("# Section C");
 
     expect(bIndex).toBeLessThan(aIndex);
     expect(aIndex).toBeLessThan(cIndex);
@@ -232,8 +232,8 @@ Content 5`;
 
     // Verify section 2 is now after section 4
     const lines = result.content.split("\n");
-    const idx2 = lines.findIndex((line) => line === "# Section 2");
-    const idx4 = lines.findIndex((line) => line === "# Section 4");
+    const idx2 = lines.indexOf("# Section 2");
+    const idx4 = lines.indexOf("# Section 4");
 
     expect(idx4).toBeLessThan(idx2);
   });
@@ -284,10 +284,10 @@ Content 1C`;
 
     // All levels should stay together
     const lines = result.content.split("\n");
-    const idx1a = lines.findIndex((line) => line === "# Level 1A");
-    const idx2a = lines.findIndex((line) => line === "## Level 2A");
-    const idx3a = lines.findIndex((line) => line === "### Level 3A");
-    const idx1c = lines.findIndex((line) => line === "# Level 1C");
+    const idx1a = lines.indexOf("# Level 1A");
+    const idx2a = lines.indexOf("## Level 2A");
+    const idx3a = lines.indexOf("### Level 3A");
+    const idx1c = lines.indexOf("# Level 1C");
 
     expect(idx1c).toBeLessThan(idx1a);
     expect(idx1a).toBeLessThan(idx2a);
@@ -310,8 +310,8 @@ Content C`;
     expect(result.count).toBe(1);
 
     const lines = result.content.split("\n");
-    const aIndex = lines.findIndex((line) => line === "# Section A");
-    const bIndex = lines.findIndex((line) => line === "# Section B");
+    const aIndex = lines.indexOf("# Section A");
+    const bIndex = lines.indexOf("# Section B");
 
     expect(bIndex).toBeLessThan(aIndex);
   });
@@ -335,10 +335,10 @@ Other content`;
 
     // Top Level and all its children should move
     const lines = result.content.split("\n");
-    const topIndex = lines.findIndex((line) => line === "# Top Level");
-    const secondIndex = lines.findIndex((line) => line === "## Second Level");
-    const thirdIndex = lines.findIndex((line) => line === "### Third Level");
-    const anotherIndex = lines.findIndex((line) => line === "# Another Top");
+    const topIndex = lines.indexOf("# Top Level");
+    const secondIndex = lines.indexOf("## Second Level");
+    const thirdIndex = lines.indexOf("### Third Level");
+    const anotherIndex = lines.indexOf("# Another Top");
 
     expect(anotherIndex).toBeLessThan(topIndex);
     expect(topIndex).toBeLessThan(secondIndex);
@@ -367,8 +367,8 @@ The end`;
     expect(result.warnings).toHaveLength(0);
 
     const lines = result.content.split("\n");
-    const introIndex = lines.findIndex((line) => line === "# Introduction");
-    const conclusionIndex = lines.findIndex((line) => line === "# Conclusion");
+    const introIndex = lines.indexOf("# Introduction");
+    const conclusionIndex = lines.indexOf("# Conclusion");
 
     expect(conclusionIndex).toBeLessThan(introIndex);
   });
@@ -442,10 +442,10 @@ Content D`;
     expect(result.warnings).toHaveLength(0);
 
     const lines = result.content.split("\n");
-    const aIndex = lines.findIndex((line) => line === "# A");
-    const bIndex = lines.findIndex((line) => line === "# B");
-    const cIndex = lines.findIndex((line) => line === "# C");
-    const dIndex = lines.findIndex((line) => line === "# D");
+    const aIndex = lines.indexOf("# A");
+    const bIndex = lines.indexOf("# B");
+    const cIndex = lines.indexOf("# C");
+    const dIndex = lines.indexOf("# D");
 
     expect(bIndex).toBeLessThan(dIndex);
     expect(dIndex).toBeLessThan(cIndex);
@@ -476,8 +476,8 @@ The end`;
 
     // Conclusion should be after Introduction
     const lines = result.content.split("\n");
-    const introIndex = lines.findIndex((line) => line === "# Introduction");
-    const conclusionIndex = lines.findIndex((line) => line === "# Conclusion");
+    const introIndex = lines.indexOf("# Introduction");
+    const conclusionIndex = lines.indexOf("# Conclusion");
 
     expect(introIndex).toBeLessThan(conclusionIndex);
   });
