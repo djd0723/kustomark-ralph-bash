@@ -4176,3 +4176,74 @@ Replaced browser `alert()` calls with modern toast notifications for improved us
 - Zero warnings ✓
 
 **Status:** Web UI Toast Notifications COMPLETE! ✅
+
+---
+
+**2026-01-02 (Enhanced Lint Warnings - Developer Experience Improvement):**
+
+Implemented enhanced lint warnings to help developers write better patches and configurations.
+
+**New Lint Checks Implemented:**
+
+1. ✅ **Regex Pattern Validation** (`validateRegexPattern`)
+   - Validates regex syntax before patches are applied
+   - Reports syntax errors as lint errors
+   - Prevents runtime failures from malformed patterns
+
+2. ✅ **Regex Pattern Warnings** (`checkRegexPatternWarnings`)
+   - Warns about missing global flag (`g`) when not using anchors
+   - Detects overly broad patterns that match entire files
+   - Identifies unused capturing groups
+   - Detects invalid backreferences to non-existent groups
+   - Helps developers write more efficient and correct regex patterns
+
+3. ✅ **Glob Pattern Efficiency Warnings** (`checkGlobPatternWarnings`)
+   - Warns about overly broad resource patterns (`**/*`, `**/*.md`)
+   - Suggests missing `.md` extensions for markdown-specific patterns
+   - Flags absolute paths that harm portability
+   - Helps developers write more specific and maintainable configs
+
+4. ✅ **Destructive Operation Warnings** (`checkDestructiveOperationWarnings`)
+   - Warns about `remove-section` with `includeChildren: true` (default)
+   - Flags short `delete-between` markers that might be non-unique
+   - Warns about `replace` operations with empty replacement strings
+   - Helps prevent unintended content deletions
+
+**Files Created/Modified:**
+- `/home/dex/kustomark-ralph-bash/src/cli/lint-command.ts` - Added 4 new functions (135 lines)
+- `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Integrated warnings into lint command (50 lines)
+
+**Integration:**
+- All new warnings reported as "info" level (except regex syntax errors as "error")
+- Warnings appear in both text and JSON output formats
+- Compatible with existing `--strict` flag behavior
+- Zero performance impact (validates during lint, not during build)
+
+**Testing Results:**
+- All 2,262 tests passing ✓
+- All linting checks passing ✓
+- TypeScript compilation clean ✓
+- Zero warnings ✓
+
+**Benefits:**
+- Catches common mistakes early in development
+- Provides actionable suggestions for improvement
+- Improves patch reliability and maintainability
+- Enhances developer experience with helpful feedback
+
+**Example Output:**
+```
+kustomark lint ./team/
+
+Found 5 issue(s):
+
+INFO [patch #3]: Pattern doesn't use 'g' flag and lacks anchors (^ or $). This will only replace the first match per file. Add 'g' flag to replace all occurrences.
+INFO [patch #5]: Pattern has 2 capturing group(s) but replacement doesn't use them. Reference with $1, $2, etc. or use non-capturing groups (?:...)
+INFO: Resource pattern '**/*.md' is very broad and may match many files. Consider being more specific (e.g., 'docs/**/*.md')
+INFO [patch #7]: This operation will remove the section and all its children. Set 'includeChildren: false' to keep child sections.
+INFO [patch #9]: Delete markers are short ('---' to '---'). Ensure these are unique to avoid unintended deletions.
+
+Summary: 0 error(s), 0 warning(s), 5 info
+```
+
+**Status:** Enhanced Lint Warnings COMPLETE! ✅

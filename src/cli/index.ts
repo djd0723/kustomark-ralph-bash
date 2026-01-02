@@ -70,6 +70,7 @@ import type {
   OnNoMatchStrategy,
   PatchOperation,
   RenameFilePatch,
+  ReplaceRegexPatch,
   ResourceItem,
   ValidationError,
   ValidationResult,
@@ -81,7 +82,14 @@ import { debugCommand } from "./debug-command.js";
 import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
 import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
-import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
+import {
+  areOverlappingPatches,
+  areRedundantPatches,
+  checkDestructiveOperationWarnings,
+  checkGlobPatternWarnings,
+  checkRegexPatternWarnings,
+  validateRegexPattern,
+} from "./lint-command.js";
 import { createProgressReporter } from "./progress.js";
 import { suggestCommand } from "./suggest-command.js";
 import { templateApply, templateList, templateShow } from "./template-commands.js";
@@ -3241,6 +3249,60 @@ async function lintCommand(path: string, options: CLIOptions): Promise<number> {
             }
           }
         }
+      }
+    }
+
+    // Check 4: Enhanced lint warnings for patches
+    if (config.patches && config.patches.length > 0) {
+      for (let i = 0; i < config.patches.length; i++) {
+        const patch = config.patches[i];
+        if (!patch) continue;
+
+        // Check regex patterns for replace-regex operations
+        if (patch.op === "replace-regex") {
+          const regexPatch = patch as ReplaceRegexPatch;
+
+          // Validate regex syntax
+          const syntaxError = validateRegexPattern(regexPatch.pattern, regexPatch.flags);
+          if (syntaxError) {
+            issues.push({
+              level: "error",
+              patchIndex: i,
+              message: `Patch #${i + 1} has invalid regex pattern: ${syntaxError}`,
+            });
+          } else {
+            // Check for potential regex issues
+            const regexWarnings = checkRegexPatternWarnings(regexPatch);
+            for (const warning of regexWarnings) {
+              issues.push({
+                level: "info",
+                patchIndex: i,
+                message: `Patch #${i + 1} (replace-regex): ${warning}`,
+              });
+            }
+          }
+        }
+
+        // Check for potentially destructive operations
+        const destructiveWarnings = checkDestructiveOperationWarnings(patch);
+        for (const warning of destructiveWarnings) {
+          issues.push({
+            level: "info",
+            patchIndex: i,
+            message: `Patch #${i + 1} (${patch.op}): ${warning}`,
+          });
+        }
+      }
+    }
+
+    // Check 5: Resource glob pattern efficiency
+    if (config.resources && Array.isArray(config.resources) && config.resources.length > 0) {
+      const globWarnings = checkGlobPatternWarnings(config.resources);
+      for (const warning of globWarnings) {
+        issues.push({
+          level: "info",
+          message: warning,
+        });
       }
     }
 

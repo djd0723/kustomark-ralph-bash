@@ -18,6 +18,7 @@ import type {
   ReplacePatch,
   ReplaceRegexPatch,
   ReplaceSectionPatch,
+  ResourceItem,
   SetFrontmatterPatch,
 } from "../core/types.js";
 
@@ -242,4 +243,140 @@ export function areOverlappingPatches(patch1: PatchOperation, patch2: PatchOpera
   }
 
   return false;
+}
+
+/**
+ * Validate regex pattern syntax
+ * Returns null if valid, error message if invalid
+ */
+export function validateRegexPattern(pattern: string, flags?: string): string | null {
+  try {
+    new RegExp(pattern, flags);
+    return null;
+  } catch (error) {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return "Invalid regex pattern";
+  }
+}
+
+/**
+ * Check if a regex pattern might have unexpected behavior
+ * Returns array of warning messages
+ */
+export function checkRegexPatternWarnings(patch: ReplaceRegexPatch): string[] {
+  const warnings: string[] = [];
+  const { pattern, flags = "", replacement } = patch;
+
+  // Warn about missing global flag for replace-all operations
+  if (!flags.includes("g") && !pattern.includes("^") && !pattern.includes("$")) {
+    warnings.push(
+      "Pattern doesn't use 'g' flag and lacks anchors (^ or $). This will only replace the first match per file. Add 'g' flag to replace all occurrences.",
+    );
+  }
+
+  // Warn about overly broad patterns that might match entire file
+  if (pattern === ".*" || pattern === "[\\s\\S]*" || pattern === "(?s).") {
+    warnings.push(
+      "Pattern matches entire file content. Consider using 'replace' operation instead for better clarity.",
+    );
+  }
+
+  // Warn about capturing groups not used in replacement
+  const captureGroups = (pattern.match(/\([^?]/g) || []).length;
+  const usedGroups = (replacement.match(/\$\d+/g) || []).map((g) => parseInt(g.slice(1), 10));
+  const maxUsedGroup = usedGroups.length > 0 ? Math.max(...usedGroups) : 0;
+
+  if (captureGroups > 0 && maxUsedGroup === 0) {
+    warnings.push(
+      `Pattern has ${captureGroups} capturing group(s) but replacement doesn't use them. Reference with $1, $2, etc. or use non-capturing groups (?:...)`,
+    );
+  }
+
+  // Warn about backreferences to groups that don't exist
+  if (maxUsedGroup > captureGroups) {
+    warnings.push(
+      `Replacement references group $${maxUsedGroup} but pattern only has ${captureGroups} capturing group(s)`,
+    );
+  }
+
+  return warnings;
+}
+
+/**
+ * Check if resource glob patterns are inefficient
+ * Returns array of warning messages
+ */
+export function checkGlobPatternWarnings(resources: ResourceItem[]): string[] {
+  const warnings: string[] = [];
+
+  for (const resource of resources) {
+    if (typeof resource !== "string") {
+      continue;
+    }
+
+    // Warn about overly broad globs
+    if (resource === "**/*" || resource === "**/*.md") {
+      warnings.push(
+        `Resource pattern '${resource}' is very broad and may match many files. Consider being more specific (e.g., 'docs/**/*.md')`,
+      );
+    }
+
+    // Warn about missing file extension for markdown files
+    if (resource.includes("**/*") && !resource.includes(".md")) {
+      warnings.push(
+        `Resource pattern '${resource}' doesn't specify .md extension. Did you mean '${resource}.md'?`,
+      );
+    }
+
+    // Warn about absolute paths
+    if (resource.startsWith("/")) {
+      warnings.push(
+        `Resource pattern '${resource}' uses absolute path. Consider using relative paths for portability.`,
+      );
+    }
+  }
+
+  return warnings;
+}
+
+/**
+ * Check if patch operations might be destructive
+ * Returns array of warning messages
+ */
+export function checkDestructiveOperationWarnings(patch: PatchOperation): string[] {
+  const warnings: string[] = [];
+
+  // Warn about remove-section without children consideration
+  if (patch.op === "remove-section") {
+    const includeChildren = (patch as RemoveSectionPatch).includeChildren ?? true;
+    if (includeChildren) {
+      warnings.push(
+        "This operation will remove the section and all its children. Set 'includeChildren: false' to keep child sections.",
+      );
+    }
+  }
+
+  // Warn about delete-between that might delete large blocks
+  if (patch.op === "delete-between") {
+    const { start, end } = patch as DeleteBetweenPatch;
+    if (start.length < 10 && end.length < 10) {
+      warnings.push(
+        `Delete markers are short ('${start}' to '${end}'). Ensure these are unique to avoid unintended deletions.`,
+      );
+    }
+  }
+
+  // Warn about replace operations with empty replacements
+  if (patch.op === "replace") {
+    const { old, new: newValue } = patch as ReplacePatch;
+    if (newValue === "") {
+      warnings.push(
+        `Replacing '${old.slice(0, 50)}...' with empty string. Consider using 'delete-between' if removing a block.`,
+      );
+    }
+  }
+
+  return warnings;
 }
