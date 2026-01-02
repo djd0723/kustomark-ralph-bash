@@ -225,10 +225,11 @@ describe("Git Fetcher", () => {
 
     test("should handle network timeout", async () => {
       // Set very short timeout to force timeout error
+      // Disable retries to keep test fast
       await expect(
         fetchGitRepository(
           "github.com/anthropics/anthropic-sdk-typescript?ref=main",
-          { cacheDir: TEST_CACHE_DIR, timeout: 1 }, // 1ms timeout
+          { cacheDir: TEST_CACHE_DIR, timeout: 1, maxRetries: 0 }, // 1ms timeout, no retries
         ),
       ).rejects.toThrow();
     });

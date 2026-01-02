@@ -59,6 +59,14 @@ export interface GitFetchOptions {
   offline?: boolean;
   /** Authentication token (for HTTPS git operations) */
   authToken?: string;
+  /** Maximum number of retry attempts for transient failures (default: 3) */
+  maxRetries?: number;
+  /** Base delay in milliseconds for exponential backoff (default: 1000) */
+  retryBaseDelay?: number;
+  /** Maximum delay in milliseconds between retries (default: 30000) */
+  retryMaxDelay?: number;
+  /** Enable verbose logging of retry attempts (default: false) */
+  verbose?: boolean;
 }
 
 /**
@@ -77,6 +85,114 @@ export interface GitFetchOptions {
  */
 export function getDefaultCacheDir(): string {
   return join(homedir(), ".cache", "kustomark", "git");
+}
+
+/**
+ * Check if a git error is retryable
+ *
+ * Determines if a git operation error is transient and should be retried.
+ * Retryable errors include network failures, timeouts, and temporary
+ * server issues.
+ *
+ * @param error - The GitFetchError to check
+ * @returns true if the error is retryable, false otherwise
+ */
+function isRetryableGitError(error: GitFetchError): boolean {
+  // Network errors (retryable)
+  const retryableErrorCodes = [
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "ETIMEDOUT",
+    "ECONNABORTED",
+    "ENETUNREACH",
+    "EAI_AGAIN",
+  ];
+
+  // Check for network error codes in error message or stderr
+  const errorText = `${error.message} ${error.stderr || ""}`;
+  if (retryableErrorCodes.some((code) => errorText.includes(code))) {
+    return true;
+  }
+
+  // Timeout errors
+  if (error.code === "TIMEOUT") {
+    return true;
+  }
+
+  // Git-specific transient errors
+  if (error.stderr) {
+    const stderr = error.stderr.toLowerCase();
+    // Connection/network issues
+    if (
+      stderr.includes("could not resolve host") ||
+      stderr.includes("failed to connect") ||
+      stderr.includes("connection timed out") ||
+      stderr.includes("connection reset") ||
+      stderr.includes("transfer closed") ||
+      stderr.includes("rpc failed") ||
+      stderr.includes("the remote end hung up") ||
+      stderr.includes("error: rpc failed") ||
+      stderr.includes("fatal: the remote end hung up unexpectedly")
+    ) {
+      return true;
+    }
+
+    // Temporary server issues
+    if (
+      stderr.includes("503 service unavailable") ||
+      stderr.includes("502 bad gateway") ||
+      stderr.includes("504 gateway timeout")
+    ) {
+      return true;
+    }
+  }
+
+  // Non-retryable errors: authentication failures, invalid URLs, etc.
+  if (
+    error.code === "CLONE_FAILED" &&
+    error.stderr &&
+    (error.stderr.includes("Authentication failed") ||
+      error.stderr.includes("could not read Username") ||
+      error.stderr.includes("Permission denied") ||
+      error.stderr.includes("Repository not found"))
+  ) {
+    return false;
+  }
+
+  // Default: assume retryable for CLONE_FAILED, FETCH_FAILED
+  return error.code === "CLONE_FAILED" || error.code === "FETCH_FAILED";
+}
+
+/**
+ * Calculate retry delay with exponential backoff
+ *
+ * Implements exponential backoff with jitter to prevent thundering herd.
+ * Formula: min(maxDelay, baseDelay * 2^attempt) + jitter
+ *
+ * @param attempt - Current retry attempt number (0-indexed)
+ * @param baseDelay - Base delay in milliseconds (default: 1000)
+ * @param maxDelay - Maximum delay cap in milliseconds (default: 30000)
+ * @returns Delay in milliseconds before next retry
+ */
+function calculateRetryDelay(attempt: number, baseDelay = 1000, maxDelay = 30000): number {
+  // Exponential backoff: baseDelay * 2^attempt
+  const exponentialDelay = baseDelay * 2 ** attempt;
+
+  // Cap at max delay
+  const cappedDelay = Math.min(exponentialDelay, maxDelay);
+
+  // Add jitter (0-1000ms) to prevent thundering herd
+  const jitter = Math.random() * 1000;
+
+  return Math.floor(cappedDelay + jitter);
+}
+
+/**
+ * Sleep for specified milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -146,7 +262,77 @@ async function executeGit(
 }
 
 /**
- * Clone a git repository
+ * Clone a git repository with retry logic
+ */
+async function cloneRepositoryWithRetry(
+  url: string,
+  dest: string,
+  options: {
+    sparsePath?: string;
+    timeout?: number;
+    authToken?: string;
+    maxRetries?: number;
+    retryBaseDelay?: number;
+    retryMaxDelay?: number;
+    verbose?: boolean;
+  } = {},
+): Promise<void> {
+  const maxRetries = options.maxRetries ?? 3;
+  const retryBaseDelay = options.retryBaseDelay ?? 1000;
+  const retryMaxDelay = options.retryMaxDelay ?? 30000;
+  const verbose = options.verbose ?? false;
+
+  let lastError: GitFetchError | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      await cloneRepository(url, dest, options.sparsePath, options.timeout, options.authToken);
+      // Success!
+      if (verbose && attempt > 0) {
+        console.log(`Successfully cloned ${url} after ${attempt} retry attempt(s)`);
+      }
+      return;
+    } catch (error) {
+      if (!(error instanceof GitFetchError)) {
+        throw error;
+      }
+
+      lastError = error;
+
+      // If this was the last attempt, throw
+      if (attempt === maxRetries) {
+        break;
+      }
+
+      // Check if error is retryable
+      if (!isRetryableGitError(lastError)) {
+        if (verbose) {
+          console.log(`Non-retryable error encountered: ${lastError.code}`);
+        }
+        throw lastError;
+      }
+
+      // Calculate delay
+      const delay = calculateRetryDelay(attempt, retryBaseDelay, retryMaxDelay);
+
+      if (verbose) {
+        console.log(
+          `Retry attempt ${attempt + 1}/${maxRetries} for cloning ${url} after ${delay}ms ` +
+            `(error: ${lastError.message})`,
+        );
+      }
+
+      // Wait before retrying
+      await sleep(delay);
+    }
+  }
+
+  // All retries exhausted
+  throw lastError;
+}
+
+/**
+ * Clone a git repository (internal function without retry)
  */
 async function cloneRepository(
   url: string,
@@ -445,17 +631,68 @@ export async function fetchGitRepository(
       );
     }
 
-    // Update existing repository
-    try {
-      await executeGit(["fetch", "origin"], {
-        cwd: repoPath,
-        timeout: options.timeout,
-        authToken: options.authToken,
-      });
-    } catch (_error) {
-      // If fetch fails, remove the cached repo and clone fresh
-      await rm(repoPath, { recursive: true, force: true });
-      needsClone = true;
+    // Update existing repository with retry logic
+    const maxRetries = options.maxRetries ?? 3;
+    const retryBaseDelay = options.retryBaseDelay ?? 1000;
+    const retryMaxDelay = options.retryMaxDelay ?? 30000;
+    const verbose = options.verbose ?? false;
+
+    let fetchSuccess = false;
+    let lastError: GitFetchError | undefined;
+
+    for (let attempt = 0; attempt <= maxRetries && !fetchSuccess; attempt++) {
+      try {
+        await executeGit(["fetch", "origin"], {
+          cwd: repoPath,
+          timeout: options.timeout,
+          authToken: options.authToken,
+        });
+        fetchSuccess = true;
+        if (verbose && attempt > 0) {
+          console.log(`Successfully fetched updates after ${attempt} retry attempt(s)`);
+        }
+      } catch (error) {
+        if (!(error instanceof GitFetchError)) {
+          throw error;
+        }
+
+        lastError = error;
+
+        // If this was the last attempt, fall back to fresh clone
+        if (attempt === maxRetries) {
+          if (verbose) {
+            console.log(`All ${maxRetries} retry attempts exhausted, falling back to fresh clone`);
+          }
+          await rm(repoPath, { recursive: true, force: true });
+          needsClone = true;
+          break;
+        }
+
+        // Check if error is retryable
+        if (!isRetryableGitError(lastError)) {
+          if (verbose) {
+            console.log(
+              `Non-retryable error encountered: ${lastError.code}, falling back to fresh clone`,
+            );
+          }
+          await rm(repoPath, { recursive: true, force: true });
+          needsClone = true;
+          break;
+        }
+
+        // Calculate delay
+        const delay = calculateRetryDelay(attempt, retryBaseDelay, retryMaxDelay);
+
+        if (verbose) {
+          console.log(
+            `Retry attempt ${attempt + 1}/${maxRetries} for fetching updates after ${delay}ms ` +
+              `(error: ${lastError.message})`,
+          );
+        }
+
+        // Wait before retrying
+        await sleep(delay);
+      }
     }
   } else if (!needsClone) {
     cached = true;
@@ -463,13 +700,15 @@ export async function fetchGitRepository(
 
   // Clone if needed
   if (needsClone) {
-    await cloneRepository(
-      parsed.cloneUrl,
-      repoPath,
-      parsed.path,
-      options.timeout,
-      options.authToken,
-    );
+    await cloneRepositoryWithRetry(parsed.cloneUrl, repoPath, {
+      sparsePath: parsed.path,
+      timeout: options.timeout,
+      authToken: options.authToken,
+      maxRetries: options.maxRetries,
+      retryBaseDelay: options.retryBaseDelay,
+      retryMaxDelay: options.retryMaxDelay,
+      verbose: options.verbose,
+    });
   }
 
   // Checkout the specified ref
