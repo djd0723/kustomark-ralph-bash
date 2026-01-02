@@ -237,7 +237,12 @@ async function readFilesRecursively(
           path: subpath ? relativePath.substring(subpath.length) : relativePath,
           content,
         });
-      } catch (error) {}
+      } catch (error) {
+        // Log warning but continue processing other files
+        console.warn(
+          `Warning: Could not read file ${fullPath}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 

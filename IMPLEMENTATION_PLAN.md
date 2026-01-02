@@ -1204,3 +1204,43 @@ This document tracks the implementation of kustomark based on the spec milestone
 - Cache invalidation logic complete for all major use cases
 - Users no longer get stale builds from cache inconsistencies
 
+**2026-01-02 (Code Quality and Performance Enhancements):**
+- ✅ Unskipped base config tracking test (test.skip removed from line 815)
+  - Test now passes successfully - implementation was already complete
+  - Removed outdated comment about feature being a "known limitation"
+  - All 911 tests now passing (0 skips, down from 1 skip)
+
+- ✅ Fixed critical error handling bug in http-fetcher.ts
+  - Empty catch block at line 240 was silently swallowing file read errors
+  - Now logs warnings when files fail to read during archive extraction
+  - Prevents silent failures and helps debug extraction issues
+  - Files modified: `/home/dex/kustomark-ralph-bash/src/core/http-fetcher.ts`
+
+- ✅ Converted cache entries from array to Map for O(1) lookup performance
+  - **Performance Impact:** Reduced cache lookup from O(n) to O(1) time complexity
+  - **Especially beneficial** for large projects with hundreds or thousands of files
+  - **Backward compatible:** Old cache files (array format) automatically converted to Map
+  - **JSON format preserved:** Serialized cache still uses array format for readability
+  - Implementation details:
+    - Updated `BuildCache.entries` type from `BuildCacheEntry[]` to `Map<string, BuildCacheEntry>`
+    - Modified all cache functions: createEmptyCache(), parseBuildCache(), serializeBuildCache(), findCacheEntry(), updateBuildCache(), pruneCache(), determineFilesToRebuild()
+    - Updated CLI code to use Map methods (.size instead of .length, .get() instead of .find())
+    - Updated all 54 build-cache tests to work with Map instead of array
+  - Files modified:
+    - `/home/dex/kustomark-ralph-bash/src/core/types.ts` - BuildCache interface
+    - `/home/dex/kustomark-ralph-bash/src/core/build-cache.ts` - All cache functions
+    - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Cache access in CLI
+    - `/home/dex/kustomark-ralph-bash/tests/core/build-cache.test.ts` - All 54 tests
+
+**Testing Results:**
+- All 911 tests passing (up from 910, test unskipped)
+- 0 skips (down from 1 skip - all tests now active)
+- 4368 expect() calls successful (up from 4354)
+- Main project linting clean for core/cli/lsp (web UI has cosmetic warnings only)
+
+**Impact:**
+- Base config tracking test now active and passing
+- HTTP archive extraction errors no longer silent
+- Cache lookups significantly faster for large projects (O(1) vs O(n))
+- Better code quality and error visibility for debugging
+

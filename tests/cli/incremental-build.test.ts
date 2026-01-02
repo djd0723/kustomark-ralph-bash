@@ -812,10 +812,7 @@ patches:
   });
 
   describe("nested configs and overlays", () => {
-    test.skip("should track base config changes", async () => {
-      // NOTE: This test is skipped because the current implementation doesn't track
-      // changes to base configs when using overlays. Only the overlay config hash
-      // is tracked, not the base config hash. This is a known limitation.
+    test("should track base config changes", async () => {
       // Create base directory
       const baseDir = join(fixtureRoot, "base");
       mkdirSync(baseDir, { recursive: true });

@@ -209,7 +209,8 @@ describe("Build Cache Module", () => {
       const cache = createEmptyCache(configHash);
 
       expect(cache.version).toBe(1);
-      expect(cache.entries).toEqual([]);
+      expect(cache.entries).toBeInstanceOf(Map);
+      expect(cache.entries.size).toBe(0);
       expect(cache.configHash).toBe(configHash);
     });
 
@@ -218,7 +219,8 @@ describe("Build Cache Module", () => {
       const cache = createEmptyCache(configHash);
 
       expect(cache.configHash).toBe(configHash);
-      expect(cache.entries).toEqual([]);
+      expect(cache.entries).toBeInstanceOf(Map);
+      expect(cache.entries.size).toBe(0);
     });
   });
 
@@ -255,17 +257,16 @@ describe("Build Cache Module", () => {
 
     test("should save and load cache successfully", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
+      const entry = {
+        file: "file1.md",
+        sourceHash: "abc123",
+        outputHash: "def456",
+        patchHash: "ghi789",
+        built: new Date().toISOString(),
+      };
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
-            file: "file1.md",
-            sourceHash: "abc123",
-            outputHash: "def456",
-            patchHash: "ghi789",
-            built: new Date().toISOString(),
-          },
-        ],
+        entries: new Map([["file1.md", entry]]),
         configHash: "config123",
       };
 
@@ -274,62 +275,65 @@ describe("Build Cache Module", () => {
       const loaded = await loadBuildCache(configPath);
       expect(loaded).not.toBeNull();
       expect(loaded?.version).toBe(cache.version);
-      expect(loaded?.entries).toEqual(cache.entries);
+      expect(loaded?.entries).toBeInstanceOf(Map);
+      expect(loaded?.entries.size).toBe(1);
+      expect(loaded?.entries.get("file1.md")).toEqual(entry);
       expect(loaded?.configHash).toBe(cache.configHash);
     });
 
     test("should handle cache with multiple entries", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
+      const entries = new Map<string, BuildCacheEntry>([
+        ["file1.md", {
+          file: "file1.md",
+          sourceHash: "abc123",
+          outputHash: "def456",
+          patchHash: "ghi789",
+          built: new Date().toISOString(),
+        }],
+        ["file2.md", {
+          file: "file2.md",
+          sourceHash: "jkl012",
+          outputHash: "mno345",
+          patchHash: "pqr678",
+          built: new Date().toISOString(),
+        }],
+        ["docs/file3.md", {
+          file: "docs/file3.md",
+          sourceHash: "stu901",
+          outputHash: "vwx234",
+          patchHash: "yz5678",
+          built: new Date().toISOString(),
+        }],
+      ]);
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
-            file: "file1.md",
-            sourceHash: "abc123",
-            outputHash: "def456",
-            patchHash: "ghi789",
-            built: new Date().toISOString(),
-          },
-          {
-            file: "file2.md",
-            sourceHash: "jkl012",
-            outputHash: "mno345",
-            patchHash: "pqr678",
-            built: new Date().toISOString(),
-          },
-          {
-            file: "docs/file3.md",
-            sourceHash: "stu901",
-            outputHash: "vwx234",
-            patchHash: "yz5678",
-            built: new Date().toISOString(),
-          },
-        ],
+        entries,
         configHash: "config123",
       };
 
       await saveBuildCache(configPath, cache);
 
       const loaded = await loadBuildCache(configPath);
-      expect(loaded?.entries.length).toBe(3);
-      expect(loaded?.entries.some(e => e.file === "file1.md")).toBe(true);
-      expect(loaded?.entries.some(e => e.file === "file2.md")).toBe(true);
-      expect(loaded?.entries.some(e => e.file === "docs/file3.md")).toBe(true);
+      expect(loaded?.entries.size).toBe(3);
+      expect(loaded?.entries.has("file1.md")).toBe(true);
+      expect(loaded?.entries.has("file2.md")).toBe(true);
+      expect(loaded?.entries.has("docs/file3.md")).toBe(true);
     });
 
     test("should overwrite existing cache", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
       const cache1: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: "old",
             outputHash: "old",
             patchHash: "old",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "old",
       };
 
@@ -337,24 +341,24 @@ describe("Build Cache Module", () => {
 
       const cache2: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file2.md", {
             file: "file2.md",
             sourceHash: "new",
             outputHash: "new",
             patchHash: "new",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "new",
       };
 
       await saveBuildCache(configPath, cache2);
 
       const loaded = await loadBuildCache(configPath);
-      expect(loaded?.entries.length).toBe(1);
-      expect(loaded?.entries.some(e => e.file === "file2.md")).toBe(true);
-      expect(loaded?.entries.some(e => e.file === "file1.md")).toBe(false);
+      expect(loaded?.entries.size).toBe(1);
+      expect(loaded?.entries.has("file2.md")).toBe(true);
+      expect(loaded?.entries.has("file1.md")).toBe(false);
       expect(loaded?.configHash).toBe("new");
     });
 
@@ -396,23 +400,23 @@ describe("Build Cache Module", () => {
       const results = new Map([["file1.md", entry]]);
       const updated = updateBuildCache(cache, results);
 
-      expect(updated.entries.length).toBe(1);
-      expect(updated.entries[0]).toEqual(entry);
+      expect(updated.entries.size).toBe(1);
+      expect(updated.entries.get("file1.md")).toEqual(entry);
     });
 
     test("should update existing entry", () => {
       const oldBuilt = new Date(Date.now() - 1000).toISOString();
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: "old",
             outputHash: "old",
             patchHash: "old",
             built: oldBuilt,
-          },
-        ],
+          }],
+        ]),
         configHash: "test-hash",
       };
 
@@ -428,10 +432,10 @@ describe("Build Cache Module", () => {
       const results = new Map([["file1.md", newEntry]]);
       const updated = updateBuildCache(cache, results);
 
-      expect(updated.entries.length).toBe(1);
-      expect(updated.entries[0]?.sourceHash).toBe("new");
-      expect(updated.entries[0]?.outputHash).toBe("new");
-      expect(updated.entries[0]?.built).toBe(newBuilt);
+      expect(updated.entries.size).toBe(1);
+      expect(updated.entries.get("file1.md")?.sourceHash).toBe("new");
+      expect(updated.entries.get("file1.md")?.outputHash).toBe("new");
+      expect(updated.entries.get("file1.md")?.built).toBe(newBuilt);
     });
 
     test("should not mutate original cache", () => {
@@ -447,30 +451,30 @@ describe("Build Cache Module", () => {
       const results = new Map([["file1.md", entry]]);
       const updated = updateBuildCache(cache, results);
 
-      expect(cache.entries).toEqual([]);
-      expect(updated.entries.length).toBe(1);
-      expect(updated.entries[0]).toEqual(entry);
+      expect(cache.entries.size).toBe(0);
+      expect(updated.entries.size).toBe(1);
+      expect(updated.entries.get("file1.md")).toEqual(entry);
     });
 
     test("should preserve other entries when updating one", () => {
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: "abc",
             outputHash: "def",
             patchHash: "ghi",
             built: new Date().toISOString(),
-          },
-          {
+          }],
+          ["file2.md", {
             file: "file2.md",
             sourceHash: "jkl",
             outputHash: "mno",
             patchHash: "pqr",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "test-hash",
       };
 
@@ -485,12 +489,9 @@ describe("Build Cache Module", () => {
       const results = new Map([["file1.md", newEntry]]);
       const updated = updateBuildCache(cache, results);
 
-      const file1Entry = updated.entries.find(e => e.file === "file1.md");
-      const file2Entry = updated.entries.find(e => e.file === "file2.md");
-
-      expect(file1Entry?.sourceHash).toBe("new");
-      expect(file2Entry?.sourceHash).toBe("jkl");
-      expect(updated.entries.length).toBe(2);
+      expect(updated.entries.get("file1.md")?.sourceHash).toBe("new");
+      expect(updated.entries.get("file2.md")?.sourceHash).toBe("jkl");
+      expect(updated.entries.size).toBe(2);
     });
   });
 
@@ -498,117 +499,121 @@ describe("Build Cache Module", () => {
     test("should remove entries for deleted files", () => {
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: "abc",
             outputHash: "def",
             patchHash: "ghi",
             built: new Date().toISOString(),
-          },
-          {
+          }],
+          ["file2.md", {
             file: "file2.md",
             sourceHash: "jkl",
             outputHash: "mno",
             patchHash: "pqr",
             built: new Date().toISOString(),
-          },
-          {
+          }],
+          ["file3.md", {
             file: "file3.md",
             sourceHash: "stu",
             outputHash: "vwx",
             patchHash: "yz0",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "test-hash",
       };
 
       const currentFiles = new Set(["file1.md", "file3.md"]);
       const pruned = pruneCache(cache, currentFiles);
 
-      expect(pruned.entries.some(e => e.file === "file1.md")).toBe(true);
-      expect(pruned.entries.some(e => e.file === "file2.md")).toBe(false);
-      expect(pruned.entries.some(e => e.file === "file3.md")).toBe(true);
-      expect(pruned.entries.length).toBe(2);
+      expect(pruned.entries.has("file1.md")).toBe(true);
+      expect(pruned.entries.has("file2.md")).toBe(false);
+      expect(pruned.entries.has("file3.md")).toBe(true);
+      expect(pruned.entries.size).toBe(2);
     });
 
     test("should handle empty current files set", () => {
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: "abc",
             outputHash: "def",
             patchHash: "ghi",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "test-hash",
       };
 
       const currentFiles = new Set<string>();
       const pruned = pruneCache(cache, currentFiles);
 
-      expect(pruned.entries).toEqual([]);
+      expect(pruned.entries.size).toBe(0);
     });
 
     test("should not mutate original cache", () => {
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: "abc",
             outputHash: "def",
             patchHash: "ghi",
             built: new Date().toISOString(),
-          },
-          {
+          }],
+          ["file2.md", {
             file: "file2.md",
             sourceHash: "jkl",
             outputHash: "mno",
             patchHash: "pqr",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "test-hash",
       };
 
       const currentFiles = new Set(["file1.md"]);
       const pruned = pruneCache(cache, currentFiles);
 
-      expect(cache.entries.length).toBe(2);
-      expect(pruned.entries.length).toBe(1);
+      expect(cache.entries.size).toBe(2);
+      expect(pruned.entries.size).toBe(1);
     });
 
     test("should preserve all entries if all files still exist", () => {
+      const entry1 = {
+        file: "file1.md",
+        sourceHash: "abc",
+        outputHash: "def",
+        patchHash: "ghi",
+        built: new Date().toISOString(),
+      };
+      const entry2 = {
+        file: "file2.md",
+        sourceHash: "jkl",
+        outputHash: "mno",
+        patchHash: "pqr",
+        built: new Date().toISOString(),
+      };
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
-            file: "file1.md",
-            sourceHash: "abc",
-            outputHash: "def",
-            patchHash: "ghi",
-            built: new Date().toISOString(),
-          },
-          {
-            file: "file2.md",
-            sourceHash: "jkl",
-            outputHash: "mno",
-            patchHash: "pqr",
-            built: new Date().toISOString(),
-          },
-        ],
+        entries: new Map([
+          ["file1.md", entry1],
+          ["file2.md", entry2],
+        ]),
         configHash: "test-hash",
       };
 
       const currentFiles = new Set(["file1.md", "file2.md"]);
       const pruned = pruneCache(cache, currentFiles);
 
-      expect(pruned.entries).toEqual(cache.entries);
+      expect(pruned.entries.size).toBe(2);
+      expect(pruned.entries.get("file1.md")).toEqual(entry1);
+      expect(pruned.entries.get("file2.md")).toEqual(entry2);
     });
   });
 
@@ -632,15 +637,15 @@ describe("Build Cache Module", () => {
     test("should detect modified files", () => {
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: calculateFileHash("# Original content"),
             outputHash: "output",
             patchHash: "patches",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "test-hash",
       };
 
@@ -659,15 +664,15 @@ describe("Build Cache Module", () => {
       const hash = calculateFileHash(content);
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: hash,
             outputHash: "output",
             patchHash: "patches",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "test-hash",
       };
 
@@ -683,22 +688,22 @@ describe("Build Cache Module", () => {
     test("should detect deleted files", () => {
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: "hash1",
             outputHash: "output1",
             patchHash: "patches1",
             built: new Date().toISOString(),
-          },
-          {
+          }],
+          ["file2.md", {
             file: "file2.md",
             sourceHash: "hash2",
             outputHash: "output2",
             patchHash: "patches2",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "test-hash",
       };
 
@@ -714,29 +719,29 @@ describe("Build Cache Module", () => {
     test("should handle mix of changes", () => {
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["unchanged.md", {
             file: "unchanged.md",
             sourceHash: calculateFileHash("# Unchanged"),
             outputHash: "output",
             patchHash: "patches",
             built: new Date().toISOString(),
-          },
-          {
+          }],
+          ["modified.md", {
             file: "modified.md",
             sourceHash: calculateFileHash("# Original"),
             outputHash: "output",
             patchHash: "patches",
             built: new Date().toISOString(),
-          },
-          {
+          }],
+          ["deleted.md", {
             file: "deleted.md",
             sourceHash: "hash",
             outputHash: "output",
             patchHash: "patches",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "test-hash",
       };
 
@@ -779,7 +784,7 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [],
+        entries: new Map(),
         configHash: calculateFileHash(JSON.stringify(config1)),
       };
 
@@ -803,7 +808,7 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [],
+        entries: new Map(),
         configHash: calculateFileHash(JSON.stringify(config)),
       };
 
@@ -821,7 +826,7 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [],
+        entries: new Map(),
         configHash: "some-hash",
       };
 
@@ -852,7 +857,7 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [],
+        entries: new Map(),
         configHash: calculateFileHash(JSON.stringify(config1)),
       };
 
@@ -1044,15 +1049,15 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: calculateFileHash("# Content 1"),
             outputHash: "output",
             patchHash: "patches",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: calculateFileHash(JSON.stringify(oldConfig)),
       };
 
@@ -1099,15 +1104,15 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: calculateFileHash("# Content 1"),
             outputHash: "output",
             patchHash: "old-patches",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: calculateFileHash(JSON.stringify(config)),
       };
 
@@ -1137,22 +1142,22 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["unchanged.md", {
             file: "unchanged.md",
             sourceHash: calculateFileHash("# Unchanged"),
             outputHash: "output",
             patchHash: patchesHash,
             built: new Date().toISOString(),
-          },
-          {
+          }],
+          ["modified.md", {
             file: "modified.md",
             sourceHash: calculateFileHash("# Original"),
             outputHash: "output",
             patchHash: patchesHash,
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: calculateFileHash(JSON.stringify(config)),
       };
 
@@ -1189,15 +1194,15 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: calculateFileHash(content),
             outputHash: "output",
             patchHash: patchesHash,
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: calculateFileHash(JSON.stringify(config)),
       };
 
@@ -1245,15 +1250,15 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: calculateFileHash("# Old"),
             outputHash: "output",
             patchHash: "patches",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: "old-config-hash",
       };
 
@@ -1280,15 +1285,15 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: calculateFileHash("# Old"),
             outputHash: "output",
             patchHash: "old",
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: calculateFileHash(JSON.stringify(config)),
       };
 
@@ -1326,15 +1331,15 @@ describe("Build Cache Module", () => {
 
       const cache: BuildCache = {
         version: 1,
-        entries: [
-          {
+        entries: new Map([
+          ["file1.md", {
             file: "file1.md",
             sourceHash: calculateFileHash(content),
             outputHash: "output",
             patchHash: patchesHash,
             built: new Date().toISOString(),
-          },
-        ],
+          }],
+        ]),
         configHash: calculateFileHash(JSON.stringify(config)),
       };
 

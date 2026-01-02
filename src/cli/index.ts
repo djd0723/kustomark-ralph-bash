@@ -1411,7 +1411,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         try {
           buildCache = await loadBuildCache(configPath, options.cacheDir);
           if (buildCache) {
-            log(`Loaded cache with ${buildCache.entries.length} entries`, 3, options);
+            log(`Loaded cache with ${buildCache.entries.size} entries`, 3, options);
 
             // Check if config changed
             if (buildCache.configHash !== configHash) {
@@ -1501,7 +1501,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         );
 
         // Check cache
-        const cacheEntry = buildCache.entries.find((e) => e.file === filePath);
+        const cacheEntry = buildCache.entries.get(filePath);
 
         let needsRebuild = false;
         let reason: string | undefined;
@@ -1697,7 +1697,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           newCacheEntries.set(filePath, entry);
         } else {
           // File wasn't rebuilt - preserve existing cache entry if it exists
-          const existingEntry = buildCache.entries.find((e) => e.file === filePath);
+          const existingEntry = buildCache.entries.get(filePath);
           if (existingEntry) {
             newCacheEntries.set(filePath, existingEntry);
           } else {
@@ -1734,7 +1734,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       // Save cache to disk (even if no files were rebuilt)
       try {
         await saveBuildCache(configPath, buildCache, options.cacheDir);
-        log(`Cache saved with ${buildCache.entries.length} entries`, 3, options);
+        log(`Cache saved with ${buildCache.entries.size} entries`, 3, options);
       } catch (error) {
         console.warn(
           `Warning: Failed to save cache: ${error instanceof Error ? error.message : String(error)}`,

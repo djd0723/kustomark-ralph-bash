@@ -456,8 +456,8 @@ export interface BuildCache {
   configHash: string;
   /** Map of config paths to their hashes (for tracking base configs in overlays) */
   configHashes?: Record<string, string>;
-  /** Cached build entries */
-  entries: BuildCacheEntry[];
+  /** Cached build entries - Map of file path to cache entry for O(1) lookup */
+  entries: Map<string, BuildCacheEntry>;
   /** Group filters used during build (for cache invalidation) */
   groupFilters?: {
     /** Enabled groups (whitelist mode) */

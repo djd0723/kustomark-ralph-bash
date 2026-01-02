@@ -63,7 +63,7 @@ export function createEmptyCache(
     version: 1,
     configHash,
     ...(configHashes && { configHashes }),
-    entries: [],
+    entries: new Map(),
   };
 
   // Only add groupFilters if at least one is specified
@@ -223,10 +223,16 @@ async function parseBuildCache(content: string | Promise<string>): Promise<Build
       });
     }
 
+    // Convert array to Map for O(1) lookups
+    const entriesMap = new Map<string, BuildCacheEntry>();
+    for (const entry of validatedEntries) {
+      entriesMap.set(entry.file, entry);
+    }
+
     const result: BuildCache = {
       version: cache.version,
       configHash: cache.configHash,
-      entries: validatedEntries,
+      entries: entriesMap,
     };
     if (cache.configHashes) {
       result.configHashes = cache.configHashes as Record<string, string>;
@@ -250,21 +256,22 @@ async function parseBuildCache(content: string | Promise<string>): Promise<Build
  * @returns JSON string representation
  */
 function serializeBuildCache(cache: BuildCache): string {
-  // Ensure entries is an array (defensive check)
-  const entries: BuildCacheEntry[] = Array.isArray(cache.entries)
-    ? cache.entries
-    : Array.from(cache.entries as Iterable<BuildCacheEntry>);
+  // Convert Map to array for JSON serialization
+  const entriesArray: BuildCacheEntry[] = Array.from(cache.entries.values());
 
   // Sort entries by file path for consistent output
-  const sortedCache: BuildCache = {
+  const sortedEntries = entriesArray.sort((a, b) => a.file.localeCompare(b.file));
+
+  // Create serializable version with array instead of Map
+  const serializableCache = {
     version: cache.version,
     configHash: cache.configHash,
     ...(cache.configHashes && { configHashes: cache.configHashes }),
     ...(cache.groupFilters && { groupFilters: cache.groupFilters }),
-    entries: [...entries].sort((a, b) => a.file.localeCompare(b.file)),
+    entries: sortedEntries,
   };
 
-  return JSON.stringify(sortedCache, null, 2);
+  return JSON.stringify(serializableCache, null, 2);
 }
 
 /**
@@ -302,26 +309,20 @@ export function updateBuildCache(
   cache: BuildCache,
   results: Map<string, BuildCacheEntry>,
 ): BuildCache {
-  // Create a map of existing entries
-  const entryMap = new Map<string, BuildCacheEntry>();
-  for (const entry of cache.entries) {
-    entryMap.set(entry.file, entry);
-  }
+  // Clone existing entries map
+  const entryMap = new Map<string, BuildCacheEntry>(cache.entries);
 
   // Update/add new entries
   for (const [file, newEntry] of results) {
     entryMap.set(file, newEntry);
   }
 
-  // Convert map back to array
-  const updatedEntries = Array.from(entryMap.values());
-
   return {
     version: cache.version,
     configHash: cache.configHash,
     ...(cache.configHashes && { configHashes: cache.configHashes }),
     ...(cache.groupFilters && { groupFilters: cache.groupFilters }),
-    entries: updatedEntries,
+    entries: entryMap,
   };
 }
 
@@ -333,7 +334,13 @@ export function updateBuildCache(
  * @returns New BuildCache object with pruned entries
  */
 export function pruneCache(cache: BuildCache, currentFiles: Set<string>): BuildCache {
-  const prunedEntries = cache.entries.filter((entry) => currentFiles.has(entry.file));
+  const prunedEntries = new Map<string, BuildCacheEntry>();
+
+  for (const [filePath, entry] of cache.entries) {
+    if (currentFiles.has(filePath)) {
+      prunedEntries.set(filePath, entry);
+    }
+  }
 
   return {
     version: cache.version,
@@ -498,27 +505,21 @@ export function detectChangedFiles(
   const added = new Set<string>();
   const deleted = new Set<string>();
 
-  // Build a map of cached file hashes for quick lookup
-  const cachedHashes = new Map<string, string>();
-  for (const entry of cache.entries) {
-    cachedHashes.set(entry.file, entry.sourceHash);
-  }
-
   // Check for changed and added files
   for (const [filePath, currentHash] of currentFiles) {
-    const cachedHash = cachedHashes.get(filePath);
+    const cacheEntry = cache.entries.get(filePath);
 
-    if (cachedHash === undefined) {
+    if (cacheEntry === undefined) {
       // File is new
       added.add(filePath);
-    } else if (cachedHash !== currentHash) {
+    } else if (cacheEntry.sourceHash !== currentHash) {
       // File content has changed
       changed.add(filePath);
     }
   }
 
   // Check for deleted files
-  for (const cachedPath of cachedHashes.keys()) {
+  for (const cachedPath of cache.entries.keys()) {
     if (!currentFiles.has(cachedPath)) {
       deleted.add(cachedPath);
     }
@@ -732,8 +733,7 @@ function hasDependencyChanged(
  * @returns Cache entry if found, null otherwise
  */
 function findCacheEntry(cache: BuildCache, filePath: string): BuildCacheEntry | null {
-  const entry = cache.entries.find((e) => e.file === filePath);
-  return entry ?? null;
+  return cache.entries.get(filePath) ?? null;
 }
 
 /**
