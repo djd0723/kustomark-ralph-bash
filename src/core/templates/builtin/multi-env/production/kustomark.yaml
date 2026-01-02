@@ -1,0 +1,160 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Production environment configuration
+# Extends base configuration with production-specific patches
+
+# Reference base configuration
+resources:
+  - ../base
+
+# Production-specific patches
+patches:
+  # Set environment in frontmatter
+  - op: set-frontmatter
+    key: environment
+    value: production
+
+  # Replace base URL with production URL
+  - op: replace
+    old: "{{BASE_URL}}"
+    new: "{{BASE_URL_PRODUCTION}}"
+
+  # Remove all development/debug sections
+  - op: remove-section
+    id: development-mode
+    onNoMatch: skip
+
+  - op: remove-section
+    id: development-specific-notes
+    onNoMatch: skip
+
+  - op: remove-section
+    id: debugging
+    onNoMatch: skip
+
+  # Remove debug configuration examples
+  - op: replace-regex
+    pattern: 'debug:\s*true,?\n?'
+    replacement: ''
+    flags: g
+
+  # Add production-specific notes
+  - op: append-to-section
+    id: getting-started
+    content: |
+
+      ## Production Environment
+
+      You are viewing the production documentation.
+
+      - **API Endpoint:** {{BASE_URL_PRODUCTION}}/api/v1
+      - **Support:** {{SUPPORT_EMAIL}}
+      - **Status Page:** {{BASE_URL_PRODUCTION}}/status
+      - **SLA:** 99.9% uptime guarantee
+
+      ### Production API Keys
+
+      To get production API keys:
+
+      1. Sign up at [{{BASE_URL_PRODUCTION}}/signup]({{BASE_URL_PRODUCTION}}/signup)
+      2. Verify your email address
+      3. Generate API keys in your dashboard
+      4. Store keys securely (never commit to version control)
+
+  # Update quick start for production
+  - op: append-to-section
+    id: quick-start
+    content: |
+
+      ### Production Configuration
+
+      Production-ready configuration:
+
+      ```javascript
+      const client = new Client({
+        apiUrl: '{{BASE_URL_PRODUCTION}}',
+        apiKey: process.env.API_KEY,  // Use environment variables
+        timeout: 5000,
+        retries: 3,
+        backoff: 'exponential',
+      });
+      ```
+
+      **Security Best Practices:**
+
+      - Never hardcode API keys
+      - Use environment variables
+      - Rotate keys regularly
+      - Monitor API usage
+      - Enable rate limiting
+
+  # Add production deployment guidance
+  - op: append-to-section
+    id: production-deployment
+    content: |
+
+      ### Production Deployment Checklist
+
+      Before deploying to production:
+
+      - [ ] All tests passing
+      - [ ] Security scan completed
+      - [ ] Performance benchmarks met
+      - [ ] Documentation updated
+      - [ ] Rollback plan prepared
+      - [ ] Monitoring and alerts configured
+      - [ ] Team notified of deployment
+
+      ### Production Support
+
+      For production issues:
+
+      - **Email:** {{SUPPORT_EMAIL}}
+      - **Emergency:** See [{{BASE_URL_PRODUCTION}}/support]({{BASE_URL_PRODUCTION}}/support)
+      - **Status:** [{{BASE_URL_PRODUCTION}}/status]({{BASE_URL_PRODUCTION}}/status)
+
+  # Enhance error handling section for production
+  - op: append-to-section
+    id: error-handling
+    content: |
+
+      ### Production Error Monitoring
+
+      In production, implement comprehensive error tracking:
+
+      ```javascript
+      const client = new Client({
+        apiUrl: '{{BASE_URL_PRODUCTION}}',
+        apiKey: process.env.API_KEY,
+        onError: (error) => {
+          // Send to error tracking service
+          errorTracker.captureException(error);
+        },
+      });
+      ```
+
+      Recommended error tracking services:
+      - Sentry
+      - Rollbar
+      - Bugsnag
+      - New Relic
+
+# Output directory
+output: ../dist/production
+
+# Strict error handling in production
+onNoMatch: error
+
+# Additional production validations
+validators:
+  - type: no-broken-links
+    enabled: true
+
+  - type: no-debug-code
+    enabled: true
+
+  - type: frontmatter-required
+    keys:
+      - environment
+      - project

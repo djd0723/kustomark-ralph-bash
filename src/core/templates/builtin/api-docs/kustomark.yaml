@@ -1,0 +1,111 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Output directory for generated API documentation
+output: ./output
+
+# Source templates and examples
+resources:
+  - templates/authentication.md
+  - templates/errors.md
+  - examples/users-api.md
+  - examples/products-api.md
+
+# Patches to generate consistent API documentation
+patches:
+  # 1. Set common frontmatter for all API docs
+  - op: set-frontmatter
+    key: api_name
+    value: "{{API_NAME}}"
+
+  - op: set-frontmatter
+    key: api_version
+    value: "{{API_VERSION}}"
+
+  - op: set-frontmatter
+    key: base_url
+    value: "{{BASE_URL}}"
+
+  # 2. Replace base URL throughout all docs
+  - op: replace
+    old: "{{BASE_URL}}"
+    new: "{{BASE_URL}}"
+
+  # 3. Replace API version
+  - op: replace
+    old: "{{API_VERSION}}"
+    new: "{{API_VERSION}}"
+
+  # 4. Replace rate limit
+  - op: replace
+    old: "{{RATE_LIMIT}}"
+    new: "{{RATE_LIMIT}}"
+
+  # 5. Replace contact email
+  - op: replace
+    old: "{{CONTACT_EMAIL}}"
+    new: "{{CONTACT_EMAIL}}"
+
+  # 6. Standardize code block language tags
+  - op: replace-regex
+    pattern: '```(bash|shell|sh)\n'
+    replacement: '```bash\n'
+    flags: g
+
+  - op: replace-regex
+    pattern: '```(js|javascript)\n'
+    replacement: '```javascript\n'
+    flags: g
+
+  # 7. Add common header to all API endpoint docs
+  - op: prepend-to-file
+    content: |
+      ---
+      api: {{API_NAME}}
+      version: {{API_VERSION}}
+      ---
+
+    include: "**/examples/*.md"
+
+  # 8. Add footer with support information
+  - op: append-to-file
+    content: |
+
+      ---
+
+      ## Support
+
+      For API support, contact {{CONTACT_EMAIL}}
+
+      **API Base URL:** {{BASE_URL}}
+
+      **Rate Limit:** {{RATE_LIMIT}} requests per minute
+
+  # 9. Format response examples consistently
+  - op: replace-regex
+    pattern: '```json\n\{\n'
+    replacement: '```json\n{\n'
+    flags: g
+
+  # 10. Ensure proper HTTP method formatting
+  - op: replace-regex
+    pattern: '\*\*(GET|POST|PUT|DELETE|PATCH)\*\*'
+    replacement: '`$1`'
+    flags: g
+
+# Merge settings
+merge:
+  enabled: false  # Keep files separate for API docs
+
+# Validation
+validators:
+  - type: frontmatter-required
+    keys:
+      - api_name
+      - api_version
+
+  - type: no-broken-links
+    enabled: true
+
+# Error handling
+onNoMatch: warn

@@ -1,0 +1,85 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Output directory for aggregated changelog
+output: {{OUTPUT_DIR}}
+
+# Source changelogs from multiple repositories
+resources:
+  # Add your repository changelogs here
+  # Examples:
+  # - https://github.com/org/backend-service.git//CHANGELOG.md?ref=main
+  # - https://github.com/org/frontend-app.git//CHANGELOG.md?ref=main
+  # - https://github.com/org/api-gateway.git//CHANGELOG.md?ref=main
+  # Or local files:
+  - ./example/CHANGELOG-backend.md
+  - ./example/CHANGELOG-frontend.md
+  - ./example/CHANGELOG-api.md
+
+# Patches to aggregate and organize changelogs
+patches:
+  # 1. Extract version-specific sections
+  - op: extract-section
+    id: "version-{{VERSION}}"
+    onNoMatch: skip
+
+  # 2. Add component headers to identify source
+  - op: prepend-to-section
+    id: "version-{{VERSION}}"
+    content: |
+      ### Backend Service
+    include: "**/CHANGELOG-backend.md"
+
+  - op: prepend-to-section
+    id: "version-{{VERSION}}"
+    content: |
+      ### Frontend Application
+    include: "**/CHANGELOG-frontend.md"
+
+  - op: prepend-to-section
+    id: "version-{{VERSION}}"
+    content: |
+      ### API Gateway
+    include: "**/CHANGELOG-api.md"
+
+  # 3. Add release header
+  - op: prepend-to-file
+    content: |
+      # {{PROJECT_NAME}} Release Notes
+
+      ## Version {{VERSION}} ({{RELEASE_DATE}})
+
+      This release includes updates across multiple components:
+
+
+  # 4. Standardize bullet formatting
+  - op: replace-regex
+    pattern: '^\*\s+'
+    replacement: '- '
+    flags: gm
+
+  # 5. Add release footer
+  - op: append-to-file
+    content: |
+
+      ---
+
+      **Full Changelog**: See individual component changelogs for detailed information.
+
+      **Installation**: Follow the [installation guide](https://docs.example.com/install) to upgrade to version {{VERSION}}.
+
+      **Support**: For issues or questions, contact support@example.com
+
+# Merge all changelog sections into a single file
+merge:
+  enabled: true
+  strategy: concatenate
+  output: CHANGELOG.md
+
+# Error handling
+onNoMatch: warn
+
+# Git fetch configuration (when using git resources)
+gitFetch:
+  depth: 1
+  branch: main

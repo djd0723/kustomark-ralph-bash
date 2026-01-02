@@ -1,0 +1,22 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# This is the root configuration file
+# Use the environment-specific directories to build for each environment:
+#   kustomark build dev/ --output ./dist/dev
+#   kustomark build staging/ --output ./dist/staging
+#   kustomark build production/ --output ./dist/production
+
+# Or use this file to build all environments at once (when supported)
+environments:
+  - name: dev
+    path: ./dev
+    output: ./dist/dev
+
+  - name: staging
+    path: ./staging
+    output: ./dist/staging
+
+  - name: production
+    path: ./production
+    output: ./dist/production

@@ -1,0 +1,110 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Output directory for compiled handbook
+output: ./output
+
+# Source sections
+resources:
+  - sections/welcome.md
+  - sections/onboarding.md
+  - sections/tools-and-access.md
+  - sections/communication.md
+  - sections/development-process.md
+  - sections/meetings.md
+  - sections/policies.md
+  - sections/resources.md
+
+# Patches to create unified handbook
+patches:
+  # 1. Set frontmatter for all sections
+  - op: set-frontmatter
+    key: company
+    value: "{{COMPANY_NAME}}"
+
+  - op: set-frontmatter
+    key: team
+    value: "{{TEAM_NAME}}"
+
+  - op: set-frontmatter
+    key: last_updated
+    value: "2024-03-15"
+
+  # 2. Add handbook header to all sections
+  - op: prepend-to-file
+    content: |
+      > **{{COMPANY_NAME}} - {{TEAM_NAME}} Team Handbook**
+      >
+      > Last updated: 2024-03-15
+
+
+  # 3. Replace company placeholders
+  - op: replace
+    old: "{{COMPANY_NAME}}"
+    new: "{{COMPANY_NAME}}"
+
+  - op: replace
+    old: "{{TEAM_NAME}}"
+    new: "{{TEAM_NAME}}"
+
+  - op: replace
+    old: "{{TEAM_LEAD}}"
+    new: "{{TEAM_LEAD}}"
+
+  - op: replace
+    old: "{{TEAM_EMAIL}}"
+    new: "{{TEAM_EMAIL}}"
+
+  - op: replace
+    old: "{{SLACK_CHANNEL}}"
+    new: "{{SLACK_CHANNEL}}"
+
+  - op: replace
+    old: "{{OFFICE_LOCATION}}"
+    new: "{{OFFICE_LOCATION}}"
+
+  # 4. Add navigation footer to each section
+  - op: append-to-file
+    content: |
+
+      ---
+
+      **Questions?** Contact {{TEAM_LEAD}} ({{TEAM_EMAIL}}) or ask in {{SLACK_CHANNEL}}
+
+  # 5. Standardize header levels (sections start at h2)
+  - op: replace-regex
+    pattern: '^# (.+)$'
+    replacement: '## $1'
+    flags: gm
+
+  # 6. Format code blocks
+  - op: replace-regex
+    pattern: '```(\w+)\n'
+    replacement: '```$1\n'
+    flags: g
+
+# Merge all sections into single handbook
+merge:
+  enabled: true
+  strategy: concatenate
+  output: HANDBOOK.md
+  separator: "\n\n---\n\n"
+
+# Add table of contents
+toc:
+  enabled: true
+  position: after-header
+  max_depth: 3
+
+# Validation
+validators:
+  - type: frontmatter-required
+    keys:
+      - company
+      - team
+
+  - type: no-broken-links
+    enabled: true
+
+# Error handling
+onNoMatch: warn

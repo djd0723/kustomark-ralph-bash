@@ -1,0 +1,69 @@
+apiVersion: kustomark/v1
+kind: Template
+metadata:
+  name: changelog-aggregator
+  description: Aggregate changelogs from multiple repositories into a unified release notes document
+  category: documentation
+  tags:
+    - changelog
+    - release-notes
+    - aggregation
+    - multi-repo
+  author:
+    name: Kustomark Team
+    email: hello@kustomark.dev
+  version: 1.0.0
+
+variables:
+  - name: PROJECT_NAME
+    description: Name of the project or product
+    type: string
+    required: true
+    example: MyProduct
+
+  - name: VERSION
+    description: Version number for this release
+    type: string
+    required: true
+    example: 1.2.0
+
+  - name: RELEASE_DATE
+    description: Release date (YYYY-MM-DD)
+    type: string
+    required: true
+    example: "2024-03-15"
+
+  - name: OUTPUT_DIR
+    description: Directory where aggregated changelog will be written
+    type: string
+    required: true
+    default: ./output
+    example: ./release-notes
+
+files:
+  - src: kustomark.yaml
+    dest: kustomark.yaml
+    substitute: true
+
+  - src: README.md
+    dest: README.md
+    substitute: true
+
+  - src: example/CHANGELOG-backend.md
+    dest: example/CHANGELOG-backend.md
+    substitute: true
+
+  - src: example/CHANGELOG-frontend.md
+    dest: example/CHANGELOG-frontend.md
+    substitute: true
+
+  - src: example/CHANGELOG-api.md
+    dest: example/CHANGELOG-api.md
+    substitute: true
+
+postApply:
+  - description: Build aggregated changelog
+    command: kustomark build
+
+  - description: Preview the output
+    command: cat {{OUTPUT_DIR}}/CHANGELOG.md

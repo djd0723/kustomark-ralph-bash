@@ -121,6 +121,72 @@ const BUILTIN_TEMPLATES: Record<string, TemplateMetadata> = {
       "README.md",
     ],
   },
+  "changelog-aggregator": {
+    id: "changelog-aggregator",
+    name: "Changelog Aggregator",
+    description: "Aggregate changelogs from multiple repositories into unified release notes",
+    source: "built-in",
+    tags: ["changelog", "release-notes", "aggregation", "multi-repo"],
+    files: [
+      "kustomark.yaml",
+      "README.md",
+      "example/CHANGELOG-backend.md",
+      "example/CHANGELOG-frontend.md",
+      "example/CHANGELOG-api.md",
+    ],
+  },
+  "multi-env": {
+    id: "multi-env",
+    name: "Multi-Environment",
+    description: "Multi-environment documentation with base and environment-specific overlays",
+    source: "built-in",
+    tags: ["multi-environment", "overlay", "configuration", "deployment"],
+    files: [
+      "kustomark.yaml",
+      "README.md",
+      "base/kustomark.yaml",
+      "base/getting-started.md",
+      "base/api-reference.md",
+      "dev/kustomark.yaml",
+      "staging/kustomark.yaml",
+      "production/kustomark.yaml",
+    ],
+  },
+  "api-docs": {
+    id: "api-docs",
+    name: "API Documentation",
+    description: "Generate consistent API documentation from templates and examples",
+    source: "built-in",
+    tags: ["api", "documentation", "openapi", "rest"],
+    files: [
+      "kustomark.yaml",
+      "README.md",
+      "templates/endpoint-template.md",
+      "templates/authentication.md",
+      "templates/errors.md",
+      "examples/users-api.md",
+      "examples/products-api.md",
+    ],
+  },
+  "team-handbook": {
+    id: "team-handbook",
+    name: "Team Handbook",
+    description: "Team handbook with onboarding, processes, and policies sections",
+    source: "built-in",
+    tags: ["handbook", "team", "onboarding", "processes", "policies"],
+    files: [
+      "kustomark.yaml",
+      "README.md",
+      "sections/welcome.md",
+      "sections/onboarding.md",
+      "sections/tools-and-access.md",
+      "sections/communication.md",
+      "sections/development-process.md",
+      "sections/meetings.md",
+      "sections/policies.md",
+      "sections/resources.md",
+    ],
+  },
 };
 
 /**
@@ -361,6 +427,15 @@ kustomark build production/ --output ./dist/production
 `,
         },
       ];
+
+    case "changelog-aggregator":
+    case "multi-env":
+    case "api-docs":
+    case "team-handbook":
+      // These templates are loaded from filesystem (have template.yaml files)
+      // This case should not be reached as they'll be loaded via loadTemplateFiles()
+      // But included for completeness
+      return [];
 
     default:
       throw new TemplateError(`Unknown built-in template: ${templateId}`, "UNKNOWN_TEMPLATE");

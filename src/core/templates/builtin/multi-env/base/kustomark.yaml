@@ -1,0 +1,49 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Base configuration - shared across all environments
+# This file defines common resources and patches
+
+# Source markdown files
+resources:
+  - getting-started.md
+  - api-reference.md
+
+# Common patches applied to all environments
+patches:
+  # Set project name in frontmatter
+  - op: set-frontmatter
+    key: project
+    value: "{{PROJECT_NAME}}"
+
+  # Add support contact
+  - op: set-frontmatter
+    key: support
+    value: "{{SUPPORT_EMAIL}}"
+
+  # Standardize code block formatting
+  - op: replace-regex
+    pattern: '```(\w+)\n'
+    replacement: '```$1\n'
+    flags: g
+
+  # Add common footer to all pages
+  - op: append-to-file
+    content: |
+
+      ---
+
+      **Need Help?** Contact us at {{SUPPORT_EMAIL}}
+
+# Validation rules
+validators:
+  - type: frontmatter-required
+    keys:
+      - project
+      - environment
+
+  - type: no-broken-links
+    enabled: true
+
+# Error handling
+onNoMatch: warn

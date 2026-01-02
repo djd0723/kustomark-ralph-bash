@@ -1,0 +1,79 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Development environment configuration
+# Extends base configuration with dev-specific patches
+
+# Reference base configuration
+resources:
+  - ../base
+
+# Development-specific patches
+patches:
+  # Set environment in frontmatter
+  - op: set-frontmatter
+    key: environment
+    value: development
+
+  # Replace base URL with development URL
+  - op: replace
+    old: "{{BASE_URL}}"
+    new: "{{BASE_URL_DEV}}"
+
+  # Add development warning banner
+  - op: prepend-to-file
+    content: |
+      > **Development Environment**
+      >
+      > This documentation is for the development environment. Features may be unstable.
+      > For production documentation, see [{{BASE_URL_PRODUCTION}}/docs]({{BASE_URL_PRODUCTION}}/docs)
+
+
+  # Enable debug sections (keep debugging content)
+  # No removal patch needed - debug content stays
+
+  # Add development-specific notes
+  - op: append-to-section
+    id: getting-started
+    content: |
+
+      ## Development-Specific Notes
+
+      When working in the development environment:
+
+      - **API Endpoint:** {{BASE_URL_DEV}}/api/v1
+      - **Hot Reload:** Enabled by default
+      - **Debug Mode:** Logs are verbose
+      - **Rate Limiting:** Relaxed (100 req/min)
+      - **CORS:** Allowed from all origins
+
+      ### Development Tools
+
+      Access development tools at:
+      - API Explorer: {{BASE_URL_DEV}}/api-explorer
+      - GraphQL Playground: {{BASE_URL_DEV}}/graphql
+      - Logs Viewer: {{BASE_URL_DEV}}/logs
+
+  # Add development example configuration
+  - op: append-to-section
+    id: quick-start
+    content: |
+
+      ### Development Configuration
+
+      For local development, use this configuration:
+
+      ```javascript
+      const client = new Client({
+        apiUrl: '{{BASE_URL_DEV}}',
+        apiKey: 'dev-api-key',
+        debug: true,
+        timeout: 30000,  // Longer timeout for debugging
+      });
+      ```
+
+# Output directory
+output: ../dist/dev
+
+# Error handling - be lenient in dev
+onNoMatch: warn

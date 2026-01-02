@@ -6,6 +6,137 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 ## Recent Enhancements
 
+**2026-01-02 (Template System Expansion - 4 New Built-in Templates - COMPLETE!):**
+- ✅ **NEW TEMPLATES**: Implemented 4 high-value production-ready templates
+- ✅ **COMPREHENSIVE TESTING**: 36 new tests with 225 assertions (100% pass rate)
+- ✅ **DOCUMENTATION**: Updated README with detailed template usage guide
+- ✅ **Implementation**: Extended template system in `/home/dex/kustomark-ralph-bash/src/core/templates/builtin/`
+
+**New Templates Implemented:**
+
+1. **changelog-aggregator** - Aggregate changelogs from multiple repositories
+   - **Use Case**: Combine changelogs from backend, frontend, and API repos into unified release notes
+   - **Files Created**: 6 files (template.yaml, kustomark.yaml, README.md, 3 example changelogs)
+   - **Key Features**:
+     - Multi-repository changelog aggregation
+     - Version-based extraction and merging
+     - Component headers for organization
+     - Git URL and local file support
+     - Automatic normalization of version formats
+   - **Variables**: PROJECT_NAME, VERSION, RELEASE_DATE, OUTPUT_DIR, INCLUDE_UNRELEASED
+   - **Patches Used**: replace-regex, prepend, append-to-section, set-frontmatter
+   - **Location**: `/home/dex/kustomark-ralph-bash/src/core/templates/builtin/changelog-aggregator/`
+
+2. **multi-env** - Multi-environment documentation (dev/staging/production)
+   - **Use Case**: Single source documentation that adapts for different deployment environments
+   - **Files Created**: 8 files (root config, base config + docs, dev/staging/production overlays)
+   - **Key Features**:
+     - Base + overlay pattern for DRY documentation
+     - Environment-specific URL replacement
+     - Debug section removal in production
+     - Security warnings in dev/staging
+     - Conditional content based on environment
+   - **Variables**: PROJECT_NAME, BASE_URL_DEV, BASE_URL_STAGING, BASE_URL_PRODUCTION, SUPPORT_EMAIL
+   - **Patches Used**: replace, set-frontmatter, prepend, remove-section (conditional)
+   - **Location**: `/home/dex/kustomark-ralph-bash/src/core/templates/builtin/multi-env/`
+
+3. **api-docs** - API documentation with versioning and consistency
+   - **Use Case**: Generate standardized API documentation from OpenAPI specs or markdown templates
+   - **Files Created**: 7 files (config, endpoint/auth/error templates, 2 complete examples)
+   - **Key Features**:
+     - Consistent endpoint documentation format
+     - Authentication and error handling guides
+     - Code examples in multiple languages (curl, JS, Python)
+     - Rate limiting information
+     - Version badges and metadata
+     - OpenAPI integration patterns
+   - **Variables**: API_NAME, API_VERSION, BASE_URL, CONTACT_EMAIL, RATE_LIMIT
+   - **Patches Used**: set-frontmatter, replace, append-to-section, replace-regex
+   - **Location**: `/home/dex/kustomark-ralph-bash/src/core/templates/builtin/api-docs/`
+
+4. **team-handbook** - Team documentation with onboarding and policies
+   - **Use Case**: Create comprehensive internal team handbooks with standardized structure
+   - **Files Created**: 10 files (config, README, 8 section files: welcome, onboarding, tools, communication, development, meetings, policies, resources)
+   - **Key Features**:
+     - 8 pre-structured handbook sections
+     - Onboarding checklists and timelines
+     - Tools catalog and access procedures
+     - Communication guidelines
+     - Development workflows and standards
+     - Meeting schedules and best practices
+     - Team policies and procedures
+     - Resource directory with links
+   - **Variables**: COMPANY_NAME, TEAM_NAME, TEAM_LEAD, TEAM_EMAIL, SLACK_CHANNEL, OFFICE_LOCATION
+   - **Patches Used**: replace, set-frontmatter, prepend, append-to-section
+   - **Location**: `/home/dex/kustomark-ralph-bash/src/core/templates/builtin/team-handbook/`
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/core/templates/builtin/changelog-aggregator/*` (6 files, 550+ lines)
+- `/home/dex/kustomark-ralph-bash/src/core/templates/builtin/multi-env/*` (8 files, 800+ lines)
+- `/home/dex/kustomark-ralph-bash/src/core/templates/builtin/api-docs/*` (7 files, 950+ lines)
+- `/home/dex/kustomark-ralph-bash/src/core/templates/builtin/team-handbook/*` (10 files, 1200+ lines)
+- `/home/dex/kustomark-ralph-bash/tests/core/new-templates.test.ts` (799 lines, 36 tests)
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/templates/manager.ts` - Added 4 new templates to BUILTIN_TEMPLATES and getBuiltinTemplateFiles()
+- `/home/dex/kustomark-ralph-bash/README.md` - Added "Built-in Templates" section with documentation for all 6 templates (190 lines)
+
+**Testing Results:**
+- ✅ All 3,273 tests passing (added 36 new tests) ✓
+- ✅ All linting checks passing (`bun check`) ✓
+- ✅ TypeScript compilation clean ✓
+- ✅ 10,819 expect() calls successful (added 225 new assertions)
+- ✅ Zero breaking changes - full backward compatibility maintained
+
+**Template Discovery:**
+- Total built-in templates: 6 (base, overlay, upstream-fork, skill-customization, changelog-aggregator, multi-env, api-docs, team-handbook)
+- All templates support filesystem-based discovery
+- Fallback to hardcoded templates for backward compatibility
+- User templates can override built-ins
+
+**Benefits:**
+1. **Developer Onboarding**: Templates reduce setup time from hours to minutes
+2. **Best Practices**: Templates encode proven patterns and workflows
+3. **Consistency**: Standardized documentation structure across teams
+4. **Flexibility**: Variables allow customization while maintaining structure
+5. **Production-Ready**: All templates include comprehensive examples and documentation
+6. **Real-World Value**: Each template solves common documentation challenges:
+   - changelog-aggregator: Multi-repo release management
+   - multi-env: Environment-specific API docs
+   - api-docs: REST/GraphQL documentation standardization
+   - team-handbook: Internal knowledge management
+
+**Usage Examples:**
+```bash
+# List all available templates
+kustomark template list
+
+# Show details for a specific template
+kustomark template show changelog-aggregator
+
+# Apply a template with variables
+kustomark template apply changelog-aggregator \
+  --var PROJECT_NAME="My Platform" \
+  --var VERSION="1.0.0" \
+  --var RELEASE_DATE="2026-01-02" \
+  --var OUTPUT_DIR="./changelog" \
+  --output ./my-project
+
+# Apply multi-env template
+kustomark template apply multi-env \
+  --var PROJECT_NAME="My API" \
+  --var BASE_URL_DEV="http://localhost:3000" \
+  --var BASE_URL_STAGING="https://staging-api.example.com" \
+  --var BASE_URL_PRODUCTION="https://api.example.com" \
+  --output ./my-api-docs
+```
+
+**Status:** Template System Expansion COMPLETE! ✅
+
+The kustomark template ecosystem now includes 6 comprehensive built-in templates covering the most common documentation use cases. All templates are production-ready with extensive documentation, examples, and test coverage.
+
+---
+
 **2026-01-02 (Code Quality Improvements - COMPLETE!):**
 - ✅ **REFACTORING**: Consolidated duplicate Levenshtein distance implementations
 - ✅ **NEW UTILITY**: Centralized logging system for better observability

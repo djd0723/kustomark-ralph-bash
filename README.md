@@ -23,6 +23,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark suggest](#kustomark-suggest)
   - [kustomark analyze](#kustomark-analyze-path)
   - [kustomark template](#kustomark-template)
+    - [Built-in Templates](#built-in-templates)
 - [Configuration](#configuration)
 - [Security & Validation](#security--validation)
 - [Patch Operations](#patch-operations)
@@ -965,6 +966,195 @@ kustomark template apply skills \
 - **Team Onboarding**: New team members can get started in seconds
 - **Documentation Pipelines**: Set up documentation builds quickly
 - **Skill Customization**: Create custom Claude Code skills from templates
+
+#### Built-in Templates
+
+Kustomark includes several built-in templates to help you get started quickly with common use cases:
+
+##### upstream-fork
+
+Consume markdown from upstream sources while maintaining local customizations without forking.
+
+**What it does:**
+- Sets up a configuration to fetch content from an upstream repository
+- Applies your customizations via patches while preserving upstream structure
+- Enables tracking upstream updates without losing local changes
+
+**When to use:**
+- You want to use documentation from another repository but need to customize it
+- You need to rebrand or modify upstream documentation for your organization
+- You want to stay in sync with upstream updates while maintaining local patches
+
+**Example usage:**
+```bash
+kustomark template apply upstream-fork \
+  --var UPSTREAM_URL=https://github.com/example/docs.git \
+  --var OUTPUT_DIR=./my-docs \
+  --var BRANDING_OLD=UpstreamProduct \
+  --var BRANDING_NEW=MyProduct
+```
+
+**Key variables:**
+- `UPSTREAM_URL` (required) - Git URL of the upstream repository
+- `OUTPUT_DIR` (required) - Directory for customized output (default: `./output`)
+- `BRANDING_OLD` (optional) - Old branding/product name to replace
+- `BRANDING_NEW` (optional) - New branding/product name
+
+##### skill-customization
+
+Customize Claude AI skills while tracking upstream changes.
+
+**What it does:**
+- Creates a configuration structure for customizing Claude Code skills
+- Enables organization-specific modifications to skill prompts and tools
+- Maintains connection to upstream skill updates
+
+**When to use:**
+- You want to customize Claude skills for your organization's needs
+- You need to add company-specific context or tooling to skills
+- You want to track and merge updates from upstream skill repositories
+
+**Example usage:**
+```bash
+kustomark template apply skill-customization \
+  --var SKILL_NAME=code-analyzer \
+  --var SKILL_DESCRIPTION="Analyzes code for quality and best practices" \
+  --var ORG_NAME="ACME Corp" \
+  --var ORG_PREFIX=acme \
+  --var OUTPUT_DIR=./custom-skills
+```
+
+**Key variables:**
+- `SKILL_NAME` (required) - Name of the skill to customize
+- `SKILL_DESCRIPTION` (required) - Description of what the skill does
+- `ORG_NAME` (required) - Your organization name
+- `ORG_PREFIX` (required) - Prefix for tool names (lowercase, no spaces)
+- `UPSTREAM_URL` (optional) - Git URL of upstream skill repository
+- `OUTPUT_DIR` (required) - Directory for customized output (default: `./customized`)
+
+##### changelog-aggregator
+
+Aggregate changelogs from multiple repositories into unified release notes.
+
+**What it does:**
+- Combines changelog files from multiple repositories or components
+- Generates consolidated release notes for multi-repo projects
+- Maintains consistent formatting across changelog sources
+
+**When to use:**
+- You have a microservices architecture with multiple changelog files
+- You need to create unified release notes for a product with multiple components
+- You want to aggregate changelogs from frontend, backend, and API services
+
+**Example usage:**
+```bash
+kustomark template apply changelog-aggregator \
+  --var PROJECT_NAME=MyProduct \
+  --var VERSION=1.2.0 \
+  --var RELEASE_DATE=2024-03-15 \
+  --var OUTPUT_DIR=./release-notes
+```
+
+**Key variables:**
+- `PROJECT_NAME` (required) - Name of the project or product
+- `VERSION` (required) - Version number for this release
+- `RELEASE_DATE` (required) - Release date (YYYY-MM-DD format)
+- `OUTPUT_DIR` (required) - Directory for aggregated changelog (default: `./output`)
+
+##### multi-env
+
+Multi-environment documentation with base and environment-specific overlays.
+
+**What it does:**
+- Creates a base documentation structure with environment-specific overlays
+- Generates separate documentation builds for dev, staging, and production
+- Enables environment-specific configuration while sharing common content
+
+**When to use:**
+- You need different documentation for different environments (dev/staging/prod)
+- You want to maintain shared base docs with environment-specific customizations
+- You need to document environment-specific URLs, configurations, or behaviors
+
+**Example usage:**
+```bash
+kustomark template apply multi-env \
+  --var PROJECT_NAME=MyProduct \
+  --var BASE_URL_DEV=https://dev.myproduct.com \
+  --var BASE_URL_STAGING=https://staging.myproduct.com \
+  --var BASE_URL_PRODUCTION=https://myproduct.com \
+  --var SUPPORT_EMAIL=support@example.com
+```
+
+**Key variables:**
+- `PROJECT_NAME` (required) - Name of the project or product
+- `BASE_URL_DEV` (required) - Base URL for development (default: `https://dev.example.com`)
+- `BASE_URL_STAGING` (required) - Base URL for staging (default: `https://staging.example.com`)
+- `BASE_URL_PRODUCTION` (required) - Base URL for production (default: `https://example.com`)
+- `SUPPORT_EMAIL` (required) - Support email address
+
+##### api-docs
+
+Generate consistent API documentation from OpenAPI specs or templates.
+
+**What it does:**
+- Creates a structured template for API documentation
+- Provides standardized sections for endpoints, authentication, and errors
+- Includes example documentation for common API patterns
+
+**When to use:**
+- You're building REST or GraphQL API documentation
+- You need consistent documentation structure across multiple APIs
+- You want to document authentication, rate limits, and error handling
+
+**Example usage:**
+```bash
+kustomark template apply api-docs \
+  --var API_NAME=MyAPI \
+  --var API_VERSION=v1 \
+  --var BASE_URL=https://api.example.com \
+  --var CONTACT_EMAIL=api-support@example.com \
+  --var RATE_LIMIT=1000
+```
+
+**Key variables:**
+- `API_NAME` (required) - Name of the API
+- `API_VERSION` (required) - API version number
+- `BASE_URL` (required) - Base URL for the API
+- `CONTACT_EMAIL` (required) - Contact email for API support
+- `RATE_LIMIT` (required) - Rate limit in requests per minute (default: `1000`)
+
+##### team-handbook
+
+Team handbook with onboarding, processes, and policies sections.
+
+**What it does:**
+- Creates a comprehensive team handbook structure
+- Includes sections for onboarding, tools, communication, and policies
+- Provides templates for common team documentation needs
+
+**When to use:**
+- You're creating or standardizing team documentation
+- You need onboarding documentation for new team members
+- You want to document team processes, policies, and communication channels
+
+**Example usage:**
+```bash
+kustomark template apply team-handbook \
+  --var COMPANY_NAME="ACME Corp" \
+  --var TEAM_NAME=Engineering \
+  --var TEAM_LEAD="Jane Doe" \
+  --var TEAM_EMAIL=engineering@example.com \
+  --var SLACK_CHANNEL="#engineering" \
+  --var OFFICE_LOCATION="San Francisco, CA"
+```
+
+**Key variables:**
+- `COMPANY_NAME` (required) - Company or organization name
+- `TEAM_NAME` (required) - Team or department name
+- `TEAM_LEAD` (required) - Team lead or manager name
+- `TEAM_EMAIL` (required) - Team contact email
+- `SLACK_CHANNEL` (required) - Primary team Slack channel
+- `OFFICE_LOCATION` (required) - Primary office location
 
 ### `kustomark explain [path]`
 

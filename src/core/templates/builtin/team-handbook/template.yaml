@@ -1,0 +1,101 @@
+apiVersion: kustomark/v1
+kind: Template
+metadata:
+  name: team-handbook
+  description: Team handbook with onboarding, processes, and policies sections
+  category: documentation
+  tags:
+    - handbook
+    - team
+    - onboarding
+    - processes
+    - policies
+  author:
+    name: Kustomark Team
+    email: hello@kustomark.dev
+  version: 1.0.0
+
+variables:
+  - name: COMPANY_NAME
+    description: Company or organization name
+    type: string
+    required: true
+    example: ACME Corp
+
+  - name: TEAM_NAME
+    description: Team or department name
+    type: string
+    required: true
+    example: Engineering
+
+  - name: TEAM_LEAD
+    description: Team lead or manager name
+    type: string
+    required: true
+    example: Jane Doe
+
+  - name: TEAM_EMAIL
+    description: Team contact email
+    type: string
+    required: true
+    example: engineering@example.com
+
+  - name: SLACK_CHANNEL
+    description: Primary team Slack channel
+    type: string
+    required: true
+    example: "#engineering"
+
+  - name: OFFICE_LOCATION
+    description: Primary office location
+    type: string
+    required: true
+    example: San Francisco, CA
+
+files:
+  - src: kustomark.yaml
+    dest: kustomark.yaml
+    substitute: true
+
+  - src: README.md
+    dest: README.md
+    substitute: true
+
+  - src: sections/welcome.md
+    dest: sections/welcome.md
+    substitute: true
+
+  - src: sections/onboarding.md
+    dest: sections/onboarding.md
+    substitute: true
+
+  - src: sections/tools-and-access.md
+    dest: sections/tools-and-access.md
+    substitute: true
+
+  - src: sections/communication.md
+    dest: sections/communication.md
+    substitute: true
+
+  - src: sections/development-process.md
+    dest: sections/development-process.md
+    substitute: true
+
+  - src: sections/meetings.md
+    dest: sections/meetings.md
+    substitute: true
+
+  - src: sections/policies.md
+    dest: sections/policies.md
+    substitute: true
+
+  - src: sections/resources.md
+    dest: sections/resources.md
+    substitute: true
+
+postApply:
+  - description: Build team handbook
+    command: kustomark build
+
+  - description: Preview output
+    command: cat output/HANDBOOK.md

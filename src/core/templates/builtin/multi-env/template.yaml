@@ -1,0 +1,92 @@
+apiVersion: kustomark/v1
+kind: Template
+metadata:
+  name: multi-env
+  description: Multi-environment documentation with base and environment-specific overlays
+  category: documentation
+  tags:
+    - multi-environment
+    - overlay
+    - configuration
+    - deployment
+  author:
+    name: Kustomark Team
+    email: hello@kustomark.dev
+  version: 1.0.0
+
+variables:
+  - name: PROJECT_NAME
+    description: Name of the project or product
+    type: string
+    required: true
+    example: MyProduct
+
+  - name: BASE_URL_DEV
+    description: Base URL for development environment
+    type: string
+    required: true
+    default: https://dev.example.com
+    example: https://dev.myproduct.com
+
+  - name: BASE_URL_STAGING
+    description: Base URL for staging environment
+    type: string
+    required: true
+    default: https://staging.example.com
+    example: https://staging.myproduct.com
+
+  - name: BASE_URL_PRODUCTION
+    description: Base URL for production environment
+    type: string
+    required: true
+    default: https://example.com
+    example: https://myproduct.com
+
+  - name: SUPPORT_EMAIL
+    description: Support email address
+    type: string
+    required: true
+    example: support@example.com
+
+files:
+  - src: kustomark.yaml
+    dest: kustomark.yaml
+    substitute: true
+
+  - src: README.md
+    dest: README.md
+    substitute: true
+
+  - src: base/kustomark.yaml
+    dest: base/kustomark.yaml
+    substitute: true
+
+  - src: base/getting-started.md
+    dest: base/getting-started.md
+    substitute: true
+
+  - src: base/api-reference.md
+    dest: base/api-reference.md
+    substitute: true
+
+  - src: dev/kustomark.yaml
+    dest: dev/kustomark.yaml
+    substitute: true
+
+  - src: staging/kustomark.yaml
+    dest: staging/kustomark.yaml
+    substitute: true
+
+  - src: production/kustomark.yaml
+    dest: production/kustomark.yaml
+    substitute: true
+
+postApply:
+  - description: Build development documentation
+    command: kustomark build dev/ --output ./dist/dev
+
+  - description: Build staging documentation
+    command: kustomark build staging/ --output ./dist/staging
+
+  - description: Build production documentation
+    command: kustomark build production/ --output ./dist/production

@@ -1,0 +1,96 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Staging environment configuration
+# Extends base configuration with staging-specific patches
+
+# Reference base configuration
+resources:
+  - ../base
+
+# Staging-specific patches
+patches:
+  # Set environment in frontmatter
+  - op: set-frontmatter
+    key: environment
+    value: staging
+
+  # Replace base URL with staging URL
+  - op: replace
+    old: "{{BASE_URL}}"
+    new: "{{BASE_URL_STAGING}}"
+
+  # Add staging notice banner
+  - op: prepend-to-file
+    content: |
+      > **Staging Environment**
+      >
+      > This is the staging environment for testing before production deployment.
+      > For production documentation, see [{{BASE_URL_PRODUCTION}}/docs]({{BASE_URL_PRODUCTION}}/docs)
+
+
+  # Add staging-specific notes
+  - op: append-to-section
+    id: getting-started
+    content: |
+
+      ## Staging Environment Notes
+
+      The staging environment mirrors production with these differences:
+
+      - **API Endpoint:** {{BASE_URL_STAGING}}/api/v1
+      - **Data:** Test data only (reset weekly)
+      - **Rate Limiting:** Production-like (1000 req/min)
+      - **Authentication:** Requires valid staging API keys
+
+      ### Testing in Staging
+
+      Staging is ideal for:
+      - Integration testing
+      - Performance testing
+      - User acceptance testing (UAT)
+      - Pre-production validation
+
+      ### Staging API Keys
+
+      Request staging API keys at: {{BASE_URL_STAGING}}/api-keys
+
+  # Add staging configuration example
+  - op: append-to-section
+    id: quick-start
+    content: |
+
+      ### Staging Configuration
+
+      For staging environment testing:
+
+      ```javascript
+      const client = new Client({
+        apiUrl: '{{BASE_URL_STAGING}}',
+        apiKey: process.env.STAGING_API_KEY,
+        timeout: 10000,
+      });
+      ```
+
+  # Add staging deployment notes
+  - op: append-to-section
+    id: production-deployment
+    content: |
+
+      ### Staging Deployment Process
+
+      Before deploying to production:
+
+      1. Deploy to staging first
+      2. Run automated tests
+      3. Perform manual testing
+      4. Get approval from QA team
+      5. Schedule production deployment
+
+      **Staging URL:** {{BASE_URL_STAGING}}
+
+# Output directory
+output: ../dist/staging
+
+# Error handling - strict like production
+onNoMatch: error

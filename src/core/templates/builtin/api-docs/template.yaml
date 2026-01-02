@@ -1,0 +1,84 @@
+apiVersion: kustomark/v1
+kind: Template
+metadata:
+  name: api-docs
+  description: Generate consistent API documentation from OpenAPI specs or templates
+  category: documentation
+  tags:
+    - api
+    - documentation
+    - openapi
+    - rest
+    - graphql
+  author:
+    name: Kustomark Team
+    email: hello@kustomark.dev
+  version: 1.0.0
+
+variables:
+  - name: API_NAME
+    description: Name of the API
+    type: string
+    required: true
+    example: MyAPI
+
+  - name: API_VERSION
+    description: API version number
+    type: string
+    required: true
+    example: v1
+
+  - name: BASE_URL
+    description: Base URL for the API
+    type: string
+    required: true
+    example: https://api.example.com
+
+  - name: CONTACT_EMAIL
+    description: Contact email for API support
+    type: string
+    required: true
+    example: api-support@example.com
+
+  - name: RATE_LIMIT
+    description: Rate limit (requests per minute)
+    type: string
+    required: true
+    default: "1000"
+    example: "1000"
+
+files:
+  - src: kustomark.yaml
+    dest: kustomark.yaml
+    substitute: true
+
+  - src: README.md
+    dest: README.md
+    substitute: true
+
+  - src: templates/endpoint-template.md
+    dest: templates/endpoint-template.md
+    substitute: true
+
+  - src: templates/authentication.md
+    dest: templates/authentication.md
+    substitute: true
+
+  - src: templates/errors.md
+    dest: templates/errors.md
+    substitute: true
+
+  - src: examples/users-api.md
+    dest: examples/users-api.md
+    substitute: true
+
+  - src: examples/products-api.md
+    dest: examples/products-api.md
+    substitute: true
+
+postApply:
+  - description: Build API documentation
+    command: kustomark build
+
+  - description: Preview output
+    command: ls -la output/
