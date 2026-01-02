@@ -39,19 +39,39 @@ See [README - Conditional Patches](../README.md#conditional-patches) for full do
 
 ## Deferred: Interactive Features
 
-Current focus is non-interactive CLI for automation. Interactive features may come later.
+**Status**: IMPLEMENTED (All features below have been completed)
 
 ### Interactive Debug Mode
 
+**Status**: Implemented
+
 Step-through patch application with keyboard input.
 
-**Current alternative**: Use `--format=json` with verbose flags.
+**Implementation Details**:
+- Interactive prompt-based debugging with (a)pply, (s)kip, (q)uit options
+- File preview and patch details at each step
+- Auto-apply mode with decision persistence (--auto-apply, --save-decisions, --load-decisions)
+- Non-interactive execution for automation workflows
+- Graceful cancellation support (Ctrl+C)
+
+See [README - Debug Command](../README.md#kustomark-debug) for full documentation.
 
 ### Interactive Init Wizard
 
-Prompt-based config creation.
+**Status**: Implemented
 
-**Current alternative**: Use explicit flags: `kustomark init --base ../company/`
+Prompt-based config creation with beautiful CLI UX.
+
+**Implementation Details**:
+- Config type selection (base vs overlay)
+- Output directory and base config prompts
+- Resource pattern multiselect
+- Optional starter patches with 6 common operations
+- Input validation and file existence checks
+- Graceful cancellation at any step
+- Backward compatible with non-interactive mode (--base, --output flags)
+
+See [README - Init Command](../README.md#kustomark-init) for full documentation.
 
 ## Deferred: Complexity
 
@@ -121,14 +141,21 @@ Patch YAML, JSON, TOML.
 
 ## Future Candidates
 
-| Feature | Complexity | Notes |
-|---------|------------|-------|
-| Interactive debug mode | Medium | PTY-based step-through |
-| Interactive init wizard | Low | Prompt-based setup |
-| Patch inheritance (extend by ID) | Medium | |
-| Patch groups (enable/disable) | Medium | |
-| Parallel builds | Medium | |
-| Incremental builds | High | |
-| Build cache | High | |
-| LSP server | High | IDE integration |
-| Web UI | High | Visual patch editor |
+**Status**: ALL IMPLEMENTED ✅
+
+All features listed below have been successfully implemented and are now part of the core kustomark toolset.
+
+| Feature | Complexity | Status | Notes |
+|---------|------------|--------|-------|
+| Interactive debug mode | Medium | ✅ COMPLETE | PTY-based step-through with decision persistence |
+| Interactive init wizard | Low | ✅ COMPLETE | Prompt-based setup with @clack/prompts |
+| Patch inheritance (extend by ID) | Medium | ✅ COMPLETE | Single/multiple parent inheritance with field merging |
+| Patch groups (enable/disable) | Medium | ✅ COMPLETE | --enable-groups and --disable-groups flags |
+| Parallel builds | Medium | ✅ COMPLETE | --parallel and --jobs=N flags with concurrency control |
+| Incremental builds | High | ✅ COMPLETE | --incremental with SHA256-based change detection |
+| Build cache | High | ✅ COMPLETE | Project-local .kustomark/build-cache.json |
+| LSP server | High | ✅ COMPLETE | Full IDE integration with autocomplete, diagnostics, hover |
+| Web UI | High | ✅ COMPLETE | React-based visual editor with live preview |
+| Template system | Medium | ✅ COMPLETE | Built-in templates with template list/show/apply/init |
+
+See [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) for detailed implementation notes and [README.md](../README.md) for usage documentation.
