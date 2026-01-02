@@ -1,0 +1,68 @@
+apiVersion: kustomark/v1
+kind: Template
+metadata:
+  name: upstream-fork
+  description: Consume markdown from upstream sources while maintaining local customizations
+  category: upstream-fork
+  tags:
+    - upstream
+    - fork
+    - documentation
+    - sync
+  author:
+    name: Kustomark Team
+    email: hello@kustomark.dev
+  version: 1.0.0
+
+variables:
+  - name: UPSTREAM_URL
+    description: Git URL of the upstream repository to fetch content from
+    type: string
+    required: true
+    example: https://github.com/example/docs.git
+
+  - name: OUTPUT_DIR
+    description: Directory where customized markdown will be written
+    type: string
+    required: true
+    default: ./output
+    example: ./my-customized-docs
+
+  - name: BRANDING_OLD
+    description: Old branding/product name to replace (leave empty to skip branding replacement)
+    type: string
+    required: false
+    example: UpstreamProduct
+
+  - name: BRANDING_NEW
+    description: New branding/product name to use as replacement
+    type: string
+    required: false
+    example: MyProduct
+
+files:
+  - src: kustomark.yaml
+    dest: kustomark.yaml
+    substitute: true
+
+  - src: README.md
+    dest: README.md
+    substitute: true
+
+  - src: example/source.md
+    dest: example/source.md
+    substitute: true
+
+  - src: example/upstream.md
+    dest: example/upstream.md
+    substitute: true
+
+postApply:
+  - description: Fetch upstream content
+    command: kustomark fetch {{UPSTREAM_URL}}
+
+  - description: Build customized output
+    command: kustomark build
+
+  - description: Show diff between upstream and customized content
+    command: kustomark diff

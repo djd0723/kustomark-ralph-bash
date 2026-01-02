@@ -1,0 +1,92 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Output directory for customized skill
+output: {{OUTPUT_DIR}}
+
+# Upstream resource (git repository or local files)
+resources:
+  - {{UPSTREAM_URL}}
+
+# Patches to apply for {{ORG_NAME}} customization
+patches:
+  # 1. Update skill name with organization prefix
+  - op: set-frontmatter
+    key: name
+    value: "{{ORG_PREFIX}}-{{SKILL_NAME}}"
+
+  # 2. Update skill description
+  - op: set-frontmatter
+    key: description
+    value: "{{SKILL_DESCRIPTION}}"
+
+  # 3. Add organization tag to frontmatter
+  - op: merge-frontmatter
+    data:
+      tags:
+        - {{ORG_PREFIX}}
+      customized: true
+      organization: "{{ORG_NAME}}"
+
+  # 4. Rename all tool functions with organization prefix
+  # Matches: function toolName( -> function {{ORG_PREFIX}}_toolName(
+  - op: replace-regex
+    pattern: '(function\s+)(\w+)(\s*\()'
+    replacement: '${1}{{ORG_PREFIX}}_${2}${3}'
+    flags: g
+
+  # 5. Rename function calls with organization prefix
+  # Matches: await toolName( -> await {{ORG_PREFIX}}_toolName(
+  - op: replace-regex
+    pattern: '(\bawait\s+)(\w+)(\s*\()'
+    replacement: '${1}{{ORG_PREFIX}}_${2}${3}'
+    flags: g
+
+  # 6. Add custom organization guidelines
+  - op: append-to-section
+    id: instructions
+    content: |
+
+      ### {{ORG_NAME}} Guidelines
+
+      When using this skill for {{ORG_NAME}}:
+
+      1. Follow {{ORG_NAME}} best practices
+      2. Ensure compliance with {{ORG_NAME}} policies
+      3. Document all customizations
+      4. Test thoroughly before deployment
+
+  # 7. Add organization-specific configuration
+  - op: append-to-section
+    id: configuration
+    content: |
+
+      ### {{ORG_NAME}} Configuration
+
+      ```yaml
+      name: {{ORG_PREFIX}}-{{SKILL_NAME}}
+      organization: {{ORG_NAME}}
+      customized: true
+      ```
+
+  # 8. Add attribution section
+  - op: append-to-section
+    id: end-of-file
+    content: |
+
+      ## Attribution
+
+      This skill was customized for {{ORG_NAME}} using Kustomark.
+
+      Original source: {{UPSTREAM_URL}}
+      Customized by: {{ORG_NAME}} Team
+
+      For issues or questions, contact your {{ORG_NAME}} administrator.
+
+# Error handling strategy
+onNoMatch: warn
+
+# Git fetch configuration (when using git resources)
+gitFetch:
+  depth: 1
+  branch: main

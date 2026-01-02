@@ -1,0 +1,173 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Example: Customizing the code-analyzer skill for ACME Corp
+
+# Output directory
+output: ./customized
+
+# Resource: Use local skill.md as example
+# In real usage, this would be a Git URL like:
+# resources:
+#   - https://github.com/user/code-analyzer-skill.git
+resources:
+  - skill.md
+
+# Patches for ACME Corp customization
+patches:
+  # 1. Update skill name
+  - op: set-frontmatter
+    key: name
+    value: "acme-code-analyzer"
+
+  # 2. Update version
+  - op: set-frontmatter
+    key: version
+    value: "1.0.0-acme"
+
+  # 3. Add organization tag
+  - op: set-frontmatter
+    key: tags
+    value:
+      - code
+      - analysis
+      - quality
+      - acme
+
+  # 4. Add customization metadata
+  - op: set-frontmatter
+    key: customized
+    value: true
+
+  # 5. Rename all tools with acme_ prefix
+  # Matches: function analyze( -> function acme_analyze(
+  - op: replace-regex
+    pattern: '(function\s+)(\w+)(\s*\()'
+    replacement: '${1}acme_${2}${3}'
+    flags: g
+
+  # 6. Rename function calls with acme_ prefix
+  # Matches: await analyze( -> await acme_analyze(
+  - op: replace-regex
+    pattern: '(\bawait\s+)(\w+)(\s*\()'
+    replacement: '${1}acme_${2}${3}'
+    flags: g
+
+  # 7. Add custom instructions
+  - op: append-to-section
+    id: instructions
+    content: |
+
+      ### ACME Corp Guidelines
+
+      When analyzing code for ACME Corp:
+
+      1. **Security First**: Always check for OWASP Top 10 vulnerabilities
+      2. **Performance**: Flag O(n²) or worse algorithms
+      3. **Style**: Follow ACME Style Guide v2.0
+      4. **Documentation**: Require JSDoc for all public APIs
+      5. **Testing**: Minimum 80% code coverage
+
+      Security considerations:
+      - No hardcoded credentials
+      - Validate all user inputs
+      - Use parameterized queries
+      - Implement rate limiting
+
+  # 8. Add ACME-specific configuration section
+  - op: append-to-section
+    id: configuration
+    content: |
+
+      ### ACME Corp Defaults
+
+      ```yaml
+      name: acme-code-analyzer
+      config:
+        severity: error  # ACME requires error-level only
+        rules:
+          no-console: error
+          no-eval: error
+          no-var: error
+          max-complexity: 8  # ACME standard
+          max-lines: 300    # ACME standard
+        excludePatterns:
+          - '**/*.test.ts'
+          - '**/*.spec.ts'
+          - '**/node_modules/**'
+          - '**/vendor/**'
+        acme:
+          enforceStyleGuide: true
+          requireSecurityScan: true
+          requirePerformanceCheck: true
+      ```
+
+  # 9. Update examples to use ACME prefix
+  - op: replace-section
+    id: examples
+    content: |
+      ## Examples
+
+      ### Analyze a Single File (ACME Style)
+
+      ```typescript
+      const result = await acme_analyze('./src/main.ts', 'typescript');
+      console.log(await acme_report([result], 'text'));
+      ```
+
+      ### Scan and Analyze Directory (ACME Style)
+
+      ```typescript
+      const files = await acme_scan('./src', { recursive: true });
+      const results = await Promise.all(
+        files.map(file => acme_analyze(file, detectLanguage(file)))
+      );
+      console.log(await acme_report(results, 'html'));
+      ```
+
+      ### With ACME Configuration
+
+      ```typescript
+      const config = {
+        severity: 'error',
+        rules: {
+          maxComplexity: 8,
+          maxLines: 300,
+        },
+        acme: {
+          enforceStyleGuide: true,
+        },
+      };
+
+      const result = await acme_analyze('./src/main.ts', 'typescript', config);
+      ```
+
+  # 10. Update limitations section
+  - op: append-to-section
+    id: limitations
+    content: |
+      - ACME Corp internal use only
+      - Requires VPN connection for cloud features
+      - Must comply with ACME data retention policies
+
+  # 11. Add attribution
+  - op: replace-section
+    id: attribution
+    content: |
+      ## Attribution
+
+      This skill was customized for ACME Corp using Kustomark.
+
+      Original skill: https://github.com/anthropics/skills/code-analyzer
+      Customized by: ACME DevTools Team
+      Last updated: 2024-01-15
+
+      For issues or questions, contact: devtools@acme.corp
+
+# Error handling
+onNoMatch: warn
+
+# File operations
+fileOps:
+  preservePermissions: true
+  createDirs: true

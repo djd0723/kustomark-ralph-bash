@@ -73,6 +73,7 @@ ${formatSection("ADVANCED COMMANDS")}
   ${formatCommand("lint")}         Check for common issues in configuration
   ${formatCommand("explain")}      Show resolution chain and patch details
   ${formatCommand("test")}         Run patch tests against sample content
+  ${formatCommand("template")}     Manage and apply configuration templates
   ${formatCommand("fetch")}        Fetch remote resources without building
   ${formatCommand("web")}          Launch web UI for visual editing
   ${formatCommand("cache")}        Manage cache for remote resources
@@ -140,6 +141,7 @@ export function getCommandHelp(command: string): string {
     web: getWebHelp,
     cache: getCacheHelp,
     schema: getSchemaHelp,
+    template: getTemplateHelp,
   };
 
   const helpFunc = helpFunctions[command];
@@ -1228,6 +1230,198 @@ ${formatSection("SEE ALSO")}
 }
 
 // ============================================================================
+// Template Command Help
+// ============================================================================
+
+function getTemplateHelp(): string {
+  return `
+${formatTitle("kustomark template - Manage and apply configuration templates")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark template list")} [options]
+  ${formatCommand("kustomark template show")} <template> [options]
+  ${formatCommand("kustomark template apply")} <template> [options]
+
+${formatSection("DESCRIPTION")}
+  Template commands help you discover, inspect, and apply pre-built
+  configuration templates. Templates provide starter configurations for
+  common use cases, reducing time-to-first-success for new users.
+
+${formatSection("SUBCOMMANDS")}
+  ${formatFlag("list")}               List all available templates
+  ${formatFlag("show")} <template>    Show detailed information about a template
+  ${formatFlag("apply")} <template>   Apply a template to create new configuration
+
+${formatSection("LIST OPTIONS")}
+  ${formatFlag("--category")} <cat>     Filter by category (upstream-fork, documentation, skills, custom)
+  ${formatFlag("--tag")} <tag>          Filter by tag
+  ${formatFlag("--format")} <text|json> Output format (default: text)
+
+${formatSection("SHOW OPTIONS")}
+  ${formatFlag("--format")} <text|json> Output format (default: text)
+
+${formatSection("APPLY OPTIONS")}
+  ${formatFlag("--output")} <path>         Output directory (default: current directory)
+  ${formatFlag("--values")} <json|file>    Variable values as JSON or path to values file
+  ${formatFlag("--skip-post-apply")}      Skip post-apply commands
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# List all available templates")}
+  ${formatCommand("kustomark template list")}
+
+  ${formatExample("# List templates in a specific category")}
+  ${formatCommand("kustomark template list --category=skills")}
+
+  ${formatExample("# Show detailed information about a template")}
+  ${formatCommand("kustomark template show upstream-fork")}
+
+  ${formatExample("# Apply a template with default values")}
+  ${formatCommand("kustomark template apply upstream-fork")}
+
+  ${formatExample("# Apply template with custom values (inline JSON)")}
+  ${formatCommand('kustomark template apply upstream-fork --values=\'{"project_name":"my-docs","upstream_url":"https://github.com/org/repo"}\'')}
+
+  ${formatExample("# Apply template with values from file")}
+  ${formatCommand("kustomark template apply upstream-fork --values=values.yaml")}
+
+  ${formatExample("# Apply template to specific directory")}
+  ${formatCommand("kustomark template apply skills --output=./my-skills/")}
+
+  ${formatExample("# Apply template and skip post-apply hooks")}
+  ${formatCommand("kustomark template apply documentation --skip-post-apply")}
+
+  ${formatExample("# Get template list as JSON")}
+  ${formatCommand("kustomark template list --format=json")}
+
+${formatSection("TEMPLATE CATEGORIES")}
+  ${formatHighlight("upstream-fork:")}
+    Templates for consuming and customizing upstream markdown content
+    Example: Fork documentation and apply team-specific patches
+
+  ${formatHighlight("documentation:")}
+    Documentation pipeline templates for building doc sites
+    Example: API docs, user guides, internal wikis
+
+  ${formatHighlight("skills:")}
+    Claude Code skill customization templates
+    Example: Team-specific skill variants, custom prompts
+
+  ${formatHighlight("custom:")}
+    User-defined custom templates
+    Example: Project-specific patterns
+
+${formatSection("TEMPLATE STRUCTURE")}
+  Each template contains:
+    - ${formatHighlight("template.yaml")}   Template definition with metadata and variables
+    - ${formatHighlight("files/")}          Template files to copy (with variable substitution)
+    - ${formatHighlight("README.md")}       Template documentation
+
+  ${formatHighlight("Template variables:")}
+    Templates can define variables that are substituted in file names
+    and content using {{variable_name}} syntax. Variables can be:
+    - Required or optional
+    - Typed (string, boolean, number, array)
+    - Validated with regex patterns
+    - Have default values
+
+${formatSection("VARIABLE SUBSTITUTION")}
+  Template files use {{variable_name}} placeholders:
+
+  ${formatExample("# kustomark.yaml template file")}
+  ${formatExample("apiVersion: kustomark/v1")}
+  ${formatExample("kind: Kustomization")}
+  ${formatExample("resources:")}
+  ${formatExample("  - {{upstream_url}}")}
+  ${formatExample("patches:")}
+  ${formatExample("  - op: replace")}
+  ${formatExample("    old: {{old_name}}")}
+  ${formatExample("    new: {{new_name}}")}
+
+  ${formatHighlight("Values file (values.yaml):")}
+  ${formatExample("upstream_url: https://github.com/org/repo")}
+  ${formatExample("old_name: upstream")}
+  ${formatExample("new_name: my-team")}
+
+${formatSection("POST-APPLY COMMANDS")}
+  Templates can define commands to run after files are created:
+    - Initialize git repository
+    - Run initial build
+    - Validate configuration
+    - Display next steps
+
+  Use --skip-post-apply to prevent these commands from running.
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Quick start for new projects:")}
+    ${formatCommand("kustomark template list")}
+    ${formatCommand("kustomark template show upstream-fork")}
+    ${formatCommand("kustomark template apply upstream-fork")}
+    Get up and running in seconds
+
+  ${formatHighlight("Team onboarding:")}
+    Share templates with team members
+    Consistent project structure across team
+    Reduce configuration errors
+
+  ${formatHighlight("Documentation as code:")}
+    Apply documentation templates
+    Customize for your project
+    Build and deploy with kustomark
+
+  ${formatHighlight("Skill customization:")}
+    Start with base skill template
+    Customize for team workflows
+    Share across organization
+
+${formatSection("CREATING CUSTOM TEMPLATES")}
+  To create your own template:
+
+  1. Create directory with template.yaml:
+     ${formatExample("apiVersion: kustomark/v1")}
+     ${formatExample("kind: Template")}
+     ${formatExample("metadata:")}
+     ${formatExample("  name: my-template")}
+     ${formatExample("  description: My custom template")}
+     ${formatExample("  category: custom")}
+     ${formatExample("  version: 1.0.0")}
+     ${formatExample("variables:")}
+     ${formatExample("  - name: project_name")}
+     ${formatExample("    description: Project name")}
+     ${formatExample("    type: string")}
+     ${formatExample("    required: true")}
+     ${formatExample("files:")}
+     ${formatExample("  - src: kustomark.yaml.tpl")}
+     ${formatExample("    dest: kustomark.yaml")}
+     ${formatExample("    substitute: true")}
+
+  2. Add template files with {{variables}}
+  3. Test with: kustomark template apply ./my-template
+
+${formatSection("JSON OUTPUT")}
+  With --format=json, commands output structured data:
+
+  ${formatHighlight("List:")}
+    {"count": 5, "templates": [...]}
+
+  ${formatHighlight("Show:")}
+    {template definition with all metadata}
+
+  ${formatHighlight("Apply:")}
+    {"success": true, "filesCreated": [...], "errors": [], "warnings": []}
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    Command succeeded
+  ${formatHighlight("1")}    Command failed or template not found
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark init")}      Create configuration (alternative to templates)
+  ${formatCommand("kustomark validate")}  Validate created configuration
+  ${formatCommand("kustomark build")}     Build from template-created config
+`;
+}
+
+// ============================================================================
 // Format Helper
 // ============================================================================
 
@@ -1257,6 +1451,7 @@ export const helpCommands = [
   "web",
   "cache",
   "schema",
+  "template",
 ] as const;
 
 export type HelpCommand = (typeof helpCommands)[number];

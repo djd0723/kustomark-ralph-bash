@@ -81,6 +81,7 @@ import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
 import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
 import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
+import { templateApply, templateList, templateShow } from "./template-commands.js";
 import { executeOnBuildHooks, executeOnChangeHooks, executeOnErrorHooks } from "./watch-hooks.js";
 import { webCommand } from "./web-command.js";
 
@@ -124,6 +125,9 @@ interface CLIOptions {
   input?: string; // For test --input option (input markdown file)
   content?: string; // For test --content option (inline markdown content)
   showSteps?: boolean; // For test --show-steps option (show intermediate results)
+  var?: Record<string, string>; // For template apply --var key=value
+  overwrite?: boolean; // For template apply --overwrite option
+  category?: string; // For template list --category option
 }
 
 interface BuildStats {
@@ -264,6 +268,9 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     input: undefined,
     content: undefined,
     showSteps: false,
+    var: undefined,
+    overwrite: false,
+    category: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -535,6 +542,41 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       }
     } else if (arg === "--show-steps") {
       options.showSteps = true;
+    } else if (arg === "--overwrite") {
+      options.overwrite = true;
+    } else if (arg === "--category" || arg.startsWith("--category=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.category = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith("-")) {
+          options.category = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--var" || arg.startsWith("--var=")) {
+      let varPair = "";
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) varPair = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith("-")) {
+          varPair = nextArg;
+          i++;
+        }
+      }
+      // Parse KEY=VALUE
+      if (varPair) {
+        const eqIndex = varPair.indexOf("=");
+        if (eqIndex > 0) {
+          const key = varPair.substring(0, eqIndex);
+          const value = varPair.substring(eqIndex + 1);
+          if (!options.var) options.var = {};
+          options.var[key] = value;
+        }
+      }
     }
   }
 
@@ -3847,6 +3889,51 @@ async function main(): Promise<number> {
       return await debugCommand(path, options);
     case "test":
       return await testCommand(path, options);
+    case "template": {
+      // Handle template subcommands
+      // Extract positional args (non-flags) from args
+      const positionalArgs = args.slice(1).filter((arg) => !arg.startsWith("-"));
+      const subcommand = positionalArgs[0]; // First positional arg after 'template'
+      const templateOptions = {
+        format: options.format,
+        verbosity: options.verbosity,
+        category: options.category,
+        var: options.var,
+        dryRun: options.dryRun,
+        overwrite: options.overwrite,
+      };
+
+      switch (subcommand) {
+        case "list":
+        case undefined: // Default to list
+          return await templateList(templateOptions);
+        case "show": {
+          const templateName = positionalArgs[1];
+          if (!templateName) {
+            console.error("Error: Template name is required");
+            console.error("Usage: kustomark template show <template-name>");
+            return 1;
+          }
+          return await templateShow(templateName, templateOptions);
+        }
+        case "apply": {
+          const templateName = positionalArgs[1];
+          if (!templateName) {
+            console.error("Error: Template name is required");
+            console.error("Usage: kustomark template apply <template-name> [output-dir]");
+            return 1;
+          }
+          // Output directory can be positionalArgs[2] or options.output or current directory
+          const outputDir = positionalArgs[2] || options.output || ".";
+          return await templateApply(templateName, outputDir, templateOptions);
+        }
+        default:
+          console.error(`Unknown template subcommand: ${subcommand}`);
+          console.error("Valid subcommands: list, show, apply");
+          console.error("Run 'kustomark help template' for usage information");
+          return 1;
+      }
+    }
     case "cache":
       return await cacheCommand(args.slice(1), options);
     default:

@@ -1,0 +1,43 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# Output directory for customized markdown files
+output: {{OUTPUT_DIR}}
+
+# Upstream resource (git repository or local files)
+resources:
+  - {{UPSTREAM_URL}}
+
+# Patches to apply for local customizations
+patches:
+  # Example: Replace branding/product names throughout all markdown files
+  - op: replace
+    old: "{{BRANDING_OLD}}"
+    new: "{{BRANDING_NEW}}"
+    onNoMatch: skip
+    when:
+      type: and
+      conditions:
+        - type: fileContains
+          value: "{{BRANDING_OLD}}"
+        - type: not
+          condition:
+            type: fileContains
+            value: "{{BRANDING_NEW}}"
+
+  # Example: Add custom footer to all markdown files
+  - op: append-to-section
+    id: end-of-file
+    content: |
+
+      ---
+
+      *This documentation has been customized for local use. Original source: {{UPSTREAM_URL}}*
+
+# Error handling strategy
+onNoMatch: warn
+
+# Git fetch configuration (when using git resources)
+gitFetch:
+  depth: 1
+  branch: main

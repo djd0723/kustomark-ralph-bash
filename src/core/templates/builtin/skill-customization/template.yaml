@@ -1,0 +1,85 @@
+apiVersion: kustomark/v1
+kind: Template
+metadata:
+  name: skill-customization
+  description: Customize Claude AI skills while tracking upstream changes
+  category: skills
+  tags:
+    - skills
+    - claude
+    - ai
+    - customization
+  author:
+    name: Kustomark Team
+    email: hello@kustomark.dev
+  version: 1.0.0
+
+variables:
+  - name: SKILL_NAME
+    description: Name of the skill to customize (e.g., code-analyzer)
+    type: string
+    required: true
+    example: code-analyzer
+
+  - name: SKILL_DESCRIPTION
+    description: Description of what the skill does
+    type: string
+    required: true
+    example: Analyzes code for quality and best practices
+
+  - name: ORG_NAME
+    description: Your organization name for customization
+    type: string
+    required: true
+    example: ACME Corp
+
+  - name: ORG_PREFIX
+    description: Prefix to add to tool names (lowercase, no spaces)
+    type: string
+    required: true
+    example: acme
+    pattern: "^[a-z][a-z0-9_]*$"
+
+  - name: UPSTREAM_URL
+    description: Git URL of the upstream skill repository (leave empty for local skill)
+    type: string
+    required: false
+    example: https://github.com/anthropics/skills.git
+
+  - name: OUTPUT_DIR
+    description: Directory where customized skill will be written
+    type: string
+    required: true
+    default: ./customized
+    example: ./my-custom-skills
+
+files:
+  - src: kustomark.yaml
+    dest: kustomark.yaml
+    substitute: true
+
+  - src: README.md
+    dest: README.md
+    substitute: true
+
+  - src: example/kustomark.yaml
+    dest: example/kustomark.yaml
+    substitute: true
+
+  - src: example/README.md
+    dest: example/README.md
+    substitute: true
+
+  - src: example/skill.md
+    dest: example/skill.md
+    substitute: true
+
+postApply:
+  - description: Preview the customizations
+    command: kustomark diff
+
+  - description: Build customized skill
+    command: kustomark build
+
+  - description: Validate the output
+    command: kustomark validate
