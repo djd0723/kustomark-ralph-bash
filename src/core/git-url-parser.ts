@@ -107,6 +107,8 @@ function parseGitHubShorthand(url: string): ParsedGitUrl | null {
   // Extract path from subpath (remove query string if present)
   const path = subpath ? extractRefFromQuery(subpath).baseUrl : undefined;
 
+  const fullUrl = `https://${host}/${org}/${cleanRepo}.git`;
+
   return {
     type: "git",
     protocol: "https",
@@ -115,7 +117,8 @@ function parseGitHubShorthand(url: string): ParsedGitUrl | null {
     repo: cleanRepo,
     path,
     ref: ref || "main", // Default to 'main' if no ref specified
-    fullUrl: `https://${host}/${org}/${cleanRepo}.git`,
+    fullUrl,
+    cloneUrl: fullUrl,
   };
 }
 
@@ -123,23 +126,36 @@ function parseGitHubShorthand(url: string): ParsedGitUrl | null {
  * Parses git HTTPS URL: https://github.com/org/repo.git//subdir?ref=main
  */
 function parseGitHttpsUrl(url: string): ParsedGitUrl | null {
-  // Split on '//' to separate repo URL from path
-  const parts = url.split("//");
+  // Special handling: If URL has no subpath, it won't have '//' delimiter after the protocol
+  // We need to preserve the protocol:// part
+  let repoUrlPart: string;
+  let subpath: string | undefined;
 
-  // First part should be the protocol and host/org/repo
-  const firstPart = parts[0];
-  if (!firstPart) {
+  // Check if there's a subpath delimiter (// after the repo URL)
+  // The first // is the protocol (https://), so we look for additional //
+  const protocolEndIndex = url.indexOf("://");
+  if (protocolEndIndex === -1) {
     return null;
   }
 
-  // Join remaining parts for subpath (handles edge case of multiple //)
-  const subpath = parts.length > 1 ? parts.slice(1).join("//") : undefined;
+  const afterProtocol = url.slice(protocolEndIndex + 3); // Skip past '://'
+  const subpathIndex = afterProtocol.indexOf("//");
+
+  if (subpathIndex !== -1) {
+    // Has subpath
+    repoUrlPart = url.slice(0, protocolEndIndex + 3 + subpathIndex);
+    subpath = afterProtocol.slice(subpathIndex + 2); // Skip past '//'
+  } else {
+    // No subpath
+    repoUrlPart = url;
+    subpath = undefined;
+  }
 
   // Extract ref from query string in subpath
   const path = subpath ? extractRefFromQuery(subpath).baseUrl : undefined;
 
   // Parse the base URL (before first //)
-  const { baseUrl: repoUrl, ref: refFromRepoUrl } = extractRefFromQuery(firstPart);
+  const { baseUrl: repoUrl, ref: refFromRepoUrl } = extractRefFromQuery(repoUrlPart);
 
   // Extract ref from query string in repo URL
   const { ref: refFromSubpath } = subpath ? extractRefFromQuery(subpath) : { ref: undefined };
@@ -180,6 +196,8 @@ function parseGitHttpsUrl(url: string): ParsedGitUrl | null {
   // Remove .git suffix
   const repo = repoWithGit.endsWith(".git") ? repoWithGit.slice(0, -4) : repoWithGit;
 
+  const fullUrl = `https://${host}/${org}/${repo}.git`;
+
   return {
     type: "git",
     protocol: "https",
@@ -188,7 +206,8 @@ function parseGitHttpsUrl(url: string): ParsedGitUrl | null {
     repo,
     path,
     ref,
-    fullUrl: `https://${host}/${org}/${repo}.git`,
+    fullUrl,
+    cloneUrl: fullUrl,
   };
 }
 
@@ -243,6 +262,8 @@ function parseGitSshUrl(url: string): ParsedGitUrl | null {
   // Remove .git suffix
   const repo = repoWithGit.endsWith(".git") ? repoWithGit.slice(0, -4) : repoWithGit;
 
+  const fullUrl = `https://${host}/${org}/${repo}.git`; // Always return HTTPS URL for clone
+
   return {
     type: "git",
     protocol: "ssh",
@@ -251,7 +272,8 @@ function parseGitSshUrl(url: string): ParsedGitUrl | null {
     repo,
     path: pathUrl,
     ref,
-    fullUrl: `https://${host}/${org}/${repo}.git`, // Always return HTTPS URL for clone
+    fullUrl,
+    cloneUrl: fullUrl,
   };
 }
 

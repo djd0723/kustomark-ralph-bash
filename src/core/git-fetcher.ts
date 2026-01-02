@@ -1,0 +1,324 @@
+/**
+ * Git Fetcher Module
+ *
+ * Provides git repository fetching with caching and authentication support
+ */
+
+import { existsSync } from "node:fs";
+import { mkdir, readdir, rm } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { parseGitUrl } from "./git-url-parser.js";
+import type { ParsedGitUrl } from "./types.js";
+
+/**
+ * Error thrown when git operations fail
+ */
+export class GitFetchError extends Error {
+  public readonly code: string;
+  public readonly stderr?: string;
+
+  constructor(message: string, code: string, stderr?: string) {
+    super(message);
+    this.name = "GitFetchError";
+    this.code = code;
+    this.stderr = stderr;
+  }
+}
+
+/**
+ * Result of a git fetch operation
+ */
+export interface GitFetchResult {
+  /** Path to the cached repository */
+  repoPath: string;
+  /** Whether the repository was fetched from remote or used from cache */
+  cached: boolean;
+  /** The resolved commit SHA */
+  resolvedSha: string;
+}
+
+/**
+ * Options for git fetching
+ */
+export interface GitFetchOptions {
+  /** Custom cache directory (defaults to ~/.cache/kustomark/git) */
+  cacheDir?: string;
+  /** Whether to update an existing cached repository */
+  update?: boolean;
+  /** Timeout in milliseconds for git operations */
+  timeout?: number;
+}
+
+/**
+ * Get the default cache directory for git repositories
+ */
+export function getDefaultCacheDir(): string {
+  return join(homedir(), ".cache", "kustomark", "git");
+}
+
+/**
+ * Generate a cache key for a git URL
+ * Format: {host}_{org}_{repo}
+ */
+function getCacheKey(parsed: ParsedGitUrl): string {
+  const host = parsed.host.replace(/[^a-zA-Z0-9]/g, "_");
+  const org = parsed.org.replace(/[^a-zA-Z0-9]/g, "_");
+  const repo = parsed.repo.replace(/[^a-zA-Z0-9]/g, "_");
+  return `${host}_${org}_${repo}`;
+}
+
+/**
+ * Execute a git command
+ */
+async function executeGit(
+  args: string[],
+  options: { cwd?: string; timeout?: number } = {},
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const proc = Bun.spawn(["git", ...args], {
+    cwd: options.cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: {
+      ...process.env,
+      GIT_TERMINAL_PROMPT: "0", // Disable interactive prompts
+    },
+  });
+
+  let killed = false;
+  const timeout = options.timeout ?? 60000;
+  const timeoutHandle = setTimeout(() => {
+    killed = true;
+    proc.kill();
+  }, timeout);
+
+  try {
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+
+    clearTimeout(timeoutHandle);
+
+    if (killed) {
+      throw new GitFetchError(`Git operation timed out after ${timeout}ms`, "TIMEOUT");
+    }
+
+    return { exitCode, stdout: stdout.trim(), stderr: stderr.trim() };
+  } catch (error) {
+    clearTimeout(timeoutHandle);
+    throw error;
+  }
+}
+
+/**
+ * Clone a git repository
+ */
+async function cloneRepository(
+  url: string,
+  dest: string,
+  sparsePath?: string,
+  timeout?: number,
+): Promise<void> {
+  if (sparsePath) {
+    // Clone with sparse checkout
+    const { exitCode, stderr } = await executeGit(
+      ["clone", "--no-checkout", "--filter=blob:none", url, dest],
+      { timeout },
+    );
+
+    if (exitCode !== 0) {
+      throw new GitFetchError(`Failed to clone repository: ${stderr}`, "CLONE_FAILED", stderr);
+    }
+
+    // Initialize sparse checkout
+    const sparseResult = await executeGit(["sparse-checkout", "init", "--cone"], {
+      cwd: dest,
+      timeout,
+    });
+
+    if (sparseResult.exitCode !== 0) {
+      throw new GitFetchError(
+        `Failed to initialize sparse checkout: ${sparseResult.stderr}`,
+        "SPARSE_INIT_FAILED",
+        sparseResult.stderr,
+      );
+    }
+
+    // Set sparse checkout path
+    const setResult = await executeGit(["sparse-checkout", "set", sparsePath], {
+      cwd: dest,
+      timeout,
+    });
+
+    if (setResult.exitCode !== 0) {
+      throw new GitFetchError(
+        `Failed to set sparse checkout path: ${setResult.stderr}`,
+        "SPARSE_SET_FAILED",
+        setResult.stderr,
+      );
+    }
+  } else {
+    // Standard clone
+    const { exitCode, stderr } = await executeGit(["clone", url, dest], { timeout });
+
+    if (exitCode !== 0) {
+      throw new GitFetchError(`Failed to clone repository: ${stderr}`, "CLONE_FAILED", stderr);
+    }
+  }
+}
+
+/**
+ * Checkout a specific ref (branch, tag, or commit)
+ */
+async function checkoutRef(repoPath: string, ref: string, timeout?: number): Promise<string> {
+  // Fetch the ref if it's not available locally
+  const fetchResult = await executeGit(["fetch", "origin", ref], { cwd: repoPath, timeout });
+
+  if (fetchResult.exitCode !== 0) {
+    // If fetch fails, try fetching all refs (might be a tag)
+    const fetchAllResult = await executeGit(["fetch", "origin"], { cwd: repoPath, timeout });
+
+    if (fetchAllResult.exitCode !== 0) {
+      throw new GitFetchError(
+        `Failed to fetch ref ${ref}: ${fetchAllResult.stderr}`,
+        "FETCH_FAILED",
+        fetchAllResult.stderr,
+      );
+    }
+  }
+
+  // Checkout the ref
+  const checkoutResult = await executeGit(["checkout", ref], { cwd: repoPath, timeout });
+
+  if (checkoutResult.exitCode !== 0) {
+    throw new GitFetchError(
+      `Failed to checkout ref ${ref}: ${checkoutResult.stderr}`,
+      "CHECKOUT_FAILED",
+      checkoutResult.stderr,
+    );
+  }
+
+  // Get the resolved commit SHA
+  const revParseResult = await executeGit(["rev-parse", "HEAD"], { cwd: repoPath, timeout });
+
+  if (revParseResult.exitCode !== 0) {
+    throw new GitFetchError(
+      `Failed to resolve commit SHA: ${revParseResult.stderr}`,
+      "REV_PARSE_FAILED",
+      revParseResult.stderr,
+    );
+  }
+
+  return revParseResult.stdout;
+}
+
+/**
+ * Fetch a git repository and return the path to the cached copy
+ *
+ * @param gitUrl - Git URL to fetch (GitHub shorthand, git::https://, or git::git@)
+ * @param options - Fetch options
+ * @returns GitFetchResult with repo path, cache status, and resolved SHA
+ *
+ * @example
+ * ```typescript
+ * const result = await fetchGitRepository(
+ *   'github.com/org/repo//path?ref=v1.0.0'
+ * );
+ * console.log(result.repoPath); // ~/.cache/kustomark/git/github_com_org_repo
+ * console.log(result.resolvedSha); // abc123...
+ * ```
+ */
+export async function fetchGitRepository(
+  gitUrl: string,
+  options: GitFetchOptions = {},
+): Promise<GitFetchResult> {
+  const parsed = parseGitUrl(gitUrl);
+  if (!parsed) {
+    throw new GitFetchError(`Invalid git URL: ${gitUrl}`, "INVALID_URL");
+  }
+
+  const cacheDir = options.cacheDir ?? getDefaultCacheDir();
+  const cacheKey = getCacheKey(parsed);
+  const repoPath = join(cacheDir, cacheKey);
+  const ref = parsed.ref ?? "main";
+
+  // Ensure cache directory exists
+  await mkdir(cacheDir, { recursive: true });
+
+  let cached = false;
+  let needsClone = !existsSync(repoPath);
+
+  if (!needsClone && options.update) {
+    // Update existing repository
+    try {
+      await executeGit(["fetch", "origin"], { cwd: repoPath, timeout: options.timeout });
+    } catch (error) {
+      // If fetch fails, remove the cached repo and clone fresh
+      await rm(repoPath, { recursive: true, force: true });
+      needsClone = true;
+    }
+  } else if (!needsClone) {
+    cached = true;
+  }
+
+  // Clone if needed
+  if (needsClone) {
+    await cloneRepository(parsed.cloneUrl, repoPath, parsed.path, options.timeout);
+  }
+
+  // Checkout the specified ref
+  const resolvedSha = await checkoutRef(repoPath, ref, options.timeout);
+
+  return {
+    repoPath,
+    cached,
+    resolvedSha,
+  };
+}
+
+/**
+ * Clear the git cache
+ *
+ * @param cacheDir - Cache directory to clear (defaults to ~/.cache/kustomark/git)
+ * @param pattern - Optional pattern to match cache keys (e.g., 'github_com_org_repo')
+ */
+export async function clearGitCache(cacheDir?: string, pattern?: string): Promise<number> {
+  const dir = cacheDir ?? getDefaultCacheDir();
+
+  if (!existsSync(dir)) {
+    return 0;
+  }
+
+  const entries = await readdir(dir);
+  let cleared = 0;
+
+  for (const entry of entries) {
+    if (pattern && !entry.includes(pattern)) {
+      continue;
+    }
+
+    const entryPath = join(dir, entry);
+    await rm(entryPath, { recursive: true, force: true });
+    cleared++;
+  }
+
+  return cleared;
+}
+
+/**
+ * List cached git repositories
+ *
+ * @param cacheDir - Cache directory to list (defaults to ~/.cache/kustomark/git)
+ * @returns Array of cache keys
+ */
+export async function listGitCache(cacheDir?: string): Promise<string[]> {
+  const dir = cacheDir ?? getDefaultCacheDir();
+
+  if (!existsSync(dir)) {
+    return [];
+  }
+
+  return await readdir(dir);
+}

@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs";
+import { readFile, readdir } from "node:fs/promises";
 import { isAbsolute, join, normalize, resolve } from "node:path";
 import micromatch from "micromatch";
+import { type GitFetchOptions, fetchGitRepository } from "./git-fetcher.js";
 import { isGitUrl, parseGitUrl } from "./git-url-parser.js";
 
 /**
@@ -47,6 +50,8 @@ interface ResolveOptions {
   currentDepth?: number;
   /** Set of visited config paths to detect cycles */
   visited?: Set<string>;
+  /** Git fetch options */
+  gitFetchOptions?: GitFetchOptions;
 }
 
 /**
@@ -66,19 +71,19 @@ interface ResolveOptions {
  *   ['/project/docs/README.md', '# README'],
  * ]);
  *
- * const resources = resolveResources(
+ * const resources = await resolveResources(
  *   ['**\/*.md', '!**\/README.md'],
  *   '/project',
  *   fileMap
  * );
  * ```
  */
-export function resolveResources(
+export async function resolveResources(
   resources: string[],
   baseDir: string,
   fileMap: Map<string, string>,
   options: ResolveOptions = {},
-): ResolvedResource[] {
+): Promise<ResolvedResource[]> {
   const { maxDepth = 10, currentDepth = 0, visited = new Set<string>() } = options;
 
   // Normalize base directory to absolute path
@@ -127,17 +132,47 @@ export function resolveResources(
         );
       }
 
-      // TODO: Implement git URL fetching in a future task
-      // For now, we just validate that the URL is parseable
-      // Future implementation will:
-      // 1. Clone the repository (or use existing cache)
-      // 2. Checkout the specified ref (branch/tag/commit)
-      // 3. Extract files from the specified path
-      // 4. Add resolved markdown files to resolvedResources
-      throw new ResourceResolutionError(
-        `Git URL resolution not yet implemented: ${pattern}. Git fetching will be added in a future update.`,
-        pattern,
-      );
+      try {
+        // Fetch the git repository
+        const fetchResult = await fetchGitRepository(pattern, options.gitFetchOptions);
+
+        // Determine the directory to search for markdown files
+        const searchDir = parsedGit.path
+          ? join(fetchResult.repoPath, parsedGit.path)
+          : fetchResult.repoPath;
+
+        // Verify the directory exists
+        if (!existsSync(searchDir)) {
+          throw new ResourceResolutionError(
+            `Path not found in repository: ${parsedGit.path ?? "(root)"}`,
+            pattern,
+          );
+        }
+
+        // Recursively find all markdown files in the directory
+        const gitMarkdownFiles = await findMarkdownFiles(searchDir);
+
+        // Create file map entries for git files
+        for (const filePath of gitMarkdownFiles) {
+          const content = await readFile(filePath, "utf-8");
+          fileMap.set(normalize(filePath), content);
+
+          resolvedResources.push({
+            path: normalize(filePath),
+            content,
+            source: pattern,
+          });
+        }
+      } catch (error) {
+        if (error instanceof ResourceResolutionError) {
+          throw error;
+        }
+        throw new ResourceResolutionError(
+          `Failed to fetch git repository: ${error instanceof Error ? error.message : String(error)}`,
+          pattern,
+          error instanceof Error ? error : undefined,
+        );
+      }
     }
 
     // Check if pattern is a reference to another kustomark config (directory)
@@ -173,10 +208,11 @@ export function resolveResources(
             const newVisited = new Set(visited);
             newVisited.add(resolvedDir);
 
-            const nestedResources = resolveResources(config.resources, resolvedDir, fileMap, {
+            const nestedResources = await resolveResources(config.resources, resolvedDir, fileMap, {
               maxDepth,
               currentDepth: currentDepth + 1,
               visited: newVisited,
+              gitFetchOptions: options.gitFetchOptions,
             });
 
             resolvedResources.push(...nestedResources);
@@ -368,4 +404,33 @@ function deduplicateResources(resources: ResolvedResource[]): ResolvedResource[]
   }
 
   return Array.from(seen.values());
+}
+
+/**
+ * Recursively find all markdown files in a directory
+ */
+async function findMarkdownFiles(dir: string): Promise<string[]> {
+  const results: string[] = [];
+
+  async function scan(currentDir: string): Promise<void> {
+    const entries = await readdir(currentDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = join(currentDir, entry.name);
+
+      // Skip .git directory
+      if (entry.name === ".git") {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        await scan(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        results.push(fullPath);
+      }
+    }
+  }
+
+  await scan(dir);
+  return results;
 }

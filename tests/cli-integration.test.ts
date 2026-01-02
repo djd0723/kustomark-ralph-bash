@@ -17,7 +17,7 @@ import type { KustomarkConfig, PatchOperation } from '../src/core/types.js';
 import micromatch from 'micromatch';
 
 describe('CLI Integration Tests', () => {
-  test('basic fixture: resource resolution, replace, and section operations', () => {
+  test('basic fixture: resource resolution, replace, and section operations', async () => {
     // Setup paths
     const fixtureRoot = resolve(__dirname, 'fixtures/integration/basic');
     const baseDir = join(fixtureRoot, 'base');
@@ -61,7 +61,7 @@ describe('CLI Integration Tests', () => {
       fileMap.set(resolve(baseConfigPath), baseConfigContent);
 
       // Step 4: Resolve resources
-      const resolvedResources = resolveResources(
+      const resolvedResources = await resolveResources(
         config.resources,
         overlayDir,
         fileMap

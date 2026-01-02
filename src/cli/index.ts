@@ -157,12 +157,15 @@ function validateConfig(
  * Resolve resources using the core resource resolver
  * This builds a fileMap and calls the core resolver
  */
-function resolveResources(config: KustomarkConfig, basePath: string): Map<string, string> {
+async function resolveResources(
+  config: KustomarkConfig,
+  basePath: string,
+): Promise<Map<string, string>> {
   // Build file map by scanning the file system
   const fileMap = buildCompleteFileMap(basePath);
 
   // Use core resource resolver
-  const resolvedResources = coreResolveResources(config.resources, basePath, fileMap);
+  const resolvedResources = await coreResolveResources(config.resources, basePath, fileMap);
 
   // Convert from ResolvedResource[] to Map<string, string>
   // For now, use just the basename of each file as the key
@@ -450,7 +453,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
 
     // Resolve resources
     log("Resolving resources...", 2, options);
-    const resources = resolveResources(config, basePath);
+    const resources = await resolveResources(config, basePath);
 
     // Apply patches
     log("Applying patches...", 2, options);
@@ -600,7 +603,7 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
 
     // Resolve resources
     log("Resolving resources...", 2, options);
-    const originalResources = resolveResources(config, basePath);
+    const originalResources = await resolveResources(config, basePath);
 
     // Apply patches
     log("Applying patches...", 2, options);

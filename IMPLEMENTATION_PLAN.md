@@ -120,14 +120,18 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Integrate git URL detection into resource-resolver.ts
    - ✅ Add git URL validation in config-parser.ts
    - ✅ Update CLI help text to document git URL support
-   - ✅ Comprehensive test coverage (83 new tests, 484 total tests passing)
+   - ✅ Fixed git::https:// parsing bug (proper protocol handling)
+   - ✅ Comprehensive test coverage (85 tests in git-url-parser.test.ts)
 
-2. **[TODO] Git Repository Fetching**
-   - Implement git clone/fetch functionality
-   - Support sparse checkout for subdirectories
-   - Handle authentication (SSH keys, credential helpers)
-   - Cache cloned repositories
-   - Checkout specified ref (branch/tag/commit)
+2. **[DONE] Git Repository Fetching** ✅
+   - ✅ Implemented git clone/fetch functionality using Bun.spawn
+   - ✅ Support sparse checkout for subdirectories
+   - ✅ Handle authentication (SSH keys, credential helpers via git)
+   - ✅ Cache cloned repositories in ~/.cache/kustomark/git/
+   - ✅ Checkout specified ref (branch/tag/commit)
+   - ✅ Integrated into resource-resolver.ts for seamless git URL resolution
+   - ✅ Export all git fetcher functions from core/index.ts
+   - ✅ Comprehensive test coverage (14 new tests in git-fetcher.test.ts)
 
 3. **[TODO] HTTP Archive Support**
    - Support `.tar.gz`, `.tgz`, `.tar`, `.zip` archives
@@ -276,8 +280,39 @@ This document tracks the implementation of kustomark based on the spec milestone
 **Status:**
 - **M1 COMPLETE! ✅**
 - **M2 COMPLETE! ✅**
-- **M3 IN PROGRESS** - Git URL parsing complete, git fetching next
+- **M3 GIT FETCHING COMPLETE! ✅**
   - Git URL parsing and validation: DONE ✅
-  - Next: Git repository fetching functionality
+  - Git repository fetching: DONE ✅
+  - Next: HTTP archive support and lock file generation
 
-**Next Priority:** M3 Git Repository Fetching (clone, sparse checkout, authentication, caching)
+**Next Priority:** M3 HTTP Archive Support (.tar.gz, .zip) and Lock File Generation
+
+**2026-01-02 (M3 Git Repository Fetching):**
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/git-fetcher.ts` with complete git operations:
+  - `fetchGitRepository()` - Clone and cache git repositories with sparse checkout support
+  - `clearGitCache()` - Clear cached repositories (all or by pattern)
+  - `listGitCache()` - List all cached repositories
+  - `getDefaultCacheDir()` - Get default cache directory path
+  - `GitFetchError` - Custom error class for git operations
+  - Supports authentication via SSH keys and git credential helpers
+  - Caches repositories in `~/.cache/kustomark/git/`
+  - Handles branch/tag/commit checkout with SHA resolution
+- ✅ Fixed git::https:// URL parsing bug in git-url-parser.ts:
+  - Proper handling of protocol:// separator to avoid breaking HTTPS URLs
+  - Now correctly parses git::https:// and git::http:// formats
+- ✅ Added `cloneUrl` field to `ParsedGitUrl` type for git operations
+- ✅ Made `resolveResources()` async to support git fetching
+- ✅ Integrated git fetching into resource-resolver.ts:
+  - Automatically fetches git repositories when git URLs are encountered
+  - Recursively finds markdown files in fetched repositories
+  - Respects subpath specifications in git URLs
+  - Adds fetched files to the file map for processing
+- ✅ Updated CLI to handle async resource resolution
+- ✅ Updated all tests to handle async resolveResources (resource-resolver.test.ts, cli-integration.test.ts)
+- ✅ Created comprehensive test suite in `/home/dex/kustomark-ralph-bash/tests/git-fetcher.test.ts`:
+  - 14 tests covering fetching, caching, error handling, and cache operations
+  - Tests use real GitHub repository (anthropics/anthropic-sdk-typescript)
+  - All network tests have appropriate timeouts (60s-180s)
+- ✅ All 501 tests passing ✓
+- ✅ All linting checks passing (bun check) ✓
+- ✅ Type-safe implementation with proper error handling

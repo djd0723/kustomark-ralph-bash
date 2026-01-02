@@ -380,4 +380,6 @@ export interface ParsedGitUrl {
   ref: string;
   /** Full git clone URL (always HTTPS format) */
   fullUrl: string;
+  /** Clone URL for git operations (same as fullUrl) */
+  cloneUrl: string;
 }

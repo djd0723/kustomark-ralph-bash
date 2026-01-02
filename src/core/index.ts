@@ -93,3 +93,14 @@ export {
 
 // Export git URL parser functions
 export { isGitUrl, parseGitUrl } from "./git-url-parser.js";
+
+// Export git fetcher functions and types
+export {
+  fetchGitRepository,
+  clearGitCache,
+  listGitCache,
+  getDefaultCacheDir,
+  GitFetchError,
+  type GitFetchResult,
+  type GitFetchOptions,
+} from "./git-fetcher.js";

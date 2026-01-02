@@ -120,6 +120,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "main",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -135,6 +136,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "main",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -150,6 +152,7 @@ describe("parseGitUrl", () => {
         path: "docs",
         ref: "main",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -165,6 +168,7 @@ describe("parseGitUrl", () => {
         path: "docs/getting-started",
         ref: "main",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -180,6 +184,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "v18.2.0",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -195,6 +200,7 @@ describe("parseGitUrl", () => {
         path: "docs",
         ref: "v18.2.0",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -211,6 +217,7 @@ describe("parseGitUrl", () => {
         path: "docs",
         ref: "main", // Falls back to default since ref is after //
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -226,6 +233,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "abc1234567890def",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -243,20 +251,36 @@ describe("parseGitUrl", () => {
   });
 
   describe("git::https:// format", () => {
-    // Note: The git::https:// parsing currently has a bug where splitting on '//' breaks
-    // the https:// protocol. These tests document the current (broken) behavior.
-
-    test("returns null for git::https:// URL (known bug with // splitting)", () => {
+    test("parses git::https:// URL correctly", () => {
       const result = parseGitUrl("git::https://github.com/facebook/react.git");
 
-      // TODO: Fix the parser to handle https:// URLs correctly
-      expect(result).toBeNull();
+      expect(result).toEqual({
+        type: "git",
+        protocol: "https",
+        host: "github.com",
+        org: "facebook",
+        repo: "react",
+        path: undefined,
+        ref: "main",
+        fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
+      });
     });
 
-    test("returns null for git::http:// URL (known bug with // splitting)", () => {
+    test("parses git::http:// URL correctly (converts to https)", () => {
       const result = parseGitUrl("git::http://github.com/facebook/react.git");
 
-      expect(result).toBeNull();
+      expect(result).toEqual({
+        type: "git",
+        protocol: "https",
+        host: "github.com",
+        org: "facebook",
+        repo: "react",
+        path: undefined,
+        ref: "main",
+        fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
+      });
     });
   });
 
@@ -273,6 +297,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "main",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -288,6 +313,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "main",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -303,6 +329,7 @@ describe("parseGitUrl", () => {
         path: "docs",
         ref: "main",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -318,6 +345,7 @@ describe("parseGitUrl", () => {
         path: "docs",
         ref: "v18.2.0",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -333,6 +361,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "abc1234",
         fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
       });
     });
 
@@ -356,6 +385,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "main",
         fullUrl: "https://gitlab.com/myorg/myrepo.git",
+        cloneUrl: "https://gitlab.com/myorg/myrepo.git",
       });
     });
 
@@ -524,6 +554,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "main",
         fullUrl: "https://gitlab.com/myorg/myrepo.git",
+        cloneUrl: "https://gitlab.com/myorg/myrepo.git",
       });
     });
 
@@ -539,6 +570,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "main",
         fullUrl: "https://bitbucket.org/company/project.git",
+        cloneUrl: "https://bitbucket.org/company/project.git",
       });
     });
 
@@ -554,6 +586,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "main",
         fullUrl: "https://git.example.com/team/app.git",
+        cloneUrl: "https://git.example.com/team/app.git",
       });
     });
 
@@ -579,6 +612,7 @@ describe("parseGitUrl", () => {
         path: "docs/README.md",
         ref: "v1.28.0",
         fullUrl: "https://github.com/kubernetes/kubernetes.git",
+        cloneUrl: "https://github.com/kubernetes/kubernetes.git",
       });
     });
 
@@ -596,6 +630,7 @@ describe("parseGitUrl", () => {
         path: "examples/blog",
         ref: "abc123def456",
         fullUrl: "https://github.com/vercel/next.js.git",
+        cloneUrl: "https://github.com/vercel/next.js.git",
       });
     });
 
@@ -613,6 +648,7 @@ describe("parseGitUrl", () => {
         path: "extensions/markdown",
         ref: "release/1.80",
         fullUrl: "https://github.com/microsoft/vscode.git",
+        cloneUrl: "https://github.com/microsoft/vscode.git",
       });
     });
 
@@ -628,6 +664,7 @@ describe("parseGitUrl", () => {
         path: undefined,
         ref: "main",
         fullUrl: "https://github.com/torvalds/linux.git",
+        cloneUrl: "https://github.com/torvalds/linux.git",
       });
     });
   });
