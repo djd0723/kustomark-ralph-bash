@@ -6,7 +6,9 @@
  */
 
 import {
+  type Dirent,
   existsSync,
+  watch as fsWatch,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -36,6 +38,7 @@ import type {
   ValidationResult,
 } from "../core/types.js";
 import { runValidators } from "../core/validators.js";
+import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
 
 // ============================================================================
 // Types
@@ -48,9 +51,25 @@ interface CLIOptions {
   verbosity: number; // 0=quiet, 1=normal, 2=-v, 3=-vv, 4=-vvv
   update: boolean;
   noLock: boolean;
+  stats: boolean;
   file?: string; // For explain --file option
   base?: string; // For init --base option
   output?: string; // For init --output option
+  debounce?: number; // For watch --debounce option (in milliseconds)
+}
+
+interface BuildStats {
+  duration: number; // Duration in milliseconds
+  files: {
+    processed: number;
+    written: number;
+  };
+  patches: {
+    applied: number;
+    skipped: number;
+  };
+  bytes: number; // Total bytes written
+  byOperation: Record<string, number>; // Count by operation type
 }
 
 interface BuildResult {
@@ -59,6 +78,7 @@ interface BuildResult {
   patchesApplied: number;
   warnings: string[];
   validationErrors: ValidationError[];
+  stats?: BuildStats; // Optional stats when --stats flag is used
 }
 
 interface DiffResult {
@@ -106,6 +126,28 @@ interface InitResult {
   type: "base" | "overlay";
 }
 
+interface WatchEvent {
+  event: "build";
+  success: boolean;
+  filesWritten?: number;
+  error?: string;
+  timestamp: string;
+}
+
+interface LintIssue {
+  level: "error" | "warning" | "info";
+  line?: number;
+  message: string;
+  patchIndex?: number;
+}
+
+interface LintResult {
+  issues: LintIssue[];
+  errorCount: number;
+  warningCount: number;
+  infoCount: number;
+}
+
 // ============================================================================
 // Argument Parsing
 // ============================================================================
@@ -120,9 +162,11 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     verbosity: 1,
     update: false,
     noLock: false,
+    stats: false,
     file: undefined,
     base: undefined,
     output: undefined,
+    debounce: undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -155,6 +199,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.clean = true;
     } else if (arg === "--strict") {
       options.strict = true;
+    } else if (arg === "--stats") {
+      options.stats = true;
     } else if (arg === "--update") {
       options.update = true;
     } else if (arg === "--no-lock") {
@@ -194,6 +240,17 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       }
     } else if (arg === "-q") {
       options.verbosity = 0;
+    } else if (arg === "--debounce" || arg.startsWith("--debounce=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.debounce = Number.parseInt(value, 10);
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.debounce = Number.parseInt(nextArg, 10);
+          i++;
+        }
+      }
     } else if (arg === "-vvv") {
       options.verbosity = 4;
     } else if (arg === "-vv") {
@@ -280,13 +337,17 @@ function applyPatches(
 ): {
   resources: Map<string, string>;
   patchesApplied: number;
+  patchesSkipped: number;
   warnings: string[];
   validationErrors: ValidationError[];
+  operationCounts: Record<string, number>;
 } {
   const patchedResources = new Map<string, string>();
   let totalPatchesApplied = 0;
+  let totalPatchesSkipped = 0;
   const allWarnings: string[] = [];
   const allValidationErrors: ValidationError[] = [];
+  const operationCounts: Record<string, number> = {};
 
   // Apply patches to each file
   for (const [filePath, content] of resources.entries()) {
@@ -303,6 +364,17 @@ function applyPatches(
     const result = coreApplyPatches(content, applicablePatches, onNoMatch);
     patchedResources.set(filePath, result.content);
     totalPatchesApplied += result.applied;
+
+    // Track skipped patches (patches that didn't match)
+    const skipped = applicablePatches.length - result.applied;
+    totalPatchesSkipped += skipped;
+
+    // Count patches by operation type
+    for (const patch of applicablePatches) {
+      const opType = patch.op;
+      operationCounts[opType] = (operationCounts[opType] || 0) + 1;
+    }
+
     allWarnings.push(...result.warnings);
 
     // Collect validation errors from per-patch validation
@@ -317,8 +389,10 @@ function applyPatches(
   return {
     resources: patchedResources,
     patchesApplied: totalPatchesApplied,
+    patchesSkipped: totalPatchesSkipped,
     warnings: allWarnings,
     validationErrors: allValidationErrors,
+    operationCounts,
   };
 }
 
@@ -414,7 +488,13 @@ function buildCompleteFileMap(basePath: string): Map<string, string> {
       return;
     }
 
-    const entries = readdirSync(dir, { withFileTypes: true });
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch (error) {
+      // Skip directories we can't read (permission denied, etc.)
+      return;
+    }
 
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
@@ -866,13 +946,18 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       lockEntries,
     );
 
+    // Track build start time for stats
+    const startTime = options.stats ? performance.now() : 0;
+
     // Apply patches
     log("Applying patches...", 2, options);
     const {
       resources: patchedResources,
       patchesApplied,
+      patchesSkipped,
       warnings,
       validationErrors: patchValidationErrors,
+      operationCounts,
     } = applyPatches(resources, config.patches || [], config.onNoMatch || "warn");
 
     // Collect all validation errors (from patches and global validators)
@@ -897,6 +982,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
 
     const sourceFiles = new Set<string>();
     let filesWritten = 0;
+    let totalBytes = 0;
 
     for (const [filePath, content] of patchedResources.entries()) {
       const outputPath = join(outputDir, filePath);
@@ -905,6 +991,11 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       mkdirSync(dirname(outputPath), { recursive: true });
       writeFileSync(outputPath, content, "utf-8");
       filesWritten++;
+
+      // Track bytes written for stats
+      if (options.stats) {
+        totalBytes += Buffer.byteLength(content, "utf-8");
+      }
 
       log(`  Wrote ${filePath}`, 3, options);
     }
@@ -927,6 +1018,27 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       log("Lock file saved", 2, options);
     }
 
+    // Calculate stats if requested
+    let stats: BuildStats | undefined;
+    if (options.stats) {
+      const endTime = performance.now();
+      const duration = Math.round(endTime - startTime);
+
+      stats = {
+        duration,
+        files: {
+          processed: resources.size,
+          written: filesWritten,
+        },
+        patches: {
+          applied: patchesApplied,
+          skipped: patchesSkipped,
+        },
+        bytes: totalBytes,
+        byOperation: operationCounts,
+      };
+    }
+
     // Output results
     const result: BuildResult = {
       success: true,
@@ -934,6 +1046,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       patchesApplied,
       warnings,
       validationErrors: allValidationErrors,
+      stats,
     };
 
     if (options.format === "json") {
@@ -954,6 +1067,23 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
             const validator = error.validator ? `[${error.validator}]` : "";
             const field = error.field ? `(${error.field})` : "";
             console.error(`  Error in ${location}${validator}${field}: ${error.message}`);
+          }
+        }
+      }
+
+      // Output stats summary in text mode
+      if (options.stats && stats) {
+        console.log("\nBuild Statistics:");
+        console.log(`  Duration: ${stats.duration}ms`);
+        console.log(`  Files processed: ${stats.files.processed}`);
+        console.log(`  Files written: ${stats.files.written}`);
+        console.log(`  Patches applied: ${stats.patches.applied}`);
+        console.log(`  Patches skipped: ${stats.patches.skipped}`);
+        console.log(`  Total bytes: ${stats.bytes}`);
+        if (Object.keys(stats.byOperation).length > 0) {
+          console.log("  By operation:");
+          for (const [op, count] of Object.entries(stats.byOperation)) {
+            console.log(`    ${op}: ${count}`);
           }
         }
       }
@@ -1351,6 +1481,553 @@ function schemaCommand(_options: CLIOptions): number {
   }
 }
 
+async function lintCommand(path: string, options: CLIOptions): Promise<number> {
+  try {
+    const inputPath = resolve(path);
+
+    // Determine the actual config file path
+    let configPath = inputPath;
+    if (existsSync(inputPath) && statSync(inputPath).isDirectory()) {
+      configPath = join(inputPath, "kustomark.yaml");
+    }
+
+    const basePath = dirname(configPath);
+
+    log(`Loading config from ${configPath}...`, 2, options);
+    const config = readKustomarkConfig(inputPath);
+
+    // Validate config first
+    const validation = validateConfig(config, { requireOutput: false });
+    if (!validation.valid) {
+      if (options.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              issues: validation.errors.map((e) => ({
+                level: "error",
+                message: `${e.field}: ${e.message}`,
+              })),
+              errorCount: validation.errors.length,
+              warningCount: 0,
+              infoCount: 0,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        console.error("Error: Invalid configuration");
+        for (const error of validation.errors) {
+          console.error(`  ${error.field}: ${error.message}`);
+        }
+      }
+      return 1;
+    }
+
+    // Load lock file
+    let lockFile: LockFile | null = null;
+    const lockEntries: LockFileEntry[] = [];
+
+    if (!options.noLock) {
+      log("Loading lock file...", 3, options);
+      lockFile = loadLockFile(configPath);
+    }
+
+    // Resolve resources
+    log("Resolving resources...", 2, options);
+    const resources = await resolveResources(
+      config,
+      basePath,
+      lockFile,
+      options.update,
+      lockEntries,
+    );
+
+    log(`Resolved ${resources.size} resource(s)`, 3, options);
+
+    // Run lint analysis
+    const issues: LintIssue[] = [];
+
+    if (config.patches && config.patches.length > 0) {
+      // Track which patches match files
+      const patchMatchCounts = new Map<number, number>();
+
+      // Track patches for redundancy and overlap detection
+      const patchDetails = new Map<
+        number,
+        {
+          files: Set<string>;
+          patch: PatchOperation;
+        }
+      >();
+
+      // Analyze each patch
+      for (let i = 0; i < config.patches.length; i++) {
+        const patch = config.patches[i];
+        if (!patch) continue;
+
+        let matchCount = 0;
+        const matchedFiles = new Set<string>();
+
+        // Check which files this patch applies to
+        for (const [filePath] of resources.entries()) {
+          if (shouldApplyPatch(patch, filePath)) {
+            matchCount++;
+            matchedFiles.add(filePath);
+          }
+        }
+
+        patchMatchCounts.set(i, matchCount);
+        patchDetails.set(i, { files: matchedFiles, patch });
+
+        // Check 1: Unreachable patches (patterns match nothing)
+        if (matchCount === 0) {
+          const hasInclude = patch.include !== undefined;
+          const hasExclude = patch.exclude !== undefined;
+
+          if (hasInclude || hasExclude) {
+            // This patch has include/exclude patterns but matches nothing
+            issues.push({
+              level: "warning",
+              patchIndex: i,
+              message: `Patch #${i + 1} (${patch.op}) matches 0 files - check include/exclude patterns`,
+            });
+          }
+        }
+      }
+
+      // Check 2: Redundant patches (same operation applied twice)
+      for (let i = 0; i < config.patches.length; i++) {
+        const patch1 = config.patches[i];
+        if (!patch1) continue;
+
+        for (let j = i + 1; j < config.patches.length; j++) {
+          const patch2 = config.patches[j];
+          if (!patch2) continue;
+
+          // Check if patches are redundant
+          if (areRedundantPatches(patch1, patch2)) {
+            const details1 = patchDetails.get(i);
+            const details2 = patchDetails.get(j);
+
+            // Check if they apply to the same files
+            if (details1 && details2) {
+              const overlap = new Set([...details1.files].filter((f) => details2.files.has(f)));
+
+              if (overlap.size > 0) {
+                issues.push({
+                  level: "warning",
+                  patchIndex: j,
+                  message: `Patch #${j + 1} (${patch2.op}) is redundant with patch #${i + 1} - same operation applied to ${overlap.size} file(s)`,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Check 3: Overlapping patches (multiple patches operating on same content)
+      for (let i = 0; i < config.patches.length; i++) {
+        const patch1 = config.patches[i];
+        if (!patch1) continue;
+
+        for (let j = i + 1; j < config.patches.length; j++) {
+          const patch2 = config.patches[j];
+          if (!patch2) continue;
+
+          // Check if patches overlap (operate on the same target)
+          if (areOverlappingPatches(patch1, patch2)) {
+            const details1 = patchDetails.get(i);
+            const details2 = patchDetails.get(j);
+
+            // Check if they apply to the same files
+            if (details1 && details2) {
+              const overlap = new Set([...details1.files].filter((f) => details2.files.has(f)));
+
+              if (overlap.size > 0) {
+                issues.push({
+                  level: "info",
+                  patchIndex: j,
+                  message: `Patch #${j + 1} (${patch2.op}) may overlap with patch #${i + 1} (${patch1.op}) on ${overlap.size} file(s) - review order and targets`,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Count issues by level
+    const errorCount = issues.filter((i) => i.level === "error").length;
+    const warningCount = issues.filter((i) => i.level === "warning").length;
+    const infoCount = issues.filter((i) => i.level === "info").length;
+
+    // In strict mode, warnings become errors
+    const effectiveErrorCount = options.strict ? errorCount + warningCount : errorCount;
+
+    const result: LintResult = {
+      issues,
+      errorCount,
+      warningCount,
+      infoCount,
+    };
+
+    // Output results
+    if (options.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      if (issues.length === 0) {
+        if (options.verbosity > 0) {
+          console.log("No issues found");
+        }
+      } else {
+        console.log(`Found ${issues.length} issue(s):\n`);
+
+        for (const issue of issues) {
+          const levelStr =
+            options.strict && issue.level === "warning" ? "ERROR" : issue.level.toUpperCase();
+          const patchInfo =
+            issue.patchIndex !== undefined ? ` [patch #${issue.patchIndex + 1}]` : "";
+          const lineInfo = issue.line !== undefined ? `:${issue.line}` : "";
+
+          console.log(`${levelStr}${lineInfo}${patchInfo}: ${issue.message}`);
+        }
+
+        console.log("");
+        console.log(
+          `Summary: ${errorCount} error(s), ${warningCount} warning(s), ${infoCount} info`,
+        );
+
+        if (options.strict && warningCount > 0) {
+          console.log("(warnings treated as errors in strict mode)");
+        }
+      }
+    }
+
+    // Exit codes: 0=no errors, 1=has errors (warnings don't fail by default unless --strict)
+    return effectiveErrorCount > 0 ? 1 : 0;
+  } catch (error) {
+    if (options.format === "json") {
+      console.log(
+        JSON.stringify(
+          {
+            issues: [
+              {
+                level: "error",
+                message: error instanceof Error ? error.message : String(error),
+              },
+            ],
+            errorCount: 1,
+            warningCount: 0,
+            infoCount: 0,
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return 1;
+  }
+}
+
+async function watchCommand(path: string, options: CLIOptions): Promise<number> {
+  try {
+    const inputPath = resolve(path);
+
+    // Determine the actual config file path
+    let configPath = inputPath;
+    if (existsSync(inputPath) && statSync(inputPath).isDirectory()) {
+      configPath = join(inputPath, "kustomark.yaml");
+    }
+
+    const basePath = dirname(configPath);
+
+    // Default debounce to 300ms if not specified
+    const debounceMs = options.debounce ?? 300;
+
+    log(`Starting watch mode for ${configPath}`, 2, options);
+    log(`Debounce: ${debounceMs}ms`, 3, options);
+
+    // Perform initial build
+    log("Performing initial build...", 2, options);
+    await performWatchBuild(inputPath, options, basePath);
+
+    // Set up file watching
+    const watchedPaths = new Set<string>();
+    const watchers: Array<ReturnType<typeof fsWatch>> = [];
+    let debounceTimer: Timer | null = null;
+
+    // Helper to add a path to watch
+    const addWatch = (watchPath: string): void => {
+      if (watchedPaths.has(watchPath)) {
+        return;
+      }
+
+      try {
+        const watcher = fsWatch(watchPath, { recursive: false }, (_eventType, _filename) => {
+          // Debounce file changes
+          if (debounceTimer) {
+            clearTimeout(debounceTimer);
+          }
+
+          debounceTimer = setTimeout(() => {
+            log("File change detected, rebuilding...", 2, options);
+            performWatchBuild(inputPath, options, basePath).catch((error) => {
+              log(
+                `Error during rebuild: ${error instanceof Error ? error.message : String(error)}`,
+                1,
+                options,
+              );
+            });
+          }, debounceMs);
+        });
+
+        watchers.push(watcher);
+        watchedPaths.add(watchPath);
+        log(`Watching: ${watchPath}`, 3, options);
+      } catch (error) {
+        log(
+          `Failed to watch ${watchPath}: ${error instanceof Error ? error.message : String(error)}`,
+          3,
+          options,
+        );
+      }
+    };
+
+    // Watch the config file itself
+    addWatch(configPath);
+
+    // Discover and watch all resource files and referenced configs
+    const discoverFilesToWatch = async (): Promise<void> => {
+      try {
+        const config = readKustomarkConfig(inputPath);
+        const fileMap = buildCompleteFileMap(basePath);
+
+        // Resolve resources to discover all files
+        const lockFile = options.noLock ? null : loadLockFile(configPath);
+        const resources = await resolveResources(config, basePath, lockFile, false);
+
+        // Watch all resolved resource files
+        for (const [filePath] of resources.entries()) {
+          const absolutePath = resolve(basePath, filePath);
+          const parentDir = dirname(absolutePath);
+
+          // Watch the parent directory (to catch file changes, additions, deletions)
+          addWatch(parentDir);
+        }
+
+        // Watch base configs if this is an overlay
+        if (config.resources && config.resources.length > 0) {
+          for (const resource of config.resources) {
+            if (isDirectoryReference(resource)) {
+              const resolvedDir = resolvePathFromBase(resource, basePath);
+              const baseConfigPath = findKustomarkConfigHelper(resolvedDir, fileMap);
+
+              if (baseConfigPath) {
+                addWatch(baseConfigPath);
+                addWatch(dirname(baseConfigPath));
+              }
+            }
+          }
+        }
+      } catch (error) {
+        log(
+          `Failed to discover files to watch: ${error instanceof Error ? error.message : String(error)}`,
+          2,
+          options,
+        );
+      }
+    };
+
+    await discoverFilesToWatch();
+
+    // Handle graceful shutdown
+    let isShuttingDown = false;
+
+    const cleanup = (): void => {
+      if (isShuttingDown) {
+        return;
+      }
+      isShuttingDown = true;
+
+      log("\nShutting down watch mode...", 2, options);
+
+      // Clear debounce timer
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+
+      // Close all watchers
+      for (const watcher of watchers) {
+        watcher.close();
+      }
+
+      log("Watch mode stopped", 2, options);
+      process.exit(0);
+    };
+
+    // Register signal handlers
+    process.on("SIGINT", cleanup);
+    process.on("SIGTERM", cleanup);
+
+    log("Watching for changes... (press Ctrl+C to stop)", 1, options);
+
+    // Keep the process running
+    await new Promise(() => {
+      // This promise never resolves, keeping the process alive
+    });
+
+    return 0;
+  } catch (error) {
+    if (options.format === "json") {
+      const event: WatchEvent = {
+        event: "build",
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+      };
+      console.log(JSON.stringify(event));
+    } else {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return 1;
+  }
+}
+
+/**
+ * Perform a build for watch mode and output results according to format
+ */
+async function performWatchBuild(
+  inputPath: string,
+  options: CLIOptions,
+  basePath: string,
+): Promise<void> {
+  try {
+    log("Loading config...", 3, options);
+    const config = readKustomarkConfig(inputPath);
+
+    // Validate config
+    const validation = validateConfig(config, { requireOutput: true });
+    if (!validation.valid) {
+      throw new Error(
+        `Invalid configuration: ${validation.errors.map((e) => e.message).join(", ")}`,
+      );
+    }
+
+    // Load lock file
+    let lockFile: LockFile | null = null;
+    const lockEntries: LockFileEntry[] = [];
+
+    if (!options.noLock) {
+      log("Loading lock file...", 3, options);
+      lockFile = loadLockFile(resolve(basePath, "kustomark.yaml"));
+    }
+
+    // Resolve resources
+    log("Resolving resources...", 3, options);
+    const resources = await resolveResources(
+      config,
+      basePath,
+      lockFile,
+      options.update,
+      lockEntries,
+    );
+
+    // Apply patches
+    log("Applying patches...", 3, options);
+    const {
+      resources: patchedResources,
+      patchesApplied,
+      warnings,
+      validationErrors: patchValidationErrors,
+    } = applyPatches(resources, config.patches || [], config.onNoMatch || "warn");
+
+    // Collect all validation errors (from patches and global validators)
+    const allValidationErrors: ValidationError[] = [...patchValidationErrors];
+
+    // Run global validators on each patched file
+    if (config.validators && config.validators.length > 0) {
+      for (const [filePath, content] of patchedResources.entries()) {
+        const errors = runValidators(content, config.validators);
+        for (const error of errors) {
+          allValidationErrors.push({
+            ...error,
+            file: filePath,
+          });
+        }
+      }
+    }
+
+    // Check for validation errors
+    if (allValidationErrors.length > 0) {
+      const errorMessages = allValidationErrors
+        .map((e) => `${e.file || "unknown"}: ${e.message}`)
+        .join(", ");
+      throw new Error(`Validation failed: ${errorMessages}`);
+    }
+
+    // Write output files
+    const outputDir = resolve(basePath, config.output ?? ".");
+    mkdirSync(outputDir, { recursive: true });
+
+    const sourceFiles = new Set<string>();
+    let filesWritten = 0;
+
+    for (const [filePath, content] of patchedResources.entries()) {
+      const outputPath = join(outputDir, filePath);
+      sourceFiles.add(filePath);
+
+      mkdirSync(dirname(outputPath), { recursive: true });
+      writeFileSync(outputPath, content, "utf-8");
+      filesWritten++;
+
+      log(`  Wrote ${filePath}`, 4, options);
+    }
+
+    // Clean if requested
+    if (options.clean) {
+      log("Cleaning output directory...", 3, options);
+      const removed = cleanOutputDir(outputDir, sourceFiles);
+      log(`  Removed ${removed} files`, 3, options);
+    }
+
+    // Output results
+    if (options.format === "json") {
+      const event: WatchEvent = {
+        event: "build",
+        success: true,
+        filesWritten,
+        timestamp: new Date().toISOString(),
+      };
+      console.log(JSON.stringify(event));
+    } else {
+      log(
+        `Build complete: ${filesWritten} file(s) written, ${patchesApplied} patch(es) applied`,
+        1,
+        options,
+      );
+      if (warnings.length > 0) {
+        log(`Warnings: ${warnings.join(", ")}`, 2, options);
+      }
+    }
+  } catch (error) {
+    if (options.format === "json") {
+      const event: WatchEvent = {
+        event: "build",
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+      };
+      console.log(JSON.stringify(event));
+    } else {
+      log(`Build failed: ${error instanceof Error ? error.message : String(error)}`, 1, options);
+    }
+    throw error;
+  }
+}
+
 // Future: Implement fetch command for M3 remote sources
 // @ts-expect-error Reserved for future implementation
 async function _fetchCommand(_path: string, options: CLIOptions): Promise<number> {
@@ -1482,12 +2159,18 @@ Usage:
   kustomark build [path]      Build and write output
   kustomark diff [path]       Show what would change
   kustomark validate [path]   Validate configuration
+  kustomark watch [path]      Watch and rebuild on file changes
+  kustomark lint [path]       Check for common issues in config
   kustomark explain [path]    Show resolution chain and patch details
   kustomark schema            Export JSON Schema for editor integration
   kustomark init [path]       Create a new kustomark.yaml config
 
 Explain Flags:
   --file <filename>           Show lineage for specific file
+  --format <text|json>        Output format (default: text)
+
+Watch Flags:
+  --debounce <ms>             Debounce delay in milliseconds (default: 300)
   --format <text|json>        Output format (default: text)
 
 Init Flags:
@@ -1498,6 +2181,7 @@ Flags:
   --format <text|json>        Output format (default: text)
   --clean                     Remove output files not in source
   --strict                    Enable strict validation (validate command)
+  --stats                     Show build statistics (build command)
   -v, -vv, -vvv              Increase verbosity
   -q                         Quiet mode (errors only)
 
@@ -1526,6 +2210,10 @@ Exit Codes:
       return await diffCommand(path, options);
     case "validate":
       return await validateCommand(path, options);
+    case "watch":
+      return await watchCommand(path, options);
+    case "lint":
+      return await lintCommand(path, options);
     case "explain":
       return await explainCommand(path, options);
     case "schema":

@@ -184,20 +184,27 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ File lineage with --file flag
    - ✅ JSON output format support
 
-4. **[TODO] Lint Command** ⏳
-   - Check for unreachable patches
-   - Check for redundant patches
-   - Check for overlapping patches
-   - Support --strict flag
+4. **[DONE] Lint Command** ✅
+   - ✅ Check for unreachable patches (patterns matching 0 files)
+   - ✅ Check for redundant patches (same operation twice)
+   - ✅ Check for overlapping patches (multiple patches on same content)
+   - ✅ Support --strict flag (warnings become errors)
+   - ✅ JSON and text output formats
+   - ✅ Proper exit codes (0=no errors, 1=has errors)
 
-5. **[TODO] Watch Mode** ⏳
-   - Rebuild on file changes
-   - Support --debounce flag
-   - Newline-delimited JSON events
+5. **[DONE] Watch Mode** ✅
+   - ✅ Rebuild on file changes
+   - ✅ Support --debounce flag (default: 300ms)
+   - ✅ Newline-delimited JSON events
+   - ✅ Watches config, resources, and referenced configs
+   - ✅ Graceful SIGINT/SIGTERM handling
+   - ✅ Progress to stderr, results to stdout
 
-6. **[TODO] Stats Feature** ⏳
-   - Build statistics with --stats flag
-   - Performance profiling data
+6. **[DONE] Stats Feature** ✅
+   - ✅ Build statistics with --stats flag
+   - ✅ Performance profiling data (duration, files, patches, bytes)
+   - ✅ Operation breakdown (count by patch type)
+   - ✅ JSON and text output formats
 
 ## Current Status
 
@@ -330,17 +337,17 @@ This document tracks the implementation of kustomark based on the spec milestone
   - HTTP archive fetching with caching: DONE ✅
   - Caching system: DONE ✅
   - Lock file generation: DONE ✅
-- **M4 IN PROGRESS! ⏳**
+- **M4 COMPLETE! ✅**
   - Init command: DONE ✅
   - Schema command: DONE ✅
   - Explain command: DONE ✅
-  - Lint command: TODO ⏳
-  - Watch mode: TODO ⏳
-  - Stats feature: TODO ⏳
+  - Lint command: DONE ✅
+  - Watch mode: DONE ✅
+  - Stats feature: DONE ✅
 - **Issue #1 FIXED! ✅**
   - Directory structure preservation implemented and tested
 
-**Next Priority:** M4 remaining features (lint, watch, stats)
+**Next Priority:** Any remaining features from out-of-scope or future work
 
 **2026-01-02 (M3 Git Repository Fetching):**
 - ✅ Created `/home/dex/kustomark-ralph-bash/src/core/git-fetcher.ts` with complete git operations:
@@ -484,3 +491,30 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ All 676 tests passing (14 new tests: 1 init, 14 schema, note explain doesn't have separate tests yet) ✓
 - ✅ All linting checks passing (bun check) ✓
 - ✅ All commands are non-interactive with explicit flags as per spec
+
+**2026-01-02 (M4 Developer Experience - Lint, Watch, Stats - COMPLETE!):**
+- ✅ Implemented `kustomark lint` command for checking common issues
+  - Detects unreachable patches (patterns matching 0 files)
+  - Detects redundant patches (same operation applied twice)
+  - Detects overlapping patches (multiple patches on same content)
+  - `--strict` flag treats warnings as errors
+  - JSON and text output formats
+  - Proper exit codes (0=no errors, 1=has errors)
+  - Created `/home/dex/kustomark-ralph-bash/src/cli/lint-command.ts` helper module
+- ✅ Implemented `kustomark watch` command for auto-rebuilding
+  - Watches config file, resources, and referenced configs
+  - `--debounce <ms>` flag to control rebuild delay (default: 300ms)
+  - Newline-delimited JSON events with `--format=json`
+  - Graceful SIGINT/SIGTERM handling with watcher cleanup
+  - Progress to stderr, results to stdout (spec-compliant)
+  - 5 comprehensive tests in tests/cli/watch.test.ts
+- ✅ Implemented `--stats` flag for build command
+  - Tracks build duration, files processed/written, patches applied/skipped
+  - Counts operations by type (replace, remove-section, etc.)
+  - Tracks total bytes written
+  - JSON output matches M4 spec format exactly
+  - Text output shows readable summary
+  - 8 comprehensive tests in tests/cli/stats.test.ts
+- ✅ All 689 tests passing (13 new tests: 5 watch, 8 stats) ✓
+- ✅ All linting checks passing (bun check) ✓
+- ✅ M4 Developer Experience milestone COMPLETE! ✅
