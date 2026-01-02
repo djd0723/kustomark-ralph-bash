@@ -2001,9 +2001,11 @@ ${formatSection("SHOW OPTIONS")}
   ${formatFlag("--format")} <text|json> Output format (default: text)
 
 ${formatSection("APPLY OPTIONS")}
+  ${formatFlag("-i, --interactive")}      Enable interactive prompts for missing variables
+  ${formatFlag("--var")} <KEY=VALUE>       Provide template variable (can be repeated)
   ${formatFlag("--output")} <path>         Output directory (default: current directory)
-  ${formatFlag("--values")} <json|file>    Variable values as JSON or path to values file
-  ${formatFlag("--skip-post-apply")}      Skip post-apply commands
+  ${formatFlag("--dry-run")}              Preview without creating files
+  ${formatFlag("--overwrite")}            Replace existing files
   ${formatFlag("--format")} <text|json>    Output format (default: text)
 
 ${formatSection("INIT OPTIONS")}
@@ -2021,20 +2023,26 @@ ${formatSection("EXAMPLES")}
   ${formatExample("# Show detailed information about a template")}
   ${formatCommand("kustomark template show upstream-fork")}
 
-  ${formatExample("# Apply a template with default values")}
+  ${formatExample("# Interactive mode - prompts for all variables")}
   ${formatCommand("kustomark template apply upstream-fork")}
 
-  ${formatExample("# Apply template with custom values (inline JSON)")}
-  ${formatCommand('kustomark template apply upstream-fork --values=\'{"project_name":"my-docs","upstream_url":"https://github.com/org/repo"}\'')}
+  ${formatExample("# Interactive mode with some pre-filled variables")}
+  ${formatCommand("kustomark template apply upstream-fork --var project_name=my-docs")}
 
-  ${formatExample("# Apply template with values from file")}
-  ${formatCommand("kustomark template apply upstream-fork --values=values.yaml")}
+  ${formatExample("# Explicit interactive mode")}
+  ${formatCommand("kustomark template apply upstream-fork --interactive")}
+
+  ${formatExample("# Non-interactive mode - provide all variables")}
+  ${formatCommand("kustomark template apply upstream-fork --var project_name=my-docs --var upstream_url=https://github.com/org/repo")}
 
   ${formatExample("# Apply template to specific directory")}
   ${formatCommand("kustomark template apply skills --output=./my-skills/")}
 
-  ${formatExample("# Apply template and skip post-apply hooks")}
-  ${formatCommand("kustomark template apply documentation --skip-post-apply")}
+  ${formatExample("# Dry run - preview without creating files")}
+  ${formatCommand("kustomark template apply upstream-fork --dry-run --var project_name=test --var upstream_url=https://example.com")}
+
+  ${formatExample("# Overwrite existing files")}
+  ${formatCommand("kustomark template apply documentation --overwrite --var project_name=docs")}
 
   ${formatExample("# Get template list as JSON")}
   ${formatCommand("kustomark template list --format=json")}
@@ -2044,6 +2052,29 @@ ${formatSection("EXAMPLES")}
 
   ${formatExample("# Create a template with defaults (non-interactive)")}
   ${formatCommand("kustomark template init my-template --non-interactive")}
+
+${formatSection("INTERACTIVE MODE BEHAVIOR")}
+  ${formatHighlight("Auto-interactive mode:")}
+    When running ${formatCommand("kustomark template apply")} without ${formatFlag("--var")} flags
+    and format is ${formatFlag("text")}, interactive mode is automatically enabled.
+    You'll be prompted for any required variables.
+
+  ${formatHighlight("Explicit interactive mode:")}
+    Use ${formatFlag("--interactive")} to enable prompts even when some variables
+    are provided via ${formatFlag("--var")} flags. This allows you to mix
+    command-line arguments with interactive input.
+
+  ${formatHighlight("Non-interactive mode:")}
+    Interactive mode is disabled when:
+    - ${formatFlag("--format=json")} is used (for automation compatibility)
+    - All required variables are provided via ${formatFlag("--var")} flags
+    - This ensures templates work in CI/CD pipelines
+
+  ${formatHighlight("User experience:")}
+    - Interactive prompts show which variables are already provided
+    - Input validation ensures required variables aren't left empty
+    - Graceful cancellation with Ctrl+C exits without error
+    - Helpful error messages guide you to use ${formatFlag("--var")} or ${formatFlag("--interactive")}
 
 ${formatSection("TEMPLATE CATEGORIES")}
   ${formatHighlight("upstream-fork:")}

@@ -5,6 +5,7 @@
 
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import * as clack from "@clack/prompts";
 import type { TemplateVariables } from "../core/templates/applier.js";
 import { TemplateApplier, TemplateManager } from "../core/templates/index.js";
 
@@ -19,6 +20,7 @@ export interface TemplateCommandOptions {
   var?: Record<string, string>; // For apply --var key=value
   dryRun?: boolean; // For apply --dry-run
   overwrite?: boolean; // For apply --overwrite
+  interactive?: boolean; // For apply --interactive
 }
 
 export interface TemplateListResult {
@@ -56,6 +58,75 @@ export interface TemplateApplyResult {
   substitutions: number;
   dryRun: boolean;
   error?: string;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Prompt user for missing template variables interactively
+ * Uses @clack/prompts to provide a user-friendly interactive experience
+ *
+ * @param foundVariables - Array of all variable names found in the template
+ * @param providedVariables - Variables already provided via --var flags
+ * @returns Promise resolving to complete variable map including prompted values
+ */
+async function promptForVariables(
+  foundVariables: string[],
+  providedVariables: TemplateVariables,
+): Promise<TemplateVariables> {
+  // Filter out variables that are already provided
+  const missingVariables = foundVariables.filter((varName) => !(varName in providedVariables));
+
+  // If all variables are provided, no need to prompt
+  if (missingVariables.length === 0) {
+    return providedVariables;
+  }
+
+  // Start interactive prompts
+  clack.intro("Template Variable Configuration");
+
+  // Show which variables were already provided
+  if (Object.keys(providedVariables).length > 0) {
+    const providedList = Object.entries(providedVariables)
+      .map(([key, value]) => `  ${key} = ${value}`)
+      .join("\n");
+    clack.note(`Already provided:\n${providedList}`, "Provided Variables");
+  }
+
+  // Build the complete variables object starting with provided ones
+  const allVariables: TemplateVariables = { ...providedVariables };
+
+  try {
+    // Prompt for each missing variable
+    for (const varName of missingVariables) {
+      const value = await clack.text({
+        message: `Value for {{${varName}}}:`,
+        placeholder: `Enter value for ${varName}`,
+        validate: (input) => {
+          if (!input || input.trim() === "") {
+            return `Variable ${varName} is required`;
+          }
+        },
+      });
+
+      // Handle cancellation
+      if (clack.isCancel(value)) {
+        clack.cancel("Template application cancelled");
+        process.exit(0);
+      }
+
+      allVariables[varName] = value as string;
+    }
+
+    clack.outro("Variables configured successfully!");
+    return allVariables;
+  } catch (error) {
+    // Handle any unexpected errors during prompting
+    clack.cancel("An error occurred during variable prompting");
+    throw error;
+  }
 }
 
 // ============================================================================
@@ -231,13 +302,39 @@ export async function templateApply(
     }
 
     // Prepare variables
-    const variables: TemplateVariables = options.var ?? {};
+    let variables: TemplateVariables = options.var ?? {};
 
-    // Validate variables
+    // Validate variables to find what's needed
     const validation = applier.validateVariables(template, variables);
 
-    if (!validation.valid) {
-      // Report missing variables
+    // Determine if we should use interactive mode
+    // Interactive mode is enabled when:
+    // 1. --interactive flag is explicitly set, OR
+    // 2. No --var flags were provided AND format is 'text' (not JSON)
+    const shouldUseInteractive =
+      options.interactive === true ||
+      (Object.keys(variables).length === 0 && options.format === "text");
+
+    // If variables are missing and interactive mode is available, prompt for them
+    if (!validation.valid && shouldUseInteractive) {
+      try {
+        // Prompt for missing variables
+        variables = await promptForVariables(validation.found, variables);
+
+        // Re-validate with the new variables
+        const revalidation = applier.validateVariables(template, variables);
+        if (!revalidation.valid) {
+          // This shouldn't happen if promptForVariables worked correctly,
+          // but handle it just in case
+          console.error("Error: Some variables are still missing after prompting");
+          return 1;
+        }
+      } catch (_error) {
+        // Error during prompting (user cancelled or other error)
+        return 1;
+      }
+    } else if (!validation.valid) {
+      // Non-interactive mode or JSON format - report missing variables as error
       if (options.format === "json") {
         console.log(
           JSON.stringify(
@@ -264,7 +361,7 @@ export async function templateApply(
         for (const missing of validation.missing) {
           console.error(`  - ${missing.variable} (used in ${missing.file})`);
         }
-        console.error("\nProvide variables using --var KEY=VALUE");
+        console.error("\nProvide variables using --var KEY=VALUE or use --interactive");
       }
       return 1;
     }

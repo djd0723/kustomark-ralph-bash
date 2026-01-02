@@ -22,6 +22,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark watch](#kustomark-watch-path)
   - [kustomark suggest](#kustomark-suggest)
   - [kustomark analyze](#kustomark-analyze-path)
+  - [kustomark template](#kustomark-template)
 - [Configuration](#configuration)
 - [Patch Operations](#patch-operations)
 - [Table Operations](#table-operations)
@@ -789,6 +790,180 @@ With `--format=json`, outputs structured data for programmatic analysis:
 - **Documentation:** Generate reports on configuration characteristics
 
 **Exit Code:** Returns 0 on success, 1 on error (e.g., config file not found).
+
+### `kustomark template`
+
+Manage and apply configuration templates. Templates provide starter configurations for common use cases, reducing time-to-first-success for new users.
+
+**Subcommands:**
+
+- `list` - List all available templates
+- `show <template>` - Show detailed information about a template
+- `apply <template> [output-dir]` - Apply a template to create new configuration
+
+#### Template List
+
+List all available templates:
+
+```bash
+# List all templates
+kustomark template list
+
+# List templates in a specific category
+kustomark template list --category=skills
+
+# Get list as JSON
+kustomark template list --format=json
+```
+
+**Options:**
+- `--category <cat>` - Filter by category (upstream-fork, documentation, skills, custom)
+- `--format <text|json>` - Output format (default: text)
+
+#### Template Show
+
+Show detailed information about a specific template:
+
+```bash
+# Show template details
+kustomark template show upstream-fork
+
+# Get details as JSON
+kustomark template show upstream-fork --format=json
+```
+
+**Options:**
+- `--format <text|json>` - Output format (default: text)
+
+#### Template Apply
+
+Apply a template to create new configuration. Supports three modes for providing template variables:
+
+**1. Interactive Mode (Recommended for beginners)**
+
+When you run `template apply` without providing variables, kustomark automatically prompts you for any required values:
+
+```bash
+# Interactive mode - prompts for all variables
+kustomark template apply upstream-fork
+
+# Output:
+# ┌  Template Variable Configuration
+# │
+# ◆  Value for {{project_name}}:
+# │  my-awesome-docs
+# │
+# ◆  Value for {{upstream_url}}:
+# │  https://github.com/vendor/docs
+# │
+# └  Variables configured successfully!
+```
+
+**2. Explicit Interactive Mode**
+
+Use the `--interactive` flag to explicitly enable interactive prompts, even when some variables are provided:
+
+```bash
+# Mix provided variables with interactive prompts
+kustomark template apply upstream-fork --var project_name=my-docs --interactive
+
+# Output:
+# ┌  Template Variable Configuration
+# │
+# ├  Already provided:
+# │  project_name = my-docs
+# │
+# ◆  Value for {{upstream_url}}:
+# │  https://github.com/vendor/docs
+# │
+# └  Variables configured successfully!
+```
+
+**3. Non-Interactive Mode (For automation/scripting)**
+
+Provide all variables via `--var` flags:
+
+```bash
+# Provide all variables via flags
+kustomark template apply upstream-fork \
+  --var project_name=my-docs \
+  --var upstream_url=https://github.com/vendor/docs
+
+# Use with JSON format (disables interactive mode)
+kustomark template apply upstream-fork --format=json \
+  --var project_name=my-docs \
+  --var upstream_url=https://github.com/vendor/docs
+```
+
+**Additional Options:**
+
+```bash
+# Apply to specific output directory
+kustomark template apply skills --output=./my-skills/
+
+# Dry run - preview without creating files
+kustomark template apply upstream-fork --dry-run \
+  --var project_name=test \
+  --var upstream_url=https://example.com
+
+# Overwrite existing files
+kustomark template apply documentation --overwrite \
+  --var project_name=docs
+```
+
+**Options:**
+- `-i, --interactive` - Enable interactive prompts for missing variables
+- `--var KEY=VALUE` - Provide template variable (can be used multiple times)
+- `--output <path>` - Output directory (default: current directory)
+- `--dry-run` - Preview changes without creating files
+- `--overwrite` - Replace existing files
+- `--format <text|json>` - Output format (default: text)
+
+**Interactive Mode Behavior:**
+
+Interactive mode is automatically enabled when:
+1. The `--interactive` flag is explicitly set, OR
+2. No `--var` flags were provided AND format is `text` (not JSON)
+
+Interactive mode is disabled when:
+- `--format=json` is used (for automation compatibility)
+- All required variables are provided via `--var` flags
+
+**Examples:**
+
+```bash
+# Example 1: Full interactive workflow (no flags needed)
+kustomark template apply upstream-fork
+# → Prompts for: project_name, upstream_url, etc.
+
+# Example 2: Partial variables + interactive
+kustomark template apply upstream-fork --var project_name=my-docs
+# → Only prompts for: upstream_url (project_name already provided)
+
+# Example 3: Automation/CI-CD (non-interactive)
+kustomark template apply upstream-fork \
+  --var project_name=automated-docs \
+  --var upstream_url=https://github.com/org/repo \
+  --format=json
+
+# Example 4: Explicit interactive with some pre-filled values
+kustomark template apply skills \
+  --var skill_name=my-skill \
+  --interactive
+# → Shows skill_name as already provided, prompts for remaining variables
+```
+
+**Exit Codes:**
+- `0` - Template applied successfully
+- `1` - Error (template not found, missing variables, file errors)
+
+**Use Cases:**
+
+- **Quick Start**: Apply built-in templates without reading documentation
+- **Consistent Structure**: Ensure all projects follow the same patterns
+- **Team Onboarding**: New team members can get started in seconds
+- **Documentation Pipelines**: Set up documentation builds quickly
+- **Skill Customization**: Create custom Claude Code skills from templates
 
 ## Configuration
 
