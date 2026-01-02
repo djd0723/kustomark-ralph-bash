@@ -106,6 +106,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -172,6 +187,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -235,6 +265,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -295,6 +340,21 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
                 },
                 group: {
                   type: "string",
@@ -357,6 +417,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -418,6 +493,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -478,6 +568,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -534,6 +639,21 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
                 },
                 group: {
                   type: "string",
@@ -596,6 +716,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -652,6 +787,21 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
                 },
                 group: {
                   type: "string",
@@ -718,6 +868,21 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
                 },
                 group: {
                   type: "string",
@@ -789,6 +954,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -849,6 +1029,21 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
                 },
                 group: {
                   type: "string",
@@ -920,6 +1115,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -990,6 +1200,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -1052,6 +1277,21 @@ export function generateSchema(): object {
                     },
                   },
                 },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
                 group: {
                   type: "string",
                   description:
@@ -1112,6 +1352,21 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
                 },
                 group: {
                   type: "string",
@@ -1174,6 +1429,21 @@ export function generateSchema(): object {
                       description: "Validate that the result does not contain this string",
                     },
                   },
+                },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
                 },
                 group: {
                   type: "string",

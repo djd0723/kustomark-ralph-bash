@@ -575,3 +575,59 @@ This document tracks the implementation of kustomark based on the spec milestone
   - `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts` - Fixed validOps list
   - `/home/dex/kustomark-ralph-bash/tests/cli/parallel.test.ts` - Added 7 tests
   - `/home/dex/kustomark-ralph-bash/PARALLEL_BUILDS.md` - Added documentation
+
+**2026-01-02 (Patch Inheritance Feature - Future Work):**
+- ✅ Implemented Patch Inheritance feature (Medium complexity from Future Candidates list):
+  - Added `id?: string` and `extends?: string | string[]` fields to `PatchCommonFields` interface
+  - Created `/home/dex/kustomark-ralph-bash/src/core/patch-inheritance.ts` module with:
+    - `resolveInheritance()` - Resolves all patch inheritance chains before patches are applied
+    - `resolvePatchInheritance()` - Recursively resolves single patch inheritance
+    - `mergePatches()` - Merges parent and child patches with proper field handling
+    - Circular reference detection and error reporting
+  - Added comprehensive validation in config-parser.ts:
+    - `validatePatchIds()` - Validates patch IDs are unique and properly formatted
+    - `validateInheritanceReferences()` - Validates extends references exist and are valid
+    - `detectCircularInheritance()` - Detects circular inheritance using depth-first search
+    - Forward reference prevention (patches can only extend previously defined patches)
+  - Integrated inheritance resolution into patch-engine.ts:
+    - `applyPatches()` now calls `resolveInheritance()` before applying patches
+    - Transparent to existing code - all patches resolved before application
+  - Updated schema.ts to add `id` and `extends` fields to all 18 patch operation schemas
+    - Section operations use `patchId` to avoid collision with section identifier `id` field
+  - Created comprehensive test suite in `/home/dex/kustomark-ralph-bash/tests/core/patch-inheritance.test.ts`:
+    - 36 tests covering basic inheritance, multiple inheritance, deep chains, field merging, error cases
+    - Tests for different operation types, group fields, validation fields, complex scenarios
+  - Added 16 validation tests to config-parser.test.ts:
+    - ID validation (duplicates, empty, invalid characters, non-string)
+    - Extends validation (non-existent IDs, forward references, self-reference)
+    - Circular reference detection (direct, indirect, three-way cycles)
+  - Updated README.md with comprehensive Patch Inheritance documentation:
+    - Basic syntax and examples
+    - Single parent, multiple parent, and deep inheritance examples
+    - Field merging rules (primitives override, arrays concatenate, validate replaces)
+    - Section operations with `patchId` usage
+    - Limitations and best practices
+  - All 764 tests passing ✓
+  - All linting checks passing (bun check) ✓
+
+  **Inheritance features:**
+  - Single and multiple parent inheritance
+  - Deep inheritance chains (unlimited depth)
+  - Field merging: primitives override, arrays concatenate, validate replaces
+  - Circular reference detection with full cycle reporting
+  - Forward reference prevention for deterministic behavior
+  - Compatible with all 18 patch operations
+  - Section operations use `patchId` for inheritance to avoid ID collision
+
+  **Files created:**
+  - `/home/dex/kustomark-ralph-bash/src/core/patch-inheritance.ts` - Core inheritance logic
+  - `/home/dex/kustomark-ralph-bash/tests/core/patch-inheritance.test.ts` - 36 comprehensive tests
+
+  **Files modified:**
+  - `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added id and extends to PatchCommonFields
+  - `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts` - Added validation functions
+  - `/home/dex/kustomark-ralph-bash/src/core/patch-engine.ts` - Integrated inheritance resolution
+  - `/home/dex/kustomark-ralph-bash/src/core/index.ts` - Exported resolveInheritance function
+  - `/home/dex/kustomark-ralph-bash/src/core/schema.ts` - Added id/extends fields to all operations
+  - `/home/dex/kustomark-ralph-bash/tests/config-parser.test.ts` - Added 16 validation tests
+  - `/home/dex/kustomark-ralph-bash/README.md` - Added Patch Inheritance documentation section

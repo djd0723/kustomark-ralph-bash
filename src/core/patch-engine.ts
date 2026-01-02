@@ -10,6 +10,7 @@
  */
 
 import * as yaml from "js-yaml";
+import { resolveInheritance } from "./patch-inheritance.js";
 import type {
   MarkdownSection,
   OnNoMatchStrategy,
@@ -1192,12 +1193,15 @@ export function applyPatches(
   patches: PatchOperation[],
   defaultOnNoMatch: OnNoMatchStrategy = "warn",
 ): PatchResult {
+  // Resolve inheritance before applying patches
+  const resolvedPatches = resolveInheritance(patches);
+
   let currentContent = content;
   let appliedCount = 0;
   const warnings: string[] = [];
   const validationErrors: ValidationError[] = [];
 
-  for (const patch of patches) {
+  for (const patch of resolvedPatches) {
     const result = applySinglePatch(currentContent, patch, defaultOnNoMatch);
     currentContent = result.content;
 

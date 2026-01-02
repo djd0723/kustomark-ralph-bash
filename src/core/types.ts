@@ -19,6 +19,10 @@ export interface PatchValidation {
  * Common fields shared by all patch operations
  */
 export interface PatchCommonFields {
+  /** Unique identifier for this patch (for inheritance) */
+  id?: string;
+  /** Patch ID(s) to extend from (single ID or array of IDs) */
+  extends?: string | string[];
   /** Glob pattern(s) to include specific files */
   include?: string | string[];
   /** Glob pattern(s) to exclude specific files */

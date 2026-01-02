@@ -1785,4 +1785,299 @@ describe('validateConfig', () => {
       expect(result.errors).toHaveLength(0);
     });
   });
+
+  describe('Patch Inheritance Validation', () => {
+    describe('ID Validation', () => {
+      test('accepts valid patch IDs', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'patch-1', op: 'replace', old: 'foo', new: 'bar' },
+            { id: 'patch_2', op: 'replace', old: 'baz', new: 'qux' },
+            { id: 'PatchABC123', op: 'replace', old: 'a', new: 'b' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('rejects duplicate patch IDs', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'duplicate', op: 'replace', old: 'foo', new: 'bar' },
+            { id: 'duplicate', op: 'replace', old: 'baz', new: 'qux' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[1].id',
+            message: expect.stringContaining('duplicate patch id'),
+          })
+        );
+      });
+
+      test('rejects invalid ID characters', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'has spaces', op: 'replace', old: 'foo', new: 'bar' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].id',
+            message: expect.stringContaining('invalid characters'),
+          })
+        );
+      });
+
+      test('rejects empty patch ID', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: '', op: 'replace', old: 'foo', new: 'bar' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].id',
+            message: expect.stringContaining('cannot be empty'),
+          })
+        );
+      });
+
+      test('rejects non-string patch ID', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 123, op: 'replace', old: 'foo', new: 'bar' },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].id',
+            message: expect.stringContaining('must be a string'),
+          })
+        );
+      });
+    });
+
+    describe('Extends Validation', () => {
+      test('accepts valid extends reference', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'base', op: 'replace', old: 'foo', new: 'bar' },
+            { id: 'child', extends: 'base', op: 'replace', old: 'baz', new: 'qux' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('accepts multiple extends as array', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'base1', op: 'replace', old: 'foo', new: 'bar' },
+            { id: 'base2', op: 'replace', old: 'baz', new: 'qux' },
+            { id: 'child', extends: ['base1', 'base2'], op: 'replace', old: 'x', new: 'y' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('rejects extends to non-existent ID', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'child', extends: 'non-existent', op: 'replace', old: 'foo', new: 'bar' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].extends',
+            message: expect.stringContaining('non-existent id'),
+          })
+        );
+      });
+
+      test('rejects forward references', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'child', extends: 'parent', op: 'replace', old: 'foo', new: 'bar' },
+            { id: 'parent', op: 'replace', old: 'baz', new: 'qux' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[0].extends',
+            message: expect.stringContaining('defined later'),
+          })
+        );
+      });
+
+      test('rejects self-reference', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'self', extends: 'self', op: 'replace', old: 'foo', new: 'bar' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        // Can get either "cannot extend itself" or "circular inheritance" error
+        expect(result.errors.length).toBeGreaterThan(0);
+        expect(result.errors.some(e =>
+          e.field === 'patches[0].extends' &&
+          (e.message.includes('cannot extend itself') || e.message.includes('circular'))
+        )).toBe(true);
+      });
+
+      test('rejects non-string extends', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'base', op: 'replace', old: 'foo', new: 'bar' },
+            { id: 'child', extends: 123, op: 'replace' },
+          ],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'patches[1].extends',
+            message: expect.stringContaining('must be a string or array of strings'),
+          })
+        );
+      });
+    });
+
+    describe('Circular Reference Detection', () => {
+      test('detects direct circular reference (two patches)', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'patch-a', extends: 'patch-b', op: 'replace', old: 'foo', new: 'bar' },
+            { id: 'patch-b', extends: 'patch-a', op: 'replace', old: 'baz', new: 'qux' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            message: expect.stringContaining('circular inheritance'),
+          })
+        );
+      });
+
+      test('detects indirect circular reference (three patches)', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'patch-a', extends: 'patch-b', op: 'replace', old: 'foo', new: 'bar' },
+            { id: 'patch-b', extends: 'patch-c', op: 'replace', old: 'baz', new: 'qux' },
+            { id: 'patch-c', extends: 'patch-a', op: 'replace', old: 'x', new: 'y' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({
+            message: expect.stringContaining('circular inheritance'),
+          })
+        );
+      });
+
+      test('allows long non-circular chains', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          patches: [
+            { id: 'level-1', op: 'replace', old: 'a', new: 'b' },
+            { id: 'level-2', extends: 'level-1', op: 'replace', old: 'c', new: 'd' },
+            { id: 'level-3', extends: 'level-2', op: 'replace', old: 'e', new: 'f' },
+            { id: 'level-4', extends: 'level-3', op: 'replace', old: 'g', new: 'h' },
+            { id: 'level-5', extends: 'level-4', op: 'replace', old: 'i', new: 'j' },
+          ],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+    });
+  });
 });

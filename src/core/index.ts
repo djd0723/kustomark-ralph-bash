@@ -135,3 +135,6 @@ export {
 } from "./lock-file.js";
 
 export type { LockFile, LockFileEntry } from "./types.js";
+
+// Export patch inheritance functions
+export { resolveInheritance } from "./patch-inheritance.js";

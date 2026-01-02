@@ -14,6 +14,10 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
 - [Patch Operations](#patch-operations)
 - [Resource Resolution](#resource-resolution)
 - [Advanced Usage](#advanced-usage)
+  - [Patch Groups](#patch-groups)
+  - [Patch Inheritance](#patch-inheritance)
+  - [Error Handling Strategies](#error-handling-strategies)
+  - [Complex Overlay Example](#complex-overlay-example)
 - [Exit Codes](#exit-codes)
 - [JSON Output](#json-output)
 - [Contributing](#contributing)
@@ -618,6 +622,353 @@ kustomark build . --enable-groups=branding --disable-groups=branding
 - `--enable-groups`: whitelist mode (only specified groups + ungrouped)
 - `--disable-groups`: blacklist mode (exclude specified groups)
 - If both flags specified, `--enable-groups` takes precedence
+
+### Patch Inheritance
+
+Patches can extend other patches by ID to promote code reuse. This allows you to build complex patches on top of simpler base patches, reducing duplication and improving maintainability.
+
+#### Overview
+
+Patch inheritance enables you to:
+- Define base patches once and reuse them across multiple derived patches
+- Build inheritance chains for progressive customization
+- Merge fields from parent patches into child patches
+- Keep patches DRY (Don't Repeat Yourself)
+
+#### Basic Syntax
+
+Use the `id` field to name a patch, and the `extends` field to inherit from a parent patch:
+
+```yaml
+patches:
+  # Base patch (no extends)
+  - op: replace
+    id: base-replace
+    old: "old-text"
+    new: "new-text"
+
+  # Derived patch (extends the base)
+  - op: replace
+    id: extended-replace
+    extends: base-replace
+    new: "even-newer-text"  # Overrides the parent's 'new' field
+```
+
+When a patch extends another patch:
+1. All fields from the parent patch are inherited
+2. Fields explicitly defined in the child patch override parent fields
+3. Arrays are concatenated rather than replaced
+4. The `validate` array replaces (not concatenates) the parent's validation rules
+
+#### Single Parent Inheritance
+
+A derived patch inherits all fields from its parent and can override specific fields:
+
+```yaml
+patches:
+  # Base branding patch
+  - op: replace
+    id: base-branding
+    old: "ACME Corp"
+    new: "ACME"
+
+  # Specialized branding patch for specific files
+  - op: replace
+    id: branding-docs
+    extends: base-branding
+    include: "docs/**/*.md"
+    onNoMatch: warn
+```
+
+In this example, `branding-docs` inherits `old`, `new`, and `op` from `base-branding`, while adding its own `include` pattern and `onNoMatch` behavior.
+
+#### Multiple Inheritance (Extends as Array)
+
+A patch can inherit from multiple parent patches:
+
+```yaml
+patches:
+  - op: replace
+    id: base-text
+    old: "old-text"
+    new: "new-text"
+
+  - op: replace
+    id: base-branding
+    old: "ACME Corp"
+    new: "Your Company"
+
+  # Combines fields from both parents
+  - op: replace
+    id: combined-patch
+    extends: [base-text, base-branding]
+    include: "guides/**/*.md"
+```
+
+When using multiple inheritance:
+- Fields are merged in order (first parent's fields, then second parent's, etc.)
+- Later parent fields override earlier parent fields
+- Child patch fields override all parent fields
+- Arrays are concatenated from all parents plus the child
+
+#### Deep Inheritance Chains
+
+Patches can extend patches that themselves extend other patches:
+
+```yaml
+patches:
+  # Level 1: Base patch
+  - op: replace
+    id: level-1
+    old: "v1"
+    new: "v2"
+
+  # Level 2: Extends level 1
+  - op: replace
+    id: level-2
+    extends: level-1
+    old: "v2"  # Override
+    new: "v3"
+
+  # Level 3: Extends level 2
+  - op: replace
+    id: level-3
+    extends: level-2
+    include: "*.md"
+
+  # Level 4: Extends level 3
+  - op: replace
+    id: level-4
+    extends: level-3
+    exclude: "README.md"
+```
+
+The chain resolves from the deepest parent upward, with later definitions overriding earlier ones.
+
+#### Field Merging Rules
+
+Different field types merge differently when inheriting:
+
+**Primitive Fields (strings, numbers, booleans):**
+```yaml
+patches:
+  - op: replace
+    id: parent-patch
+    old: "text1"
+    new: "text2"
+
+  - op: replace
+    id: child-patch
+    extends: parent-patch
+    new: "text3"  # OVERRIDES parent's new field
+```
+
+Child patch's `new` field (text3) overrides parent's (text2).
+
+**Array Fields (include, exclude, validate):**
+```yaml
+patches:
+  - op: replace
+    id: parent-patch
+    old: "old"
+    new: "new"
+    include: ["*.md"]
+    validate: ["pattern1"]
+
+  - op: replace
+    id: child-patch
+    extends: parent-patch
+    include: ["guides/**/*.md"]  # CONCATENATES: ["*.md", "guides/**/*.md"]
+    validate: ["pattern2"]       # REPLACES: ["pattern2"]
+```
+
+- `include` and `exclude` arrays concatenate
+- `validate` arrays replace (not concatenate)
+
+**Complex Fields (content for section operations):**
+```yaml
+patches:
+  - op: replace-section
+    id: base-section
+    id: my-section
+    content: "Base content\n"
+
+  - op: replace-section
+    id: extended-section
+    extends: base-section
+    content: "New content\n"  # OVERRIDES base content
+```
+
+#### Section Operations with Inheritance
+
+For section operations (replace-section, append-to-section, etc.), the `patchId` field is used for inheritance instead of `id`:
+
+```yaml
+patches:
+  # Base section patch
+  - op: append-to-section
+    patchId: base-append
+    id: installation
+    content: "Basic install steps"
+
+  # Inherit from base, customize for specific files
+  - op: append-to-section
+    patchId: custom-append
+    extends: base-append
+    include: "quickstart.md"
+```
+
+This distinction prevents confusion between:
+- `id`: The markdown section to operate on
+- `patchId`: The unique identifier for the patch itself (for inheritance)
+
+#### Complete Inheritance Example
+
+```yaml
+patches:
+  # Base patches
+  - op: replace
+    id: version-replace
+    old: "1.0.0"
+    new: "2.0.0"
+    onNoMatch: warn
+
+  - op: replace-section
+    patchId: base-install
+    id: installation
+    content: |
+      To install, run:
+      ```bash
+      npm install
+      ```
+
+  # Specialized patches extending the base
+  - op: replace
+    id: docs-version
+    extends: version-replace
+    include: "docs/**/*.md"
+
+  - op: replace
+    id: api-version
+    extends: version-replace
+    include: "api/**/*.md"
+    new: "2.0.0-beta"  # Override parent's new value
+
+  - op: replace-section
+    patchId: quickstart-install
+    extends: base-install
+    include: "quickstart.md"
+    content: |
+      Quick install:
+      ```bash
+      npm install -S
+      ```
+
+  # Inheritance chain
+  - op: replace
+    id: brand-replace
+    extends: version-replace
+    old: "Company"
+    new: "Brand"
+
+  - op: replace
+    id: team-brand
+    extends: brand-replace
+    include: "team/**/*.md"
+```
+
+#### Limitations and Best Practices
+
+**Limitations:**
+
+1. **No circular dependencies**: A patch cannot (directly or indirectly) extend itself. This will cause an error.
+
+2. **Patch order**: A patch cannot extend a patch defined after it in the configuration. Always define parent patches before child patches.
+
+3. **Single operation type per inheritance chain**: All patches in an inheritance chain must be the same operation type (e.g., all `replace`, or all `append-to-section`).
+
+4. **Field compatibility**: Ensure fields are compatible across the inheritance chain. Extending a `replace-regex` patch with `flags` and then overriding with a `replace` patch will fail validation.
+
+**Best Practices:**
+
+1. **Name patches descriptively**: Use clear, hierarchical names:
+   ```yaml
+   - id: base-branding
+   - id: branding-web-docs  # extends base-branding
+   - id: branding-guides    # extends base-branding
+   ```
+
+2. **Limit inheritance depth**: Keep chains to 2-3 levels. Deep chains become hard to follow:
+   ```yaml
+   # Good: Simple hierarchy
+   base → specialized → file-specific
+
+   # Avoid: Deep chains
+   base → level2 → level3 → level4 → level5
+   ```
+
+3. **Use multiple inheritance for composition**: Group related fields:
+   ```yaml
+   - id: file-filter
+     include: "docs/**/*.md"
+
+   - id: branding-rule
+     old: "old"
+     new: "new"
+
+   - id: combined
+     extends: [branding-rule, file-filter]
+   ```
+
+4. **Document inheritance relationships**: Use comments to clarify the inheritance structure:
+   ```yaml
+   patches:
+     # Base rule - reused by multiple patches
+     - op: replace
+       id: base-version
+       old: "v1"
+       new: "v2"
+
+     # Override for internal docs only
+     - op: replace
+       id: version-internal
+       extends: base-version
+       include: "internal/**/*.md"
+   ```
+
+5. **Prefer composition over modification**: Instead of deep override chains, compose from focused base patches:
+   ```yaml
+   # Good: Clear intent
+   patches:
+     - op: replace
+       id: file-filter-docs
+       include: "docs/**/*.md"
+
+     - op: replace
+       id: rule-version
+       old: "v1"
+       new: "v2"
+
+     - op: replace
+       id: docs-version
+       extends: [rule-version, file-filter-docs]
+
+   # Avoid: Chains of overrides
+   patches:
+     - op: replace
+       id: step1
+       include: "docs/**/*.md"
+
+     - op: replace
+       id: step2
+       extends: step1
+       old: "v1"
+
+     - op: replace
+       id: step3
+       extends: step2
+       new: "v2"
+   ```
 
 ### Error Handling Strategies
 

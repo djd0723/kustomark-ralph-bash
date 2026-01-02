@@ -150,6 +150,13 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
         const patchErrors = validatePatch(patch, index);
         errors.push(...patchErrors);
       });
+
+      // Validate patch IDs and inheritance
+      const idErrors = validatePatchIds(config.patches);
+      errors.push(...idErrors);
+
+      const inheritanceErrors = validateInheritanceReferences(config.patches);
+      errors.push(...inheritanceErrors);
     }
   }
 
@@ -412,4 +419,281 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
  */
 function isValidOnNoMatchStrategy(value: unknown): value is OnNoMatchStrategy {
   return value === "skip" || value === "warn" || value === "error";
+}
+
+/**
+ * Validate patch IDs are unique and properly formatted
+ */
+function validatePatchIds(patches: unknown[]): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const seenIds = new Set<string>();
+
+  patches.forEach((patch, index) => {
+    if (!patch || typeof patch !== "object") {
+      return;
+    }
+
+    const p = patch as Record<string, unknown>;
+
+    // For section operations, the `id` field refers to the section ID, not the patch ID
+    // Skip validation for these operations as they use `patchId` for inheritance
+    const sectionOps = [
+      "remove-section",
+      "replace-section",
+      "prepend-to-section",
+      "append-to-section",
+      "move-section",
+      "rename-header",
+      "change-section-level",
+    ];
+    if (p.op && typeof p.op === "string" && sectionOps.includes(p.op)) {
+      // For section operations, check patchId instead
+      if (p.patchId !== undefined) {
+        if (typeof p.patchId !== "string") {
+          errors.push({
+            field: `patches[${index}].patchId`,
+            message: "patch id must be a string",
+          });
+          return;
+        }
+
+        if (p.patchId === "") {
+          errors.push({
+            field: `patches[${index}].patchId`,
+            message: "patch id cannot be empty",
+          });
+          return;
+        }
+
+        if (!/^[a-zA-Z0-9_-]+$/.test(p.patchId)) {
+          errors.push({
+            field: `patches[${index}].patchId`,
+            message: `patch id "${p.patchId}" contains invalid characters (only alphanumeric, hyphens, and underscores allowed)`,
+          });
+          return;
+        }
+
+        if (seenIds.has(p.patchId)) {
+          errors.push({
+            field: `patches[${index}].patchId`,
+            message: `duplicate patch id "${p.patchId}" (IDs must be unique within a config)`,
+          });
+          return;
+        }
+
+        seenIds.add(p.patchId);
+      }
+      return;
+    }
+
+    // Check if patch has an ID (for non-section operations)
+    if (p.id !== undefined) {
+      if (typeof p.id !== "string") {
+        errors.push({
+          field: `patches[${index}].id`,
+          message: "patch id must be a string",
+        });
+        return;
+      }
+
+      // Check for empty ID first
+      if (p.id === "") {
+        errors.push({
+          field: `patches[${index}].id`,
+          message: "patch id cannot be empty",
+        });
+        return;
+      }
+
+      // Validate ID format (alphanumeric, hyphens, underscores only)
+      if (!/^[a-zA-Z0-9_-]+$/.test(p.id)) {
+        errors.push({
+          field: `patches[${index}].id`,
+          message: `patch id "${p.id}" contains invalid characters (only alphanumeric, hyphens, and underscores allowed)`,
+        });
+        return;
+      }
+
+      // Check for duplicate IDs
+      if (seenIds.has(p.id)) {
+        errors.push({
+          field: `patches[${index}].id`,
+          message: `duplicate patch id "${p.id}" (IDs must be unique within a config)`,
+        });
+        return;
+      }
+
+      seenIds.add(p.id);
+    }
+  });
+
+  return errors;
+}
+
+/**
+ * Validate extends references exist and detect circular dependencies
+ */
+function validateInheritanceReferences(patches: unknown[]): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  // Build ID map for reference checking (handling both id and patchId)
+  const idMap = new Map<string, number>();
+  const sectionOps = [
+    "remove-section",
+    "replace-section",
+    "prepend-to-section",
+    "append-to-section",
+    "move-section",
+    "rename-header",
+    "change-section-level",
+  ];
+
+  patches.forEach((patch, index) => {
+    if (patch && typeof patch === "object") {
+      const p = patch as Record<string, unknown>;
+      // For section operations, use patchId; for others, use id
+      const isSectonOp = p.op && typeof p.op === "string" && sectionOps.includes(p.op);
+      const patchIdField = isSectonOp ? p.patchId : p.id;
+
+      if (patchIdField && typeof patchIdField === "string") {
+        idMap.set(patchIdField, index);
+      }
+    }
+  });
+
+  // Validate each patch's extends references
+  patches.forEach((patch, index) => {
+    if (!patch || typeof patch !== "object") {
+      return;
+    }
+
+    const p = patch as Record<string, unknown>;
+
+    if (p.extends !== undefined) {
+      // Normalize to array
+      const extendsArray = Array.isArray(p.extends) ? p.extends : [p.extends];
+
+      for (const extendId of extendsArray) {
+        if (typeof extendId !== "string") {
+          errors.push({
+            field: `patches[${index}].extends`,
+            message: "extends must be a string or array of strings",
+          });
+          continue;
+        }
+
+        // Check if referenced ID exists
+        const referencedIndex = idMap.get(extendId);
+        if (referencedIndex === undefined) {
+          errors.push({
+            field: `patches[${index}].extends`,
+            message: `patch extends non-existent id "${extendId}"`,
+          });
+          continue;
+        }
+
+        // Check for forward references (patch can only extend previously defined patches)
+        if (referencedIndex >= index) {
+          errors.push({
+            field: `patches[${index}].extends`,
+            message: `patch extends "${extendId}" which is defined later (forward references not allowed)`,
+          });
+          continue;
+        }
+
+        // Check for self-reference
+        if (p.id === extendId) {
+          errors.push({
+            field: `patches[${index}].extends`,
+            message: `patch "${p.id}" cannot extend itself`,
+          });
+        }
+      }
+
+      // Detect circular references
+      if (p.id && typeof p.id === "string") {
+        const circular = detectCircularInheritance(patches, index, new Set(), []);
+        if (circular) {
+          errors.push({
+            field: `patches[${index}].extends`,
+            message: `circular inheritance detected: ${circular.join(" -> ")}`,
+          });
+        }
+      }
+    }
+  });
+
+  return errors;
+}
+
+/**
+ * Detect circular inheritance using depth-first search
+ * Returns the circular path if found, null otherwise
+ */
+function detectCircularInheritance(
+  patches: unknown[],
+  patchIndex: number,
+  visited: Set<string>,
+  path: string[],
+): string[] | null {
+  const patch = patches[patchIndex];
+  if (!patch || typeof patch !== "object") {
+    return null;
+  }
+
+  const p = patch as Record<string, unknown>;
+
+  // If patch has no ID, can't detect circular reference
+  if (!p.id || typeof p.id !== "string") {
+    return null;
+  }
+
+  // If we've seen this ID before in current path, we have a cycle
+  if (visited.has(p.id)) {
+    return [...path, p.id];
+  }
+
+  // If no extends, no cycle
+  if (!p.extends) {
+    return null;
+  }
+
+  // Add to visited and path
+  visited.add(p.id);
+  path.push(p.id);
+
+  // Normalize extends to array
+  const extendsArray = Array.isArray(p.extends) ? p.extends : [p.extends];
+
+  // Build ID map for lookups
+  const idMap = new Map<string, number>();
+  patches.forEach((patch, index) => {
+    if (patch && typeof patch === "object") {
+      const p = patch as Record<string, unknown>;
+      if (p.id && typeof p.id === "string") {
+        idMap.set(p.id, index);
+      }
+    }
+  });
+
+  // Check each parent
+  for (const extendId of extendsArray) {
+    if (typeof extendId !== "string") {
+      continue;
+    }
+
+    const parentIndex = idMap.get(extendId);
+    if (parentIndex === undefined) {
+      continue;
+    }
+
+    // Recursively check parent
+    const circular = detectCircularInheritance(patches, parentIndex, new Set(visited), [...path]);
+
+    if (circular) {
+      return circular;
+    }
+  }
+
+  return null;
 }
