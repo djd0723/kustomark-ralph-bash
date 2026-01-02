@@ -108,11 +108,8 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
               message: `Invalid git URL format: "${resource}"`,
             });
           } else {
-            // Add warning that git URL fetching is not yet implemented
-            warnings.push({
-              field: `resources[${index}]`,
-              message: `Git URL detected but fetching is not yet fully supported: "${resource}"`,
-            });
+            // Git URL is valid and will be fetched by the resource resolver
+            // No warning needed - git fetching is fully implemented
           }
         }
       }

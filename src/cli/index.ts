@@ -3383,8 +3383,9 @@ Lock File:
   --dry-run                   Preview changes without writing files (build command)
 
 Remote Resources:
-  Git URLs are recognized and validated but fetching is not yet implemented.
-  Supported formats: github.com/org/repo, git::https://..., git::git@...
+  Git URLs: github.com/org/repo//path?ref=v1.0, git::https://..., git::git@...
+  HTTP Archives: https://example.com/archive.tar.gz//path?checksum=sha256:...
+  All remote resources are cached in ~/.cache/kustomark/ for performance
 
 Exit Codes:
   0    Success (for diff: no changes)

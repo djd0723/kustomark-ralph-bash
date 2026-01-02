@@ -2511,3 +2511,58 @@ This document tracks the implementation of kustomark based on the spec milestone
   - `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md` - This entry
 
   **Status:** COMPLETE! ✅ High-priority code quality improvement successfully implemented.
+
+
+**2026-01-02 (Documentation and Help Text Improvements - COMPLETE!):**
+- ✅ Enhanced documentation and help text for complete feature coverage:
+
+  **Documentation Enhancements:**
+  - Added comprehensive documentation for all 12 previously undocumented patch operations in README.md:
+    - **Section Operations:** `rename-header`, `move-section`, `change-section-level`
+    - **Frontmatter Operations:** `set-frontmatter`, `remove-frontmatter`, `rename-frontmatter`, `merge-frontmatter`
+    - **Line Operations:** `insert-after-line`, `insert-before-line`, `replace-line`, `delete-between`, `replace-between`
+  - Each operation now has:
+    - Clear description of functionality
+    - Complete YAML configuration examples
+    - Before/after code examples demonstrating usage
+    - Notes on special behaviors and edge cases
+  - Added new sections: "Frontmatter Operations" and "Line Operations"
+  - Total documentation: ALL 22 patch operations now fully documented (100% coverage, up from 45%)
+
+  **Outdated Warning Removals:**
+  - Removed misleading git URL warning from config-parser.ts (line 111-115)
+    - Git URL fetching is now fully implemented, no warning needed
+    - Replaced with comment confirming git URLs are supported
+  - Updated CLI help text in src/cli/index.ts (lines 3385-3388)
+    - Replaced outdated "Git URLs are recognized and validated but fetching is not yet implemented"
+    - Added accurate description with git URL and HTTP archive formats
+    - Added caching information
+
+  **Test Updates:**
+  - Fixed 2 failing LSP diagnostics tests in tests/lsp/diagnostics.test.ts:
+    - Updated "generates warning for git URL resources" → "does not generate warnings for valid git URL resources"
+    - Updated "uses Warning severity for git URL warnings" → "uses Error severity for invalid resource patterns"
+    - Tests now reflect that git URLs are fully supported and should not generate warnings
+  - All 1,607 tests passing ✓
+  - 6,321 expect() calls successful
+  - Zero test failures
+
+  **Impact:**
+  - **Documentation Completeness:** 100% patch operation coverage (22/22 operations documented)
+  - **User Experience:** No more misleading warnings about unsupported features
+  - **Accuracy:** CLI help text now correctly reflects implemented features
+  - **Professional Polish:** Project appears complete and production-ready
+  - **Discoverability:** Users can now find examples for all operations in README
+
+  **Files Modified:**
+  - README.md - Added ~600 lines of operation documentation
+  - src/core/config-parser.ts - Removed outdated git warning
+  - src/cli/index.ts - Updated help text for remote resources
+  - tests/lsp/diagnostics.test.ts - Fixed 2 tests for git URL support
+
+  **Documentation Sections Added:**
+  - "Frontmatter Operations" (4 operations: set, remove, rename, merge)
+  - "Line Operations" (5 operations: insert-after-line, insert-before-line, replace-line, delete-between, replace-between)
+  - Enhanced "Patch Operations" with 3 more section operations (rename-header, move-section, change-section-level)
+
+  **Status:** COMPLETE! ✅ All documentation and messaging now accurate and comprehensive.

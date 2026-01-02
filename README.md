@@ -686,6 +686,595 @@ Basic usage instructions.
 Config instructions.
 ```
 
+### `rename-header` - Rename Section Headers
+
+Rename a section header while preserving its level and custom IDs.
+
+```yaml
+- op: rename-header
+  id: old-section-name
+  newText: "New Section Name"
+```
+
+**Example:**
+
+Input:
+```markdown
+## Getting Started
+
+Welcome to our guide.
+
+## Installation {#install}
+
+Install instructions here.
+```
+
+Output:
+```markdown
+## Getting Started
+
+Welcome to our guide.
+
+## Setup Instructions {#install}
+
+Install instructions here.
+```
+
+**Notes:**
+- Preserves the header level (e.g., `##` stays `##`)
+- Preserves custom IDs if present (e.g., `{#custom-id}`)
+- Only renames the header text, not the section content
+
+### `move-section` - Move Section to New Position
+
+Move a section (with all its children) to a new position in the document.
+
+```yaml
+- op: move-section
+  id: section-to-move
+  beforeId: target-section  # or use afterId
+```
+
+**Example:**
+
+Input:
+```markdown
+## Introduction
+
+Welcome!
+
+## Installation
+
+Install instructions.
+
+## Configuration
+
+Config instructions.
+
+## Usage
+
+Usage instructions.
+```
+
+Using `beforeId`:
+```yaml
+- op: move-section
+  id: usage
+  beforeId: installation
+```
+
+Output:
+```markdown
+## Introduction
+
+Welcome!
+
+## Usage
+
+Usage instructions.
+
+## Installation
+
+Install instructions.
+
+## Configuration
+
+Config instructions.
+```
+
+**Notes:**
+- Use `beforeId` to place before a target section
+- Use `afterId` to place after a target section
+- Moves the entire section including all subsections
+- Section IDs are GitHub-style slugs (e.g., `## Installation` → `installation`)
+
+### `change-section-level` - Promote/Demote Section Headers
+
+Change the header level of a section (and optionally its children).
+
+```yaml
+- op: change-section-level
+  id: subsection
+  levelChange: -1  # -1 to promote (## → #), +1 to demote (## → ###)
+  adjustChildren: true  # default: false
+```
+
+**Example:**
+
+Input:
+```markdown
+# Main Title
+
+## Section
+
+### Subsection
+
+Content here.
+
+#### Deep Subsection
+
+More content.
+```
+
+Using `levelChange: -1` to promote "Subsection":
+```yaml
+- op: change-section-level
+  id: subsection
+  levelChange: -1
+  adjustChildren: true
+```
+
+Output:
+```markdown
+# Main Title
+
+## Section
+
+## Subsection
+
+Content here.
+
+### Deep Subsection
+
+More content.
+```
+
+**Notes:**
+- Positive `levelChange` demotes (adds `#`), negative promotes (removes `#`)
+- `adjustChildren: true` adjusts all subsections by the same amount
+- Header levels are clamped to valid range (1-6)
+
+## Frontmatter Operations
+
+Frontmatter operations allow you to manipulate YAML frontmatter at the beginning of markdown files. These operations support dot notation for nested keys (e.g., `metadata.author`).
+
+### `set-frontmatter` - Set Frontmatter Field
+
+Set or update a frontmatter field with a new value.
+
+```yaml
+- op: set-frontmatter
+  key: author
+  value: "Jane Doe"
+```
+
+**Nested keys with dot notation:**
+
+```yaml
+- op: set-frontmatter
+  key: metadata.lastUpdated
+  value: "2026-01-02"
+```
+
+**Example:**
+
+Input:
+```markdown
+---
+title: "My Document"
+---
+
+# My Document
+
+Content here.
+```
+
+Output:
+```markdown
+---
+title: "My Document"
+author: "Jane Doe"
+---
+
+# My Document
+
+Content here.
+```
+
+**Setting nested values:**
+
+Input:
+```markdown
+---
+title: "My Document"
+---
+```
+
+Using:
+```yaml
+- op: set-frontmatter
+  key: metadata.author
+  value: "Jane Doe"
+```
+
+Output:
+```markdown
+---
+title: "My Document"
+metadata:
+  author: "Jane Doe"
+---
+```
+
+### `remove-frontmatter` - Remove Frontmatter Field
+
+Remove a field from the frontmatter.
+
+```yaml
+- op: remove-frontmatter
+  key: draft
+```
+
+**Example:**
+
+Input:
+```markdown
+---
+title: "My Document"
+draft: true
+author: "Jane Doe"
+---
+
+# My Document
+```
+
+Output:
+```markdown
+---
+title: "My Document"
+author: "Jane Doe"
+---
+
+# My Document
+```
+
+**Removing nested fields:**
+
+```yaml
+- op: remove-frontmatter
+  key: metadata.internal
+```
+
+### `rename-frontmatter` - Rename Frontmatter Field
+
+Rename a frontmatter field while preserving its value.
+
+```yaml
+- op: rename-frontmatter
+  oldKey: author
+  newKey: creator
+```
+
+**Example:**
+
+Input:
+```markdown
+---
+title: "My Document"
+author: "Jane Doe"
+---
+
+# My Document
+```
+
+Output:
+```markdown
+---
+title: "My Document"
+creator: "Jane Doe"
+---
+
+# My Document
+```
+
+**Renaming nested fields:**
+
+```yaml
+- op: rename-frontmatter
+  oldKey: metadata.author
+  newKey: metadata.creator
+```
+
+### `merge-frontmatter` - Merge Frontmatter Object
+
+Merge an object into the frontmatter, combining with existing values.
+
+```yaml
+- op: merge-frontmatter
+  values:
+    tags:
+      - documentation
+      - guide
+    metadata:
+      version: "1.0"
+```
+
+**Example:**
+
+Input:
+```markdown
+---
+title: "My Document"
+tags:
+  - tutorial
+---
+
+# My Document
+```
+
+Output:
+```markdown
+---
+title: "My Document"
+tags:
+  - documentation
+  - guide
+metadata:
+  version: "1.0"
+---
+
+# My Document
+```
+
+**Notes:**
+- Arrays are replaced (not concatenated)
+- Objects are shallow merged
+- Existing keys are overwritten by new values
+
+## Line Operations
+
+Line operations allow precise manipulation of content at the line level, using exact string matching or regular expressions.
+
+### `insert-after-line` - Insert Content After Matching Line
+
+Insert content after the first line matching a pattern.
+
+```yaml
+- op: insert-after-line
+  match: "## Installation"
+  content: |
+
+    > **Note:** Requires Node.js 18 or higher.
+```
+
+**Using regex:**
+
+```yaml
+- op: insert-after-line
+  regex: "^npm install"
+  content: |
+    npm run build
+```
+
+**Example:**
+
+Input:
+```markdown
+## Installation
+
+Run the following command:
+
+npm install kustomark
+```
+
+Output:
+```markdown
+## Installation
+
+Run the following command:
+
+npm install kustomark
+npm run build
+```
+
+### `insert-before-line` - Insert Content Before Matching Line
+
+Insert content before the first line matching a pattern.
+
+```yaml
+- op: insert-before-line
+  match: "## Usage"
+  content: |
+
+    ## Prerequisites
+
+    Make sure you have completed installation first.
+```
+
+**Example:**
+
+Input:
+```markdown
+## Installation
+
+Install instructions here.
+
+## Usage
+
+Usage instructions here.
+```
+
+Output:
+```markdown
+## Installation
+
+Install instructions here.
+
+## Prerequisites
+
+Make sure you have completed installation first.
+
+## Usage
+
+Usage instructions here.
+```
+
+### `replace-line` - Replace Matching Line
+
+Replace the first line matching a pattern with new content.
+
+```yaml
+- op: replace-line
+  match: "Version: 1.0.0"
+  replacement: "Version: 2.0.0"
+```
+
+**Using regex with capture groups:**
+
+```yaml
+- op: replace-line
+  regex: "^Version: (\\d+)\\.(\\d+)\\.(\\d+)"
+  replacement: "Version: $1.$2.1"
+```
+
+**Example:**
+
+Input:
+```markdown
+# My Project
+
+Version: 1.0.0
+
+A great project.
+```
+
+Output:
+```markdown
+# My Project
+
+Version: 2.0.0
+
+A great project.
+```
+
+### `delete-between` - Delete Lines Between Markers
+
+Delete all lines between two markers (inclusive or exclusive).
+
+```yaml
+- op: delete-between
+  startMatch: "<!-- BEGIN REMOVE -->"
+  endMatch: "<!-- END REMOVE -->"
+  includeStart: true  # default: true
+  includeEnd: true    # default: true
+```
+
+**Example:**
+
+Input:
+```markdown
+# My Document
+
+Some content here.
+
+<!-- BEGIN REMOVE -->
+This section is temporary.
+It should be removed.
+<!-- END REMOVE -->
+
+More content here.
+```
+
+Output:
+```markdown
+# My Document
+
+Some content here.
+
+More content here.
+```
+
+**Exclusive mode (keeping markers):**
+
+```yaml
+- op: delete-between
+  startMatch: "<!-- BEGIN REMOVE -->"
+  endMatch: "<!-- END REMOVE -->"
+  includeStart: false
+  includeEnd: false
+```
+
+Output:
+```markdown
+# My Document
+
+Some content here.
+
+<!-- BEGIN REMOVE -->
+<!-- END REMOVE -->
+
+More content here.
+```
+
+### `replace-between` - Replace Content Between Markers
+
+Replace all content between two markers with new content.
+
+```yaml
+- op: replace-between
+  startMatch: "<!-- BEGIN CONFIG -->"
+  endMatch: "<!-- END CONFIG -->"
+  replacement: |
+    config:
+      enabled: true
+      mode: production
+  includeStart: false  # default: false
+  includeEnd: false    # default: false
+```
+
+**Example:**
+
+Input:
+```markdown
+# Configuration
+
+<!-- BEGIN CONFIG -->
+config:
+  enabled: false
+  mode: development
+<!-- END CONFIG -->
+
+# Usage
+```
+
+Output:
+```markdown
+# Configuration
+
+<!-- BEGIN CONFIG -->
+config:
+  enabled: true
+  mode: production
+<!-- END CONFIG -->
+
+# Usage
+```
+
+**Notes:**
+- `includeStart: true` replaces the start marker too
+- `includeEnd: true` replaces the end marker too
+- Supports both exact string matching and regex patterns
+
 ## File Operations
 
 File operations allow you to manipulate files during the build process. These operations work on the file map (source files to output paths) and support glob pattern matching.

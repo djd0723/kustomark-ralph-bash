@@ -715,7 +715,7 @@ watch:
   });
 
   describe('warning generation', () => {
-    test('generates warning for git URL resources', () => {
+    test('does not generate warnings for valid git URL resources', () => {
       const content = `apiVersion: kustomark/v1
 kind: Kustomization
 resources:
@@ -723,9 +723,9 @@ resources:
 
       const diagnostics = provider.provideDiagnostics('test.yaml', content);
 
+      // Git URLs are fully supported, should not generate warnings
       const warnings = diagnostics.filter(d => d.severity === DiagnosticSeverity.Warning);
-      expect(warnings.length).toBeGreaterThan(0);
-      expect(warnings[0]?.message).toContain('Git URL detected');
+      expect(warnings).toHaveLength(0);
     });
 
     test('does not generate warnings for valid local resources', () => {
@@ -858,16 +858,16 @@ resources:
       expect(diagnostics[0]?.severity).toBe(DiagnosticSeverity.Error);
     });
 
-    test('uses Warning severity for git URL warnings', () => {
+    test('uses Error severity for invalid resource patterns', () => {
       const content = `apiVersion: kustomark/v1
 kind: Kustomization
 resources:
-  - github.com/org/repo//path?ref=main`;
+  - 123`;  // Invalid resource format
 
       const diagnostics = provider.provideDiagnostics('test.yaml', content);
 
-      const warnings = diagnostics.filter(d => d.severity === DiagnosticSeverity.Warning);
-      expect(warnings).toHaveLength(1);
+      const errors = diagnostics.filter(d => d.severity === DiagnosticSeverity.Error);
+      expect(errors.length).toBeGreaterThan(0);
     });
   });
 
