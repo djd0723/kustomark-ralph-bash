@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run tests
+        run: bun test
+
+      - name: Build all artifacts
+        run: |
+          bun run build
+          bun run build:lsp
+          bun run build:web
+
+      - name: Create release archive
+        run: |
+          mkdir -p release
+          cp -r dist release/
+          cp package.json release/
+          cp README.md release/
+          cp LICENSE release/ 2>/dev/null || echo "No LICENSE file"
+          tar -czf kustomark-${{ github.ref_name }}.tar.gz -C release .
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "## Changes" > RELEASE_NOTES.md
+          git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"- %s" >> RELEASE_NOTES.md || echo "- Initial release" >> RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: kustomark-${{ github.ref_name }}.tar.gz
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

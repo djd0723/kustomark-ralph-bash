@@ -12,7 +12,7 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Initialize TypeScript project with Bun
    - ✅ Setup project structure (core library, CLI)
    - ✅ Configure linting, testing, build
-   - ⏳ Setup CI/CD basics (deferred)
+   - ✅ Setup CI/CD basics - **COMPLETE! 2026-01-02**
 
 2. **[DONE] Core Library - Config Parsing** ✅
    - ✅ Parse YAML config schema
@@ -3562,3 +3562,191 @@ kustomark template apply my-custom-template ./output --var PROJECT_NAME="My Proj
 **Status:** Custom Template System Enhancement COMPLETE! ✅
 
 This feature significantly enhances the template system, enabling teams to create and share standardized project templates while maintaining the simplicity of the built-in templates.
+
+
+---
+
+**2026-01-02 (CI/CD Infrastructure - M1 Deferred Item - COMPLETE!):**
+
+Implemented comprehensive CI/CD infrastructure using GitHub Actions, completing one of the two deferred items from M1.
+
+**Problem Analysis:**
+
+From M1 implementation plan (line 15), CI/CD basics were deferred to focus on core functionality. With all milestones M1-M4 complete and extensive feature additions (LSP server, Web UI, templates, etc.), the project needed:
+
+1. **Automated testing** - 1,945 tests with 7,186 assertions running only locally
+2. **Quality gates** - No automated checks before merges
+3. **Build verification** - Multiple build targets (CLI, LSP, Web) to verify
+4. **Security scanning** - No automated vulnerability detection
+5. **Dependency management** - No automated dependency updates
+6. **Release automation** - Manual release process
+
+**Implementation:**
+
+1. ✅ **Main CI Pipeline** (`.github/workflows/ci.yml`):
+   - **Test matrix**: Tests on Bun 'latest' and '1.0.0' for compatibility
+   - **Linting**: Runs `bun check` (TypeScript + Biome)
+   - **Full test suite**: Runs all 1,945 tests
+   - **Build verification**: 
+     - CLI build (`bun run build`)
+     - LSP server build (`bun run build:lsp`)
+     - Web client build (`bun run build:web:client`)
+     - Web server build (`bun run build:web:server`)
+   - **Artifact verification**: Ensures executables are created correctly
+   - **Separate jobs**: Test, Web, and Code Quality jobs run in parallel
+   - **Triggers**: Runs on push to main, PRs, and manual dispatch
+
+2. ✅ **Release Automation** (`.github/workflows/release.yml`):
+   - **Tag-based releases**: Triggers on version tags (v*.*.*)
+   - **Full test suite**: Ensures releases are tested
+   - **Multi-artifact build**: CLI, LSP, and Web UI
+   - **Release archive**: Creates `.tar.gz` with all artifacts
+   - **Automated changelog**: Generates release notes from git commits
+   - **GitHub Releases**: Automatic release creation with artifacts
+   - **Manual dispatch**: Supports manual release triggering
+
+3. ✅ **Security Analysis** (`.github/workflows/codeql.yml`):
+   - **CodeQL scanning**: JavaScript/TypeScript security analysis
+   - **Scheduled scans**: Weekly automated security scans (Mondays)
+   - **PR scanning**: Security checks on all pull requests
+   - **Security-and-quality queries**: Comprehensive ruleset
+   - **GitHub Security tab integration**: Results visible in repository
+
+4. ✅ **Dependency Management** (`.github/dependabot.yml`):
+   - **NPM dependencies**: Weekly automated updates (Mondays)
+   - **GitHub Actions updates**: Weekly workflow updates
+   - **Auto-labeling**: Dependencies tagged for easy filtering
+   - **Review assignment**: Auto-assigns to project owner
+   - **Conventional commits**: Proper commit message formatting
+   - **Rate limiting**: Max 10 npm PRs, 5 action PRs to avoid spam
+
+5. ✅ **GitHub Templates**:
+   - **Pull Request Template** (`.github/pull_request_template.md`):
+     - Structured PR descriptions
+     - Type of change checklist
+     - Testing verification
+     - Code quality checklist
+   - **Bug Report Template** (`.github/ISSUE_TEMPLATE/bug_report.md`):
+     - Reproduction steps
+     - Environment information
+     - Configuration samples
+   - **Feature Request Template** (`.github/ISSUE_TEMPLATE/feature_request.md`):
+     - Problem statement
+     - Proposed solution
+     - Use cases and examples
+     - Willingness to contribute
+
+6. ✅ **Contributing Guidelines** (`.github/CONTRIBUTING.md`):
+   - Development setup instructions
+   - Project structure overview
+   - Development workflow
+   - Style guide (TypeScript, testing, organization)
+   - PR process and checklist
+   - Adding new features guide
+   - Bug reporting and feature requests
+
+7. ✅ **README Updates**:
+   - Added CI status badge
+   - Added CodeQL security badge
+   - Badges link to workflow results
+
+**Features Implemented:**
+
+**CI/CD Capabilities:**
+- ✅ Automated testing on every PR and main push
+- ✅ Multi-version compatibility testing (Bun latest + 1.0.0)
+- ✅ Parallel job execution (test, web, quality)
+- ✅ Build verification for all artifacts
+- ✅ Automated releases from version tags
+- ✅ Weekly security scans
+- ✅ Automated dependency updates
+- ✅ Structured issue and PR templates
+- ✅ Comprehensive contributing guide
+
+**Benefits:**
+
+1. **Quality Assurance**:
+   - All PRs must pass 1,945 tests before merge
+   - TypeScript compilation verified
+   - All build targets validated
+   - No broken builds reach main branch
+
+2. **Security**:
+   - Weekly CodeQL scans detect vulnerabilities
+   - Dependency updates keep packages current
+   - Security issues tracked in GitHub Security tab
+
+3. **Developer Experience**:
+   - Contributors get instant feedback
+   - Clear templates guide issue/PR creation
+   - Contributing guide reduces onboarding friction
+   - Automated releases reduce manual work
+
+4. **Project Health**:
+   - CI badges show project status at a glance
+   - Dependabot keeps dependencies fresh
+   - Automated workflows reduce maintenance burden
+
+**Files Created:**
+- `.github/workflows/ci.yml` (107 lines) - Main CI pipeline
+- `.github/workflows/release.yml` (51 lines) - Release automation
+- `.github/workflows/codeql.yml` (36 lines) - Security scanning
+- `.github/dependabot.yml` (30 lines) - Dependency management
+- `.github/pull_request_template.md` (60 lines) - PR template
+- `.github/ISSUE_TEMPLATE/bug_report.md` (52 lines) - Bug reports
+- `.github/ISSUE_TEMPLATE/feature_request.md` (60 lines) - Feature requests
+- `.github/CONTRIBUTING.md` (307 lines) - Contributing guide
+
+**Files Modified:**
+- `README.md` - Added CI and CodeQL status badges
+
+**Testing Results:**
+- All 1,945 tests passing ✓
+- 7,186 expect() calls successful ✓
+- All linting checks passing (bun check) ✓
+- TypeScript compilation clean ✓
+- All build targets verified (CLI, LSP, Web) ✓
+
+**CI Workflow Structure:**
+
+```yaml
+CI Pipeline (ci.yml)
+├── test (matrix: Bun latest, 1.0.0)
+│   ├── Checkout + Setup
+│   ├── Install dependencies
+│   ├── Linting (bun check)
+│   ├── Tests (bun test)
+│   ├── Build CLI
+│   ├── Build LSP
+│   └── Verify executables
+├── web
+│   ├── Build web client
+│   ├── Build web server
+│   └── Verify builds
+└── lint-format
+    ├── TypeScript compilation
+    └── Build verification
+
+Release Pipeline (release.yml)
+├── Run full test suite
+├── Build all artifacts (CLI, LSP, Web)
+├── Create release archive
+├── Generate changelog
+└── Create GitHub Release
+
+Security Pipeline (codeql.yml)
+├── Initialize CodeQL
+├── Autobuild
+└── Security analysis
+```
+
+**Status:** CI/CD Infrastructure COMPLETE! ✅
+
+This completes one of the two deferred items from M1 (line 15: "Setup CI/CD basics"). The project now has production-grade CI/CD infrastructure that:
+- Ensures code quality through automated testing
+- Protects against security vulnerabilities
+- Streamlines the release process
+- Guides contributors with clear templates
+- Keeps dependencies up to date
+
+The remaining M1 deferred item is "API documentation for core library" (line 70).

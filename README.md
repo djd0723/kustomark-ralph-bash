@@ -1,5 +1,8 @@
 # Kustomark
 
+[![CI](https://github.com/dexhorthy/kustomark-ralph-bash/actions/workflows/ci.yml/badge.svg)](https://github.com/dexhorthy/kustomark-ralph-bash/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/dexhorthy/kustomark-ralph-bash/actions/workflows/codeql.yml/badge.svg)](https://github.com/dexhorthy/kustomark-ralph-bash/actions/workflows/codeql.yml)
+
 > Declarative markdown patching pipeline. Like kustomize, but for markdown.
 
 Kustomark solves the "upstream fork problem" for markdown files. Consume markdown from upstream sources while maintaining local customizations without forking. Perfect for documentation, Claude Code skills, and any scenario where you need to customize markdown files while staying in sync with upstream updates.

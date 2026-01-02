@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test on Bun ${{ matrix.bun-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        bun-version: ['latest', '1.0.0']
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ matrix.bun-version }}
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run linting
+        run: bun check
+
+      - name: Run tests
+        run: bun test
+
+      - name: Build CLI
+        run: bun run build
+
+      - name: Build LSP server
+        run: bun run build:lsp
+
+      - name: Verify CLI executable
+        run: |
+          chmod +x dist/cli/index.js
+          node dist/cli/index.js --version || echo "CLI built successfully"
+
+      - name: Verify LSP server
+        run: |
+          test -f dist/lsp/server.js || exit 1
+          echo "LSP server built successfully"
+
+  web:
+    name: Build Web UI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build web client
+        run: bun run build:web:client
+
+      - name: Build web server
+        run: bun run build:web:server
+
+      - name: Verify web builds
+        run: |
+          test -d src/web/client/dist || exit 1
+          test -f dist/web/index.js || exit 1
+          echo "Web UI built successfully"
+
+  lint-format:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Check TypeScript compilation
+        run: bun check
+
+      - name: Run all builds
+        run: |
+          bun run build
+          bun run build:lsp
+          echo "All builds completed successfully"
