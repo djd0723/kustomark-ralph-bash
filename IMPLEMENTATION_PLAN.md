@@ -346,8 +346,18 @@ This document tracks the implementation of kustomark based on the spec milestone
   - Stats feature: DONE ✅
 - **Issue #1 FIXED! ✅**
   - Directory structure preservation implemented and tested
+- **Future Work - COMPLETED:**
+  - ✅ Patch Groups (Medium complexity)
+  - ✅ Parallel Builds (Medium complexity)
+  - ✅ Patch Inheritance (Medium complexity)
+  - ✅ Incremental Builds (High complexity)
+  - ✅ LSP Server (High complexity) - **NEW! 2026-01-02**
 
-**Next Priority:** Any remaining features from out-of-scope or future work
+**Next Priority:**
+- VSCode Extension packaging for LSP server
+- Web UI (High complexity from Future Candidates)
+- Interactive debug mode (Medium complexity from Future Candidates)
+- Interactive init wizard (Low complexity from Future Candidates)
 
 **2026-01-02 (Patch Groups Feature - Future Work):**
 - ✅ Implemented Patch Groups feature (Medium complexity from Future Candidates list):
