@@ -49,12 +49,14 @@ import type {
   PatchOperation,
   ValidationError,
   ValidationResult,
+  WatchHooks,
 } from "../core/types.js";
 import { runValidators } from "../core/validators.js";
 import { debugCommand } from "./debug-command.js";
 import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
 import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
+import { executeOnBuildHooks, executeOnChangeHooks, executeOnErrorHooks } from "./watch-hooks.js";
 import { webCommand } from "./web-command.js";
 
 // ============================================================================
@@ -88,6 +90,7 @@ interface CLIOptions {
   autoApply?: boolean; // For debug --auto-apply option
   saveDecisions?: string; // For debug --save-decisions option
   loadDecisions?: string; // For debug --load-decisions option
+  noHooks?: boolean; // For watch --no-hooks option
 }
 
 interface BuildStats {
@@ -258,6 +261,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.update = true;
     } else if (arg === "--no-lock") {
       options.noLock = true;
+    } else if (arg === "--no-hooks") {
+      options.noHooks = true;
     } else if (arg === "--file" || arg.startsWith("--file=")) {
       if (arg.includes("=")) {
         const value = arg.split("=")[1];
@@ -2436,7 +2441,8 @@ async function watchCommand(path: string, options: CLIOptions): Promise<number> 
 
     // Perform initial build
     log("Performing initial build...", 2, options);
-    await performWatchBuild(inputPath, options, basePath);
+    const config = readKustomarkConfig(inputPath);
+    await performWatchBuild(inputPath, options, basePath, config.watch);
 
     // Set up file watching
     const watchedPaths = new Set<string>();
@@ -2450,15 +2456,28 @@ async function watchCommand(path: string, options: CLIOptions): Promise<number> 
       }
 
       try {
-        const watcher = fsWatch(watchPath, { recursive: false }, (_eventType, _filename) => {
+        const watcher = fsWatch(watchPath, { recursive: false }, (_eventType, filename) => {
           // Debounce file changes
           if (debounceTimer) {
             clearTimeout(debounceTimer);
           }
 
-          debounceTimer = setTimeout(() => {
+          debounceTimer = setTimeout(async () => {
             log("File change detected, rebuilding...", 2, options);
-            performWatchBuild(inputPath, options, basePath).catch((error) => {
+
+            // Load config to get watch hooks
+            const config = readKustomarkConfig(inputPath);
+
+            // Execute onChange hooks
+            if (config.watch && filename) {
+              await executeOnChangeHooks(
+                config.watch,
+                filename,
+                { verbosity: options.verbosity, disabled: options.noHooks ?? false }
+              );
+            }
+
+            performWatchBuild(inputPath, options, basePath, config.watch).catch((error) => {
               log(
                 `Error during rebuild: ${error instanceof Error ? error.message : String(error)}`,
                 1,
@@ -2587,6 +2606,7 @@ async function performWatchBuild(
   inputPath: string,
   options: CLIOptions,
   basePath: string,
+  watchHooks?: WatchHooks,
 ): Promise<void> {
   try {
     log("Loading config...", 3, options);
@@ -2677,6 +2697,15 @@ async function performWatchBuild(
       log(`  Removed ${removed} files`, 3, options);
     }
 
+    // Execute onBuild hooks after successful build
+    if (watchHooks) {
+      await executeOnBuildHooks(
+        watchHooks,
+        filesWritten,
+        { verbosity: options.verbosity, disabled: options.noHooks ?? false }
+      );
+    }
+
     // Output results
     if (options.format === "json") {
       const event: WatchEvent = {
@@ -2697,16 +2726,27 @@ async function performWatchBuild(
       }
     }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Execute onError hooks
+    if (watchHooks) {
+      await executeOnErrorHooks(
+        watchHooks,
+        errorMessage,
+        { verbosity: options.verbosity, disabled: options.noHooks ?? false }
+      );
+    }
+
     if (options.format === "json") {
       const event: WatchEvent = {
         event: "build",
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
         timestamp: new Date().toISOString(),
       };
       console.log(JSON.stringify(event));
     } else {
-      log(`Build failed: ${error instanceof Error ? error.message : String(error)}`, 1, options);
+      log(`Build failed: ${errorMessage}`, 1, options);
     }
     throw error;
   }
@@ -2864,6 +2904,7 @@ Explain Flags:
 
 Watch Flags:
   --debounce <ms>             Debounce delay in milliseconds (default: 300)
+  --no-hooks                  Disable watch hooks (for security)
   --format <text|json>        Output format (default: text)
 
 Init Flags:

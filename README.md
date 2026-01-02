@@ -15,6 +15,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark validate](#kustomark-validate-path)
   - [kustomark init](#kustomark-init-path)
   - [kustomark debug](#kustomark-debug-path)
+  - [kustomark watch](#kustomark-watch-path)
 - [Configuration](#configuration)
 - [Patch Operations](#patch-operations)
 - [Resource Resolution](#resource-resolution)
@@ -35,6 +36,9 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [Starting the Web UI](#starting-the-web-ui)
   - [Features](#features-1)
   - [Development](#development-1)
+- [Watch Mode](#watch-mode)
+  - [Starting Watch Mode](#starting-watch-mode)
+  - [Watch Mode Hooks](#watch-mode-hooks)
 - [Design Principles](#design-principles)
 - [Contributing](#contributing)
 
@@ -332,6 +336,59 @@ Decisions are saved in JSON format and can be replayed:
 - Troubleshoot why specific patches aren't being applied
 - Create reproducible patch application workflows
 - Debug complex overlay configurations with many patches
+
+### `kustomark watch [path]`
+
+Monitor files for changes and automatically rebuild output.
+
+```bash
+# Start watch mode
+kustomark watch ./team/
+
+# Watch with custom debounce interval (default: 300ms)
+kustomark watch ./team/ --debounce=500
+
+# Watch with JSON output for integration
+kustomark watch ./team/ --format=json
+
+# Disable watch hooks for security
+kustomark watch ./team/ --no-hooks
+
+# Watch with verbose logging
+kustomark watch ./team/ -vv
+```
+
+**Options:**
+- `--debounce <ms>` - Debounce interval in milliseconds (default: 300)
+- `--no-hooks` - Disable watch hooks for security (prevents executing shell commands)
+- `--format <text|json>` - Output format (default: text)
+- `-v`, `-vv`, `-vvv` - Increase verbosity
+- `-q` - Quiet mode (errors only)
+
+**How it works:**
+
+1. Performs initial build when started
+2. Watches all source files and the configuration file for changes
+3. Debounces rapid changes to avoid excessive rebuilds
+4. Executes configured hooks (onBuild, onError, onChange) unless disabled
+5. Continues watching until interrupted (Ctrl+C)
+
+**JSON Output:**
+
+With `--format=json`, watch mode outputs newline-delimited JSON events:
+
+```json
+{"event":"build","success":true,"filesWritten":5,"patchesApplied":12,"timestamp":"2024-01-15T10:30:45.123Z"}
+{"event":"build","success":false,"error":"Invalid configuration","timestamp":"2024-01-15T10:31:02.456Z"}
+```
+
+**Use Cases:**
+- Development workflow with auto-rebuild
+- Integration with deployment pipelines
+- Continuous documentation updates
+- Running tests or notifications on file changes
+
+See [Watch Mode Hooks](#watch-mode-hooks) for advanced automation with shell commands.
 
 ## Configuration
 
@@ -1678,6 +1735,233 @@ bun run dev:web:server
 ```
 
 For more details, see [WEB_UI_README.md](WEB_UI_README.md).
+
+## Watch Mode
+
+Watch mode enables automatic rebuilding of your markdown files whenever source files or configuration changes are detected. This is particularly useful during development or for continuous integration workflows.
+
+### Starting Watch Mode
+
+```bash
+# Start watch mode with default settings
+kustomark watch ./myproject/
+
+# Custom debounce interval (prevents excessive rebuilds)
+kustomark watch ./myproject/ --debounce=500
+
+# JSON output for programmatic integration
+kustomark watch ./myproject/ --format=json
+
+# Disable hooks for security
+kustomark watch ./myproject/ --no-hooks
+```
+
+See the [kustomark watch](#kustomark-watch-path) command reference for all options.
+
+### Watch Mode Hooks
+
+Watch hooks allow you to execute shell commands automatically in response to build events. This enables powerful automation workflows such as notifications, deployments, testing, and more.
+
+#### Overview
+
+Hooks are shell commands configured in your `kustomark.yaml` file that run at specific lifecycle events:
+
+- **onBuild**: Runs after a successful build completes
+- **onError**: Runs when a build fails
+- **onChange**: Runs when file changes are detected (before rebuild)
+
+Hooks execute sequentially and can use template variables to access event context information.
+
+#### Configuration Example
+
+Add a `watch` section to your `kustomark.yaml`:
+
+```yaml
+apiVersion: kustomark/v1
+kind: Kustomization
+
+output: ./output
+
+resources:
+  - "**/*.md"
+
+patches:
+  - op: replace
+    old: "foo"
+    new: "bar"
+
+# Watch mode hooks
+watch:
+  # Run after successful build
+  onBuild:
+    - echo "Build completed successfully at {{timestamp}}"
+    - ./scripts/deploy.sh
+    - notify-send "Kustomark" "Build completed"
+
+  # Run when build fails
+  onError:
+    - echo "Build failed: {{error}}"
+    - echo "Exit code: {{exitCode}}"
+    - notify-send "Kustomark Build Failed" "{{error}}"
+
+  # Run when files change (before rebuild)
+  onChange:
+    - echo "File changed: {{file}} at {{timestamp}}"
+    - git add {{file}}
+```
+
+#### Template Variables
+
+Hooks support template variables that are replaced with actual values at runtime:
+
+| Variable | Description | Available In |
+|----------|-------------|--------------|
+| `{{file}}` | Path to the file that changed | onChange |
+| `{{error}}` | Error message from failed build | onError |
+| `{{exitCode}}` | Exit code (0 for success, 1 for error) | onBuild, onError |
+| `{{timestamp}}` | ISO 8601 timestamp of the event | All hooks |
+
+**Example variable interpolation:**
+
+```yaml
+watch:
+  onBuild:
+    - echo "Build succeeded at {{timestamp}} with exit code {{exitCode}}"
+    # Output: Build succeeded at 2024-01-15T10:30:45.123Z with exit code 0
+
+  onError:
+    - echo "Build failed: {{error}} (exit code: {{exitCode}})"
+    # Output: Build failed: Invalid configuration (exit code: 1)
+
+  onChange:
+    - echo "File {{file}} changed at {{timestamp}}"
+    # Output: File guide.md changed at 2024-01-15T10:30:45.123Z
+```
+
+#### Security
+
+By default, watch hooks are enabled and will execute the configured shell commands. For security-sensitive environments where you don't want arbitrary shell commands to execute:
+
+```bash
+# Disable all hooks
+kustomark watch . --no-hooks
+```
+
+**Security considerations:**
+
+1. **Trusted configurations only**: Only use watch hooks with trusted `kustomark.yaml` files, as hooks can execute arbitrary shell commands
+2. **Use --no-hooks in CI/CD**: Consider disabling hooks in automated environments unless explicitly needed
+3. **Audit hook commands**: Review all hook commands before running watch mode
+4. **Minimal privileges**: Run watch mode with minimal necessary privileges
+5. **No user input in hooks**: Don't interpolate user-controlled input into hook commands
+
+#### Use Cases
+
+**1. Desktop Notifications:**
+
+```yaml
+watch:
+  onBuild:
+    - notify-send "Kustomark" "Build completed successfully"
+  onError:
+    - notify-send -u critical "Kustomark" "Build failed: {{error}}"
+```
+
+**2. Automated Deployment:**
+
+```yaml
+watch:
+  onBuild:
+    - rsync -av ./output/ user@server:/var/www/docs/
+    - echo "Deployed at {{timestamp}}"
+  onError:
+    - echo "Deployment skipped due to build error"
+```
+
+**3. Running Tests:**
+
+```yaml
+watch:
+  onBuild:
+    - npm test
+    - echo "Tests completed at {{timestamp}}"
+  onError:
+    - echo "Skipping tests due to build failure: {{error}}"
+```
+
+**4. Git Integration:**
+
+```yaml
+watch:
+  onChange:
+    - git add {{file}}
+    - echo "Staged {{file}} for commit"
+  onBuild:
+    - git commit -m "Auto-update docs at {{timestamp}}"
+    - git push origin main
+```
+
+**5. Slack/Discord Notifications:**
+
+```yaml
+watch:
+  onBuild:
+    - 'curl -X POST https://hooks.slack.com/... -d "{\"text\":\"Docs updated at {{timestamp}}\"}"'
+  onError:
+    - 'curl -X POST https://hooks.slack.com/... -d "{\"text\":\"Build failed: {{error}}\"}"'
+```
+
+**6. Build Metrics:**
+
+```yaml
+watch:
+  onBuild:
+    - echo "{{timestamp}},success,{{exitCode}}" >> build-metrics.csv
+  onError:
+    - echo "{{timestamp}},failure,{{exitCode}},{{error}}" >> build-metrics.csv
+```
+
+**7. Multi-Environment Deployment:**
+
+```yaml
+watch:
+  onBuild:
+    - ./deploy.sh staging
+    - sleep 5
+    - ./run-smoke-tests.sh
+    - ./deploy.sh production
+```
+
+#### Hook Execution Details
+
+**Execution order:**
+- Hooks within a single event (e.g., onBuild) run sequentially in the order defined
+- If one hook fails, subsequent hooks still execute
+- Hook failures don't stop watch mode (it continues watching)
+
+**Timeout:**
+- Each hook command has a 30-second timeout
+- Commands exceeding the timeout are killed automatically
+- Timeout failures are logged but don't stop watch mode
+
+**Environment:**
+- Hooks inherit the shell environment from the parent process
+- Commands execute in a shell (`sh -c`)
+- Working directory is the directory containing `kustomark.yaml`
+
+**Verbosity levels:**
+- `-vvv` (verbosity 3): Shows hook execution messages
+- `-vvvv` (verbosity 4): Shows hook stdout and stderr output
+
+**Example with verbosity:**
+
+```bash
+# See which hooks are executing
+kustomark watch . -vvv
+
+# See full hook output
+kustomark watch . -vvvv
+```
 
 ## Design Principles
 

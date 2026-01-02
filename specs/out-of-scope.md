@@ -18,18 +18,6 @@ Prompt-based config creation.
 
 **Current alternative**: Use explicit flags: `kustomark init --base ../company/`
 
-### Watch Hooks
-
-Shell commands triggered on build events.
-
-```yaml
-watch:
-  onBuild: ["echo done"]
-  onError: ["notify-send failed"]
-```
-
-**Current alternative**: Parse JSON output from `kustomark watch --format=json`.
-
 ## Deferred: Complexity
 
 ### Conditional Patches

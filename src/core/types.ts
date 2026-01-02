@@ -277,6 +277,32 @@ export interface Validator {
 }
 
 /**
+ * Watch mode hooks configuration
+ */
+export interface WatchHooks {
+  /** Commands to run after successful build */
+  onBuild?: string[];
+  /** Commands to run when build fails */
+  onError?: string[];
+  /** Commands to run when file changes are detected */
+  onChange?: string[];
+}
+
+/**
+ * Hook execution context for template variables
+ */
+export interface HookContext {
+  /** The file that changed (for onChange hooks) */
+  file?: string;
+  /** Exit code from build or previous hook */
+  exitCode?: number;
+  /** Error message (for onError hooks) */
+  error?: string;
+  /** Timestamp of the event */
+  timestamp: string;
+}
+
+/**
  * Kustomark configuration structure
  */
 export interface KustomarkConfig {
@@ -294,6 +320,8 @@ export interface KustomarkConfig {
   onNoMatch?: OnNoMatchStrategy;
   /** Global validators to run on all resources */
   validators?: Validator[];
+  /** Watch mode hooks - shell commands triggered on build events */
+  watch?: WatchHooks;
 }
 
 /**

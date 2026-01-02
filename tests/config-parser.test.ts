@@ -2080,4 +2080,652 @@ describe('validateConfig', () => {
       });
     });
   });
+
+  describe('Watch Hooks Validation', () => {
+    describe('valid watch.onBuild configuration', () => {
+      test('accepts valid onBuild hook array', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: ['echo "build complete"', 'npm run deploy'],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('accepts single onBuild hook', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: ['echo "done"'],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts onBuild hooks with template variables', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: [
+              'echo "Build at {{timestamp}}"',
+              'echo "Exit code: {{exitCode}}"',
+            ],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('valid watch.onError configuration', () => {
+      test('accepts valid onError hook array', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onError: ['echo "Build failed: {{error}}"', 'notify-send "Error"'],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('accepts single onError hook', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onError: ['echo "error"'],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts onError hooks with error and exitCode variables', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onError: [
+              'echo "Error: {{error}}"',
+              'echo "Exit code: {{exitCode}}"',
+              'echo "Timestamp: {{timestamp}}"',
+            ],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('valid watch.onChange configuration', () => {
+      test('accepts valid onChange hook array', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onChange: ['echo "File changed: {{file}}"', 'git add {{file}}'],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('accepts single onChange hook', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onChange: ['echo "changed"'],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts onChange hooks with file variable', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onChange: [
+              'echo "Changed: {{file}}"',
+              'echo "At: {{timestamp}}"',
+            ],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('valid watch configuration with multiple hook types', () => {
+      test('accepts all three hook types together', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: ['echo "build"'],
+            onError: ['echo "error"'],
+            onChange: ['echo "change"'],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('accepts watch with only some hook types', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: ['echo "build"'],
+            onChange: ['echo "change"'],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts complex real-world watch configuration', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: [
+              'echo "Build completed at {{timestamp}}"',
+              'npm run lint',
+              'npm run test',
+              './deploy.sh',
+            ],
+            onError: [
+              'echo "Build failed: {{error}}"',
+              'notify-send "Kustomark Build Failed" "{{error}}"',
+              'echo "[{{timestamp}}] Build error: {{error}}" >> build.log',
+            ],
+            onChange: [
+              'echo "File changed: {{file}}"',
+              'git add {{file}}',
+              'echo "[{{timestamp}}] Modified: {{file}}" >> changes.log',
+            ],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+    });
+
+    describe('invalid watch configurations', () => {
+      test('fails when watch is not an object', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: 'invalid',
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual({
+          field: 'watch',
+          message: 'watch must be an object',
+        });
+      });
+
+      test('fails when watch is an array', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: ['echo "test"'],
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual({
+          field: 'watch',
+          message: 'watch must be an object',
+        });
+      });
+
+      test('fails when watch is a number', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: 123,
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual({
+          field: 'watch',
+          message: 'watch must be an object',
+        });
+      });
+
+      test('fails when onBuild is not an array', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: 'echo "test"',
+          },
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual({
+          field: 'watch.onBuild',
+          message: 'onBuild must be an array of strings',
+        });
+      });
+
+      test('fails when onError is not an array', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onError: { command: 'echo "test"' },
+          },
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual({
+          field: 'watch.onError',
+          message: 'onError must be an array of strings',
+        });
+      });
+
+      test('fails when onChange is not an array', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onChange: 123,
+          },
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual({
+          field: 'watch.onChange',
+          message: 'onChange must be an array of strings',
+        });
+      });
+
+      test('fails when onBuild array contains non-string', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: ['echo "valid"', 123, 'echo "also valid"'],
+          },
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual({
+          field: 'watch.onBuild[1]',
+          message: 'hook command must be a string',
+        });
+      });
+
+      test('fails when onError array contains non-string', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onError: [null, 'echo "valid"'],
+          },
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual({
+          field: 'watch.onError[0]',
+          message: 'hook command must be a string',
+        });
+      });
+
+      test('fails when onChange array contains non-string', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onChange: ['echo "valid"', { command: 'invalid' }, true],
+          },
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContainEqual({
+          field: 'watch.onChange[1]',
+          message: 'hook command must be a string',
+        });
+        expect(result.errors).toContainEqual({
+          field: 'watch.onChange[2]',
+          message: 'hook command must be a string',
+        });
+      });
+
+      test('accumulates errors from multiple invalid hook arrays', () => {
+        const config = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: [123, 'valid'],
+            onError: ['valid', null],
+            onChange: [true, false],
+          },
+        } as unknown as KustomarkConfig;
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(false);
+        expect(result.errors.length).toBeGreaterThanOrEqual(4);
+        expect(result.errors.some(e => e.field === 'watch.onBuild[0]')).toBe(true);
+        expect(result.errors.some(e => e.field === 'watch.onError[1]')).toBe(true);
+        expect(result.errors.some(e => e.field === 'watch.onChange[0]')).toBe(true);
+        expect(result.errors.some(e => e.field === 'watch.onChange[1]')).toBe(true);
+      });
+    });
+
+    describe('empty hooks arrays', () => {
+      test('accepts empty onBuild array', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: [],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('accepts empty onError array', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onError: [],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts empty onChange array', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onChange: [],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts all empty hook arrays', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: [],
+            onError: [],
+            onChange: [],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts empty watch object', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {},
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('undefined watch field', () => {
+      test('accepts config without watch field', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      });
+
+      test('accepts watch with only undefined hook fields', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: undefined,
+            onError: undefined,
+            onChange: undefined,
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('watch hooks with special characters and edge cases', () => {
+      test('accepts hooks with shell special characters', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: [
+              'echo "Build: $HOME" | tee -a log.txt',
+              'test -f output.md && echo "exists"',
+              'ls -la | grep "*.md" || true',
+            ],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts hooks with quotes and escapes', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onError: [
+              'echo "Error: \\"{{error}}\\""',
+              "echo 'Single quotes'",
+            ],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts hooks with multiline commands', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: [
+              'if [ -f output.md ]; then echo "exists"; fi',
+              'for f in *.md; do echo "$f"; done',
+            ],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts hooks with absolute and relative paths', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onChange: [
+              '/usr/local/bin/notify',
+              './scripts/deploy.sh',
+              '../shared/update.sh',
+            ],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts empty string hooks', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: [''],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts hooks with only whitespace', () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: ['   ', '\t', '\n'],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+
+      test('accepts very long hook commands', () => {
+        const longCommand = 'echo ' + 'a'.repeat(1000);
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          watch: {
+            onBuild: [longCommand],
+          },
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.valid).toBe(true);
+      });
+    });
+  });
 });

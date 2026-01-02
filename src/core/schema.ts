@@ -1483,6 +1483,37 @@ export function generateSchema(): object {
           additionalProperties: false,
         },
       },
+      watch: {
+        type: "object",
+        description: "Watch mode hooks - shell commands triggered on build events",
+        properties: {
+          onBuild: {
+            type: "array",
+            description: "Commands to execute after successful build (run sequentially)",
+            items: {
+              type: "string",
+              description: "Shell command with optional template variables: {{file}}, {{exitCode}}, {{timestamp}}",
+            },
+          },
+          onError: {
+            type: "array",
+            description: "Commands to execute when build fails",
+            items: {
+              type: "string",
+              description: "Shell command with optional template variables: {{error}}, {{exitCode}}, {{timestamp}}",
+            },
+          },
+          onChange: {
+            type: "array",
+            description: "Commands to execute when file changes are detected (before build)",
+            items: {
+              type: "string",
+              description: "Shell command with optional template variables: {{file}}, {{timestamp}}",
+            },
+          },
+        },
+        additionalProperties: false,
+      },
     },
     additionalProperties: false,
   };

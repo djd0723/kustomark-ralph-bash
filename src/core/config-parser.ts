@@ -160,6 +160,75 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
     }
   }
 
+  // Validate watch hooks (optional)
+  if (config.watch !== undefined) {
+    if (typeof config.watch !== "object" || Array.isArray(config.watch)) {
+      errors.push({
+        field: "watch",
+        message: "watch must be an object",
+      });
+    } else {
+      const watch = config.watch as Record<string, unknown>;
+
+      // Validate onBuild
+      if (watch.onBuild !== undefined) {
+        if (!Array.isArray(watch.onBuild)) {
+          errors.push({
+            field: "watch.onBuild",
+            message: "onBuild must be an array of strings",
+          });
+        } else {
+          watch.onBuild.forEach((cmd: unknown, index: number) => {
+            if (typeof cmd !== "string") {
+              errors.push({
+                field: `watch.onBuild[${index}]`,
+                message: "hook command must be a string",
+              });
+            }
+          });
+        }
+      }
+
+      // Validate onError
+      if (watch.onError !== undefined) {
+        if (!Array.isArray(watch.onError)) {
+          errors.push({
+            field: "watch.onError",
+            message: "onError must be an array of strings",
+          });
+        } else {
+          watch.onError.forEach((cmd: unknown, index: number) => {
+            if (typeof cmd !== "string") {
+              errors.push({
+                field: `watch.onError[${index}]`,
+                message: "hook command must be a string",
+              });
+            }
+          });
+        }
+      }
+
+      // Validate onChange
+      if (watch.onChange !== undefined) {
+        if (!Array.isArray(watch.onChange)) {
+          errors.push({
+            field: "watch.onChange",
+            message: "onChange must be an array of strings",
+          });
+        } else {
+          watch.onChange.forEach((cmd: unknown, index: number) => {
+            if (typeof cmd !== "string") {
+              errors.push({
+                field: `watch.onChange[${index}]`,
+                message: "hook command must be a string",
+              });
+            }
+          });
+        }
+      }
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
