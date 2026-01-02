@@ -75,13 +75,14 @@ ${formatSection("ADVANCED COMMANDS")}
   ${formatCommand("lint")}         Check for common issues in configuration
   ${formatCommand("explain")}      Show resolution chain and patch details
   ${formatCommand("analyze")}      Analyze patch complexity and provide insights
-  ${formatCommand("suggest")}      Generate patches from file differences
   ${formatCommand("test")}         Run patch tests against sample content
   ${formatCommand("template")}     Manage and apply configuration templates
   ${formatCommand("fetch")}        Fetch remote resources without building
   ${formatCommand("web")}          Launch web UI for visual editing
   ${formatCommand("cache")}        Manage cache for remote resources
   ${formatCommand("schema")}       Export JSON Schema for editor integration
+  ${formatCommand("snapshot")}     Create, verify, or update build output snapshots
+  ${formatCommand("suggest")}      Generate patches from file differences
 
 ${formatSection("GETTING HELP")}
   ${formatCommand("kustomark help")}                Show this help message
@@ -148,6 +149,7 @@ export function getCommandHelp(command: string): string {
     web: getWebHelp,
     cache: getCacheHelp,
     schema: getSchemaHelp,
+    snapshot: getSnapshotHelp,
     template: getTemplateHelp,
     suggest: getSuggestHelp,
   };
@@ -1755,6 +1757,217 @@ ${formatSection("SEE ALSO")}
 }
 
 // ============================================================================
+// Snapshot Command Help
+// ============================================================================
+
+function getSnapshotHelp(): string {
+  return `
+${formatTitle("kustomark snapshot - Create, verify, or update build output snapshots")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark snapshot")} [path] [options]
+  ${formatCommand("kustomark snapshot")} [path] ${formatFlag("--verify")} [options]
+  ${formatCommand("kustomark snapshot")} [path] ${formatFlag("--update-snapshot")} [options]
+
+${formatSection("DESCRIPTION")}
+  Snapshot testing helps detect unintended changes by comparing current build
+  output against a saved baseline. Use ${formatFlag("snapshot")} to create a baseline,
+  ${formatFlag("--verify")} to check for changes (returns exit code 1 if different),
+  and ${formatFlag("--update-snapshot")} to update the baseline after intentional
+  modifications.
+
+  Snapshots are stored as .snapshot files alongside your build output, allowing
+  you to catch unintended changes in your patches or configuration and verify
+  that your builds remain stable across updates.
+
+${formatSection("ARGUMENTS")}
+  ${formatFlag("path")}    Path to kustomark.yaml or directory (default: current directory)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--verify")}             Verify current build matches saved snapshot
+  ${formatFlag("--update-snapshot")}    Update existing snapshot with current build
+  ${formatFlag("--format")} <text|json> Output format (default: text)
+  ${formatFlag("-v, -vv, -vvv")}       Increase verbosity
+  ${formatFlag("-q")}                  Quiet mode (errors only)
+
+  All build options (--parallel, --incremental, --enable-groups, etc.) are
+  also supported for snapshot to ensure accurate comparisons.
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Create initial snapshot")}
+  ${formatCommand("kustomark snapshot")}
+
+  ${formatExample("# Verify build matches snapshot (useful in CI)")}
+  ${formatCommand("kustomark snapshot --verify")}
+
+  ${formatExample("# Update snapshot after intentional changes")}
+  ${formatCommand("kustomark snapshot --update-snapshot")}
+
+  ${formatExample("# Snapshot from specific directory")}
+  ${formatCommand("kustomark snapshot ./team/")}
+
+  ${formatExample("# Verify with verbose output")}
+  ${formatCommand("kustomark snapshot --verify -v")}
+
+  ${formatExample("# JSON output for automation")}
+  ${formatCommand("kustomark snapshot --verify --format=json")}
+
+  ${formatExample("# Create snapshot with specific patch groups")}
+  ${formatCommand("kustomark snapshot --enable-groups=branding,security")}
+
+${formatSection("MODES")}
+  ${formatHighlight("Create mode (default):")}
+    ${formatCommand("kustomark snapshot")}
+    Creates .snapshot files for each build output
+    Useful when setting up snapshot testing for first time
+
+  ${formatHighlight("Verify mode:")}
+    ${formatCommand("kustomark snapshot --verify")}
+    Compares current build with saved snapshots
+    Returns exit code 0 if no differences, 1 if different
+    Useful in CI/CD pipelines to detect changes
+
+  ${formatHighlight("Update mode:")}
+    ${formatCommand("kustomark snapshot --update-snapshot")}
+    Overwrites existing snapshots with current build
+    Use after intentional changes and code review
+    Creates new snapshots if they don't exist
+
+${formatSection("SNAPSHOT FILES")}
+  ${formatHighlight("File naming:")}
+    Output files have .snapshot extension added
+    Example: guide.md becomes guide.md.snapshot
+    Stored alongside original output files
+
+  ${formatHighlight("Snapshot content:")}
+    Complete output file content for comparison
+    Plain text format for git-friendly diffs
+    Can be stored in version control
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Regression testing:")}
+    ${formatCommand("kustomark snapshot --verify")}
+    Ensure patches produce expected output
+    Catch unintended changes in configuration
+
+  ${formatHighlight("CI/CD validation:")}
+    ${formatCommand("kustomark snapshot --verify")}
+    Run in CI pipeline to detect regressions
+    Fail build if output changes unexpectedly
+
+  ${formatHighlight("Patch development:")}
+    1. ${formatCommand("kustomark snapshot")} - Create baseline
+    2. Make changes to patches
+    3. ${formatCommand("kustomark snapshot --verify")} - Check impact
+    4. ${formatCommand("kustomark snapshot --update-snapshot")} - Accept changes
+
+  ${formatHighlight("Documentation verification:")}
+    Create snapshots of generated documentation
+    Verify documentation remains consistent
+    Catch unintended formatting changes
+
+${formatSection("WORKFLOW EXAMPLES")}
+  ${formatHighlight("Initial setup:")}
+    1. Finalize your kustomark.yaml configuration
+    2. Run ${formatCommand("kustomark build")} to verify everything works
+    3. ${formatCommand("kustomark snapshot")} - Create baseline snapshots
+    4. Commit ${formatExample(".snapshot")} files to git
+
+  ${formatHighlight("Development workflow:")}
+    1. Make changes to patches or configuration
+    2. ${formatCommand("kustomark diff")} - Preview changes
+    3. ${formatCommand("kustomark build")} - Build if satisfied
+    4. ${formatCommand("kustomark snapshot --verify")} - Check if changed
+
+  ${formatHighlight("Snapshot verification:")}
+    1. ${formatCommand("kustomark snapshot --verify")} - Check current state
+    2. Review any differences with ${formatCommand("kustomark diff")}
+    3. ${formatCommand("kustomark snapshot --update-snapshot")} - Accept changes
+    4. Commit updated snapshots
+
+  ${formatHighlight("CI/CD integration:")}
+    # In your CI script
+    ${formatCommand("kustomark build")}  # Build output
+    ${formatCommand("kustomark snapshot --verify")}  # Verify no regressions
+    # CI fails if snapshots don't match
+
+${formatSection("COMPARISON WITH BUILD")}
+  ${formatHighlight("build")}           Writes files to output directory
+  ${formatHighlight("snapshot")}       Creates/verifies .snapshot files of output
+
+  The snapshot command uses the same build process but focuses on
+  comparing output against saved snapshots rather than writing files.
+
+${formatSection("OUTPUT FORMAT")}
+  ${formatHighlight("Text format:")}
+    Summary of snapshot operations
+    Lists changed, added, and deleted files
+    Shows differences for changed files
+
+  ${formatHighlight("JSON format:")}
+    {
+      "action": "verify|create|update",
+      "success": true|false,
+      "filesChanged": 3,
+      "filesAdded": 1,
+      "filesDeleted": 0,
+      "differences": [
+        {
+          "file": "guide.md",
+          "status": "modified",
+          "diff": "..."
+        }
+      ]
+    }
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    Snapshots match (verify) or created/updated successfully
+  ${formatHighlight("1")}    Snapshots don't match (verify) or error occurred
+  ${formatHighlight("2")}    Configuration file not found or invalid
+
+${formatSection("BEST PRACTICES")}
+  ${formatHighlight("Commit snapshots to version control:")}
+    Store .snapshot files with your code
+    Enables visibility into output changes
+    Useful for code reviews
+
+  ${formatHighlight("Review changes before updating:")}
+    Always run ${formatCommand("kustomark diff")} before updating snapshots
+    Review the differences carefully
+    Verify changes are intentional
+
+  ${formatHighlight("Use in CI/CD:")}
+    Include ${formatCommand("kustomark snapshot --verify")} in CI pipeline
+    Detect unintended changes immediately
+    Fail fast to prevent bad deployments
+
+  ${formatHighlight("Regular maintenance:")}
+    Update snapshots after intentional changes
+    Remove .snapshot files for deleted outputs
+    Keep snapshots synchronized with configuration
+
+${formatSection("TIPS")}
+  ${formatHighlight("First snapshot creates baseline:")}
+    ${formatCommand("kustomark snapshot")} - Creates baseline snapshots
+    ${formatCommand("kustomark snapshot --verify")} - Later verifies against baseline
+
+  ${formatHighlight("Use with patch groups:")}
+    ${formatCommand("kustomark snapshot --enable-groups=feature")}
+    Snapshot specific patch combinations
+
+  ${formatHighlight("Combine with other commands:")}
+    ${formatCommand("kustomark snapshot && kustomark diff")}
+    See full impact before updating
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark build")}     Build output files
+  ${formatCommand("kustomark diff")}      Preview changes
+  ${formatCommand("kustomark preview")}   Visual side-by-side comparison
+  ${formatCommand("kustomark test")}      Run patch tests
+`;
+}
+
+// ============================================================================
 // Template Command Help
 // ============================================================================
 
@@ -2199,6 +2412,7 @@ export const helpCommands = [
   "web",
   "cache",
   "schema",
+  "snapshot",
   "template",
   "suggest",
 ] as const;

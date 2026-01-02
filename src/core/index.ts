@@ -180,6 +180,17 @@ export {
   SecurityValidationError,
   validateResourceSecurity,
 } from "./security.js";
+// Export snapshot manager functions and types
+export {
+  type BuildResult,
+  calculateFileHash as calculateSnapshotFileHash,
+  createSnapshot,
+  loadSnapshot,
+  type SnapshotManifest,
+  type SnapshotVerificationResult,
+  updateSnapshot,
+  verifySnapshot,
+} from "./snapshot-manager.js";
 // Export suggestion engine functions
 export {
   calculateLevenshteinDistance,

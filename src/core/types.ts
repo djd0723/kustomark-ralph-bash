@@ -1098,3 +1098,39 @@ export interface BenchmarkComparison {
     improvement: boolean;
   };
 }
+
+// Snapshot Testing Types
+
+/**
+ * Snapshot manifest containing metadata about a saved snapshot
+ */
+export interface SnapshotManifest {
+  /** Timestamp when snapshot was created */
+  timestamp: string;
+  /** Kustomark version used to create snapshot */
+  version: string;
+  /** Map of file paths to their SHA256 hashes */
+  fileHashes: Record<string, string>;
+  /** Total number of files in snapshot */
+  fileCount: number;
+}
+
+/**
+ * Result of verifying current build against a snapshot
+ */
+export interface SnapshotVerificationResult {
+  /** Whether the current build matches the snapshot */
+  matches: boolean;
+  /** Files that were added (not in snapshot) */
+  added: string[];
+  /** Files that were removed (in snapshot but not in build) */
+  removed: string[];
+  /** Files that were modified (different hash) */
+  modified: Array<{
+    path: string;
+    expectedHash: string;
+    actualHash: string;
+  }>;
+  /** Total number of differences found */
+  differenceCount: number;
+}

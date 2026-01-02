@@ -155,6 +155,8 @@ export interface CLIOptions {
   progress?: boolean; // For --progress option (show progress feedback)
   minRisk?: "low" | "medium" | "high" | string; // For analyze --min-risk option (minimum risk level to show)
   sort?: "risk" | "complexity" | "impact" | "coverage" | string; // For analyze --sort option (sort by field)
+  verify?: boolean; // For --verify flag (verify current build against snapshot)
+  updateSnapshot?: boolean; // For --update-snapshot flag (update snapshot with current build)
 }
 
 interface BuildStats {
@@ -347,6 +349,10 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.dryRun = true;
     } else if (arg === "--analyze") {
       options.analyze = true;
+    } else if (arg === "--verify") {
+      options.verify = true;
+    } else if (arg === "--update-snapshot") {
+      options.updateSnapshot = true;
     } else if (arg === "--no-hooks") {
       options.noHooks = true;
     } else if (arg === "--file" || arg.startsWith("--file=")) {
@@ -4212,10 +4218,18 @@ async function main(): Promise<number> {
       });
     case "debug":
       return await debugCommand(path, options);
+    case "fix": {
+      const { fixCommand } = await import("./fix-command.js");
+      return await fixCommand(path, options);
+    }
     case "test":
       return await testCommand(path, options);
     case "analyze":
       return await analyzeCommand(path, options);
+    case "snapshot": {
+      const { snapshotCommand } = await import("./snapshot-command.js");
+      return await snapshotCommand(path, options);
+    }
     case "suggest":
       return await suggestCommand(options);
     case "benchmark":

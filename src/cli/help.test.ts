@@ -165,7 +165,7 @@ describe("Help System", () => {
         "preview",
       ];
       expect(helpCommands).toEqual(expect.arrayContaining(expected));
-      expect(helpCommands.length).toBe(18);
+      expect(helpCommands.length).toBe(19);
     });
 
     test("has no duplicates", () => {
