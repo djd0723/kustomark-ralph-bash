@@ -6,9 +6,7 @@
       "name": "@kustomark/web-client",
       "dependencies": {
         "clsx": "^2.1.1",
-        "react": "^18.3.1",
         "react-diff-viewer-continued": "^3.4.0",
-        "react-dom": "^18.3.1",
         "react-hot-toast": "^2.6.0",
         "react-markdown": "^9.0.1",
         "remark-gfm": "^4.0.0",
@@ -16,14 +14,16 @@
       },
       "devDependencies": {
         "@tailwindcss/typography": "^0.5.15",
-        "@types/react": "^18.3.12",
-        "@types/react-dom": "^18.3.1",
         "@vitejs/plugin-react": "^4.3.4",
         "autoprefixer": "^10.4.20",
         "postcss": "^8.4.49",
         "tailwindcss": "^3.4.17",
         "typescript": "^5.7.2",
         "vite": "^6.0.3",
+      },
+      "peerDependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
       },
     },
   },
@@ -231,8 +231,6 @@
     "@types/prop-types": ["@types/prop-types@15.7.15", "", {}, "sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw=="],
 
     "@types/react": ["@types/react@18.3.27", "", { "dependencies": { "@types/prop-types": "*", "csstype": "^3.2.2" } }, "sha512-cisd7gxkzjBKU2GgdYrTdtQx1SORymWyaAFhaxQPK9bYO9ot3Y5OikQRvY0VYQtvwjeQnizCINJAenh/V7MK2w=="],
-
-    "@types/react-dom": ["@types/react-dom@18.3.7", "", { "peerDependencies": { "@types/react": "^18.0.0" } }, "sha512-MEe3UeoENYVFXzoXEWsvcpg6ZvlrFNlOQ7EOsvhI3CfAXwzPfO8Qwuxd40nepsYKqyyVQnTdEfv68q91yLcKrQ=="],
 
     "@types/unist": ["@types/unist@3.0.3", "", {}, "sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q=="],
 

@@ -44,6 +44,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [Incremental Builds](#incremental-builds)
 - [Exit Codes](#exit-codes)
 - [JSON Output](#json-output)
+- [API Documentation](#api-documentation)
 - [IDE Integration](#ide-integration)
   - [VSCode Extension](#vscode-extension)
   - [JSON Schema](#json-schema)
@@ -3407,6 +3408,76 @@ else
   exit 1
 fi
 ```
+
+## API Documentation
+
+For developers integrating Kustomark into their applications or extending its functionality, comprehensive API documentation is available for the core library.
+
+### Accessing the API Documentation
+
+The complete TypeScript API documentation is available in the `docs/api/` directory and includes:
+
+- **All exported functions and classes** from the core library
+- **Type definitions** for all configuration schemas and data structures
+- **Patch operations** with detailed parameter documentation
+- **Configuration schemas** with validation rules
+- **Resource resolution** and remote fetching APIs
+- **Build cache** and incremental build utilities
+- **Template system** for variable substitution
+- **Condition evaluation** for conditional patches
+
+### Generating Documentation
+
+To regenerate the API documentation from source:
+
+```bash
+bun run docs:api
+```
+
+The documentation is generated using [TypeDoc](https://typedoc.org/) from the TypeScript source code and JSDoc comments in `src/core/**/*.ts`.
+
+### Core Library Usage
+
+The core library can be imported and used programmatically:
+
+```typescript
+import {
+  applyPatches,
+  parseConfig,
+  resolveResources,
+  type KustomarkConfig,
+  type PatchOperation
+} from 'kustomark';
+
+// Load and parse a kustomark configuration
+const config: KustomarkConfig = await parseConfig('./kustomark.yaml');
+
+// Resolve resources (local files, git repos, HTTP archives)
+const resources = await resolveResources(config.resources, {
+  baseDir: process.cwd()
+});
+
+// Apply patches to markdown content
+const result = applyPatches(content, config.patches || [], {
+  onNoMatch: config.onNoMatch || 'warn',
+  filePath: 'README.md'
+});
+
+console.log(`Applied ${result.applied} patches`);
+console.log(result.content);
+```
+
+### Key Modules
+
+- **patch-engine.ts** - Core patching operations and markdown parsing
+- **config-parser.ts** - Configuration file parsing and validation
+- **resource-resolver.ts** - Resource resolution (local, git, HTTP)
+- **build-cache.ts** - Incremental build caching
+- **condition-evaluator.ts** - Conditional patch evaluation
+- **validators.ts** - Content validation framework
+- **template-manager.ts** - Template variable substitution
+
+For detailed documentation of all functions, types, and interfaces, see the [API documentation](./docs/api/index.html).
 
 ## IDE Integration
 

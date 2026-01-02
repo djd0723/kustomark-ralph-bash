@@ -1,0 +1,6 @@
+[test]
+# Load setup file before running tests
+preload = ["./tests/setup.ts"]
+
+# Use happy-dom for DOM testing
+testEnvironment = "happy-dom"

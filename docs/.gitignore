@@ -1,0 +1,12 @@
+# TypeDoc generated API documentation
+# Regenerate with: bun run docs:api
+api/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore editor files
+*.swp
+*.swo
+*~

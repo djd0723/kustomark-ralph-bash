@@ -6,6 +6,16 @@ This directory contains the API documentation for the Kustomark core library.
 
 - **[Full API Reference](./api/index.html)** - Complete TypeDoc-generated API documentation
 
+### Regenerating API Documentation
+
+To regenerate the API documentation from source code:
+
+```bash
+bun run docs:api
+```
+
+The documentation is generated from TypeScript source code and JSDoc comments in `src/core/**/*.ts` using [TypeDoc](https://typedoc.org/).
+
 ## Core Library Overview
 
 The Kustomark core library provides a comprehensive set of tools for patching markdown files programmatically.

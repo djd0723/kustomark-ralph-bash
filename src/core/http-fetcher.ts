@@ -6,6 +6,8 @@
 
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { get as httpGet } from "node:http";
+import { get as httpsGet } from "node:https";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { findLockEntry } from "./lock-file.js";
@@ -264,62 +266,105 @@ async function readFilesRecursively(
 }
 
 /**
- * Download a file from a URL
+ * Download a file from a URL using Node.js http/https modules
+ * This avoids CORS issues that occur with Bun's fetch() implementation
  */
 async function downloadFile(
   url: string,
   destPath: string,
   options: { authToken?: string; headers?: Record<string, string>; timeout?: number } = {},
 ): Promise<void> {
-  const headers: Record<string, string> = {
-    "User-Agent": "kustomark-http-fetcher/1.0",
-    ...options.headers,
-  };
+  return new Promise((resolve, reject) => {
+    const headers: Record<string, string> = {
+      "User-Agent": "kustomark-http-fetcher/1.0",
+      ...options.headers,
+    };
 
-  // Add authentication if provided
-  if (options.authToken) {
-    headers.Authorization = `Bearer ${options.authToken}`;
-  }
+    // Add authentication if provided
+    if (options.authToken) {
+      headers.Authorization = `Bearer ${options.authToken}`;
+    }
 
-  const controller = new AbortController();
-  const timeout = options.timeout ?? 60000;
-  const timeoutHandle = setTimeout(() => controller.abort(), timeout);
+    const timeout = options.timeout ?? 60000;
+    const parsedUrl = new URL(url);
+    const get = parsedUrl.protocol === "https:" ? httpsGet : httpGet;
 
-  try {
-    const response = await fetch(url, {
-      headers,
-      signal: controller.signal,
+    const request = get(
+      url,
+      {
+        headers,
+        timeout,
+      },
+      (response) => {
+        // Handle redirects
+        if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          const redirectUrl = response.headers.location;
+          downloadFile(redirectUrl, destPath, options)
+            .then(resolve)
+            .catch(reject);
+          return;
+        }
+
+        // Check for HTTP errors
+        if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+          reject(
+            new HttpFetchError(
+              `HTTP ${response.statusCode}: ${response.statusMessage}`,
+              "HTTP_ERROR",
+              response.statusCode,
+            ),
+          );
+          return;
+        }
+
+        // Collect response data
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk) => {
+          chunks.push(Buffer.from(chunk));
+        });
+
+        response.on("end", async () => {
+          try {
+            const buffer = Buffer.concat(chunks);
+            await writeFile(destPath, buffer);
+            resolve();
+          } catch (error) {
+            reject(
+              new HttpFetchError(
+                `Failed to write file: ${(error as Error).message}`,
+                "WRITE_FAILED",
+              ),
+            );
+          }
+        });
+
+        response.on("error", (error) => {
+          reject(
+            new HttpFetchError(
+              `Response error: ${error.message}`,
+              "DOWNLOAD_FAILED",
+            ),
+          );
+        });
+      },
+    );
+
+    request.on("timeout", () => {
+      request.destroy();
+      reject(new HttpFetchError(`Download timed out after ${timeout}ms`, "TIMEOUT"));
     });
 
-    clearTimeout(timeoutHandle);
-
-    if (!response.ok) {
-      throw new HttpFetchError(
-        `HTTP ${response.status}: ${response.statusText}`,
-        "HTTP_ERROR",
-        response.status,
+    request.on("error", (error) => {
+      reject(
+        new HttpFetchError(
+          `Failed to download file: ${error.message}`,
+          "DOWNLOAD_FAILED",
+        ),
       );
-    }
+    });
 
-    // Write the response to the file
-    const arrayBuffer = await response.arrayBuffer();
-    await writeFile(destPath, new Uint8Array(arrayBuffer));
-  } catch (error) {
-    clearTimeout(timeoutHandle);
-
-    if (error instanceof HttpFetchError) {
-      throw error;
-    }
-
-    if ((error as Error).name === "AbortError") {
-      throw new HttpFetchError(`Download timed out after ${timeout}ms`, "TIMEOUT");
-    }
-
-    throw new HttpFetchError(
-      `Failed to download file: ${(error as Error).message}`,
-      "DOWNLOAD_FAILED",
-    );
-  }
+    request.end();
+  });
 }
 
 /**
