@@ -77,7 +77,7 @@ Final text`;
 
 describe("Table Operations Integration - replace-table-cell", () => {
   describe("basic replacement with index selectors", () => {
-    test("replaces cell using all numeric indices", () => {
+    test("replaces cell using all numeric indices", async () => {
       const content = createSimpleTable();
       // Table starts at line 0 (first line is the header)
       const patches: PatchOperation[] = [
@@ -90,14 +90,14 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Charlie | 30 |");
       expect(result.content).not.toContain("| Alice | 30 |");
       expect(result.applied).toBe(1);
     });
 
-    test("replaces cell in middle row and column", () => {
+    test("replaces cell in middle row and column", async () => {
       const content = `| A | B | C |
 | :--- | :--- | :--- |
 | 1 | 2 | 3 |
@@ -114,13 +114,13 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| 4 | X | 6 |");
       expect(result.applied).toBe(1);
     });
 
-    test("replaces multiple cells in sequence", () => {
+    test("replaces multiple cells in sequence", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -139,7 +139,7 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Charlie | 30 |");
       expect(result.content).toContain("| Bob | 99 |");
@@ -148,7 +148,7 @@ describe("Table Operations Integration - replace-table-cell", () => {
   });
 
   describe("replacement with column name selector", () => {
-    test("replaces cell using column name and row index", () => {
+    test("replaces cell using column name and row index", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -160,13 +160,13 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | 35 |");
       expect(result.applied).toBe(1);
     });
 
-    test("replaces using row value selector with column name", () => {
+    test("replaces using row value selector with column name", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -178,13 +178,13 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Bob | 99 |");
       expect(result.applied).toBe(1);
     });
 
-    test("replaces using row value selector with column index", () => {
+    test("replaces using row value selector with column index", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -196,7 +196,7 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | 40 |");
       expect(result.applied).toBe(1);
@@ -204,7 +204,7 @@ describe("Table Operations Integration - replace-table-cell", () => {
   });
 
   describe("replacement with special content", () => {
-    test("replaces cell with markdown formatting", () => {
+    test("replaces cell with markdown formatting", async () => {
       const content = `| Name | Status |
 | :--- | :--- |
 | Alice | Active |`;
@@ -219,13 +219,13 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | **Active** |");
       expect(result.applied).toBe(1);
     });
 
-    test("replaces cell with code formatting", () => {
+    test("replaces cell with code formatting", async () => {
       const content = `| Name | Command |
 | :--- | :--- |
 | Alice | foo |`;
@@ -240,13 +240,13 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | `bar()` |");
       expect(result.applied).toBe(1);
     });
 
-    test("replaces cell with link", () => {
+    test("replaces cell with link", async () => {
       const content = `| Name | Link |
 | :--- | :--- |
 | Alice | old |`;
@@ -261,13 +261,13 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | [link](http://example.com) |");
       expect(result.applied).toBe(1);
     });
 
-    test("replaces cell with empty string", () => {
+    test("replaces cell with empty string", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -279,7 +279,7 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice |  |");
       expect(result.applied).toBe(1);
@@ -287,7 +287,7 @@ describe("Table Operations Integration - replace-table-cell", () => {
   });
 
   describe("table not found", () => {
-    test("returns no match warning when table not found by index", () => {
+    test("returns no match warning when table not found by index", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -300,13 +300,13 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.warnings.length).toBeGreaterThan(0);
     });
 
-    test("throws error when table not found with onNoMatch error", () => {
+    test("throws error when table not found with onNoMatch error", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -319,12 +319,12 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      expect(() => applyPatches(content, patches)).toThrow();
+      expect(applyPatches(content, patches)).rejects.toThrow();
     });
   });
 
   describe("multiple tables in same document", () => {
-    test("replaces cell in first table by line number", () => {
+    test("replaces cell in first table by line number", async () => {
       const content = createMultipleTables();
       // First table starts at line 2
       const patches: PatchOperation[] = [
@@ -337,14 +337,14 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Charlie | 30 |");
       expect(result.content).toContain("| ProjectA | Active |");
       expect(result.applied).toBe(1);
     });
 
-    test("replaces cell in second table by line number", () => {
+    test("replaces cell in second table by line number", async () => {
       const content = createMultipleTables();
       // Second table starts at line 9
       const patches: PatchOperation[] = [
@@ -357,14 +357,14 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| ProjectX | Active |");
       expect(result.content).toContain("| Alice | 30 |");
       expect(result.applied).toBe(1);
     });
 
-    test("replaces in tables in different sections", () => {
+    test("replaces in tables in different sections", async () => {
       const content = createTablesInSections();
       // First table (Personnel) starts at line 6
       // Second table (Infrastructure) starts at line 13
@@ -385,7 +385,7 @@ describe("Table Operations Integration - replace-table-cell", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | Director |");
       expect(result.content).toContain("| Server2 | Running |");
@@ -396,7 +396,7 @@ describe("Table Operations Integration - replace-table-cell", () => {
 
 describe("Table Operations Integration - add-table-row", () => {
   describe("basic row addition", () => {
-    test("appends row to table by default", () => {
+    test("appends row to table by default", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -406,7 +406,7 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Charlie | 35 |");
       expect(result.content).toContain("| Alice | 30 |");
@@ -414,7 +414,7 @@ describe("Table Operations Integration - add-table-row", () => {
       expect(result.applied).toBe(1);
     });
 
-    test("adds row to table with single existing row", () => {
+    test("adds row to table with single existing row", async () => {
       const content = `| Name | Age |
 | :--- | ---: |
 | Alice | 30 |`;
@@ -427,13 +427,13 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Bob | 25 |");
       expect(result.applied).toBe(1);
     });
 
-    test("adds row with many columns", () => {
+    test("adds row with many columns", async () => {
       const content = `| A | B | C | D | E |
 | :--- | :--- | :--- | :--- | :--- |
 | a | b | c | d | e |`;
@@ -446,7 +446,7 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| 1 | 2 | 3 | 4 | 5 |");
       expect(result.applied).toBe(1);
@@ -454,7 +454,7 @@ describe("Table Operations Integration - add-table-row", () => {
   });
 
   describe("row position parameter", () => {
-    test("inserts row at beginning", () => {
+    test("inserts row at beginning", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -465,7 +465,7 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
       const lines = result.content.split("\n");
 
       expect(lines[2]).toContain("| Charlie | 35 |");
@@ -473,7 +473,7 @@ describe("Table Operations Integration - add-table-row", () => {
       expect(result.applied).toBe(1);
     });
 
-    test("inserts row in middle", () => {
+    test("inserts row in middle", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -484,7 +484,7 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
       const lines = result.content.split("\n");
 
       expect(lines[2]).toContain("| Alice | 30 |");
@@ -493,7 +493,7 @@ describe("Table Operations Integration - add-table-row", () => {
       expect(result.applied).toBe(1);
     });
 
-    test("appends row when position equals row count", () => {
+    test("appends row when position equals row count", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -504,7 +504,7 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Charlie | 35 |");
       const lines = result.content.split("\n");
@@ -514,7 +514,7 @@ describe("Table Operations Integration - add-table-row", () => {
   });
 
   describe("row content variations", () => {
-    test("adds row with empty cells", () => {
+    test("adds row with empty cells", async () => {
       const content = `| Name | Age | Email |
 | :--- | ---: | :--- |
 | Alice | 30 | alice@example.com |`;
@@ -527,13 +527,13 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Bob |  |  |");
       expect(result.applied).toBe(1);
     });
 
-    test("adds row with markdown formatting", () => {
+    test("adds row with markdown formatting", async () => {
       const content = `| Name | Status |
 | :--- | :--- |
 | Alice | Active |`;
@@ -546,13 +546,13 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Bob | **Admin** |");
       expect(result.applied).toBe(1);
     });
 
-    test("adds row with special characters", () => {
+    test("adds row with special characters", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -562,7 +562,7 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| O'Brien | 25 |");
       expect(result.applied).toBe(1);
@@ -570,7 +570,7 @@ describe("Table Operations Integration - add-table-row", () => {
   });
 
   describe("multiple row additions", () => {
-    test("adds multiple rows in sequence", () => {
+    test("adds multiple rows in sequence", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -585,7 +585,7 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | 30 |");
       expect(result.content).toContain("| Bob | 25 |");
@@ -594,7 +594,7 @@ describe("Table Operations Integration - add-table-row", () => {
       expect(result.applied).toBe(2);
     });
 
-    test("adds rows to each table independently", () => {
+    test("adds rows to each table independently", async () => {
       const teamContent = `# Team
 
 | Name | Age |
@@ -626,8 +626,8 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const teamResult = applyPatches(teamContent, teamPatches);
-      const projectsResult = applyPatches(projectsContent, projectsPatches);
+      const teamResult = await applyPatches(teamContent, teamPatches);
+      const projectsResult = await applyPatches(projectsContent, projectsPatches);
 
       expect(teamResult.content).toContain("| Charlie | 35 |");
       expect(projectsResult.content).toContain("| ProjectC | Pending |");
@@ -637,7 +637,7 @@ describe("Table Operations Integration - add-table-row", () => {
   });
 
   describe("table not found", () => {
-    test("returns warning when table not found", () => {
+    test("returns warning when table not found", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -648,7 +648,7 @@ describe("Table Operations Integration - add-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.warnings.length).toBeGreaterThan(0);
@@ -658,7 +658,7 @@ describe("Table Operations Integration - add-table-row", () => {
 
 describe("Table Operations Integration - remove-table-row", () => {
   describe("basic row removal", () => {
-    test("removes row by numeric index", () => {
+    test("removes row by numeric index", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -668,14 +668,14 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).not.toContain("| Alice | 30 |");
       expect(result.content).toContain("| Bob | 25 |");
       expect(result.applied).toBe(1);
     });
 
-    test("removes second row", () => {
+    test("removes second row", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -685,14 +685,14 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | 30 |");
       expect(result.content).not.toContain("| Bob | 25 |");
       expect(result.applied).toBe(1);
     });
 
-    test("removes only row leaving empty table", () => {
+    test("removes only row leaving empty table", async () => {
       const content = `| Name | Age |
 | :--- | ---: |
 | Alice | 30 |`;
@@ -705,13 +705,13 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).not.toContain("| Alice | 30 |");
       expect(result.applied).toBe(1);
     });
 
-    test("removes middle row from three rows", () => {
+    test("removes middle row from three rows", async () => {
       const content = `| Name | Age |
 | :--- | ---: |
 | Alice | 30 |
@@ -726,7 +726,7 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | 30 |");
       expect(result.content).not.toContain("| Bob | 25 |");
@@ -736,7 +736,7 @@ describe("Table Operations Integration - remove-table-row", () => {
   });
 
   describe("row removal by value", () => {
-    test("removes row by column name and value", () => {
+    test("removes row by column name and value", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -746,14 +746,14 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | 30 |");
       expect(result.content).not.toContain("| Bob | 25 |");
       expect(result.applied).toBe(1);
     });
 
-    test("removes row by column index and value", () => {
+    test("removes row by column index and value", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -763,14 +763,14 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).not.toContain("| Alice | 30 |");
       expect(result.content).toContain("| Bob | 25 |");
       expect(result.applied).toBe(1);
     });
 
-    test("removes first matching row when duplicates exist", () => {
+    test("removes first matching row when duplicates exist", async () => {
       const content = `| Name | Age |
 | :--- | ---: |
 | Alice | 30 |
@@ -785,7 +785,7 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
       const lines = result.content.split("\n");
 
       expect(lines[2]).toContain("| Alice | 25 |");
@@ -795,7 +795,7 @@ describe("Table Operations Integration - remove-table-row", () => {
   });
 
   describe("multiple removals", () => {
-    test("removes multiple rows in sequence", () => {
+    test("removes multiple rows in sequence", async () => {
       const content = `| Name | Age |
 | :--- | ---: |
 | Alice | 30 |
@@ -815,7 +815,7 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).not.toContain("| Alice | 30 |");
       expect(result.content).not.toContain("| Bob | 25 |");
@@ -823,7 +823,7 @@ describe("Table Operations Integration - remove-table-row", () => {
       expect(result.applied).toBe(2);
     });
 
-    test("removes rows from multiple tables", () => {
+    test("removes rows from multiple tables", async () => {
       const content = createMultipleTables();
       // First table at line 2, second table at line 9
       const patches: PatchOperation[] = [
@@ -839,7 +839,7 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).not.toContain("| Alice | 30 |");
       expect(result.content).not.toContain("| ProjectB | Inactive |");
@@ -848,7 +848,7 @@ describe("Table Operations Integration - remove-table-row", () => {
   });
 
   describe("table not found", () => {
-    test("returns warning when table not found", () => {
+    test("returns warning when table not found", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -859,7 +859,7 @@ describe("Table Operations Integration - remove-table-row", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.warnings.length).toBeGreaterThan(0);
@@ -869,7 +869,7 @@ describe("Table Operations Integration - remove-table-row", () => {
 
 describe("Table Operations Integration - add-table-column", () => {
   describe("basic column addition", () => {
-    test("appends column to end by default", () => {
+    test("appends column to end by default", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -879,14 +879,14 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age | Email |");
       expect(result.content).toContain("| Alice | 30 |  |");
       expect(result.applied).toBe(1);
     });
 
-    test("adds column with default value", () => {
+    test("adds column with default value", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -897,7 +897,7 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age | Status |");
       expect(result.content).toContain("| Alice | 30 | Active |");
@@ -905,7 +905,7 @@ describe("Table Operations Integration - add-table-column", () => {
       expect(result.applied).toBe(1);
     });
 
-    test("adds column to table with single row", () => {
+    test("adds column to table with single row", async () => {
       const content = `| Name | Age |
 | :--- | ---: |
 | Alice | 30 |`;
@@ -918,13 +918,13 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age | Email |");
       expect(result.applied).toBe(1);
     });
 
-    test("adds column to single-column table", () => {
+    test("adds column to single-column table", async () => {
       const content = `| Name |
 | :--- |
 | Alice |`;
@@ -938,7 +938,7 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age |");
       expect(result.content).toContain("| Alice | 30 |");
@@ -947,7 +947,7 @@ describe("Table Operations Integration - add-table-column", () => {
   });
 
   describe("column position parameter", () => {
-    test("inserts column at beginning", () => {
+    test("inserts column at beginning", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -959,14 +959,14 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| ID | Name | Age |");
       expect(result.content).toContain("| 1 | Alice | 30 |");
       expect(result.applied).toBe(1);
     });
 
-    test("inserts column in middle", () => {
+    test("inserts column in middle", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -977,14 +977,14 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Email | Age |");
       expect(result.content).toContain("| Alice |  | 30 |");
       expect(result.applied).toBe(1);
     });
 
-    test("appends column when position equals header count", () => {
+    test("appends column when position equals header count", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -995,7 +995,7 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age | Email |");
       expect(result.applied).toBe(1);
@@ -1003,7 +1003,7 @@ describe("Table Operations Integration - add-table-column", () => {
   });
 
   describe("default values", () => {
-    test("uses empty string when defaultValue omitted", () => {
+    test("uses empty string when defaultValue omitted", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -1013,13 +1013,13 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | 30 |  |");
       expect(result.applied).toBe(1);
     });
 
-    test("applies default value to all rows", () => {
+    test("applies default value to all rows", async () => {
       const content = `| Name | Age |
 | :--- | ---: |
 | Alice | 30 |
@@ -1035,7 +1035,7 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | 30 | USA |");
       expect(result.content).toContain("| Bob | 25 | USA |");
@@ -1043,7 +1043,7 @@ describe("Table Operations Integration - add-table-column", () => {
       expect(result.applied).toBe(1);
     });
 
-    test("applies markdown default value", () => {
+    test("applies markdown default value", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -1054,7 +1054,7 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Alice | 30 | **Active** |");
       expect(result.applied).toBe(1);
@@ -1062,7 +1062,7 @@ describe("Table Operations Integration - add-table-column", () => {
   });
 
   describe("multiple columns addition", () => {
-    test("adds multiple columns in sequence", () => {
+    test("adds multiple columns in sequence", async () => {
       const content = `| Name |
 | :--- |
 | Alice |`;
@@ -1082,14 +1082,14 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age | Email |");
       expect(result.content).toContain("| Alice | 30 | alice@example.com |");
       expect(result.applied).toBe(2);
     });
 
-    test("adds columns to multiple tables", () => {
+    test("adds columns to multiple tables", async () => {
       const content = createMultipleTables();
       // First table at line 2, second table at line 9
       const patches: PatchOperation[] = [
@@ -1105,7 +1105,7 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age | Email |");
       expect(result.content).toContain("| Project | Status | Owner |");
@@ -1114,7 +1114,7 @@ describe("Table Operations Integration - add-table-column", () => {
   });
 
   describe("table not found", () => {
-    test("returns warning when table not found", () => {
+    test("returns warning when table not found", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -1125,7 +1125,7 @@ describe("Table Operations Integration - add-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.warnings.length).toBeGreaterThan(0);
@@ -1135,7 +1135,7 @@ describe("Table Operations Integration - add-table-column", () => {
 
 describe("Table Operations Integration - remove-table-column", () => {
   describe("basic column removal", () => {
-    test("removes column by numeric index", () => {
+    test("removes column by numeric index", async () => {
       const content = `| Name | Age | Email |
 | :--- | ---: | :--- |
 | Alice | 30 | alice@example.com |`;
@@ -1148,7 +1148,7 @@ describe("Table Operations Integration - remove-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Email |");
       expect(result.content).toContain("| Alice | alice@example.com |");
@@ -1156,7 +1156,7 @@ describe("Table Operations Integration - remove-table-column", () => {
       expect(result.applied).toBe(1);
     });
 
-    test("removes first column", () => {
+    test("removes first column", async () => {
       const content = `| Name | Age | Email |
 | :--- | ---: | :--- |
 | Alice | 30 | alice@example.com |`;
@@ -1169,14 +1169,14 @@ describe("Table Operations Integration - remove-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Age | Email |");
       expect(result.content).not.toContain("Name");
       expect(result.applied).toBe(1);
     });
 
-    test("removes last column", () => {
+    test("removes last column", async () => {
       const content = `| Name | Age | Email |
 | :--- | ---: | :--- |
 | Alice | 30 | alice@example.com |`;
@@ -1189,14 +1189,14 @@ describe("Table Operations Integration - remove-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age |");
       expect(result.content).not.toContain("Email");
       expect(result.applied).toBe(1);
     });
 
-    test("removes column by header name", () => {
+    test("removes column by header name", async () => {
       const content = `| Name | Age | Email |
 | :--- | ---: | :--- |
 | Alice | 30 | alice@example.com |`;
@@ -1209,7 +1209,7 @@ describe("Table Operations Integration - remove-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Email |");
       expect(result.content).not.toContain("Age");
@@ -1218,7 +1218,7 @@ describe("Table Operations Integration - remove-table-column", () => {
   });
 
   describe("multiple column removal", () => {
-    test("removes multiple columns in sequence", () => {
+    test("removes multiple columns in sequence", async () => {
       const content = `| A | B | C | D |
 | :--- | :--- | :--- | :--- |
 | 1 | 2 | 3 | 4 |`;
@@ -1236,7 +1236,7 @@ describe("Table Operations Integration - remove-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| A | D |");
       expect(result.content).not.toContain("B");
@@ -1244,7 +1244,7 @@ describe("Table Operations Integration - remove-table-column", () => {
       expect(result.applied).toBe(2);
     });
 
-    test("removes columns from multiple tables", () => {
+    test("removes columns from multiple tables", async () => {
       const content = createMultipleTables();
       // First table at line 2, second table at line 9
       const patches: PatchOperation[] = [
@@ -1260,7 +1260,7 @@ describe("Table Operations Integration - remove-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name |");
       expect(result.content).toContain("| Project |");
@@ -1269,7 +1269,7 @@ describe("Table Operations Integration - remove-table-column", () => {
   });
 
   describe("edge cases", () => {
-    test("removes column from table with single data row", () => {
+    test("removes column from table with single data row", async () => {
       const content = `| Name | Age | Email |
 | :--- | ---: | :--- |
 | Alice | 30 | alice@example.com |`;
@@ -1282,13 +1282,13 @@ describe("Table Operations Integration - remove-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Email |");
       expect(result.applied).toBe(1);
     });
 
-    test("removes column affecting multiple rows", () => {
+    test("removes column affecting multiple rows", async () => {
       const content = `| Name | Age | Email |
 | :--- | ---: | :--- |
 | Alice | 30 | alice@example.com |
@@ -1303,7 +1303,7 @@ describe("Table Operations Integration - remove-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).not.toContain("alice@example.com");
       expect(result.content).not.toContain("bob@example.com");
@@ -1313,7 +1313,7 @@ describe("Table Operations Integration - remove-table-column", () => {
   });
 
   describe("table not found", () => {
-    test("returns warning when table not found", () => {
+    test("returns warning when table not found", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -1324,7 +1324,7 @@ describe("Table Operations Integration - remove-table-column", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.warnings.length).toBeGreaterThan(0);
@@ -1334,7 +1334,7 @@ describe("Table Operations Integration - remove-table-column", () => {
 
 describe("Combined Table Operations", () => {
   describe("mixing different operations", () => {
-    test("adds row then replaces cell", () => {
+    test("adds row then replaces cell", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -1351,13 +1351,13 @@ describe("Combined Table Operations", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Charlie | 40 |");
       expect(result.applied).toBe(2);
     });
 
-    test("adds column then removes row", () => {
+    test("adds column then removes row", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -1372,14 +1372,14 @@ describe("Combined Table Operations", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age | Email |");
       expect(result.content).not.toContain("| Alice | 30 |");
       expect(result.applied).toBe(2);
     });
 
-    test("removes column then adds row", () => {
+    test("removes column then adds row", async () => {
       const content = `| Name | Age | Email |
 | :--- | ---: | :--- |
 | Alice | 30 | alice@example.com |`;
@@ -1397,7 +1397,7 @@ describe("Combined Table Operations", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Age |");
       expect(result.content).toContain("| Bob | 25 |");
@@ -1406,7 +1406,7 @@ describe("Combined Table Operations", () => {
   });
 
   describe("complex realistic scenarios", () => {
-    test("updates team table with multiple operations", () => {
+    test("updates team table with multiple operations", async () => {
       const content = `# Team Members
 
 | Name | Role | Active |
@@ -1436,7 +1436,7 @@ describe("Combined Table Operations", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Name | Role | Active | Start Date |");
       expect(result.content).toContain("| Alice | Director | Yes | 2024 |");
@@ -1444,7 +1444,7 @@ describe("Combined Table Operations", () => {
       expect(result.applied).toBe(3);
     });
 
-    test("refactors project tracking table", () => {
+    test("refactors project tracking table", async () => {
       const content = `# Projects
 
 | Project | Status |
@@ -1482,7 +1482,7 @@ describe("Combined Table Operations", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Project | Status | Owner |");
       expect(result.content).not.toContain("| ProjectB | Inactive |");
@@ -1493,7 +1493,7 @@ describe("Combined Table Operations", () => {
   });
 
   describe("onNoMatch strategy verification", () => {
-    test("warn strategy produces warnings for missing tables", () => {
+    test("warn strategy produces warnings for missing tables", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -1511,14 +1511,14 @@ describe("Combined Table Operations", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.warnings.length).toBeGreaterThan(0);
       expect(result.content).toContain("| Updated | 30 |");
     });
 
-    test("skip strategy silently ignores missing tables", () => {
+    test("skip strategy silently ignores missing tables", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -1536,14 +1536,14 @@ describe("Combined Table Operations", () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.warnings.length).toBe(0);
       expect(result.content).toContain("| Updated | 30 |");
     });
 
-    test("default onNoMatch applies to patch operations", () => {
+    test("default onNoMatch applies to patch operations", async () => {
       const content = createSimpleTable();
       const patches: PatchOperation[] = [
         {
@@ -1553,7 +1553,7 @@ describe("Combined Table Operations", () => {
         },
       ];
 
-      const result = applyPatches(content, patches, "warn");
+      const result = await applyPatches(content, patches, "warn");
 
       expect(result.applied).toBe(0);
       expect(result.warnings.length).toBeGreaterThan(0);
@@ -1563,7 +1563,7 @@ describe("Combined Table Operations", () => {
 
 describe("Edge Cases and Error Handling", () => {
   describe("table content preservation", () => {
-    test("preserves surrounding markdown content", () => {
+    test("preserves surrounding markdown content", async () => {
       const content = `# Header
 
 Some text before the table
@@ -1585,7 +1585,7 @@ Some text after the table`;
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("# Header");
       expect(result.content).toContain("Some text before the table");
@@ -1593,7 +1593,7 @@ Some text after the table`;
       expect(result.content).toContain("| Bob | 30 |");
     });
 
-    test("works with tables in sections", () => {
+    test("works with tables in sections", async () => {
       const content = createTablesInSections();
       // First table (Personnel) starts at line 6
       const patches: PatchOperation[] = [
@@ -1604,7 +1604,7 @@ Some text after the table`;
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Charlie | Lead |");
       expect(result.content).toContain("# Introduction");
@@ -1614,7 +1614,7 @@ Some text after the table`;
   });
 
   describe("empty and minimal tables", () => {
-    test("works with tables containing single data row", () => {
+    test("works with tables containing single data row", async () => {
       const content = `| Name | Age |
 | :--- | ---: |
 | Alice | 30 |`;
@@ -1627,13 +1627,13 @@ Some text after the table`;
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Bob | 25 |");
       expect(result.applied).toBe(1);
     });
 
-    test("handles single-column tables", () => {
+    test("handles single-column tables", async () => {
       const content = `| Name |
 | :--- |
 | Alice |`;
@@ -1648,7 +1648,7 @@ Some text after the table`;
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("| Bob |");
       expect(result.applied).toBe(1);
@@ -1656,7 +1656,7 @@ Some text after the table`;
   });
 
   describe("special characters and formatting", () => {
-    test("preserves pipe characters in cells with escaping", () => {
+    test("preserves pipe characters in cells with escaping", async () => {
       const content = `| Name | Code |
 | :--- | :--- |
 | Alice | foo |`;
@@ -1669,12 +1669,12 @@ Some text after the table`;
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
     });
 
-    test("handles cells with links and complex formatting", () => {
+    test("handles cells with links and complex formatting", async () => {
       const content = `| Name | Link |
 | :--- | :--- |
 | Alice | [docs](http://example.com) |`;
@@ -1689,13 +1689,13 @@ Some text after the table`;
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("[new](http://newsite.com)");
       expect(result.applied).toBe(1);
     });
 
-    test("handles unicode characters in table cells", () => {
+    test("handles unicode characters in table cells", async () => {
       const content = `| Name | City |
 | :--- | :--- |
 | Alice | New York |`;
@@ -1708,7 +1708,7 @@ Some text after the table`;
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.content).toContain("São Paulo");
       expect(result.applied).toBe(1);

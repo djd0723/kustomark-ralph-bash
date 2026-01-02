@@ -328,7 +328,7 @@ async function runBuild(
     const relativePath = relative(baseDirectory, resource.path);
 
     // Apply patches
-    const result = applyPatches(
+    const result = await applyPatches(
       resource.content,
       config.patches || [],
       "warn",

@@ -17,7 +17,7 @@ import type { PatchOperation, PatchResult, ValidationWarning } from "../../src/c
 
 describe("Fix Engine", () => {
   describe("analyzeFailedPatches", () => {
-    test("analyzes patch results with no failures", () => {
+    test("analyzes patch results with no failures", async () => {
       const patchResult: PatchResult = {
         content: "updated content",
         applied: 3,
@@ -40,7 +40,7 @@ describe("Fix Engine", () => {
       expect(result.failures).toEqual([]);
     });
 
-    test("counts patches correctly with condition skipped", () => {
+    test("counts patches correctly with condition skipped", async () => {
       const patchResult: PatchResult = {
         content: "content",
         applied: 2,
@@ -61,7 +61,7 @@ describe("Fix Engine", () => {
       expect(result.conditionSkippedPatches).toBe(1);
     });
 
-    test("tracks warnings from patch result", () => {
+    test("tracks warnings from patch result", async () => {
       const patchResult: PatchResult = {
         content: "content",
         applied: 1,
@@ -89,7 +89,7 @@ describe("Fix Engine", () => {
 
   describe("generateFixSuggestions", () => {
     describe("replace operations", () => {
-      test("suggests exact-match fix for case mismatch", () => {
+      test("suggests exact-match fix for case mismatch", async () => {
         const patch: PatchOperation = {
           op: "replace",
           old: "Hello",
@@ -112,7 +112,7 @@ describe("Fix Engine", () => {
         }
       });
 
-      test("suggests fuzzy-match for similar strings", () => {
+      test("suggests fuzzy-match for similar strings", async () => {
         const patch: PatchOperation = {
           op: "replace",
           old: "instalation",
@@ -133,7 +133,7 @@ describe("Fix Engine", () => {
         expect(suggestion.fuzzyMatches![0]?.value).toBe("installation");
       });
 
-      test("suggests manual-edit when no similar strings found", () => {
+      test("suggests manual-edit when no similar strings found", async () => {
         const patch: PatchOperation = {
           op: "replace",
           old: "xyzzyx",
@@ -158,7 +158,7 @@ describe("Fix Engine", () => {
         }
       });
 
-      test("includes patch index and error message", () => {
+      test("includes patch index and error message", async () => {
         const patch: PatchOperation = {
           op: "replace",
           old: "test",
@@ -178,7 +178,7 @@ describe("Fix Engine", () => {
     });
 
     describe("replace-regex operations", () => {
-      test("suggests manual-edit for regex patterns", () => {
+      test("suggests manual-edit for regex patterns", async () => {
         const patch: PatchOperation = {
           op: "replace-regex",
           pattern: "test\\d+",
@@ -199,7 +199,7 @@ describe("Fix Engine", () => {
     });
 
     describe("section operations", () => {
-      test("suggests exact-match fix for section with typo", () => {
+      test("suggests exact-match fix for section with typo", async () => {
         const patch: PatchOperation = {
           op: "remove-section",
           id: "instalation",
@@ -225,7 +225,7 @@ Some content here
         }
       });
 
-      test("suggests manual-edit when no similar sections found", () => {
+      test("suggests manual-edit when no similar sections found", async () => {
         const patch: PatchOperation = {
           op: "replace-section",
           id: "nonexistent",
@@ -248,7 +248,7 @@ Content
         expect(suggestion.description).toContain("not found");
       });
 
-      test("handles prepend-to-section operation", () => {
+      test("handles prepend-to-section operation", async () => {
         const patch: PatchOperation = {
           op: "prepend-to-section",
           id: "getting-stared",
@@ -268,7 +268,7 @@ Content
         }
       });
 
-      test("handles append-to-section operation", () => {
+      test("handles append-to-section operation", async () => {
         const patch: PatchOperation = {
           op: "append-to-section",
           id: "configuraton",
@@ -288,7 +288,7 @@ Content
         }
       });
 
-      test("handles rename-header operation", () => {
+      test("handles rename-header operation", async () => {
         const patch: PatchOperation = {
           op: "rename-header",
           id: "old-setion",
@@ -308,7 +308,7 @@ Content
         }
       });
 
-      test("handles move-section operation", () => {
+      test("handles move-section operation", async () => {
         const patch: PatchOperation = {
           op: "move-section",
           id: "movable-setion",
@@ -328,7 +328,7 @@ Content
         }
       });
 
-      test("handles change-section-level operation", () => {
+      test("handles change-section-level operation", async () => {
         const patch: PatchOperation = {
           op: "change-section-level",
           id: "my-setion",
@@ -350,7 +350,7 @@ Content
     });
 
     describe("frontmatter operations", () => {
-      test("handles remove-frontmatter with suggestions in warning", () => {
+      test("handles remove-frontmatter with suggestions in warning", async () => {
         const patch: PatchOperation = {
           op: "remove-frontmatter",
           key: "athour",
@@ -375,7 +375,7 @@ Content`;
         expect(suggestion.description).toContain("not found");
       });
 
-      test("handles rename-frontmatter with suggestions in warning", () => {
+      test("handles rename-frontmatter with suggestions in warning", async () => {
         const patch: PatchOperation = {
           op: "rename-frontmatter",
           old: "titel",
@@ -400,7 +400,7 @@ Content`;
         expect(suggestion.description).toContain("not found");
       });
 
-      test("suggests manual-edit when no similar frontmatter keys found", () => {
+      test("suggests manual-edit when no similar frontmatter keys found", async () => {
         const patch: PatchOperation = {
           op: "remove-frontmatter",
           key: "nonexistent",
@@ -423,7 +423,7 @@ Content`;
     });
 
     describe("delete-between and replace-between operations", () => {
-      test("identifies missing start and end markers", () => {
+      test("identifies missing start and end markers", async () => {
         const patch: PatchOperation = {
           op: "delete-between",
           start: "<!-- START -->",
@@ -441,7 +441,7 @@ Content`;
         expect(suggestion.description).toContain("nor end marker");
       });
 
-      test("identifies missing start marker only", () => {
+      test("identifies missing start marker only", async () => {
         const patch: PatchOperation = {
           op: "replace-between",
           start: "<!-- START -->",
@@ -460,7 +460,7 @@ Content`;
         expect(suggestion.description).toContain("was not found");
       });
 
-      test("identifies missing end marker only", () => {
+      test("identifies missing end marker only", async () => {
         const patch: PatchOperation = {
           op: "delete-between",
           start: "<!-- START -->",
@@ -478,7 +478,7 @@ Content`;
         expect(suggestion.description).toContain("was not found");
       });
 
-      test("handles case when both markers exist but in wrong order", () => {
+      test("handles case when both markers exist but in wrong order", async () => {
         const patch: PatchOperation = {
           op: "replace-between",
           start: "<!-- START -->",
@@ -498,7 +498,7 @@ Content`;
     });
 
     describe("line operations", () => {
-      test("suggests fuzzy matches for replace-line", () => {
+      test("suggests fuzzy matches for replace-line", async () => {
         const patch: PatchOperation = {
           op: "replace-line",
           match: "import { foo } from 'bar'",
@@ -517,7 +517,7 @@ export const test = 'value';`;
         expect(suggestion.fuzzyMatches!.length).toBeGreaterThan(0);
       });
 
-      test("suggests manual-edit when no similar lines found for replace-line", () => {
+      test("suggests manual-edit when no similar lines found for replace-line", async () => {
         const patch: PatchOperation = {
           op: "replace-line",
           match: "completely different line",
@@ -535,7 +535,7 @@ export const test = 'value';`;
         expect(suggestion.description).toContain("No similar lines");
       });
 
-      test("suggests fuzzy matches for insert-after-line", () => {
+      test("suggests fuzzy matches for insert-after-line", async () => {
         const patch: PatchOperation = {
           op: "insert-after-line",
           match: "console.log('test')",
@@ -553,7 +553,7 @@ const x = 1;`;
         expect(suggestion.fuzzyMatches).toBeDefined();
       });
 
-      test("suggests fuzzy matches for insert-before-line", () => {
+      test("suggests fuzzy matches for insert-before-line", async () => {
         const patch: PatchOperation = {
           op: "insert-before-line",
           match: "const x = 1",
@@ -571,7 +571,7 @@ const y = 2;`;
         expect(suggestion.fuzzyMatches).toBeDefined();
       });
 
-      test("handles insert-before-line with pattern", () => {
+      test("handles insert-before-line with pattern", async () => {
         const patch: PatchOperation = {
           op: "insert-before-line",
           pattern: "^import",
@@ -589,7 +589,7 @@ const y = 2;`;
         expect(suggestion.description).toContain("regex pattern");
       });
 
-      test("handles insert-after-line without match", () => {
+      test("handles insert-after-line without match", async () => {
         const patch: PatchOperation = {
           op: "insert-after-line",
           content: "new line",
@@ -606,7 +606,7 @@ const y = 2;`;
     });
 
     describe("file operations", () => {
-      test("suggests skip for copy-file operation", () => {
+      test("suggests skip for copy-file operation", async () => {
         const patch: PatchOperation = {
           op: "copy-file",
           from: "source.md",
@@ -623,7 +623,7 @@ const y = 2;`;
         expect(suggestion.description).toContain("should not fail");
       });
 
-      test("suggests skip for rename-file operation", () => {
+      test("suggests skip for rename-file operation", async () => {
         const patch: PatchOperation = {
           op: "rename-file",
           from: "old.md",
@@ -639,7 +639,7 @@ const y = 2;`;
         expect(suggestion.strategy).toBe("skip");
       });
 
-      test("suggests skip for delete-file operation", () => {
+      test("suggests skip for delete-file operation", async () => {
         const patch: PatchOperation = {
           op: "delete-file",
           path: "file.md",
@@ -654,7 +654,7 @@ const y = 2;`;
         expect(suggestion.strategy).toBe("skip");
       });
 
-      test("suggests skip for move-file operation", () => {
+      test("suggests skip for move-file operation", async () => {
         const patch: PatchOperation = {
           op: "move-file",
           from: "old.md",
@@ -670,7 +670,7 @@ const y = 2;`;
         expect(suggestion.strategy).toBe("skip");
       });
 
-      test("suggests skip for set-frontmatter operation", () => {
+      test("suggests skip for set-frontmatter operation", async () => {
         const patch: PatchOperation = {
           op: "set-frontmatter",
           key: "title",
@@ -686,7 +686,7 @@ const y = 2;`;
         expect(suggestion.strategy).toBe("skip");
       });
 
-      test("suggests skip for merge-frontmatter operation", () => {
+      test("suggests skip for merge-frontmatter operation", async () => {
         const patch: PatchOperation = {
           op: "merge-frontmatter",
           values: { key: "value" },
@@ -703,7 +703,7 @@ const y = 2;`;
     });
 
     describe("table operations", () => {
-      test("suggests manual-edit for replace-table-cell", () => {
+      test("suggests manual-edit for replace-table-cell", async () => {
         const patch: PatchOperation = {
           op: "replace-table-cell",
           row: 0,
@@ -721,7 +721,7 @@ const y = 2;`;
         expect(suggestion.description).toContain("Manual review required");
       });
 
-      test("suggests manual-edit for add-table-row", () => {
+      test("suggests manual-edit for add-table-row", async () => {
         const patch: PatchOperation = {
           op: "add-table-row",
           values: ["a", "b", "c"],
@@ -736,7 +736,7 @@ const y = 2;`;
         expect(suggestion.strategy).toBe("manual-edit");
       });
 
-      test("suggests manual-edit for remove-table-row", () => {
+      test("suggests manual-edit for remove-table-row", async () => {
         const patch: PatchOperation = {
           op: "remove-table-row",
           row: 0,
@@ -751,7 +751,7 @@ const y = 2;`;
         expect(suggestion.strategy).toBe("manual-edit");
       });
 
-      test("suggests manual-edit for add-table-column", () => {
+      test("suggests manual-edit for add-table-column", async () => {
         const patch: PatchOperation = {
           op: "add-table-column",
           header: "New Column",
@@ -767,7 +767,7 @@ const y = 2;`;
         expect(suggestion.strategy).toBe("manual-edit");
       });
 
-      test("suggests manual-edit for remove-table-column", () => {
+      test("suggests manual-edit for remove-table-column", async () => {
         const patch: PatchOperation = {
           op: "remove-table-column",
           column: 0,
@@ -785,7 +785,7 @@ const y = 2;`;
   });
 
   describe("applyAutoFix", () => {
-    test("applies exact-match fix with high confidence", () => {
+    test("applies exact-match fix with high confidence", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: { op: "replace", old: "Hello", new: "Goodbye" },
         patchIndex: 0,
@@ -797,7 +797,7 @@ const y = 2;`;
       };
       const content = "hello world";
 
-      const result = applyAutoFix(content, suggestion);
+      const result = await applyAutoFix(content, suggestion);
 
       expect(result.success).toBe(true);
       expect(result.content).toBe("Goodbye world");
@@ -806,7 +806,7 @@ const y = 2;`;
       expect(result.appliedPatch).toBe(suggestion.modifiedPatch);
     });
 
-    test("applies fuzzy-match fix with sufficient confidence", () => {
+    test("applies fuzzy-match fix with sufficient confidence", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: { op: "replace", old: "instalation", new: "setup" },
         patchIndex: 0,
@@ -825,14 +825,14 @@ const y = 2;`;
       };
       const content = "Read the installation guide";
 
-      const result = applyAutoFix(content, suggestion);
+      const result = await applyAutoFix(content, suggestion);
 
       expect(result.success).toBe(true);
       expect(result.content).toBe("Read the setup guide");
       expect(result.count).toBe(1);
     });
 
-    test("rejects fix below confidence threshold", () => {
+    test("rejects fix below confidence threshold", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: { op: "replace", old: "test", new: "result" },
         patchIndex: 0,
@@ -844,7 +844,7 @@ const y = 2;`;
       };
       const content = "test content";
 
-      const result = applyAutoFix(content, suggestion, 75);
+      const result = await applyAutoFix(content, suggestion, 75);
 
       expect(result.success).toBe(false);
       expect(result.content).toBe(content);
@@ -852,7 +852,7 @@ const y = 2;`;
       expect(result.error).toContain("below threshold");
     });
 
-    test("respects custom confidence threshold", () => {
+    test("respects custom confidence threshold", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: { op: "replace", old: "test", new: "result" },
         patchIndex: 0,
@@ -864,14 +864,14 @@ const y = 2;`;
       };
       const content = "test content";
 
-      const result = applyAutoFix(content, suggestion, 50);
+      const result = await applyAutoFix(content, suggestion, 50);
 
       expect(result.success).toBe(true);
       expect(result.content).toBe("result content");
       expect(result.count).toBe(1);
     });
 
-    test("rejects manual-edit strategy", () => {
+    test("rejects manual-edit strategy", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: { op: "replace", old: "test", new: "result" },
         patchIndex: 0,
@@ -882,14 +882,14 @@ const y = 2;`;
       };
       const content = "test content";
 
-      const result = applyAutoFix(content, suggestion);
+      const result = await applyAutoFix(content, suggestion);
 
       expect(result.success).toBe(false);
       // Confidence check happens first, so error is about threshold
       expect(result.error).toContain("below threshold");
     });
 
-    test("rejects skip strategy", () => {
+    test("rejects skip strategy", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: { op: "copy-file", from: "a", to: "b" },
         patchIndex: 0,
@@ -900,14 +900,14 @@ const y = 2;`;
       };
       const content = "";
 
-      const result = applyAutoFix(content, suggestion);
+      const result = await applyAutoFix(content, suggestion);
 
       expect(result.success).toBe(false);
       // Confidence check happens first, so error is about threshold
       expect(result.error).toContain("below threshold");
     });
 
-    test("handles fuzzy-match with empty matches array", () => {
+    test("handles fuzzy-match with empty matches array", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: { op: "replace", old: "test", new: "result" },
         patchIndex: 0,
@@ -919,14 +919,14 @@ const y = 2;`;
       };
       const content = "test content";
 
-      const result = applyAutoFix(content, suggestion);
+      const result = await applyAutoFix(content, suggestion);
 
       expect(result.success).toBe(false);
       // When fuzzyMatches array is empty, bestMatch is undefined
       expect(result.error).toContain("Cannot auto-fix with strategy: fuzzy-match");
     });
 
-    test("handles patch that throws error when applied", () => {
+    test("handles patch that throws error when applied", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: { op: "replace", old: "foo", new: "bar" },
         patchIndex: 0,
@@ -938,14 +938,14 @@ const y = 2;`;
       };
       const content = "hello world";
 
-      const result = applyAutoFix(content, suggestion);
+      const result = await applyAutoFix(content, suggestion);
 
       expect(result.success).toBe(false);
       // applySinglePatch will throw an error when onNoMatch is "error" and patch doesn't match
       expect(result.error).toContain("Replace patch failed");
     });
 
-    test("handles validation errors from applied patch", () => {
+    test("handles validation errors from applied patch", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: {
           op: "replace",
@@ -967,13 +967,13 @@ const y = 2;`;
       };
       const content = "test content";
 
-      const result = applyAutoFix(content, suggestion);
+      const result = await applyAutoFix(content, suggestion);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("Validation errors");
     });
 
-    test("handles exceptions during patch application", () => {
+    test("handles exceptions during patch application", async () => {
       const suggestion: FixSuggestion = {
         originalPatch: { op: "replace-regex", pattern: "[invalid", replacement: "test" },
         patchIndex: 0,
@@ -985,7 +985,7 @@ const y = 2;`;
       };
       const content = "test content";
 
-      const result = applyAutoFix(content, suggestion);
+      const result = await applyAutoFix(content, suggestion);
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -994,7 +994,7 @@ const y = 2;`;
   });
 
   describe("analyzeFilePatchFailures", () => {
-    test("identifies all failed patches in sequence", () => {
+    test("identifies all failed patches in sequence", async () => {
       const content = "Hello world";
       const patches: PatchOperation[] = [
         { op: "replace", old: "Hello", new: "Hi" },
@@ -1003,7 +1003,7 @@ const y = 2;`;
         { op: "replace", old: "nonexistent", new: "replacement" },
       ];
 
-      const failures = analyzeFilePatchFailures(content, patches);
+      const failures = await analyzeFilePatchFailures(content, patches);
 
       expect(failures).toHaveLength(2);
       expect(failures[0]?.patchIndex).toBe(1);
@@ -1018,19 +1018,19 @@ const y = 2;`;
       }
     });
 
-    test("applies successful patches before checking next ones", () => {
+    test("applies successful patches before checking next ones", async () => {
       const content = "foo bar";
       const patches: PatchOperation[] = [
         { op: "replace", old: "foo", new: "baz" },
         { op: "replace", old: "baz", new: "qux" },
       ];
 
-      const failures = analyzeFilePatchFailures(content, patches);
+      const failures = await analyzeFilePatchFailures(content, patches);
 
       expect(failures).toHaveLength(0);
     });
 
-    test("skips patches with unmet conditions", () => {
+    test("skips patches with unmet conditions", async () => {
       const content = "normal content";
       const patches: PatchOperation[] = [
         { op: "replace", old: "normal", new: "modified" },
@@ -1042,18 +1042,18 @@ const y = 2;`;
         },
       ];
 
-      const failures = analyzeFilePatchFailures(content, patches);
+      const failures = await analyzeFilePatchFailures(content, patches);
 
       expect(failures).toHaveLength(0);
     });
 
-    test("handles patches that throw errors", () => {
+    test("handles patches that throw errors", async () => {
       const content = "test content";
       const patches: PatchOperation[] = [
         { op: "replace-regex", pattern: "[invalid", replacement: "test" },
       ];
 
-      const failures = analyzeFilePatchFailures(content, patches);
+      const failures = await analyzeFilePatchFailures(content, patches);
 
       expect(failures).toHaveLength(1);
       expect(failures[0]?.strategy).toBe("manual-edit");
@@ -1061,32 +1061,32 @@ const y = 2;`;
       expect(failures[0]?.description).toContain("threw an error");
     });
 
-    test("respects onNoMatch parameter", () => {
+    test("respects onNoMatch parameter", async () => {
       const content = "test content";
       const patches: PatchOperation[] = [
         { op: "replace", old: "missing", new: "found" },
       ];
 
-      const failuresWarn = analyzeFilePatchFailures(content, patches, "warn");
+      const failuresWarn = await analyzeFilePatchFailures(content, patches, "warn");
       expect(failuresWarn).toHaveLength(1);
 
-      const failuresSkip = analyzeFilePatchFailures(content, patches, "skip");
+      const failuresSkip = await analyzeFilePatchFailures(content, patches, "skip");
       expect(failuresSkip).toHaveLength(1);
 
-      const failuresError = analyzeFilePatchFailures(content, patches, "error");
+      const failuresError = await analyzeFilePatchFailures(content, patches, "error");
       expect(failuresError).toHaveLength(1);
     });
 
-    test("handles empty patch array", () => {
+    test("handles empty patch array", async () => {
       const content = "test content";
       const patches: PatchOperation[] = [];
 
-      const failures = analyzeFilePatchFailures(content, patches);
+      const failures = await analyzeFilePatchFailures(content, patches);
 
       expect(failures).toHaveLength(0);
     });
 
-    test("handles all patches succeeding", () => {
+    test("handles all patches succeeding", async () => {
       const content = "foo bar baz";
       const patches: PatchOperation[] = [
         { op: "replace", old: "foo", new: "FOO" },
@@ -1094,12 +1094,12 @@ const y = 2;`;
         { op: "replace", old: "baz", new: "BAZ" },
       ];
 
-      const failures = analyzeFilePatchFailures(content, patches);
+      const failures = await analyzeFilePatchFailures(content, patches);
 
       expect(failures).toHaveLength(0);
     });
 
-    test("generates appropriate fix suggestions for each failure type", () => {
+    test("generates appropriate fix suggestions for each failure type", async () => {
       const content = `# Installation
 
 Some content`;
@@ -1108,14 +1108,14 @@ Some content`;
         { op: "remove-section", id: "configuraton" },
       ];
 
-      const failures = analyzeFilePatchFailures(content, patches);
+      const failures = await analyzeFilePatchFailures(content, patches);
 
       expect(failures).toHaveLength(2);
       expect(failures[0]?.strategy).toBe("fuzzy-match");
       expect(failures[1]?.strategy).toBe("manual-edit");
     });
 
-    test("handles patches with undefined values gracefully", () => {
+    test("handles patches with undefined values gracefully", async () => {
       const content = "test content";
       const patches: PatchOperation[] = [
         { op: "replace", old: "test", new: "result" },
@@ -1123,7 +1123,7 @@ Some content`;
         { op: "replace", old: "missing", new: "found" },
       ];
 
-      const failures = analyzeFilePatchFailures(content, patches);
+      const failures = await analyzeFilePatchFailures(content, patches);
 
       expect(failures).toHaveLength(1);
       expect(failures[0]?.patchIndex).toBe(2);
@@ -1131,7 +1131,7 @@ Some content`;
   });
 
   describe("edge cases and integration", () => {
-    test("handles complex content with multiple sections", () => {
+    test("handles complex content with multiple sections", async () => {
       const patch: PatchOperation = {
         op: "remove-section",
         id: "advanced-topcs",
@@ -1164,7 +1164,7 @@ Help content
       expect(suggestion.confidence).toBe(85);
     });
 
-    test("handles content with special characters", () => {
+    test("handles content with special characters", async () => {
       const patch: PatchOperation = {
         op: "replace",
         old: "TEST$VALUE",
@@ -1182,7 +1182,7 @@ Help content
       expect(["exact-match", "fuzzy-match", "manual-edit"]).toContain(suggestion.strategy);
     });
 
-    test("handles empty content", () => {
+    test("handles empty content", async () => {
       const patch: PatchOperation = {
         op: "replace",
         old: "test",
@@ -1199,7 +1199,7 @@ Help content
       expect(suggestion.confidence).toBe(0);
     });
 
-    test("handles very long strings", () => {
+    test("handles very long strings", async () => {
       const longString = "a".repeat(1000);
       const patch: PatchOperation = {
         op: "replace",
@@ -1217,7 +1217,7 @@ Help content
       expect(suggestion.strategy).toBe("manual-edit");
     });
 
-    test("calculates confidence scores correctly for fuzzy matches", () => {
+    test("calculates confidence scores correctly for fuzzy matches", async () => {
       const patch: PatchOperation = {
         op: "replace",
         old: "test",
@@ -1240,7 +1240,7 @@ Help content
       expect(allHaveConfidence).toBe(true);
     });
 
-    test("limits fuzzy matches to reasonable number", () => {
+    test("limits fuzzy matches to reasonable number", async () => {
       const patch: PatchOperation = {
         op: "replace",
         old: "test",

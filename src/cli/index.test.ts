@@ -38,7 +38,7 @@ describe("CLI Validation Integration Tests", () => {
     }
   });
 
-  test("per-patch validation with notContains - validation passes", () => {
+  test("per-patch validation with notContains - validation passes", async () => {
     // Create test fixture
     const baseContent = `# Test Document
 
@@ -72,7 +72,7 @@ patches:
     expect(config.patches).toHaveLength(1);
 
     // Apply patches
-    const result = applyPatches(baseContent, config.patches || [], "warn");
+    const result = await applyPatches(baseContent, config.patches || [], "warn");
 
     // Verify patch was applied
     expect(result.applied).toBe(1);
@@ -83,7 +83,7 @@ patches:
     expect(result.validationErrors).toHaveLength(0);
   });
 
-  test("per-patch validation with notContains - validation fails", () => {
+  test("per-patch validation with notContains - validation fails", async () => {
     // Create test fixture where validation should fail
     const baseContent = `# Test Document
 
@@ -115,7 +115,7 @@ patches:
     const config = parseConfig(configContent);
 
     // Apply patches
-    const result = applyPatches(baseContent, config.patches || [], "warn");
+    const result = await applyPatches(baseContent, config.patches || [], "warn");
 
     // Verify patch was applied
     expect(result.applied).toBe(1);
@@ -126,7 +126,7 @@ patches:
     expect(result.validationErrors[0]?.message).toContain("FORBIDDEN");
   });
 
-  test("per-patch validation with multiple patches", () => {
+  test("per-patch validation with multiple patches", async () => {
     // Create test fixture with multiple patches
     const baseContent = `# Test Document
 
@@ -176,7 +176,7 @@ patches:
     const config = parseConfig(configContent);
 
     // Apply patches
-    const result = applyPatches(baseContent, config.patches || [], "warn");
+    const result = await applyPatches(baseContent, config.patches || [], "warn");
 
     // Verify all patches were applied
     expect(result.applied).toBe(3);
@@ -186,7 +186,7 @@ patches:
     expect(result.validationErrors[0]?.message).toContain("FORBIDDEN");
   });
 
-  test("global validators with notContains - validation passes", () => {
+  test("global validators with notContains - validation passes", async () => {
     const content = `# Test Document
 
 This is a clean document.
@@ -218,7 +218,7 @@ validators:
     expect(config.validators).toHaveLength(2);
 
     // Apply patches (none in this case)
-    const patchResult = applyPatches(content, config.patches || [], "warn");
+    const patchResult = await applyPatches(content, config.patches || [], "warn");
 
     // Run global validators
     const validationErrors = runValidators(patchResult.content, config.validators || []);
@@ -227,7 +227,7 @@ validators:
     expect(validationErrors).toHaveLength(0);
   });
 
-  test("global validators with notContains - validation fails", () => {
+  test("global validators with notContains - validation fails", async () => {
     const content = `# Test Document
 
 This document has FORBIDDEN content.
@@ -257,7 +257,7 @@ validators:
     const config = parseConfig(configContent);
 
     // Apply patches (none in this case)
-    const patchResult = applyPatches(content, config.patches || [], "warn");
+    const patchResult = await applyPatches(content, config.patches || [], "warn");
 
     // Run global validators
     const validationErrors = runValidators(patchResult.content, config.validators || []);
@@ -355,7 +355,7 @@ validators:
     expect(validationErrors[0]?.message).toContain("metadata.status");
   });
 
-  test("combined per-patch and global validation", () => {
+  test("combined per-patch and global validation", async () => {
     const baseContent = `---
 title: Test Document
 ---
@@ -395,7 +395,7 @@ validators:
     const config = parseConfig(configContent);
 
     // Apply patches
-    const patchResult = applyPatches(baseContent, config.patches || [], "warn");
+    const patchResult = await applyPatches(baseContent, config.patches || [], "warn");
 
     // Run global validators
     const globalValidationErrors = runValidators(patchResult.content, config.validators || []);
@@ -409,7 +409,7 @@ validators:
     expect(globalValidationErrors[0]?.message).toContain("author");
   });
 
-  test("validation errors structure matches expected format", () => {
+  test("validation errors structure matches expected format", async () => {
     const content = `# Test Document
 
 Content with FORBIDDEN word.
@@ -440,7 +440,7 @@ validators:
     const config = parseConfig(configContent);
 
     // Apply patches
-    const patchResult = applyPatches(content, config.patches || [], "warn");
+    const patchResult = await applyPatches(content, config.patches || [], "warn");
 
     // Run global validators
     const globalValidationErrors = runValidators(patchResult.content, config.validators || []);
@@ -460,7 +460,7 @@ validators:
     expect(globalError?.message).toContain("FORBIDDEN");
   });
 
-  test("integration: build workflow with validation", () => {
+  test("integration: build workflow with validation", async () => {
     // This test simulates the full build workflow:
     // 1. Load resources
     // 2. Apply patches (with per-patch validation)
@@ -530,7 +530,7 @@ validators:
       const content = readFileSync(join(tempDir, resourceFile), "utf-8");
 
       // Apply patches
-      const patchResult = applyPatches(content, config.patches || [], "warn");
+      const patchResult = await applyPatches(content, config.patches || [], "warn");
 
       // Run global validators
       const globalErrors = runValidators(patchResult.content, config.validators || []);
@@ -559,7 +559,7 @@ validators:
     expect(resource2?.globalErrors[1]?.validator).toBe("require-title");
   });
 
-  test("validation does not affect successful patch application", () => {
+  test("validation does not affect successful patch application", async () => {
     // Verify that even when validation fails, patches are still applied
     const content = `# Test
 
@@ -587,7 +587,7 @@ patches:
     const config = parseConfig(configContent);
 
     // Apply patches
-    const result = applyPatches(content, config.patches || [], "warn");
+    const result = await applyPatches(content, config.patches || [], "warn");
 
     // Verify patch was applied even though validation failed
     expect(result.applied).toBe(1);
@@ -825,7 +825,7 @@ validators:
     expect(validationErrors[0]?.message).toContain("author");
   });
 
-  test("patch validation with include pattern only validates matching files", () => {
+  test("patch validation with include pattern only validates matching files", async () => {
     // This simulates how the CLI would filter patches per file
     const file1Content = `# File One
 
@@ -861,12 +861,12 @@ patches:
     const config = parseConfig(configContent);
 
     // Process file1 (should have validation error)
-    const file1Result = applyPatches(file1Content, config.patches || [], "warn");
+    const file1Result = await applyPatches(file1Content, config.patches || [], "warn");
     expect(file1Result.applied).toBe(1);
     expect(file1Result.validationErrors).toHaveLength(1);
 
     // Process file2 (no patches should apply due to include filter)
-    const file2Result = applyPatches(file2Content, config.patches || [], "warn");
+    const file2Result = await applyPatches(file2Content, config.patches || [], "warn");
     expect(file2Result.applied).toBe(0);
     expect(file2Result.validationErrors).toHaveLength(0);
   });

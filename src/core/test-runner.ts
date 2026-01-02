@@ -19,12 +19,12 @@ import type { PatchTest, PatchTestSuite, TestResult, TestSuiteResult } from "./t
  * @param test - The test case to run
  * @returns TestResult with detailed information about the test execution
  */
-export function runPatchTest(test: PatchTest): TestResult {
+export async function runPatchTest(test: PatchTest): Promise<TestResult> {
   const { name, input, patches, expected } = test;
 
   try {
     // Apply patches to the input content
-    const patchResult = applyPatches(input, patches, "warn");
+    const patchResult = await applyPatches(input, patches, "warn");
 
     const actual = patchResult.content;
     const passed = actual === expected;
@@ -67,16 +67,16 @@ export function runPatchTest(test: PatchTest): TestResult {
  * summary statistics.
  *
  * @param suite - The test suite to run
- * @returns TestSuiteResult with summary stats and individual test results
+ * @returns Promise resolving to TestSuiteResult with summary stats and individual test results
  */
-export function runTestSuite(suite: PatchTestSuite): TestSuiteResult {
+export async function runTestSuite(suite: PatchTestSuite): Promise<TestSuiteResult> {
   const results: TestResult[] = [];
   let passed = 0;
   let failed = 0;
 
   // Run each test in the suite
   for (const test of suite.tests) {
-    const result = runPatchTest(test);
+    const result = await runPatchTest(test);
     results.push(result);
 
     if (result.passed) {

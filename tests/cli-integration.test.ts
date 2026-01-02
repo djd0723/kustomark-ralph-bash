@@ -84,7 +84,7 @@ describe('CLI Integration Tests', () => {
         );
 
         // Apply patches
-        const result = applyPatches(
+        const result = await applyPatches(
           resource.content,
           applicablePatches,
           config.onNoMatch || 'warn'
@@ -216,7 +216,7 @@ describe('CLI Integration Tests', () => {
         );
 
         // Apply patches
-        const result = applyPatches(
+        const result = await applyPatches(
           resource.content,
           applicablePatches,
           config.onNoMatch || 'warn'
@@ -298,7 +298,7 @@ describe('CLI Integration Tests', () => {
   });
 
   describe('group filtering', () => {
-    test('--enable-groups flag: only specified groups and ungrouped patches apply', () => {
+    test('--enable-groups flag: only specified groups and ungrouped patches apply', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
         { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
@@ -315,7 +315,7 @@ describe('CLI Integration Tests', () => {
       expect(filtered[2]).toEqual(patches[3]); // ungrouped
     });
 
-    test('--disable-groups flag: all except specified groups apply', () => {
+    test('--disable-groups flag: all except specified groups apply', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
         { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
@@ -332,7 +332,7 @@ describe('CLI Integration Tests', () => {
       expect(filtered[2]).toEqual(patches[3]); // ungrouped
     });
 
-    test('--enable-groups takes precedence over --disable-groups', () => {
+    test('--enable-groups takes precedence over --disable-groups', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
         { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
@@ -353,7 +353,7 @@ describe('CLI Integration Tests', () => {
       expect(filtered[1]).toEqual(patches[3]); // ungrouped
     });
 
-    test('multiple groups in comma-separated list', () => {
+    test('multiple groups in comma-separated list', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO', group: 'text-ops' },
         { op: 'replace', old: 'bar', new: 'BAR', group: 'section-ops' },
@@ -368,7 +368,7 @@ describe('CLI Integration Tests', () => {
       expect(filtered.map(p => p.group)).toEqual(['text-ops', 'section-ops', 'advanced-ops']);
     });
 
-    test('ungrouped patches always apply regardless of group filtering', () => {
+    test('ungrouped patches always apply regardless of group filtering', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO' }, // ungrouped
         { op: 'replace', old: 'bar', new: 'BAR', group: 'group-a' },
@@ -395,7 +395,7 @@ describe('CLI Integration Tests', () => {
       expect(filteredDisable[2]).toEqual(patches[3]); // group-b
     });
 
-    test('group filtering works with include/exclude patterns', () => {
+    test('group filtering works with include/exclude patterns', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a', include: 'docs/**/*.md' },
         { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b', exclude: 'test/**/*.md' },
@@ -420,7 +420,7 @@ describe('CLI Integration Tests', () => {
       expect(fileFiltered[1]).toEqual(patches[2]); // no include/exclude
     });
 
-    test('no group filtering when neither flag is specified', () => {
+    test('no group filtering when neither flag is specified', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
         { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
@@ -435,7 +435,7 @@ describe('CLI Integration Tests', () => {
       expect(filtered).toEqual(patches);
     });
 
-    test('empty enable-groups list allows only ungrouped patches', () => {
+    test('empty enable-groups list allows only ungrouped patches', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
         { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
@@ -450,7 +450,7 @@ describe('CLI Integration Tests', () => {
       expect(filtered[0]).toEqual(patches[2]);
     });
 
-    test('empty disable-groups list allows all patches', () => {
+    test('empty disable-groups list allows all patches', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO', group: 'group-a' },
         { op: 'replace', old: 'bar', new: 'BAR', group: 'group-b' },
@@ -465,7 +465,7 @@ describe('CLI Integration Tests', () => {
       expect(filtered).toEqual(patches);
     });
 
-    test('group names are case-sensitive', () => {
+    test('group names are case-sensitive', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'foo', new: 'FOO', group: 'MyGroup' },
         { op: 'replace', old: 'bar', new: 'BAR', group: 'mygroup' },
@@ -480,7 +480,7 @@ describe('CLI Integration Tests', () => {
       expect(filtered[0]).toEqual(patches[0]);
     });
 
-    test('group filtering with complex real-world scenario', () => {
+    test('group filtering with complex real-world scenario', async () => {
       const patches: PatchOperation[] = [
         { op: 'replace', old: 'rpi', new: 'thoughts', group: 'branding' },
         { op: 'replace-regex', pattern: '\\[\\[(.+?)\\]\\]', replacement: '[$1]($1.md)', group: 'wikilinks' },
@@ -503,7 +503,7 @@ describe('CLI Integration Tests', () => {
   });
 
   describe('file operations', () => {
-    test('copy-file operation changes output destination', () => {
+    test('copy-file operation changes output destination', async () => {
       const { applyCopyFile } = require('../src/core/file-operations.js');
 
       const fileMap = new Map([
@@ -518,7 +518,7 @@ describe('CLI Integration Tests', () => {
       expect(result.fileMap.get('src/file2.md')).toBe('file2.md');
     });
 
-    test('rename-file operation with glob patterns', () => {
+    test('rename-file operation with glob patterns', async () => {
       const { applyRenameFile } = require('../src/core/file-operations.js');
 
       const fileMap = new Map([
@@ -536,7 +536,7 @@ describe('CLI Integration Tests', () => {
       expect(result.fileMap.get('src/README.md')).toBe('README.md');
     });
 
-    test('delete-file operation with glob patterns', () => {
+    test('delete-file operation with glob patterns', async () => {
       const { applyDeleteFile } = require('../src/core/file-operations.js');
 
       const fileMap = new Map([
@@ -554,7 +554,7 @@ describe('CLI Integration Tests', () => {
       expect(result.fileMap.get('src/keep.md')).toBe('keep.md');
     });
 
-    test('move-file operation changes directory', () => {
+    test('move-file operation changes directory', async () => {
       const { applyMoveFile } = require('../src/core/file-operations.js');
 
       const fileMap = new Map([
@@ -569,7 +569,7 @@ describe('CLI Integration Tests', () => {
       expect(result.fileMap.get('src/file2.md')).toBe('file2.md');
     });
 
-    test('combination of file operations', () => {
+    test('combination of file operations', async () => {
       const { applyCopyFile, applyMoveFile, applyRenameFile, applyDeleteFile } = require('../src/core/file-operations.js');
 
       let fileMap = new Map([
@@ -605,7 +605,7 @@ describe('CLI Integration Tests', () => {
       expect(fileMap.get('src/b.md')).toBe('docs/index.md');
     });
 
-    test('file operations with content patches', () => {
+    test('file operations with content patches', async () => {
       const { applyCopyFile } = require('../src/core/file-operations.js');
       const { applyPatches: applyContentPatches } = require('../src/core/patch-engine.js');
 
@@ -628,12 +628,12 @@ describe('CLI Integration Tests', () => {
         { op: 'replace', old: 'Original', new: 'Updated' }
       ];
 
-      const patchResult = applyContentPatches(fileContent, patches, 'warn');
+      const patchResult = await applyContentPatches(fileContent, patches, 'warn');
       expect(patchResult.content).toContain('Updated Title');
       expect(patchResult.applied).toBe(1);
     });
 
-    test('file operations preserve directory structure', () => {
+    test('file operations preserve directory structure', async () => {
       const { applyMoveFile } = require('../src/core/file-operations.js');
 
       const fileMap = new Map([
@@ -652,7 +652,7 @@ describe('CLI Integration Tests', () => {
       expect(result.fileMap.get('src/c/file3.md')).toBe('output/file3.md');
     });
 
-    test('rename-file preserves directory path', () => {
+    test('rename-file preserves directory path', async () => {
       const { applyRenameFile } = require('../src/core/file-operations.js');
 
       const fileMap = new Map([
@@ -669,7 +669,7 @@ describe('CLI Integration Tests', () => {
       expect(result.fileMap.get('src/x/y/file.md')).toBe('output/x/y/README.md');
     });
 
-    test('file operations with include/exclude patterns', () => {
+    test('file operations with include/exclude patterns', async () => {
       const { applyDeleteFile } = require('../src/core/file-operations.js');
 
       const fileMap = new Map([
@@ -687,7 +687,7 @@ describe('CLI Integration Tests', () => {
       expect(result.fileMap.get('src/code.md')).toBe('code.md');
     });
 
-    test('error handling: path traversal detection', () => {
+    test('error handling: path traversal detection', async () => {
       const { applyCopyFile } = require('../src/core/file-operations.js');
 
       const fileMap = new Map([
@@ -700,7 +700,7 @@ describe('CLI Integration Tests', () => {
       }).toThrow('Path traversal detected');
     });
 
-    test('error handling: invalid rename with path separator', () => {
+    test('error handling: invalid rename with path separator', async () => {
       const { applyRenameFile } = require('../src/core/file-operations.js');
 
       const fileMap = new Map([
@@ -795,7 +795,7 @@ describe('CLI Integration Tests', () => {
           );
 
           // Apply patches
-          const result = applyPatches(
+          const result = await applyPatches(
             resource.content,
             applicablePatches,
             config.onNoMatch || 'warn'
@@ -943,7 +943,7 @@ resources:
             fileName
           );
 
-          const result = applyPatches(
+          const result = await applyPatches(
             resource.content,
             applicablePatches,
             config.onNoMatch || 'warn'
@@ -1245,7 +1245,7 @@ resources:
 
       for (const resource of resources) {
         // Apply patches to each resource
-        const result = applyPatches(
+        const result = await applyPatches(
           resource.content,
           config.patches || [],
           config.onNoMatch || 'warn',

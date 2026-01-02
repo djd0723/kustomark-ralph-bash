@@ -286,7 +286,7 @@ async function runInteractiveLoop(session: DebugSession, options: CLIOptions): P
       if (action === "apply") {
         // Apply the patch immediately to update the session
         const verbose = options.verbosity >= 2;
-        const result = applyPatches(
+        const result = await applyPatches(
           session.resources.get(item.file) || "",
           [item.patch],
           item.patch.onNoMatch || "warn",
@@ -312,7 +312,7 @@ async function runInteractiveLoop(session: DebugSession, options: CLIOptions): P
 /**
  * Runs auto-apply mode using saved or default decisions
  */
-function runAutoApply(session: DebugSession, options: CLIOptions): void {
+async function runAutoApply(session: DebugSession, options: CLIOptions): Promise<void> {
   // Load decisions if provided
   let savedDecisions: DebugDecision[] = [];
   if (options.loadDecisions) {
@@ -336,7 +336,7 @@ function runAutoApply(session: DebugSession, options: CLIOptions): void {
 
     if (action === "apply") {
       const verbose = options.verbosity >= 2;
-      const result = applyPatches(
+      const result = await applyPatches(
         session.resources.get(item.file) || "",
         [item.patch],
         item.patch.onNoMatch || "warn",
@@ -462,7 +462,7 @@ export async function debugCommand(path: string, options: CLIOptions): Promise<n
       if (options.verbosity >= 2) {
         console.log("Running in auto-apply mode...");
       }
-      runAutoApply(session, options);
+      await runAutoApply(session, options);
     } else {
       if (options.verbosity >= 1) {
         console.log("\nStarting interactive debug session...");

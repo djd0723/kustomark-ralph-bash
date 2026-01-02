@@ -428,6 +428,17 @@ export interface RemoveTableColumnPatch extends PatchCommonFields {
 }
 
 /**
+ * Exec operation - runs a shell command to transform content
+ */
+export interface ExecPatch extends PatchCommonFields {
+  op: "exec";
+  /** Shell command to execute (receives content via stdin, outputs to stdout) */
+  command: string;
+  /** Timeout in milliseconds (default: 30000) */
+  timeout?: number;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -457,7 +468,8 @@ export type PatchOperation =
   | AddTableRowPatch
   | RemoveTableRowPatch
   | AddTableColumnPatch
-  | RemoveTableColumnPatch;
+  | RemoveTableColumnPatch
+  | ExecPatch;
 
 /**
  * Global validator configuration

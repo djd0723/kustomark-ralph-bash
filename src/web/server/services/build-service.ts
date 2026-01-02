@@ -74,7 +74,7 @@ export async function executeBuild(
     );
 
     // Apply patches to resources
-    const patchResult = applyPatchesToResources(
+    const patchResult = await applyPatchesToResources(
       resources,
       filteredPatches,
       config.onNoMatch || "skip",
@@ -157,15 +157,15 @@ export async function executeBuild(
 /**
  * Apply patches to a map of resources
  */
-function applyPatchesToResources(
+async function applyPatchesToResources(
   resources: Map<string, string>,
   patches: PatchOperation[],
   onNoMatch: OnNoMatchStrategy,
-): {
+): Promise<{
   resources: Map<string, string>;
   patchesApplied: number;
   validationErrors: ValidationError[];
-} {
+}> {
   const patchedResources = new Map<string, string>();
   let totalPatchesApplied = 0;
   const allValidationErrors: ValidationError[] = [];
@@ -181,7 +181,7 @@ function applyPatchesToResources(
     }
 
     // Apply all applicable patches
-    const result = applyPatches(content, applicablePatches, onNoMatch, false);
+    const result = await applyPatches(content, applicablePatches, onNoMatch, false);
     patchedResources.set(filePath, result.content);
     totalPatchesApplied += result.applied;
 

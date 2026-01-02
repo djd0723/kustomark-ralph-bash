@@ -1335,6 +1335,89 @@ export function applyRemoveTableColumn(
 }
 
 /**
+ * Apply an exec patch operation - runs a shell command to transform content
+ *
+ * This function executes a shell command with the markdown content piped to stdin,
+ * and captures the stdout as the transformed content. Security constraints:
+ * - Command runs with timeout enforcement (default 30s)
+ * - Network access is not explicitly restricted (user must configure environment)
+ * - Command must exit with code 0 for success
+ *
+ * @param content - The markdown content to transform
+ * @param command - The shell command to execute
+ * @param timeout - Timeout in milliseconds (default: 30000)
+ * @returns Promise resolving to object with transformed content and count (1 if successful, 0 if failed)
+ *
+ * @example
+ * ```typescript
+ * const content = '# Table of Contents\n\nSome content here';
+ * const result = await applyExec(content, './scripts/add-toc.sh', 5000);
+ * console.log(result.content); // Content with generated TOC
+ * console.log(result.count);   // 1 (success)
+ * ```
+ */
+export async function applyExec(
+  content: string,
+  command: string,
+  timeout = 30000,
+): Promise<{ content: string; count: number }> {
+  try {
+    // Parse command string to extract command and args
+    const parts = command.split(" ");
+    const cmd = parts[0];
+    const args = parts.slice(1);
+
+    if (!cmd) {
+      throw new Error("Empty command");
+    }
+
+    // Use Bun.spawn for better control over the subprocess
+    const proc = Bun.spawn([cmd, ...args], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    // Write content to stdin
+    proc.stdin.write(content);
+    proc.stdin.end();
+
+    // Create timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        proc.kill();
+        reject(new Error(`Command timed out after ${timeout}ms`));
+      }, timeout);
+    });
+
+    // Race between process completion and timeout
+    const result = Promise.race([
+      proc.exited.then(async () => {
+        const stdout = await new Response(proc.stdout).text();
+        const stderr = await new Response(proc.stderr).text();
+
+        if (proc.exitCode !== 0) {
+          throw new Error(`Command failed with exit code ${proc.exitCode}: ${stderr}`);
+        }
+
+        return stdout;
+      }),
+      timeoutPromise,
+    ]);
+
+    // Wait for the result
+    const output = await result;
+
+    return { content: output, count: 1 };
+  } catch (error) {
+    // Log error but return original content with count 0
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`Exec patch failed: ${errorMsg}`);
+    return { content, count: 0 };
+  }
+}
+
+/**
  * Enhanced wrapper functions that throw PatchError on failure
  * These maintain backward compatibility while providing better error messages
  */
@@ -1656,7 +1739,7 @@ function levenshteinDistance(str1: string, str2: string): number {
  * @param patch - The patch operation to apply
  * @param defaultOnNoMatch - Default behavior when patch doesn't match: 'warn' (default), 'error', or 'skip'
  * @param verbose - Whether to log verbose messages to console (for condition skipping)
- * @returns Object containing the patched content, count of changes, optional warning, validation errors, and conditionSkipped flag
+ * @returns Promise resolving to object containing the patched content, count of changes, optional warning, validation errors, and conditionSkipped flag
  *
  * @example
  * ```typescript
@@ -1667,7 +1750,7 @@ function levenshteinDistance(str1: string, str2: string): number {
  *   new: 'kustomark'
  * };
  *
- * const result = applySinglePatch(content, patch);
+ * const result = await applySinglePatch(content, patch);
  * console.log(result.content); // 'Hello kustomark'
  * console.log(result.count);   // 1
  * console.log(result.conditionSkipped); // false
@@ -1683,7 +1766,7 @@ function levenshteinDistance(str1: string, str2: string): number {
  *   when: { contains: 'special' }
  * };
  *
- * const result = applySinglePatch('normal content', patch);
+ * const result = await applySinglePatch('normal content', patch);
  * // Patch is skipped because content doesn't contain 'special'
  * console.log(result.conditionSkipped); // true
  * console.log(result.count); // 0
@@ -1691,18 +1774,18 @@ function levenshteinDistance(str1: string, str2: string): number {
  *
  * @throws {Error} If the patch operation type is unknown or if onNoMatch is 'error' and the patch doesn't match
  */
-export function applySinglePatch(
+export async function applySinglePatch(
   content: string,
   patch: PatchOperation,
   defaultOnNoMatch: OnNoMatchStrategy = "warn",
   verbose = false,
-): {
+): Promise<{
   content: string;
   count: number;
   warning?: ValidationWarning;
   validationErrors: ValidationError[];
   conditionSkipped: boolean;
-} {
+}> {
   // Check if patch has a condition
   if (patch.when) {
     const conditionMet = evaluateCondition(content, patch.when);
@@ -1904,6 +1987,10 @@ export function applySinglePatch(
       result = applyRemoveTableColumn(content, patch.table, patch.column);
       break;
 
+    case "exec":
+      result = await applyExec(content, patch.command, patch.timeout);
+      break;
+
     case "copy-file":
     case "rename-file":
     case "delete-file":
@@ -2020,6 +2107,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `add-table-column '${patch.header}' to table '${patch.table}' at position ${patch.position ?? "end"}`;
     case "remove-table-column":
       return `remove-table-column '${patch.column}' from table '${patch.table}'`;
+    case "exec":
+      return `exec '${patch.command}'`;
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":
@@ -2053,7 +2142,7 @@ function getPatchDescription(patch: PatchOperation): string {
  * @param patches - Array of patch operations to apply in order
  * @param defaultOnNoMatch - Default behavior when patches don't match: 'warn' (default), 'error', or 'skip'
  * @param verbose - Whether to log verbose messages to console (for condition skipping)
- * @returns PatchResult object with the final patched content, count of successfully applied patches,
+ * @returns Promise resolving to PatchResult object with the final patched content, count of successfully applied patches,
  *          array of warnings, array of validation errors, and count of condition-skipped patches
  *
  * @example
@@ -2077,7 +2166,7 @@ function getPatchDescription(patch: PatchOperation): string {
  *   }
  * ];
  *
- * const result = applyPatches(content, patches);
+ * const result = await applyPatches(content, patches);
  * console.log(result.applied); // 2
  * console.log(result.warnings.length); // 0
  * console.log(result.validationErrors.length); // 0
@@ -2097,18 +2186,18 @@ function getPatchDescription(patch: PatchOperation): string {
  *   }
  * ];
  *
- * const result = applyPatches('foo and baz', patches);
+ * const result = await applyPatches('foo and baz', patches);
  * console.log(result.validationErrors.length); // 1 (because result contains 'baz')
  * ```
  *
  * @throws {Error} If any patch operation is unknown or if a patch with onNoMatch='error' doesn't match
  */
-export function applyPatches(
+export async function applyPatches(
   content: string,
   patches: PatchOperation[],
   defaultOnNoMatch: OnNoMatchStrategy = "warn",
   verbose = false,
-): PatchResult {
+): Promise<PatchResult> {
   // Resolve inheritance before applying patches
   const resolvedPatches = resolveInheritance(patches);
 
@@ -2119,7 +2208,7 @@ export function applyPatches(
   const validationErrors: ValidationError[] = [];
 
   for (const patch of resolvedPatches) {
-    const result = applySinglePatch(currentContent, patch, defaultOnNoMatch, verbose);
+    const result = await applySinglePatch(currentContent, patch, defaultOnNoMatch, verbose);
     currentContent = result.content;
 
     if (result.conditionSkipped) {

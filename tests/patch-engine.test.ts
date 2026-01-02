@@ -29,29 +29,29 @@ import {
 import type { PatchOperation } from '../src/core/types.js';
 
 describe('generateSlug', () => {
-  test('converts text to lowercase slug', () => {
+  test('converts text to lowercase slug', async () => {
     expect(generateSlug('Hello World')).toBe('hello-world');
   });
 
-  test('removes special characters', () => {
+  test('removes special characters', async () => {
     expect(generateSlug('Hello! World?')).toBe('hello-world');
   });
 
-  test('handles multiple spaces', () => {
+  test('handles multiple spaces', async () => {
     expect(generateSlug('Hello   World')).toBe('hello-world');
   });
 
-  test('removes leading and trailing hyphens', () => {
+  test('removes leading and trailing hyphens', async () => {
     expect(generateSlug(' -Hello World- ')).toBe('hello-world');
   });
 
-  test('preserves underscores', () => {
+  test('preserves underscores', async () => {
     expect(generateSlug('hello_world_test')).toBe('hello_world_test');
   });
 });
 
 describe('parseSections', () => {
-  test('parses simple headers', () => {
+  test('parses simple headers', async () => {
     const content = `# Header 1\nContent\n## Header 2\nMore content`;
     const sections = parseSections(content);
 
@@ -62,7 +62,7 @@ describe('parseSections', () => {
     expect(sections[1]?.level).toBe(2);
   });
 
-  test('parses custom IDs', () => {
+  test('parses custom IDs', async () => {
     const content = `# My Header {#custom-id}\nContent`;
     const sections = parseSections(content);
 
@@ -70,7 +70,7 @@ describe('parseSections', () => {
     expect(sections[0]?.id).toBe('custom-id');
   });
 
-  test('sets section boundaries correctly', () => {
+  test('sets section boundaries correctly', async () => {
     const content = `# Header 1
 Content line 1
 Content line 2
@@ -84,7 +84,7 @@ Content line 3`;
     expect(sections[1]?.endLine).toBe(5);
   });
 
-  test('handles nested sections', () => {
+  test('handles nested sections', async () => {
     const content = `# Level 1
 ## Level 2
 ### Level 3
@@ -98,7 +98,7 @@ Content line 3`;
 });
 
 describe('findSection', () => {
-  test('finds section by ID', () => {
+  test('finds section by ID', async () => {
     const content = `# Header 1\n## Header 2\n### Header 3`;
     const sections = parseSections(content);
     const section = findSection(sections, 'header-2');
@@ -107,7 +107,7 @@ describe('findSection', () => {
     expect(section?.level).toBe(2);
   });
 
-  test('returns undefined for non-existent section', () => {
+  test('returns undefined for non-existent section', async () => {
     const content = `# Header 1`;
     const sections = parseSections(content);
     const section = findSection(sections, 'non-existent');
@@ -117,7 +117,7 @@ describe('findSection', () => {
 });
 
 describe('applyReplace', () => {
-  test('replaces all occurrences', () => {
+  test('replaces all occurrences', async () => {
     const content = 'foo bar foo baz foo';
     const result = applyReplace(content, 'foo', 'qux');
 
@@ -125,7 +125,7 @@ describe('applyReplace', () => {
     expect(result.count).toBe(3);
   });
 
-  test('returns zero count when no match', () => {
+  test('returns zero count when no match', async () => {
     const content = 'hello world';
     const result = applyReplace(content, 'foo', 'bar');
 
@@ -133,7 +133,7 @@ describe('applyReplace', () => {
     expect(result.count).toBe(0);
   });
 
-  test('handles special regex characters', () => {
+  test('handles special regex characters', async () => {
     const content = 'Price: $100.00';
     const result = applyReplace(content, '$100.00', '$200.00');
 
@@ -143,7 +143,7 @@ describe('applyReplace', () => {
 });
 
 describe('applyReplaceRegex', () => {
-  test('replaces using regex pattern', () => {
+  test('replaces using regex pattern', async () => {
     const content = 'Run `rpi task1` and `rpi task2`';
     const result = applyReplaceRegex(content, 'rpi (\\w+)', 'thoughts $1', 'g');
 
@@ -151,7 +151,7 @@ describe('applyReplaceRegex', () => {
     expect(result.count).toBe(2);
   });
 
-  test('applies flags correctly', () => {
+  test('applies flags correctly', async () => {
     const content = 'Hello HELLO hello';
     const result = applyReplaceRegex(content, 'hello', 'hi', 'gi');
 
@@ -159,7 +159,7 @@ describe('applyReplaceRegex', () => {
     expect(result.count).toBe(3);
   });
 
-  test('adds global flag if not present', () => {
+  test('adds global flag if not present', async () => {
     const content = 'foo foo foo';
     const result = applyReplaceRegex(content, 'foo', 'bar', 'i');
 
@@ -169,7 +169,7 @@ describe('applyReplaceRegex', () => {
 });
 
 describe('applyRemoveSection', () => {
-  test('removes section with children by default', () => {
+  test('removes section with children by default', async () => {
     const content = `# Header 1
 Content 1
 ## Child Header
@@ -184,7 +184,7 @@ Content 2`;
     expect(result.count).toBe(1);
   });
 
-  test('removes section without children when includeChildren=false', () => {
+  test('removes section without children when includeChildren=false', async () => {
     const content = `# Header 1
 Content 1
 ## Child Header
@@ -197,7 +197,7 @@ Child content
     expect(result.count).toBe(1);
   });
 
-  test('returns zero count when section not found', () => {
+  test('returns zero count when section not found', async () => {
     const content = '# Header 1\nContent';
     const result = applyRemoveSection(content, 'non-existent');
 
@@ -207,7 +207,7 @@ Child content
 });
 
 describe('applyReplaceSection', () => {
-  test('replaces section content', () => {
+  test('replaces section content', async () => {
     const content = `# Header 1
 Old content
 More old content
@@ -220,7 +220,7 @@ More old content
     expect(result.count).toBe(1);
   });
 
-  test('keeps header intact', () => {
+  test('keeps header intact', async () => {
     const content = `## My Section {#custom}
 Old content`;
     const result = applyReplaceSection(content, 'custom', 'New content');
@@ -232,7 +232,7 @@ Old content`;
 });
 
 describe('applyPrependToSection', () => {
-  test('prepends content to section', () => {
+  test('prepends content to section', async () => {
     const content = `# Header
 Existing content`;
     const result = applyPrependToSection(content, 'header', 'Prepended line');
@@ -243,7 +243,7 @@ Existing content`;
 });
 
 describe('applyAppendToSection', () => {
-  test('appends content to section', () => {
+  test('appends content to section', async () => {
     const content = `# Header 1
 Content 1
 # Header 2
@@ -261,28 +261,28 @@ Content 2`;
 });
 
 describe('applyPatches', () => {
-  test('applies multiple patches in order', () => {
+  test('applies multiple patches in order', async () => {
     const content = 'foo bar baz';
     const patches: PatchOperation[] = [
       { op: 'replace', old: 'foo', new: 'FOO' },
       { op: 'replace', old: 'bar', new: 'BAR' },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.content).toBe('FOO BAR baz');
     expect(result.applied).toBe(2);
     expect(result.warnings).toHaveLength(0);
   });
 
-  test('generates warnings for patches with no matches when onNoMatch=warn', () => {
+  test('generates warnings for patches with no matches when onNoMatch=warn', async () => {
     const content = 'hello world';
     const patches: PatchOperation[] = [
       { op: 'replace', old: 'foo', new: 'bar' },
       { op: 'replace', old: 'hello', new: 'hi' },
     ];
 
-    const result = applyPatches(content, patches, 'warn');
+    const result = await applyPatches(content, patches, 'warn');
 
     expect(result.content).toBe('hi world');
     expect(result.applied).toBe(1);
@@ -290,21 +290,21 @@ describe('applyPatches', () => {
     expect(result.warnings[0]?.message).toContain('matched 0 times');
   });
 
-  test('skips patches with no matches when onNoMatch=skip', () => {
+  test('skips patches with no matches when onNoMatch=skip', async () => {
     const content = 'hello world';
     const patches: PatchOperation[] = [
       { op: 'replace', old: 'foo', new: 'bar' },
       { op: 'replace', old: 'hello', new: 'hi' },
     ];
 
-    const result = applyPatches(content, patches, 'skip');
+    const result = await applyPatches(content, patches, 'skip');
 
     expect(result.content).toBe('hi world');
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(0);
   });
 
-  test('throws error for patches with no matches when onNoMatch=error', () => {
+  test('throws error for patches with no matches when onNoMatch=error', async () => {
     const content = 'hello world';
     const patches: PatchOperation[] = [
       { op: 'replace', old: 'foo', new: 'bar' },
@@ -313,20 +313,20 @@ describe('applyPatches', () => {
     expect(() => applyPatches(content, patches, 'error')).toThrow('Replace patch failed');
   });
 
-  test('respects per-patch onNoMatch override', () => {
+  test('respects per-patch onNoMatch override', async () => {
     const content = 'hello world';
     const patches: PatchOperation[] = [
       { op: 'replace', old: 'foo', new: 'bar', onNoMatch: 'skip' },
       { op: 'replace', old: 'missing', new: 'x', onNoMatch: 'warn' },
     ];
 
-    const result = applyPatches(content, patches, 'error');
+    const result = await applyPatches(content, patches, 'error');
 
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]?.message).toContain('missing');
   });
 
-  test('applies complex section operations', () => {
+  test('applies complex section operations', async () => {
     const content = `# Introduction
 Welcome text
 
@@ -349,7 +349,7 @@ Advanced content`;
       },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.content).toContain('New getting started guide');
     expect(result.content).toContain('**Note**: Updated documentation');
@@ -359,7 +359,7 @@ Advanced content`;
 });
 
 describe('parseFrontmatter', () => {
-  test('parses valid frontmatter', () => {
+  test('parses valid frontmatter', async () => {
     const content = `---
 title: My Document
 version: 1.0
@@ -373,7 +373,7 @@ version: 1.0
     expect(result.body).toBe('# Content here');
   });
 
-  test('handles content without frontmatter', () => {
+  test('handles content without frontmatter', async () => {
     const content = '# Just a heading\nSome content';
     const result = parseFrontmatter(content);
 
@@ -382,7 +382,7 @@ version: 1.0
     expect(result.body).toBe(content);
   });
 
-  test('handles empty frontmatter', () => {
+  test('handles empty frontmatter', async () => {
     const content = `---
 ---
 # Content`;
@@ -393,7 +393,7 @@ version: 1.0
     expect(result.body).toBe('# Content');
   });
 
-  test('handles nested frontmatter objects', () => {
+  test('handles nested frontmatter objects', async () => {
     const content = `---
 metadata:
   author: John
@@ -411,7 +411,7 @@ Content`;
     expect(result.data.tags).toEqual(['test', 'example']);
   });
 
-  test('handles malformed frontmatter', () => {
+  test('handles malformed frontmatter', async () => {
     const content = `---
 invalid: yaml: syntax:
 ---
@@ -422,7 +422,7 @@ Content`;
     expect(result.body).toBe(content);
   });
 
-  test('handles content with --- but no closing delimiter', () => {
+  test('handles content with --- but no closing delimiter', async () => {
     const content = `---
 title: Test
 # Missing closing delimiter`;
@@ -434,7 +434,7 @@ title: Test
 });
 
 describe('serializeFrontmatter', () => {
-  test('serializes frontmatter and body', () => {
+  test('serializes frontmatter and body', async () => {
     const data = { title: 'Test', version: '1.0' };
     const body = '# Content';
     const result = serializeFrontmatter(data, body);
@@ -445,7 +445,7 @@ describe('serializeFrontmatter', () => {
     expect(result).toContain('# Content');
   });
 
-  test('handles empty frontmatter object', () => {
+  test('handles empty frontmatter object', async () => {
     const data = {};
     const body = 'Content';
     const result = serializeFrontmatter(data, body);
@@ -453,7 +453,7 @@ describe('serializeFrontmatter', () => {
     expect(result).toBe('---\n{}\n---\nContent');
   });
 
-  test('handles nested objects', () => {
+  test('handles nested objects', async () => {
     const data = {
       metadata: {
         author: 'John',
@@ -470,7 +470,7 @@ describe('serializeFrontmatter', () => {
 });
 
 describe('applySetFrontmatter', () => {
-  test('sets simple key in existing frontmatter', () => {
+  test('sets simple key in existing frontmatter', async () => {
     const content = `---
 title: Old Title
 ---
@@ -482,7 +482,7 @@ title: Old Title
     expect(result.content).toContain('title: Old Title');
   });
 
-  test('sets nested key with dot notation', () => {
+  test('sets nested key with dot notation', async () => {
     const content = `---
 title: Test
 ---
@@ -494,7 +494,7 @@ Content`;
     expect(result.content).toContain('author: kustomark');
   });
 
-  test('creates frontmatter if it does not exist', () => {
+  test('creates frontmatter if it does not exist', async () => {
     const content = '# Just content\nNo frontmatter here';
     const result = applySetFrontmatter(content, 'version', '1.0');
 
@@ -504,7 +504,7 @@ Content`;
     expect(result.content).toContain('# Just content');
   });
 
-  test('overwrites existing key', () => {
+  test('overwrites existing key', async () => {
     const content = `---
 version: 1.0
 ---
@@ -516,7 +516,7 @@ Content`;
     expect(result.content).not.toContain('version: \'1.0\'');
   });
 
-  test('sets deeply nested key with dot notation', () => {
+  test('sets deeply nested key with dot notation', async () => {
     const content = `---
 title: Test
 ---
@@ -530,7 +530,7 @@ Content`;
     expect(result.content).toContain('value: test');
   });
 
-  test('sets value to different types', () => {
+  test('sets value to different types', async () => {
     const content = `---
 title: Test
 ---
@@ -553,7 +553,7 @@ Content`;
 });
 
 describe('applyRemoveFrontmatter', () => {
-  test('removes existing simple key', () => {
+  test('removes existing simple key', async () => {
     const content = `---
 title: Test
 version: 1.0
@@ -568,7 +568,7 @@ Content`;
     expect(result.content).toContain('author: John');
   });
 
-  test('removes nested key with dot notation', () => {
+  test('removes nested key with dot notation', async () => {
     const content = `---
 title: Test
 metadata:
@@ -584,7 +584,7 @@ Content`;
     expect(result.content).toContain('version: \'2.0\'');
   });
 
-  test('returns zero count for non-existing key', () => {
+  test('returns zero count for non-existing key', async () => {
     const content = `---
 title: Test
 ---
@@ -595,7 +595,7 @@ Content`;
     expect(result.content).toBe(content);
   });
 
-  test('returns zero count when no frontmatter exists', () => {
+  test('returns zero count when no frontmatter exists', async () => {
     const content = '# Just content';
     const result = applyRemoveFrontmatter(content, 'title');
 
@@ -603,7 +603,7 @@ Content`;
     expect(result.content).toBe(content);
   });
 
-  test('removes frontmatter entirely when last key is removed', () => {
+  test('removes frontmatter entirely when last key is removed', async () => {
     const content = `---
 title: Test
 ---
@@ -615,7 +615,7 @@ Content here`;
     expect(result.content).toBe('Content here');
   });
 
-  test('handles removing deeply nested keys', () => {
+  test('handles removing deeply nested keys', async () => {
     const content = `---
 metadata:
   deep:
@@ -631,7 +631,7 @@ Content`;
 });
 
 describe('applyRenameFrontmatter', () => {
-  test('renames existing simple key', () => {
+  test('renames existing simple key', async () => {
     const content = `---
 name: old-name
 version: '1.0'
@@ -644,7 +644,7 @@ Content`;
     expect(result.content).toContain('version: \'1.0\'');
   });
 
-  test('renames nested key with dot notation', () => {
+  test('renames nested key with dot notation', async () => {
     const content = `---
 metadata:
   oldKey: value
@@ -659,7 +659,7 @@ Content`;
     expect(result.content).toContain('other: data');
   });
 
-  test('returns zero count for non-existing key', () => {
+  test('returns zero count for non-existing key', async () => {
     const content = `---
 title: Test
 ---
@@ -670,7 +670,7 @@ Content`;
     expect(result.content).toBe(content);
   });
 
-  test('returns zero count when no frontmatter exists', () => {
+  test('returns zero count when no frontmatter exists', async () => {
     const content = '# Just content';
     const result = applyRenameFrontmatter(content, 'old', 'new');
 
@@ -678,7 +678,7 @@ Content`;
     expect(result.content).toBe(content);
   });
 
-  test('moves key to different nesting level', () => {
+  test('moves key to different nesting level', async () => {
     const content = `---
 topLevel: value
 metadata:
@@ -693,7 +693,7 @@ Content`;
     expect(result.content).toContain('metadata:');
   });
 
-  test('preserves value type when renaming', () => {
+  test('preserves value type when renaming', async () => {
     const content = `---
 count: 42
 active: true
@@ -716,7 +716,7 @@ Content`;
 });
 
 describe('applyMergeFrontmatter', () => {
-  test('merges values into existing frontmatter', () => {
+  test('merges values into existing frontmatter', async () => {
     const content = `---
 title: Test
 ---
@@ -732,7 +732,7 @@ Content`;
     expect(result.content).toContain('author: kustomark');
   });
 
-  test('merges into empty frontmatter', () => {
+  test('merges into empty frontmatter', async () => {
     const content = '# Content without frontmatter';
     const result = applyMergeFrontmatter(content, {
       version: '1.0',
@@ -747,7 +747,7 @@ Content`;
     expect(result.content).toContain('- example');
   });
 
-  test('overwrites existing keys', () => {
+  test('overwrites existing keys', async () => {
     const content = `---
 version: 1.0
 author: old
@@ -765,7 +765,7 @@ Content`;
     expect(result.content).toContain('author: old');
   });
 
-  test('supports nested keys with dot notation', () => {
+  test('supports nested keys with dot notation', async () => {
     const content = `---
 title: Test
 ---
@@ -781,7 +781,7 @@ Content`;
     expect(result.content).toContain('date: \'2024-01-01\'');
   });
 
-  test('handles empty values object', () => {
+  test('handles empty values object', async () => {
     const content = `---
 title: Test
 ---
@@ -792,7 +792,7 @@ Content`;
     expect(result.content).toContain('title: Test');
   });
 
-  test('merges complex nested structures', () => {
+  test('merges complex nested structures', async () => {
     const content = `---
 existing: value
 ---
@@ -818,7 +818,7 @@ Content`;
 });
 
 describe('frontmatter operations with applyPatches', () => {
-  test('applies multiple frontmatter operations in sequence', () => {
+  test('applies multiple frontmatter operations in sequence', async () => {
     const content = `---
 name: old-name
 version: 1.0
@@ -831,7 +831,7 @@ version: 1.0
       { op: 'merge-frontmatter', values: { author: 'kustomark', tags: ['patched'] } },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(3);
     expect(result.warnings).toHaveLength(0);
@@ -841,7 +841,7 @@ version: 1.0
     expect(result.content).toContain('tags:');
   });
 
-  test('generates warning when removing non-existent key with onNoMatch=warn', () => {
+  test('generates warning when removing non-existent key with onNoMatch=warn', async () => {
     const content = `---
 title: Test
 ---
@@ -851,14 +851,14 @@ Content`;
       { op: 'remove-frontmatter', key: 'nonexistent' },
     ];
 
-    const result = applyPatches(content, patches, 'warn');
+    const result = await applyPatches(content, patches, 'warn');
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]?.message).toContain('matched 0 times');
   });
 
-  test('skips non-matching frontmatter operations with onNoMatch=skip', () => {
+  test('skips non-matching frontmatter operations with onNoMatch=skip', async () => {
     const content = `---
 title: Test
 ---
@@ -869,14 +869,14 @@ Content`;
       { op: 'set-frontmatter', key: 'version', value: '1.0' },
     ];
 
-    const result = applyPatches(content, patches, 'warn');
+    const result = await applyPatches(content, patches, 'warn');
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(0);
     expect(result.content).toContain('version: \'1.0\'');
   });
 
-  test('throws error for non-matching frontmatter operations with onNoMatch=error', () => {
+  test('throws error for non-matching frontmatter operations with onNoMatch=error', async () => {
     const content = `---
 title: Test
 ---
@@ -889,7 +889,7 @@ Content`;
     expect(() => applyPatches(content, patches, 'error')).toThrow('Frontmatter patch failed');
   });
 
-  test('combines frontmatter and section operations', () => {
+  test('combines frontmatter and section operations', async () => {
     const content = `---
 title: Original
 ---
@@ -905,7 +905,7 @@ Old details`;
       { op: 'append-to-section', id: 'details', content: '\nAppended content' },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(3);
     expect(result.content).toContain('version: \'2.0\'');
@@ -915,7 +915,7 @@ Old details`;
 });
 
 describe('applyReplaceLine', () => {
-  test('replaces single matching line', () => {
+  test('replaces single matching line', async () => {
     const content = `line 1
 line 2
 line 3`;
@@ -927,7 +927,7 @@ line 3`);
     expect(result.count).toBe(1);
   });
 
-  test('replaces multiple matching lines', () => {
+  test('replaces multiple matching lines', async () => {
     const content = `foo
 bar
 foo
@@ -943,7 +943,7 @@ replaced`);
     expect(result.count).toBe(3);
   });
 
-  test('returns zero count when no match', () => {
+  test('returns zero count when no match', async () => {
     const content = `line 1
 line 2
 line 3`;
@@ -953,7 +953,7 @@ line 3`;
     expect(result.count).toBe(0);
   });
 
-  test('handles empty content', () => {
+  test('handles empty content', async () => {
     const content = '';
     const result = applyReplaceLine(content, 'anything', 'new');
 
@@ -961,7 +961,7 @@ line 3`;
     expect(result.count).toBe(0);
   });
 
-  test('requires exact line match', () => {
+  test('requires exact line match', async () => {
     const content = `partial line match
 other content`;
     const result = applyReplaceLine(content, 'partial', 'new');
@@ -970,7 +970,7 @@ other content`;
     expect(result.count).toBe(0);
   });
 
-  test('matches lines with special characters', () => {
+  test('matches lines with special characters', async () => {
     const content = `# Header
 $special = 100;
 normal line`;
@@ -982,7 +982,7 @@ normal line`;
 });
 
 describe('applyInsertAfterLine', () => {
-  test('inserts after single matching line with exact match', () => {
+  test('inserts after single matching line with exact match', async () => {
     const content = `line 1
 line 2
 line 3`;
@@ -995,7 +995,7 @@ line 3`);
     expect(result.count).toBe(1);
   });
 
-  test('inserts after multiple matching lines with exact match', () => {
+  test('inserts after multiple matching lines with exact match', async () => {
     const content = `marker
 content
 marker
@@ -1011,7 +1011,7 @@ more content`);
     expect(result.count).toBe(2);
   });
 
-  test('inserts after line matching regex pattern', () => {
+  test('inserts after line matching regex pattern', async () => {
     const content = `# Header 1
 content
 ## Header 2
@@ -1026,7 +1026,7 @@ more content`);
     expect(result.count).toBe(1);
   });
 
-  test('inserts after multiple lines matching regex', () => {
+  test('inserts after multiple lines matching regex', async () => {
     const content = `// TODO: fix this
 code here
 // TODO: review
@@ -1046,7 +1046,7 @@ more code
     expect(result.count).toBe(3);
   });
 
-  test('returns zero count when no match with exact string', () => {
+  test('returns zero count when no match with exact string', async () => {
     const content = `line 1
 line 2`;
     const result = applyInsertAfterLine(content, 'nonexistent', undefined, undefined, 'new');
@@ -1055,7 +1055,7 @@ line 2`;
     expect(result.count).toBe(0);
   });
 
-  test('returns zero count when no match with regex', () => {
+  test('returns zero count when no match with regex', async () => {
     const content = `line 1
 line 2`;
     const result = applyInsertAfterLine(content, undefined, '^###', true, 'new');
@@ -1064,7 +1064,7 @@ line 2`;
     expect(result.count).toBe(0);
   });
 
-  test('handles multi-line insertion', () => {
+  test('handles multi-line insertion', async () => {
     const content = `before
 marker
 after`;
@@ -1081,7 +1081,7 @@ after`);
     expect(result.count).toBe(1);
   });
 
-  test('handles empty content', () => {
+  test('handles empty content', async () => {
     const content = '';
     const result = applyInsertAfterLine(content, 'anything', undefined, undefined, 'new');
 
@@ -1089,7 +1089,7 @@ after`);
     expect(result.count).toBe(0);
   });
 
-  test('inserts with complex regex patterns', () => {
+  test('inserts with complex regex patterns', async () => {
     const content = `import React from 'react';
 import { useState } from 'react';
 const Component = () => {};`;
@@ -1107,7 +1107,7 @@ const Component = () => {};`;
 });
 
 describe('applyInsertBeforeLine', () => {
-  test('inserts before single matching line with exact match', () => {
+  test('inserts before single matching line with exact match', async () => {
     const content = `line 1
 line 2
 line 3`;
@@ -1120,7 +1120,7 @@ line 3`);
     expect(result.count).toBe(1);
   });
 
-  test('inserts before multiple matching lines with exact match', () => {
+  test('inserts before multiple matching lines with exact match', async () => {
     const content = `marker
 content
 marker
@@ -1136,7 +1136,7 @@ more content`);
     expect(result.count).toBe(2);
   });
 
-  test('inserts before line matching regex pattern', () => {
+  test('inserts before line matching regex pattern', async () => {
     const content = `# Header 1
 content
 ## Header 2
@@ -1151,7 +1151,7 @@ more content`);
     expect(result.count).toBe(1);
   });
 
-  test('inserts before multiple lines matching regex', () => {
+  test('inserts before multiple lines matching regex', async () => {
     const content = `export function a() {}
 export function b() {}
 function helper() {}
@@ -1164,7 +1164,7 @@ export function c() {}`;
     expect(result.count).toBe(3);
   });
 
-  test('returns zero count when no match with exact string', () => {
+  test('returns zero count when no match with exact string', async () => {
     const content = `line 1
 line 2`;
     const result = applyInsertBeforeLine(content, 'nonexistent', undefined, undefined, 'new');
@@ -1173,7 +1173,7 @@ line 2`;
     expect(result.count).toBe(0);
   });
 
-  test('returns zero count when no match with regex', () => {
+  test('returns zero count when no match with regex', async () => {
     const content = `line 1
 line 2`;
     const result = applyInsertBeforeLine(content, undefined, '^###', true, 'new');
@@ -1182,7 +1182,7 @@ line 2`;
     expect(result.count).toBe(0);
   });
 
-  test('handles multi-line insertion', () => {
+  test('handles multi-line insertion', async () => {
     const content = `before
 marker
 after`;
@@ -1199,7 +1199,7 @@ after`);
     expect(result.count).toBe(1);
   });
 
-  test('handles empty content', () => {
+  test('handles empty content', async () => {
     const content = '';
     const result = applyInsertBeforeLine(content, 'anything', undefined, undefined, 'new');
 
@@ -1207,7 +1207,7 @@ after`);
     expect(result.count).toBe(0);
   });
 
-  test('inserts at beginning of file', () => {
+  test('inserts at beginning of file', async () => {
     const content = `first line
 second line`;
     const result = applyInsertBeforeLine(content, 'first line', undefined, undefined, 'new first');
@@ -1220,7 +1220,7 @@ second line`);
 });
 
 describe('applyDeleteBetween', () => {
-  test('deletes between markers with inclusive=true (default)', () => {
+  test('deletes between markers with inclusive=true (default)', async () => {
     const content = `line 1
 <!-- START -->
 delete this
@@ -1234,7 +1234,7 @@ line 2`);
     expect(result.count).toBe(1);
   });
 
-  test('deletes between markers with inclusive=false', () => {
+  test('deletes between markers with inclusive=false', async () => {
     const content = `line 1
 <!-- START -->
 delete this
@@ -1250,7 +1250,7 @@ line 2`);
     expect(result.count).toBe(1);
   });
 
-  test('deletes only first occurrence', () => {
+  test('deletes only first occurrence', async () => {
     const content = `<!-- START -->
 first block
 <!-- END -->
@@ -1265,7 +1265,7 @@ second block
     expect(result.count).toBe(1);
   });
 
-  test('returns zero count when start marker not found', () => {
+  test('returns zero count when start marker not found', async () => {
     const content = `line 1
 <!-- END -->
 line 2`;
@@ -1275,7 +1275,7 @@ line 2`;
     expect(result.count).toBe(0);
   });
 
-  test('returns zero count when end marker not found', () => {
+  test('returns zero count when end marker not found', async () => {
     const content = `line 1
 <!-- START -->
 line 2`;
@@ -1285,7 +1285,7 @@ line 2`;
     expect(result.count).toBe(0);
   });
 
-  test('handles partial string matches in markers', () => {
+  test('handles partial string matches in markers', async () => {
     const content = `before
 marker-start-here
 content to delete
@@ -1298,7 +1298,7 @@ after`);
     expect(result.count).toBe(1);
   });
 
-  test('handles empty content between markers with inclusive=true', () => {
+  test('handles empty content between markers with inclusive=true', async () => {
     const content = `line 1
 <!-- START -->
 <!-- END -->
@@ -1310,7 +1310,7 @@ line 2`);
     expect(result.count).toBe(1);
   });
 
-  test('handles empty content between markers with inclusive=false', () => {
+  test('handles empty content between markers with inclusive=false', async () => {
     const content = `line 1
 <!-- START -->
 <!-- END -->
@@ -1324,7 +1324,7 @@ line 2`);
     expect(result.count).toBe(1);
   });
 
-  test('handles adjacent markers', () => {
+  test('handles adjacent markers', async () => {
     const content = `before
 start-marker
 end-marker
@@ -1338,7 +1338,7 @@ after`);
 });
 
 describe('applyReplaceBetween', () => {
-  test('replaces between markers with inclusive=true (default)', () => {
+  test('replaces between markers with inclusive=true (default)', async () => {
     const content = `line 1
 <!-- START -->
 old content
@@ -1359,7 +1359,7 @@ line 2`);
     expect(result.count).toBe(1);
   });
 
-  test('replaces between markers with inclusive=false', () => {
+  test('replaces between markers with inclusive=false', async () => {
     const content = `line 1
 <!-- START -->
 old content
@@ -1382,7 +1382,7 @@ line 2`);
     expect(result.count).toBe(1);
   });
 
-  test('replaces with multi-line content', () => {
+  test('replaces with multi-line content', async () => {
     const content = `before
 <!-- START -->
 old
@@ -1406,7 +1406,7 @@ after`);
     expect(result.count).toBe(1);
   });
 
-  test('replaces only first occurrence', () => {
+  test('replaces only first occurrence', async () => {
     const content = `<!-- START -->
 first
 <!-- END -->
@@ -1424,7 +1424,7 @@ second
     expect(result.count).toBe(1);
   });
 
-  test('returns zero count when start marker not found', () => {
+  test('returns zero count when start marker not found', async () => {
     const content = `line 1
 <!-- END -->
 line 2`;
@@ -1434,7 +1434,7 @@ line 2`;
     expect(result.count).toBe(0);
   });
 
-  test('returns zero count when end marker not found', () => {
+  test('returns zero count when end marker not found', async () => {
     const content = `line 1
 <!-- START -->
 line 2`;
@@ -1444,7 +1444,7 @@ line 2`;
     expect(result.count).toBe(0);
   });
 
-  test('handles partial string matches in markers', () => {
+  test('handles partial string matches in markers', async () => {
     const content = `before
 marker-start-here
 old content
@@ -1458,7 +1458,7 @@ after`);
     expect(result.count).toBe(1);
   });
 
-  test('replaces empty region with content', () => {
+  test('replaces empty region with content', async () => {
     const content = `line 1
 <!-- START -->
 <!-- END -->
@@ -1477,7 +1477,7 @@ line 2`);
     expect(result.count).toBe(1);
   });
 
-  test('replaces with empty string', () => {
+  test('replaces with empty string', async () => {
     const content = `line 1
 <!-- START -->
 delete this
@@ -1491,7 +1491,7 @@ line 2`);
     expect(result.count).toBe(1);
   });
 
-  test('handles adjacent markers with inclusive=false', () => {
+  test('handles adjacent markers with inclusive=false', async () => {
     const content = `before
 start
 end
@@ -1508,7 +1508,7 @@ after`);
 });
 
 describe('line operations with applyPatches', () => {
-  test('applies multiple line operations in sequence', () => {
+  test('applies multiple line operations in sequence', async () => {
     const content = `line 1
 line 2
 line 3
@@ -1520,7 +1520,7 @@ line 4`;
       { op: 'insert-before-line', match: 'line 4', content: 'inserted before 4' },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(3);
     expect(result.content).toContain('REPLACED');
@@ -1528,7 +1528,7 @@ line 4`;
     expect(result.content).toContain('inserted before 4');
   });
 
-  test('generates warning for no match with onNoMatch=warn', () => {
+  test('generates warning for no match with onNoMatch=warn', async () => {
     const content = `line 1
 line 2`;
 
@@ -1536,14 +1536,14 @@ line 2`;
       { op: 'replace-line', match: 'nonexistent', replacement: 'new' },
     ];
 
-    const result = applyPatches(content, patches, 'warn');
+    const result = await applyPatches(content, patches, 'warn');
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]?.message).toContain('matched 0 times');
   });
 
-  test('throws error for no match with onNoMatch=error', () => {
+  test('throws error for no match with onNoMatch=error', async () => {
     const content = `line 1
 line 2`;
 
@@ -1554,7 +1554,7 @@ line 2`;
     expect(() => applyPatches(content, patches, 'error')).toThrow('matched 0 times');
   });
 
-  test('skips non-matching operations with onNoMatch=skip', () => {
+  test('skips non-matching operations with onNoMatch=skip', async () => {
     const content = `line 1
 line 2`;
 
@@ -1563,14 +1563,14 @@ line 2`;
       { op: 'replace-line', match: 'line 2', replacement: 'REPLACED' },
     ];
 
-    const result = applyPatches(content, patches, 'warn');
+    const result = await applyPatches(content, patches, 'warn');
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(0);
     expect(result.content).toContain('REPLACED');
   });
 
-  test('applies delete-between and replace-between operations', () => {
+  test('applies delete-between and replace-between operations', async () => {
     const content = `keep
 <!-- DELETE START -->
 remove this
@@ -1591,7 +1591,7 @@ final`;
       },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(2);
     expect(result.content).not.toContain('remove this');
@@ -1599,7 +1599,7 @@ final`;
     expect(result.content).not.toContain('replace this');
   });
 
-  test('combines line operations with section operations', () => {
+  test('combines line operations with section operations', async () => {
     const content = `# Section 1
 content
 marker-line
@@ -1611,14 +1611,14 @@ more content`;
       { op: 'append-to-section', id: 'section-2', content: '\nappended to section' },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(2);
     expect(result.content).toContain('marker-line\ninserted line');
     expect(result.content).toContain('appended to section');
   });
 
-  test('respects per-operation onNoMatch override', () => {
+  test('respects per-operation onNoMatch override', async () => {
     const content = `line 1
 line 2`;
 
@@ -1628,7 +1628,7 @@ line 2`;
       { op: 'replace-line', match: 'line 2', replacement: 'REPLACED' },
     ];
 
-    const result = applyPatches(content, patches, 'error');
+    const result = await applyPatches(content, patches, 'error');
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(1);
@@ -1639,7 +1639,7 @@ line 2`;
 
 describe('Conditional Patches - when field', () => {
   describe('fileContains condition', () => {
-    test('applies patch when content contains value', () => {
+    test('applies patch when content contains value', async () => {
       const content = 'This is production environment documentation.';
       const patches: PatchOperation[] = [
         {
@@ -1650,13 +1650,13 @@ describe('Conditional Patches - when field', () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('PRODUCTION');
     });
 
-    test('skips patch when content does not contain value', () => {
+    test('skips patch when content does not contain value', async () => {
       const content = 'This is development environment documentation.';
       const patches: PatchOperation[] = [
         {
@@ -1667,13 +1667,13 @@ describe('Conditional Patches - when field', () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content); // Unchanged
     });
 
-    test('is case-sensitive by default', () => {
+    test('is case-sensitive by default', async () => {
       const content = 'Production environment';
       const patches: PatchOperation[] = [
         {
@@ -1684,7 +1684,7 @@ describe('Conditional Patches - when field', () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
@@ -1692,7 +1692,7 @@ describe('Conditional Patches - when field', () => {
   });
 
   describe('fileMatches condition', () => {
-    test('applies patch when content matches regex pattern', () => {
+    test('applies patch when content matches regex pattern', async () => {
       const content = 'Version 2.0.1 documentation';
       const patches: PatchOperation[] = [
         {
@@ -1703,13 +1703,13 @@ describe('Conditional Patches - when field', () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('2.1.0');
     });
 
-    test('skips patch when content does not match pattern', () => {
+    test('skips patch when content does not match pattern', async () => {
       const content = 'No version here';
       const patches: PatchOperation[] = [
         {
@@ -1720,13 +1720,13 @@ describe('Conditional Patches - when field', () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
     });
 
-    test('supports regex flags', () => {
+    test('supports regex flags', async () => {
       const content = 'UPPERCASE TEXT';
       const patches: PatchOperation[] = [
         {
@@ -1737,7 +1737,7 @@ describe('Conditional Patches - when field', () => {
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('lowercase');
@@ -1745,7 +1745,7 @@ describe('Conditional Patches - when field', () => {
   });
 
   describe('frontmatterEquals condition', () => {
-    test('applies patch when frontmatter key equals value', () => {
+    test('applies patch when frontmatter key equals value', async () => {
       const content = `---
 environment: production
 version: 2.0
@@ -1760,13 +1760,13 @@ version: 2.0
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('Production Documentation');
     });
 
-    test('skips patch when frontmatter key has different value', () => {
+    test('skips patch when frontmatter key has different value', async () => {
       const content = `---
 environment: development
 ---
@@ -1780,13 +1780,13 @@ environment: development
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
     });
 
-    test('supports nested frontmatter keys with dot notation', () => {
+    test('supports nested frontmatter keys with dot notation', async () => {
       const content = `---
 config:
   server:
@@ -1802,13 +1802,13 @@ config:
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('Production Documentation');
     });
 
-    test('compares complex values with deep equality', () => {
+    test('compares complex values with deep equality', async () => {
       const content = `---
 platforms: [windows, linux, macos]
 ---
@@ -1822,7 +1822,7 @@ platforms: [windows, linux, macos]
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('Cross-platform Documentation');
@@ -1830,7 +1830,7 @@ platforms: [windows, linux, macos]
   });
 
   describe('frontmatterExists condition', () => {
-    test('applies patch when frontmatter key exists', () => {
+    test('applies patch when frontmatter key exists', async () => {
       const content = `---
 beta: true
 ---
@@ -1844,14 +1844,14 @@ beta: true
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('Beta');
       expect(result.content).toContain('experimental');
     });
 
-    test('skips patch when frontmatter key does not exist', () => {
+    test('skips patch when frontmatter key does not exist', async () => {
       const content = `---
 stable: true
 ---
@@ -1865,12 +1865,12 @@ stable: true
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
     });
 
-    test('returns true even if value is false', () => {
+    test('returns true even if value is false', async () => {
       const content = `---
 enabled: false
 ---
@@ -1884,7 +1884,7 @@ enabled: false
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('Disabled Feature');
@@ -1892,7 +1892,7 @@ enabled: false
   });
 
   describe('not condition', () => {
-    test('applies patch when negated condition is false', () => {
+    test('applies patch when negated condition is false', async () => {
       const content = 'Development documentation';
       const patches: PatchOperation[] = [
         {
@@ -1903,13 +1903,13 @@ enabled: false
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('Non-production');
     });
 
-    test('skips patch when negated condition is true', () => {
+    test('skips patch when negated condition is true', async () => {
       const content = 'production documentation';
       const patches: PatchOperation[] = [
         {
@@ -1920,7 +1920,7 @@ enabled: false
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
@@ -1928,7 +1928,7 @@ enabled: false
   });
 
   describe('anyOf condition', () => {
-    test('applies patch when any condition matches', () => {
+    test('applies patch when any condition matches', async () => {
       const content = 'Development environment';
       const patches: PatchOperation[] = [
         {
@@ -1945,13 +1945,13 @@ enabled: false
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('ENVIRONMENT');
     });
 
-    test('skips patch when no condition matches', () => {
+    test('skips patch when no condition matches', async () => {
       const content = 'Staging environment';
       const patches: PatchOperation[] = [
         {
@@ -1968,7 +1968,7 @@ enabled: false
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
@@ -1976,7 +1976,7 @@ enabled: false
   });
 
   describe('allOf condition', () => {
-    test('applies patch when all conditions match', () => {
+    test('applies patch when all conditions match', async () => {
       const content = `---
 published: true
 ---
@@ -1997,13 +1997,13 @@ Live in production.`;
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('GUIDE');
     });
 
-    test('skips patch when any condition fails', () => {
+    test('skips patch when any condition fails', async () => {
       const content = `---
 published: false
 ---
@@ -2023,7 +2023,7 @@ published: false
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
@@ -2031,7 +2031,7 @@ published: false
   });
 
   describe('nested conditions', () => {
-    test('handles complex nested conditions', () => {
+    test('handles complex nested conditions', async () => {
       const content = `---
 environment: production
 version: 2.0
@@ -2061,13 +2061,13 @@ Current version live in production.`;
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('Production API');
     });
 
-    test('skips patch with complex condition when inner condition fails', () => {
+    test('skips patch with complex condition when inner condition fails', async () => {
       const content = `---
 environment: development
 published: true
@@ -2094,7 +2094,7 @@ published: true
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
@@ -2102,7 +2102,7 @@ published: true
   });
 
   describe('conditional patches with different operations', () => {
-    test('works with remove-section operation', () => {
+    test('works with remove-section operation', async () => {
       const content = `---
 internal: true
 ---
@@ -2118,14 +2118,14 @@ For employees only
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       // Should NOT remove because internal is true
       expect(result.applied).toBe(0);
       expect(result.content).toContain('Internal Notes');
     });
 
-    test('works with replace-section operation', () => {
+    test('works with replace-section operation', async () => {
       const content = `---
 environment: production
 ---
@@ -2142,14 +2142,14 @@ Development steps here
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toContain('Production installation');
       expect(result.content).not.toContain('Development steps');
     });
 
-    test('works with frontmatter operations', () => {
+    test('works with frontmatter operations', async () => {
       const content = `---
 draft: true
 ---
@@ -2163,7 +2163,7 @@ draft: true
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       // Should NOT apply because draft exists
       expect(result.applied).toBe(0);
@@ -2172,7 +2172,7 @@ draft: true
   });
 
   describe('multiple conditional patches', () => {
-    test('applies only patches with matching conditions', () => {
+    test('applies only patches with matching conditions', async () => {
       const content = `---
 environment: production
 version: 2.0
@@ -2199,7 +2199,7 @@ version: 2.0
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(2);
       expect(result.content).toContain('env_type: production');
@@ -2207,7 +2207,7 @@ version: 2.0
       expect(result.content).toContain('version_string: v2.0');
     });
 
-    test('sequentially evaluates conditions for each patch', () => {
+    test('sequentially evaluates conditions for each patch', async () => {
       const content = 'Initial content';
       const patches: PatchOperation[] = [
         {
@@ -2224,7 +2224,7 @@ version: 2.0
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(2);
       expect(result.content).toBe('Final content');
@@ -2232,7 +2232,7 @@ version: 2.0
   });
 
   describe('edge cases', () => {
-    test('handles missing frontmatter gracefully', () => {
+    test('handles missing frontmatter gracefully', async () => {
       const content = '# No frontmatter here';
       const patches: PatchOperation[] = [
         {
@@ -2243,13 +2243,13 @@ version: 2.0
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
     });
 
-    test('handles invalid regex in fileMatches gracefully', () => {
+    test('handles invalid regex in fileMatches gracefully', async () => {
       const content = 'Some content';
       const patches: PatchOperation[] = [
         {
@@ -2260,14 +2260,14 @@ version: 2.0
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       // Invalid regex should evaluate to false
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
     });
 
-    test('empty anyOf condition evaluates to false', () => {
+    test('empty anyOf condition evaluates to false', async () => {
       const content = 'Content';
       const patches: PatchOperation[] = [
         {
@@ -2278,13 +2278,13 @@ version: 2.0
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(0);
       expect(result.content).toBe(content);
     });
 
-    test('empty allOf condition evaluates to true', () => {
+    test('empty allOf condition evaluates to true', async () => {
       const content = 'Content';
       const patches: PatchOperation[] = [
         {
@@ -2295,7 +2295,7 @@ version: 2.0
         },
       ];
 
-      const result = applyPatches(content, patches);
+      const result = await applyPatches(content, patches);
 
       expect(result.applied).toBe(1);
       expect(result.content).toBe('Modified');
@@ -2303,7 +2303,7 @@ version: 2.0
   });
 
   describe('Smart Error Recovery - Suggestions in Warnings', () => {
-    test('generates suggestions for section operation with typo', () => {
+    test('generates suggestions for section operation with typo', async () => {
       const content = `
 # Installation
 
@@ -2321,7 +2321,7 @@ More content
         },
       ];
 
-      const result = applyPatches(content, patches, 'warn');
+      const result = await applyPatches(content, patches, 'warn');
 
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]?.message).toContain("matched 0 times");
@@ -2330,7 +2330,7 @@ More content
       expect(result.warnings[0]?.suggestions?.[0]).toContain("installation");
     });
 
-    test('generates suggestions for frontmatter operation with typo', () => {
+    test('generates suggestions for frontmatter operation with typo', async () => {
       const content = `---
 title: Test Document
 author: John Doe
@@ -2346,7 +2346,7 @@ Content
         },
       ];
 
-      const result = applyPatches(content, patches, 'warn');
+      const result = await applyPatches(content, patches, 'warn');
 
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]?.message).toContain("matched 0 times");
@@ -2355,7 +2355,7 @@ Content
       expect(result.warnings[0]?.suggestions?.[0]).toContain("author");
     });
 
-    test('generates case-insensitive suggestions for replace operation', () => {
+    test('generates case-insensitive suggestions for replace operation', async () => {
       const content = "hello world";
       const patches: PatchOperation[] = [
         {
@@ -2366,7 +2366,7 @@ Content
         },
       ];
 
-      const result = applyPatches(content, patches, 'warn');
+      const result = await applyPatches(content, patches, 'warn');
 
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]?.suggestions).toBeDefined();
@@ -2374,7 +2374,7 @@ Content
       expect(result.warnings[0]?.suggestions?.[0]).toContain("different casing");
     });
 
-    test('lists available sections when no similar section found', () => {
+    test('lists available sections when no similar section found', async () => {
       const content = `
 # Introduction
 
@@ -2391,7 +2391,7 @@ Content
         },
       ];
 
-      const result = applyPatches(content, patches, 'warn');
+      const result = await applyPatches(content, patches, 'warn');
 
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]?.suggestions).toBeDefined();
@@ -2399,7 +2399,7 @@ Content
       expect(result.warnings[0]?.suggestions?.[0]).toContain("Available sections:");
     });
 
-    test('provides helpful message when no sections exist', () => {
+    test('provides helpful message when no sections exist', async () => {
       const content = "Just plain text with no sections";
       const patches: PatchOperation[] = [
         {
@@ -2410,14 +2410,14 @@ Content
         },
       ];
 
-      const result = applyPatches(content, patches, 'warn');
+      const result = await applyPatches(content, patches, 'warn');
 
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]?.suggestions).toBeDefined();
       expect(result.warnings[0]?.suggestions).toContain("No sections found in the document");
     });
 
-    test('identifies missing markers for delete-between operation', () => {
+    test('identifies missing markers for delete-between operation', async () => {
       const content = "content without markers";
       const patches: PatchOperation[] = [
         {
@@ -2428,7 +2428,7 @@ Content
         },
       ];
 
-      const result = applyPatches(content, patches, 'warn');
+      const result = await applyPatches(content, patches, 'warn');
 
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]?.suggestions).toBeDefined();
@@ -2436,7 +2436,7 @@ Content
       expect(result.warnings[0]?.suggestions?.[0]).toContain("Neither");
     });
 
-    test('suggests similar lines for replace-line operation', () => {
+    test('suggests similar lines for replace-line operation', async () => {
       const content = `import { foo } from 'bar';
 export const test = 'value';`;
       const patches: PatchOperation[] = [
@@ -2448,14 +2448,14 @@ export const test = 'value';`;
         },
       ];
 
-      const result = applyPatches(content, patches, 'warn');
+      const result = await applyPatches(content, patches, 'warn');
 
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]?.suggestions).toBeDefined();
       expect(result.warnings[0]?.suggestions?.length).toBeGreaterThan(0);
     });
 
-    test('no suggestions for successful patches', () => {
+    test('no suggestions for successful patches', async () => {
       const content = `
 # Installation
 
@@ -2469,12 +2469,12 @@ Some content
         },
       ];
 
-      const result = applyPatches(content, patches, 'warn');
+      const result = await applyPatches(content, patches, 'warn');
 
       expect(result.warnings).toHaveLength(0);
     });
 
-    test('no warnings when onNoMatch is skip', () => {
+    test('no warnings when onNoMatch is skip', async () => {
       const content = `
 # Installation
 
@@ -2488,12 +2488,12 @@ Some content
         },
       ];
 
-      const result = applyPatches(content, patches, 'skip');
+      const result = await applyPatches(content, patches, 'skip');
 
       expect(result.warnings).toHaveLength(0);
     });
 
-    test('multiple patches with suggestions', () => {
+    test('multiple patches with suggestions', async () => {
       const content = `
 # Installation
 
@@ -2517,7 +2517,7 @@ More content
         },
       ];
 
-      const result = applyPatches(content, patches, 'warn');
+      const result = await applyPatches(content, patches, 'warn');
 
       expect(result.warnings).toHaveLength(2);
       expect(result.warnings[0]?.suggestions).toBeDefined();

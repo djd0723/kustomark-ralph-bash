@@ -7,7 +7,7 @@ import { applyChangeSectionLevel, applyPatches } from "./patch-engine.js";
 import type { PatchOperation } from "./types.js";
 
 describe("applyChangeSectionLevel", () => {
-  test("promotes section (negative delta)", () => {
+  test("promotes section (negative delta)", async () => {
     const content = `# Header 1
 Content 1
 ### Header 3
@@ -21,7 +21,7 @@ Content 3
     expect(result.count).toBe(1);
   });
 
-  test("demotes section (positive delta)", () => {
+  test("demotes section (positive delta)", async () => {
     const content = `# Header 1
 Content 1
 ## Header 2
@@ -34,7 +34,7 @@ Content 2`;
     expect(result.count).toBe(1);
   });
 
-  test("promotes by multiple levels", () => {
+  test("promotes by multiple levels", async () => {
     const content = `# Header 1
 Content 1
 ##### Header 5
@@ -47,7 +47,7 @@ Content 5`;
     expect(result.count).toBe(1);
   });
 
-  test("demotes by multiple levels", () => {
+  test("demotes by multiple levels", async () => {
     const content = `# Header 1
 Content 1
 ## Header 2
@@ -60,7 +60,7 @@ Content 2`;
     expect(result.count).toBe(1);
   });
 
-  test("clamps at level 1 (cannot promote below level 1)", () => {
+  test("clamps at level 1 (cannot promote below level 1)", async () => {
     const content = `# Header 1
 Content 1`;
     const result = applyChangeSectionLevel(content, "header-1", -5);
@@ -70,7 +70,7 @@ Content 1`;
     expect(result.count).toBe(1);
   });
 
-  test("clamps at level 6 (cannot demote above level 6)", () => {
+  test("clamps at level 6 (cannot demote above level 6)", async () => {
     const content = `###### Header 6
 Content 6`;
     const result = applyChangeSectionLevel(content, "header-6", 5);
@@ -80,7 +80,7 @@ Content 6`;
     expect(result.count).toBe(1);
   });
 
-  test("clamping from level 2 to level 1", () => {
+  test("clamping from level 2 to level 1", async () => {
     const content = `# Top
 ## Header 2
 Content`;
@@ -91,7 +91,7 @@ Content`;
     expect(result.count).toBe(1);
   });
 
-  test("clamping from level 5 to level 6", () => {
+  test("clamping from level 5 to level 6", async () => {
     const content = `##### Header 5
 Content`;
     const result = applyChangeSectionLevel(content, "header-5", 3);
@@ -101,7 +101,7 @@ Content`;
     expect(result.count).toBe(1);
   });
 
-  test("returns zero count when section not found", () => {
+  test("returns zero count when section not found", async () => {
     const content = `# Header 1
 Content 1`;
     const result = applyChangeSectionLevel(content, "nonexistent", -1);
@@ -110,7 +110,7 @@ Content 1`;
     expect(result.count).toBe(0);
   });
 
-  test("zero delta (no change but counts as success)", () => {
+  test("zero delta (no change but counts as success)", async () => {
     const content = `# Header 1
 ## Header 2
 Content`;
@@ -121,7 +121,7 @@ Content`;
     expect(result.count).toBe(1);
   });
 
-  test("preserves header text and custom ID", () => {
+  test("preserves header text and custom ID", async () => {
     const content = `# Main
 ## My Section {#custom-id}
 Content here`;
@@ -133,7 +133,7 @@ Content here`;
     expect(result.count).toBe(1);
   });
 
-  test("works with custom IDs", () => {
+  test("works with custom IDs", async () => {
     const content = `# Header 1
 ## Special Header {#my-special-id}
 Content`;
@@ -143,7 +143,7 @@ Content`;
     expect(result.count).toBe(1);
   });
 
-  test("preserves content below header", () => {
+  test("preserves content below header", async () => {
     const content = `# Header 1
 Some content here
 More content
@@ -159,7 +159,7 @@ Different content
     expect(result.count).toBe(1);
   });
 
-  test("handles header with special characters", () => {
+  test("handles header with special characters", async () => {
     const content = `# Main
 ## Header with $pecial Ch@rs! & Symbols?
 Content`;
@@ -169,7 +169,7 @@ Content`;
     expect(result.count).toBe(1);
   });
 
-  test("handles multiple sections with same operation applied separately", () => {
+  test("handles multiple sections with same operation applied separately", async () => {
     const content = `# Header 1
 ## Header 2
 ### Header 3`;
@@ -181,7 +181,7 @@ Content`;
     expect(result.content).toContain("## Header 3");
   });
 
-  test("level change near boundaries", () => {
+  test("level change near boundaries", async () => {
     const content = `# Level 1
 ## Level 2
 ### Level 3
@@ -200,7 +200,7 @@ Content`;
 });
 
 describe("change-section-level with applyPatches", () => {
-  test("applies change-section-level patch", () => {
+  test("applies change-section-level patch", async () => {
     const content = `# Introduction
 Welcome text
 
@@ -214,7 +214,7 @@ Install steps`;
       { op: "change-section-level", id: "installation", delta: -1 },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(0);
@@ -222,7 +222,7 @@ Install steps`;
     expect(result.content).not.toContain("### Installation");
   });
 
-  test("applies multiple change-section-level patches", () => {
+  test("applies multiple change-section-level patches", async () => {
     const content = `# Main
 ## Section A
 ### Section B
@@ -233,7 +233,7 @@ Install steps`;
       { op: "change-section-level", id: "section-c", delta: -2 },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(2);
     expect(result.warnings).toHaveLength(0);
@@ -241,7 +241,7 @@ Install steps`;
     expect(result.content).toContain("## Section C");
   });
 
-  test("generates warning for non-existent section with onNoMatch=warn", () => {
+  test("generates warning for non-existent section with onNoMatch=warn", async () => {
     const content = `# Header 1
 ## Header 2`;
 
@@ -249,14 +249,14 @@ Install steps`;
       { op: "change-section-level", id: "nonexistent", delta: -1 },
     ];
 
-    const result = applyPatches(content, patches, "warn");
+    const result = await applyPatches(content, patches, "warn");
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]?.message).toContain("matched 0 times");
   });
 
-  test("throws error for non-existent section with onNoMatch=error", () => {
+  test("throws error for non-existent section with onNoMatch=error", async () => {
     const content = `# Header 1
 ## Header 2`;
 
@@ -267,7 +267,7 @@ Install steps`;
     expect(() => applyPatches(content, patches, "error")).toThrow("matched 0 times");
   });
 
-  test("skips non-existent section with onNoMatch=skip", () => {
+  test("skips non-existent section with onNoMatch=skip", async () => {
     const content = `# Header 1
 ## Header 2`;
 
@@ -276,14 +276,14 @@ Install steps`;
       { op: "change-section-level", id: "header-2", delta: 1 },
     ];
 
-    const result = applyPatches(content, patches, "warn");
+    const result = await applyPatches(content, patches, "warn");
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(0);
     expect(result.content).toContain("### Header 2");
   });
 
-  test("combines with other section operations", () => {
+  test("combines with other section operations", async () => {
     const content = `# Introduction
 Old intro
 
@@ -299,7 +299,7 @@ Content`;
       { op: "append-to-section", id: "details", content: "\nAppended content" },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(3);
     expect(result.content).toContain("New intro text");
@@ -307,7 +307,7 @@ Content`;
     expect(result.content).toContain("Appended content");
   });
 
-  test("respects per-patch onNoMatch override", () => {
+  test("respects per-patch onNoMatch override", async () => {
     const content = `# Header 1
 ## Header 2`;
 
@@ -317,7 +317,7 @@ Content`;
       { op: "change-section-level", id: "header-2", delta: 1 },
     ];
 
-    const result = applyPatches(content, patches, "error");
+    const result = await applyPatches(content, patches, "error");
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(1);
@@ -325,7 +325,7 @@ Content`;
     expect(result.content).toContain("### Header 2");
   });
 
-  test("sequential level changes", () => {
+  test("sequential level changes", async () => {
     const content = `# Main
 ## Section
 Content`;
@@ -336,14 +336,14 @@ Content`;
       { op: "change-section-level", id: "section", delta: -1 },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     // Start at ##, add 1 -> ###, add 1 -> ####, subtract 1 -> ###
     expect(result.applied).toBe(3);
     expect(result.content).toContain("### Section");
   });
 
-  test("promoting and demoting in same patch set", () => {
+  test("promoting and demoting in same patch set", async () => {
     const content = `# Title
 ## Section A
 ### Section B
@@ -355,7 +355,7 @@ Content`;
       { op: "change-section-level", id: "section-c", delta: 2 }, // ## -> ####
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(3);
     expect(result.content).toContain("# Section A");
@@ -363,7 +363,7 @@ Content`;
     expect(result.content).toContain("#### Section C");
   });
 
-  test("preserves frontmatter when changing section levels", () => {
+  test("preserves frontmatter when changing section levels", async () => {
     const content = `---
 title: Test Document
 version: 1.0
@@ -376,7 +376,7 @@ More content`;
 
     const patches: PatchOperation[] = [{ op: "change-section-level", id: "details", delta: -1 }];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(1);
     expect(result.content).toContain("title: Test Document");

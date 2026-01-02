@@ -169,11 +169,11 @@ function editPatchInEditor(patch: PatchOperation): PatchOperation | null {
 /**
  * Analyze patches and find failures
  */
-function analyzePatches(
+async function analyzePatches(
   config: KustomarkConfig,
   basePath: string,
   fileMap: Map<string, string>,
-): FailedPatch[] {
+): Promise<FailedPatch[]> {
   const failedPatches: FailedPatch[] = [];
   const patches = config.patches || [];
 
@@ -190,7 +190,7 @@ function analyzePatches(
       }
 
       // Try to apply the patch
-      const result = applyPatches(content, [patch], "skip", false);
+      const result = await applyPatches(content, [patch], "skip", false);
 
       // Check if patch failed (had warnings)
       if (result.warnings.length > 0) {
@@ -663,7 +663,7 @@ export async function fixCommand(path: string, options: CLIOptions): Promise<num
       console.log("Analyzing patches...");
     }
 
-    const failedPatches = analyzePatches(config, normalizedBasePath, fileMap);
+    const failedPatches = await analyzePatches(config, normalizedBasePath, fileMap);
 
     if (failedPatches.length === 0) {
       if (options.format === "json") {

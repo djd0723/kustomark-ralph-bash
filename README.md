@@ -3005,6 +3005,118 @@ config:
 - `includeEnd: true` replaces the end marker too
 - Supports both exact string matching and regex patterns
 
+### `exec` - Execute Shell Command
+
+Execute a shell command to transform content. The content is piped to the command's stdin, and the transformed output is read from stdout.
+
+```yaml
+- op: exec
+  command: "./scripts/add-toc.sh"
+  timeout: 5000  # milliseconds (default: 30000)
+```
+
+**Security & Requirements:**
+- Command must exit with code 0 for success
+- Non-zero exit codes are treated as failures
+- Timeout enforcement (default: 30s, max: 5min)
+- Content is passed via stdin
+- Transformed content is read from stdout
+- Stderr is captured for error reporting
+
+**Example - Simple transformation:**
+
+```yaml
+- op: exec
+  command: "tr a-z A-Z"  # Convert to uppercase
+```
+
+Input:
+```markdown
+# hello world
+
+This is some content.
+```
+
+Output:
+```markdown
+# HELLO WORLD
+
+THIS IS SOME CONTENT.
+```
+
+**Example - Custom script:**
+
+Create a script `scripts/add-toc.sh`:
+```bash
+#!/bin/bash
+# Read markdown from stdin
+CONTENT=$(cat)
+
+# Extract headers and generate TOC
+TOC=$(echo "$CONTENT" | grep "^#" | sed 's/^# /- /')
+
+# Output original content with TOC prepended
+echo "## Table of Contents"
+echo "$TOC"
+echo ""
+echo "$CONTENT"
+```
+
+Then use it in your kustomization:
+```yaml
+patches:
+  - op: exec
+    command: "./scripts/add-toc.sh"
+    timeout: 5000
+```
+
+**Example - With conditions:**
+
+```yaml
+- op: exec
+  command: "./scripts/validate-links.sh"
+  when:
+    type: fileContains
+    value: "http://"
+  timeout: 10000
+```
+
+**Example - With validation:**
+
+```yaml
+- op: exec
+  command: "./scripts/add-metadata.sh"
+  validate:
+    notContains: "TODO"  # Ensure script removed all TODOs
+```
+
+**Design Principles:**
+- **Deterministic**: Same input + same script = same output
+- **Simple**: Just stdin/stdout, no complex IPC
+- **Secure**: Timeout enforcement, exit code validation
+- **Composable**: Use with other patches in sequence
+
+**Use Cases:**
+- Generate table of contents
+- Add/update frontmatter with dynamic data
+- Format code blocks
+- Validate/transform links
+- Custom markdown processing that's easier in scripts than YAML
+
+**Best Practices:**
+1. Keep scripts simple and focused
+2. Make scripts deterministic (no random data, timestamps unless needed)
+3. Test scripts independently before using in patches
+4. Use appropriate timeouts for script complexity
+5. Handle errors gracefully in scripts (exit with non-zero on failure)
+6. Version control your scripts alongside kustomization files
+
+**Limitations:**
+- Network access is not restricted (configure your environment)
+- File system access depends on script permissions
+- Commands run in the same security context as kustomark
+- Complex command-line arguments should be in a wrapper script
+
 ## Table Operations
 
 Table operations allow you to manipulate GitHub Flavored Markdown tables. Tables can be identified by their zero-based index in the document or by the section ID containing the table.

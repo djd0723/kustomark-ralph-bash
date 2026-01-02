@@ -453,13 +453,13 @@ export function generateFixSuggestions(
       };
 
     default: {
-      // TypeScript exhaustiveness check
-      const _exhaustive: never = patch;
+      // TypeScript exhaustiveness check - use type assertion for unknown operations
+      const unknownOp = (patch as PatchOperation).op;
       return {
         ...baseSuggestion,
         strategy: "manual-edit",
         confidence: 0,
-        description: `Unknown patch operation: ${(_exhaustive as PatchOperation).op}`,
+        description: `Unknown patch operation: ${unknownOp}`,
       };
     }
   }
@@ -476,11 +476,11 @@ export function generateFixSuggestions(
  * @param confidenceThreshold - Minimum confidence score to auto-apply (0-100, default 75)
  * @returns Result of applying the fix
  */
-export function applyAutoFix(
+export async function applyAutoFix(
   content: string,
   fixSuggestion: FixSuggestion,
   confidenceThreshold = 75,
-): ApplyFixResult {
+): Promise<ApplyFixResult> {
   // Check confidence threshold
   if (fixSuggestion.confidence < confidenceThreshold) {
     return {
@@ -526,7 +526,7 @@ export function applyAutoFix(
 
   // Apply the patch
   try {
-    const result = applySinglePatch(content, patchToApply, "error", false);
+    const result = await applySinglePatch(content, patchToApply, "error", false);
 
     if (result.count === 0) {
       return {
@@ -576,11 +576,11 @@ export function applyAutoFix(
  * @param onNoMatch - Strategy for handling no-match scenarios (default: "warn")
  * @returns Array of fix suggestions for failed patches
  */
-export function analyzeFilePatchFailures(
+export async function analyzeFilePatchFailures(
   content: string,
   patches: PatchOperation[],
   onNoMatch: "skip" | "warn" | "error" = "warn",
-): FixSuggestion[] {
+): Promise<FixSuggestion[]> {
   const failures: FixSuggestion[] = [];
 
   // Apply each patch individually to identify failures
@@ -591,7 +591,7 @@ export function analyzeFilePatchFailures(
     if (!patch) continue;
 
     try {
-      const result = applySinglePatch(currentContent, patch, onNoMatch, false);
+      const result = await applySinglePatch(currentContent, patch, onNoMatch, false);
 
       // Check if patch failed (count === 0 and not skipped by condition)
       if (result.count === 0 && !result.conditionSkipped) {

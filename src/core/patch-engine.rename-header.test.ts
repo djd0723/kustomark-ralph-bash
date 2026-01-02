@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { applyRenameHeader, generateSlug, parseSections } from "./patch-engine.js";
 
 describe("applyRenameHeader", () => {
-  test("renames a basic header", () => {
+  test("renames a basic header", async () => {
     const content = `# Old Header
 Content here
 
@@ -23,7 +23,7 @@ Content here
 More content`);
   });
 
-  test("renames header with custom ID", () => {
+  test("renames header with custom ID", async () => {
     const content = `# My Header {#custom-id}
 Content here`;
 
@@ -34,7 +34,7 @@ Content here`;
 Content here`);
   });
 
-  test("renames header found by GitHub slug", () => {
+  test("renames header found by GitHub slug", async () => {
     const content = `## Getting Started
 Instructions here
 
@@ -51,7 +51,7 @@ Instructions here
 More details`);
   });
 
-  test("returns count 0 when section not found", () => {
+  test("returns count 0 when section not found", async () => {
     const content = `# Header One
 Content`;
 
@@ -61,7 +61,7 @@ Content`;
     expect(result.content).toBe(content); // Content unchanged
   });
 
-  test("preserves header level when renaming level 1", () => {
+  test("preserves header level when renaming level 1", async () => {
     const content = `# Original Title
 Content`;
 
@@ -72,7 +72,7 @@ Content`;
     expect(result.content).not.toContain("## New Title");
   });
 
-  test("preserves header level when renaming level 2", () => {
+  test("preserves header level when renaming level 2", async () => {
     const content = `# Main
 ## Subsection
 Content`;
@@ -85,7 +85,7 @@ Content`;
     expect(result.content).not.toMatch(/^# Updated Subsection$/m);
   });
 
-  test("preserves header level when renaming level 3", () => {
+  test("preserves header level when renaming level 3", async () => {
     const content = `# Main
 ## Sub
 ### Details
@@ -97,7 +97,7 @@ Content`;
     expect(result.content).toContain("### New Details");
   });
 
-  test("preserves header level when renaming level 4", () => {
+  test("preserves header level when renaming level 4", async () => {
     const content = `#### Fourth Level Header
 Content`;
 
@@ -107,7 +107,7 @@ Content`;
     expect(result.content).toContain("#### Renamed");
   });
 
-  test("preserves header level when renaming level 5", () => {
+  test("preserves header level when renaming level 5", async () => {
     const content = `##### Fifth Level
 Content`;
 
@@ -117,7 +117,7 @@ Content`;
     expect(result.content).toContain("##### New Fifth");
   });
 
-  test("preserves header level when renaming level 6", () => {
+  test("preserves header level when renaming level 6", async () => {
     const content = `###### Sixth Level
 Content`;
 
@@ -127,7 +127,7 @@ Content`;
     expect(result.content).toContain("###### New Sixth");
   });
 
-  test("handles multiple sections with different names", () => {
+  test("handles multiple sections with different names", async () => {
     const content = `# Introduction
 Intro content
 
@@ -151,7 +151,7 @@ Setup content
 Usage content`);
   });
 
-  test("only renames the first section when multiple sections have the same slug", () => {
+  test("only renames the first section when multiple sections have the same slug", async () => {
     // Note: In practice, this shouldn't happen in well-formed markdown,
     // but we test the behavior anyway
     const content = `# Section
@@ -176,7 +176,7 @@ Content 1
 Content 2`);
   });
 
-  test("handles header with special characters in new name", () => {
+  test("handles header with special characters in new name", async () => {
     const content = `# Simple Header
 Content`;
 
@@ -191,7 +191,7 @@ Content`;
 Content`);
   });
 
-  test("handles renaming to empty string", () => {
+  test("handles renaming to empty string", async () => {
     const content = `## Old Name
 Content`;
 
@@ -202,7 +202,7 @@ Content`;
 Content`);
   });
 
-  test("handles header followed immediately by another header", () => {
+  test("handles header followed immediately by another header", async () => {
     const content = `# First
 ## Second
 ### Third`;
@@ -215,7 +215,7 @@ Content`);
 ### Third`);
   });
 
-  test("preserves content after the header", () => {
+  test("preserves content after the header", async () => {
     const content = `# Original
 Line 1
 Line 2
@@ -236,7 +236,7 @@ Paragraph here.
     expect(result.content).toContain("- List item");
   });
 
-  test("handles complex slug generation", () => {
+  test("handles complex slug generation", async () => {
     const content = `## Hello! World?
 Content`;
 
@@ -250,7 +250,7 @@ Content`;
     expect(result.content).toContain("## Goodbye World");
   });
 
-  test("renames header with custom ID without adding ID to new header", () => {
+  test("renames header with custom ID without adding ID to new header", async () => {
     const content = `### Configuration {#config}
 Details here`;
 
@@ -263,7 +263,7 @@ Details here`);
     expect(result.content).not.toContain("{#config}");
   });
 
-  test("handles document with frontmatter", () => {
+  test("handles document with frontmatter", async () => {
     const content = `---
 title: My Doc
 ---
@@ -278,7 +278,7 @@ Content here`;
     expect(result.content).toContain("# Primary Header");
   });
 
-  test("renames header in document with code blocks", () => {
+  test("renames header in document with code blocks", async () => {
     const content = `# Code Example
 
 \`\`\`javascript
@@ -296,7 +296,7 @@ More content`;
     expect(result.content).toContain("```javascript");
   });
 
-  test("handles headers with trailing whitespace", () => {
+  test("handles headers with trailing whitespace", async () => {
     const content = `## Test Header
 Content`;
 
@@ -306,7 +306,7 @@ Content`;
     expect(result.content).toContain("## New Header");
   });
 
-  test("preserves nested sections when renaming parent", () => {
+  test("preserves nested sections when renaming parent", async () => {
     const content = `# Parent
 Parent content
 
@@ -328,7 +328,7 @@ Child content 2`;
     expect(result.content).toContain("## Child 2");
   });
 
-  test("handles Unicode characters in new header", () => {
+  test("handles Unicode characters in new header", async () => {
     const content = `# Simple
 Content`;
 
@@ -338,7 +338,7 @@ Content`;
     expect(result.content).toContain("# Unicode: 日本語 🎉");
   });
 
-  test("handles numbers and underscores in slug matching", () => {
+  test("handles numbers and underscores in slug matching", async () => {
     const content = `## Test_Section_123
 Content`;
 

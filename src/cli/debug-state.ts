@@ -152,11 +152,11 @@ export class DebugSession {
    *
    * @returns Object with the modified content, count, and optional warning
    */
-  previewCurrentPatch(): {
+  async previewCurrentPatch(): Promise<{
     content: string;
     count: number;
     warning?: string;
-  } {
+  }> {
     const currentPatch = this.getCurrentPatch();
     if (!currentPatch) {
       return {
@@ -165,7 +165,7 @@ export class DebugSession {
       };
     }
 
-    const result = applySinglePatch(this.fileState.current, currentPatch);
+    const result = await applySinglePatch(this.fileState.current, currentPatch);
 
     // Store the preview in file state
     this.fileState.modified = result.content;
@@ -181,15 +181,15 @@ export class DebugSession {
    * Apply the current patch and record the decision
    *
    * @param reason - Optional reason for applying the patch
-   * @returns True if the patch was applied, false if already at the end
+   * @returns Promise resolving to true if the patch was applied, false if already at the end
    */
-  applyCurrentPatch(reason?: string): boolean {
+  async applyCurrentPatch(reason?: string): Promise<boolean> {
     const currentPatch = this.getCurrentPatch();
     if (!currentPatch) {
       return false;
     }
 
-    const result = applySinglePatch(this.fileState.current, currentPatch);
+    const result = await applySinglePatch(this.fileState.current, currentPatch);
 
     // Update current state
     this.fileState.current = result.content;
@@ -254,7 +254,7 @@ export class DebugSession {
    *
    * @returns True if moved to previous patch, false if already at the start
    */
-  previous(): boolean {
+  async previous(): Promise<boolean> {
     if (this.currentPatchIndex <= 0) {
       return false;
     }
@@ -262,7 +262,7 @@ export class DebugSession {
     this.currentPatchIndex--;
 
     // Rebuild state by reapplying all applied patches up to the current index
-    this.rebuildState();
+    await this.rebuildState();
 
     return true;
   }
@@ -273,13 +273,13 @@ export class DebugSession {
    * @param index - The patch index to jump to (0-based)
    * @returns True if jumped successfully, false if index is invalid
    */
-  jumpTo(index: number): boolean {
+  async jumpTo(index: number): Promise<boolean> {
     if (index < 0 || index >= this.patches.length) {
       return false;
     }
 
     this.currentPatchIndex = index;
-    this.rebuildState();
+    await this.rebuildState();
 
     return true;
   }
@@ -287,7 +287,7 @@ export class DebugSession {
   /**
    * Rebuild the current state by reapplying all decisions up to the current index
    */
-  private rebuildState(): void {
+  private async rebuildState(): Promise<void> {
     // Reset to original content
     this.fileState.current = this.fileState.original;
     this.fileState.modified = undefined;
@@ -297,7 +297,7 @@ export class DebugSession {
       if (decision.patchIndex < this.currentPatchIndex && decision.applied) {
         const patch = this.patches[decision.patchIndex];
         if (patch) {
-          const result = applySinglePatch(this.fileState.current, patch);
+          const result = await applySinglePatch(this.fileState.current, patch);
           this.fileState.current = result.content;
         }
       }
@@ -447,9 +447,9 @@ export class DebugSession {
    * This will replay the decisions to rebuild the state.
    *
    * @param inputPath - Path to the decisions file
-   * @returns True if decisions were loaded successfully, false otherwise
+   * @returns Promise resolving to true if decisions were loaded successfully, false otherwise
    */
-  loadDecisions(inputPath: string): boolean {
+  async loadDecisions(inputPath: string): Promise<boolean> {
     if (!existsSync(inputPath)) {
       return false;
     }
@@ -484,11 +484,11 @@ export class DebugSession {
         }
 
         // Jump to the patch
-        this.jumpTo(decision.patchIndex);
+        await this.jumpTo(decision.patchIndex);
 
         // Apply or skip based on decision
         if (decision.applied) {
-          this.applyCurrentPatch(decision.reason);
+          await this.applyCurrentPatch(decision.reason);
         } else {
           this.skipCurrentPatch(decision.reason);
         }
@@ -497,7 +497,7 @@ export class DebugSession {
       // Jump to the last decision's index + 1, or stay at the end
       const lastDecision = data.decisions[data.decisions.length - 1];
       if (lastDecision && lastDecision.patchIndex < this.patches.length - 1) {
-        this.jumpTo(lastDecision.patchIndex + 1);
+        await this.jumpTo(lastDecision.patchIndex + 1);
       }
 
       return true;
@@ -524,7 +524,7 @@ export class DebugSession {
    *
    * @returns The final content with all applied patches
    */
-  getFinalContent(): string {
+  async getFinalContent(): Promise<string> {
     // Apply all decisions in order to get the final content
     let content = this.fileState.original;
 
@@ -532,7 +532,7 @@ export class DebugSession {
       if (decision.applied) {
         const patch = this.patches[decision.patchIndex];
         if (patch) {
-          const result = applySinglePatch(content, patch);
+          const result = await applySinglePatch(content, patch);
           content = result.content;
         }
       }

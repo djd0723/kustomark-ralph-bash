@@ -8,7 +8,7 @@ import type { PatchTest, PatchTestSuite } from "../../src/core/types";
 
 describe("runPatchTest", () => {
   describe("basic functionality", () => {
-    test("runs passing test with replace patch", () => {
+    test("runs passing test with replace patch", async () => {
       const patchTest: PatchTest = {
         name: "simple replace",
         input: "Hello world",
@@ -22,7 +22,7 @@ describe("runPatchTest", () => {
         expected: "Hello universe",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
       expect(result.name).toBe("simple replace");
@@ -33,7 +33,7 @@ describe("runPatchTest", () => {
       expect(result.error).toBeUndefined();
     });
 
-    test("runs failing test with incorrect expected output", () => {
+    test("runs failing test with incorrect expected output", async () => {
       const patchTest: PatchTest = {
         name: "failing test",
         input: "Hello world",
@@ -47,7 +47,7 @@ describe("runPatchTest", () => {
         expected: "Hello galaxy", // Wrong expected value
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(false);
       expect(result.name).toBe("failing test");
@@ -57,7 +57,7 @@ describe("runPatchTest", () => {
       expect(result.appliedPatches).toBe(1);
     });
 
-    test("runs test with multiple patches", () => {
+    test("runs test with multiple patches", async () => {
       const patchTest: PatchTest = {
         name: "multiple patches",
         input: "# Title\n\nHello world\n\nGoodbye world",
@@ -76,7 +76,7 @@ describe("runPatchTest", () => {
         expected: "# Title\n\nHello universe\n\nFarewell universe",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
       expect(result.appliedPatches).toBe(2);
@@ -84,7 +84,7 @@ describe("runPatchTest", () => {
   });
 
   describe("patch operations", () => {
-    test("runs test with replace-regex patch", () => {
+    test("runs test with replace-regex patch", async () => {
       const patchTest: PatchTest = {
         name: "regex replace",
         input: "Version 1.0.0 released",
@@ -98,13 +98,13 @@ describe("runPatchTest", () => {
         expected: "Version 2.0.0 released",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
       expect(result.appliedPatches).toBe(1);
     });
 
-    test("runs test with set-frontmatter patch", () => {
+    test("runs test with set-frontmatter patch", async () => {
       const patchTest: PatchTest = {
         name: "set frontmatter",
         input: "---\ntitle: Old Title\n---\n\nContent",
@@ -118,12 +118,12 @@ describe("runPatchTest", () => {
         expected: "---\ntitle: New Title\n---\n\nContent",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with remove-section patch", () => {
+    test("runs test with remove-section patch", async () => {
       const patchTest: PatchTest = {
         name: "remove section",
         input: "# Title\n\n## Section 1\n\nContent 1\n\n## Section 2\n\nContent 2",
@@ -136,12 +136,12 @@ describe("runPatchTest", () => {
         expected: "# Title\n\n## Section 2\n\nContent 2",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with replace-section patch", () => {
+    test("runs test with replace-section patch", async () => {
       const patchTest: PatchTest = {
         name: "replace section",
         input: "# Title\n\n## Section 1\n\nOld content",
@@ -155,12 +155,12 @@ describe("runPatchTest", () => {
         expected: "# Title\n\n## Section 1\nNew content",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with prepend-to-section patch", () => {
+    test("runs test with prepend-to-section patch", async () => {
       const patchTest: PatchTest = {
         name: "prepend to section",
         input: "# Title\n\n## Section\n\nOriginal content",
@@ -174,12 +174,12 @@ describe("runPatchTest", () => {
         expected: "# Title\n\n## Section\nPrepended content\n\n\n\nOriginal content",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with append-to-section patch", () => {
+    test("runs test with append-to-section patch", async () => {
       const patchTest: PatchTest = {
         name: "append to section",
         input: "# Title\n\n## Section\n\nOriginal content",
@@ -193,12 +193,12 @@ describe("runPatchTest", () => {
         expected: "# Title\n\n## Section\n\nOriginal content\n\n\nAppended content",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with delete-between patch", () => {
+    test("runs test with delete-between patch", async () => {
       const patchTest: PatchTest = {
         name: "delete between",
         input: "Start\n<!-- BEGIN -->\nRemove this\n<!-- END -->\nEnd",
@@ -213,12 +213,12 @@ describe("runPatchTest", () => {
         expected: "Start\nEnd",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with replace-between patch", () => {
+    test("runs test with replace-between patch", async () => {
       const patchTest: PatchTest = {
         name: "replace between",
         input: "Start\n<!-- BEGIN -->\nOld content\n<!-- END -->\nEnd",
@@ -234,12 +234,12 @@ describe("runPatchTest", () => {
         expected: "Start\n<!-- BEGIN -->\nNew content\n<!-- END -->\nEnd",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with replace-line patch", () => {
+    test("runs test with replace-line patch", async () => {
       const patchTest: PatchTest = {
         name: "replace line",
         input: "Line 1\nOld line\nLine 3",
@@ -253,12 +253,12 @@ describe("runPatchTest", () => {
         expected: "Line 1\nNew line\nLine 3",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with insert-after-line patch", () => {
+    test("runs test with insert-after-line patch", async () => {
       const patchTest: PatchTest = {
         name: "insert after line",
         input: "Line 1\nLine 2\nLine 3",
@@ -272,12 +272,12 @@ describe("runPatchTest", () => {
         expected: "Line 1\nLine 2\nInserted line\nLine 3",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with insert-before-line patch", () => {
+    test("runs test with insert-before-line patch", async () => {
       const patchTest: PatchTest = {
         name: "insert before line",
         input: "Line 1\nLine 2\nLine 3",
@@ -291,12 +291,12 @@ describe("runPatchTest", () => {
         expected: "Line 1\nInserted line\nLine 2\nLine 3",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with rename-header patch", () => {
+    test("runs test with rename-header patch", async () => {
       const patchTest: PatchTest = {
         name: "rename header",
         input: "# Title\n\n## Old Header\n\nContent",
@@ -310,12 +310,12 @@ describe("runPatchTest", () => {
         expected: "# Title\n\n## New Header\n\nContent",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with move-section patch", () => {
+    test("runs test with move-section patch", async () => {
       const patchTest: PatchTest = {
         name: "move section",
         input: "# Title\n\n## Section A\n\nA content\n\n## Section B\n\nB content",
@@ -329,12 +329,12 @@ describe("runPatchTest", () => {
         expected: "# Title\n\n## Section B\n\nB content\n## Section A\n\nA content\n",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with change-section-level patch", () => {
+    test("runs test with change-section-level patch", async () => {
       const patchTest: PatchTest = {
         name: "change section level",
         input: "# Title\n\n## Section\n\nContent",
@@ -348,12 +348,12 @@ describe("runPatchTest", () => {
         expected: "# Title\n\n### Section\n\nContent",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with remove-frontmatter patch", () => {
+    test("runs test with remove-frontmatter patch", async () => {
       const patchTest: PatchTest = {
         name: "remove frontmatter",
         input: "---\ntitle: Title\nauthor: Author\n---\n\nContent",
@@ -366,12 +366,12 @@ describe("runPatchTest", () => {
         expected: "---\ntitle: Title\n---\n\nContent",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with rename-frontmatter patch", () => {
+    test("runs test with rename-frontmatter patch", async () => {
       const patchTest: PatchTest = {
         name: "rename frontmatter",
         input: "---\noldKey: value\n---\n\nContent",
@@ -385,12 +385,12 @@ describe("runPatchTest", () => {
         expected: "---\nnewKey: value\n---\n\nContent",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("runs test with merge-frontmatter patch", () => {
+    test("runs test with merge-frontmatter patch", async () => {
       const patchTest: PatchTest = {
         name: "merge frontmatter",
         input: "---\nexisting: value\n---\n\nContent",
@@ -406,14 +406,14 @@ describe("runPatchTest", () => {
         expected: "---\nexisting: value\nnew: field\nanother: 123\n---\n\nContent",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
   });
 
   describe("edge cases", () => {
-    test("handles test with empty input", () => {
+    test("handles test with empty input", async () => {
       const patchTest: PatchTest = {
         name: "empty input",
         input: "",
@@ -427,14 +427,14 @@ describe("runPatchTest", () => {
         expected: "",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
       expect(result.actual).toBe("");
       expect(result.appliedPatches).toBe(0);
     });
 
-    test("handles test with empty patches array", () => {
+    test("handles test with empty patches array", async () => {
       const patchTest: PatchTest = {
         name: "no patches",
         input: "Hello world",
@@ -442,14 +442,14 @@ describe("runPatchTest", () => {
         expected: "Hello world",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
       expect(result.actual).toBe("Hello world");
       expect(result.appliedPatches).toBe(0);
     });
 
-    test("handles test with patch that doesn't match", () => {
+    test("handles test with patch that doesn't match", async () => {
       const patchTest: PatchTest = {
         name: "no match",
         input: "Hello world",
@@ -463,14 +463,14 @@ describe("runPatchTest", () => {
         expected: "Hello world",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
       expect(result.actual).toBe("Hello world");
       expect(result.warnings.length).toBeGreaterThan(0);
     });
 
-    test("handles test with invalid patch operation", () => {
+    test("handles test with invalid patch operation", async () => {
       const patchTest: PatchTest = {
         name: "invalid patch",
         input: "Hello world",
@@ -482,13 +482,13 @@ describe("runPatchTest", () => {
         expected: "Hello world",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(false);
       expect(result.error).toBeDefined();
     });
 
-    test("handles test with multiline input and expected", () => {
+    test("handles test with multiline input and expected", async () => {
       const patchTest: PatchTest = {
         name: "multiline",
         input: "Line 1\nLine 2\nLine 3\nLine 4",
@@ -502,12 +502,12 @@ describe("runPatchTest", () => {
         expected: "Line 1\nModified Line 2\nLine 3\nLine 4",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("handles test with special characters", () => {
+    test("handles test with special characters", async () => {
       const patchTest: PatchTest = {
         name: "special chars",
         input: "Hello $world @foo #bar",
@@ -521,12 +521,12 @@ describe("runPatchTest", () => {
         expected: "Hello $universe @foo #bar",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
 
-    test("handles test with unicode characters", () => {
+    test("handles test with unicode characters", async () => {
       const patchTest: PatchTest = {
         name: "unicode",
         input: "Hello 世界 🌍",
@@ -540,14 +540,14 @@ describe("runPatchTest", () => {
         expected: "Hello world 🌍",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(true);
     });
   });
 
   describe("validation and warnings", () => {
-    test("includes validation errors when patch validation fails", () => {
+    test("includes validation errors when patch validation fails", async () => {
       const patchTest: PatchTest = {
         name: "validation error",
         input: "Hello world",
@@ -564,12 +564,12 @@ describe("runPatchTest", () => {
         expected: "Hello forbidden",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.validationErrors.length).toBeGreaterThan(0);
     });
 
-    test("includes warnings array", () => {
+    test("includes warnings array", async () => {
       const patchTest: PatchTest = {
         name: "warnings",
         input: "Hello world",
@@ -583,7 +583,7 @@ describe("runPatchTest", () => {
         expected: "Hello world",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.warnings).toBeDefined();
       expect(Array.isArray(result.warnings)).toBe(true);
@@ -591,7 +591,7 @@ describe("runPatchTest", () => {
   });
 
   describe("error handling", () => {
-    test("catches errors and returns failed result", () => {
+    test("catches errors and returns failed result", async () => {
       const patchTest: PatchTest = {
         name: "error test",
         input: "Hello world",
@@ -605,14 +605,14 @@ describe("runPatchTest", () => {
         expected: "Hello world",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(false);
       expect(result.error).toBeDefined();
       expect(typeof result.error).toBe("string");
     });
 
-    test("handles patch with invalid field gracefully", () => {
+    test("handles patch with invalid field gracefully", async () => {
       const patchTest: PatchTest = {
         name: "error with invalid field",
         input: "Hello world",
@@ -626,7 +626,7 @@ describe("runPatchTest", () => {
         expected: "Hello world",
       };
 
-      const result = runPatchTest(patchTest);
+      const result = await runPatchTest(patchTest);
 
       expect(result.passed).toBe(false);
       expect(result.error).toBeDefined();
@@ -636,7 +636,7 @@ describe("runPatchTest", () => {
 
 describe("runTestSuite", () => {
   describe("basic functionality", () => {
-    test("runs suite with all passing tests", () => {
+    test("runs suite with all passing tests", async () => {
       const suite: PatchTestSuite = {
         apiVersion: "kustomark/v1",
         kind: "PatchTestSuite",
@@ -656,7 +656,7 @@ describe("runTestSuite", () => {
         ],
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.total).toBe(2);
       expect(result.passed).toBe(2);
@@ -666,7 +666,7 @@ describe("runTestSuite", () => {
       expect(result.results[1].passed).toBe(true);
     });
 
-    test("runs suite with some failing tests", () => {
+    test("runs suite with some failing tests", async () => {
       const suite: PatchTestSuite = {
         apiVersion: "kustomark/v1",
         kind: "PatchTestSuite",
@@ -686,7 +686,7 @@ describe("runTestSuite", () => {
         ],
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.total).toBe(2);
       expect(result.passed).toBe(1);
@@ -695,7 +695,7 @@ describe("runTestSuite", () => {
       expect(result.results[1].passed).toBe(false);
     });
 
-    test("runs suite with all failing tests", () => {
+    test("runs suite with all failing tests", async () => {
       const suite: PatchTestSuite = {
         apiVersion: "kustomark/v1",
         kind: "PatchTestSuite",
@@ -715,14 +715,14 @@ describe("runTestSuite", () => {
         ],
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.total).toBe(2);
       expect(result.passed).toBe(0);
       expect(result.failed).toBe(2);
     });
 
-    test("runs suite with single test", () => {
+    test("runs suite with single test", async () => {
       const suite: PatchTestSuite = {
         apiVersion: "kustomark/v1",
         kind: "PatchTestSuite",
@@ -736,14 +736,14 @@ describe("runTestSuite", () => {
         ],
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.total).toBe(1);
       expect(result.passed).toBe(1);
       expect(result.failed).toBe(0);
     });
 
-    test("runs suite with multiple patches per test", () => {
+    test("runs suite with multiple patches per test", async () => {
       const suite: PatchTestSuite = {
         apiVersion: "kustomark/v1",
         kind: "PatchTestSuite",
@@ -761,7 +761,7 @@ describe("runTestSuite", () => {
         ],
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.total).toBe(1);
       expect(result.passed).toBe(1);
@@ -770,14 +770,14 @@ describe("runTestSuite", () => {
   });
 
   describe("edge cases", () => {
-    test("handles empty test suite", () => {
+    test("handles empty test suite", async () => {
       const suite: PatchTestSuite = {
         apiVersion: "kustomark/v1",
         kind: "PatchTestSuite",
         tests: [],
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.total).toBe(0);
       expect(result.passed).toBe(0);
@@ -785,7 +785,7 @@ describe("runTestSuite", () => {
       expect(result.results.length).toBe(0);
     });
 
-    test("handles suite with tests containing errors", () => {
+    test("handles suite with tests containing errors", async () => {
       const suite: PatchTestSuite = {
         apiVersion: "kustomark/v1",
         kind: "PatchTestSuite",
@@ -805,7 +805,7 @@ describe("runTestSuite", () => {
         ],
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.total).toBe(1);
       expect(result.passed).toBe(0);
@@ -813,7 +813,7 @@ describe("runTestSuite", () => {
       expect(result.results[0].error).toBeDefined();
     });
 
-    test("handles large test suite", () => {
+    test("handles large test suite", async () => {
       const tests = Array.from({ length: 100 }, (_, i) => ({
         name: `test ${i}`,
         input: `Value ${i}`,
@@ -827,7 +827,7 @@ describe("runTestSuite", () => {
         tests,
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.total).toBe(100);
       expect(result.passed).toBe(100);
@@ -836,7 +836,7 @@ describe("runTestSuite", () => {
   });
 
   describe("result aggregation", () => {
-    test("correctly counts passed and failed tests", () => {
+    test("correctly counts passed and failed tests", async () => {
       const suite: PatchTestSuite = {
         apiVersion: "kustomark/v1",
         kind: "PatchTestSuite",
@@ -874,14 +874,14 @@ describe("runTestSuite", () => {
         ],
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.total).toBe(5);
       expect(result.passed).toBe(3);
       expect(result.failed).toBe(2);
     });
 
-    test("includes all test results in results array", () => {
+    test("includes all test results in results array", async () => {
       const suite: PatchTestSuite = {
         apiVersion: "kustomark/v1",
         kind: "PatchTestSuite",
@@ -901,7 +901,7 @@ describe("runTestSuite", () => {
         ],
       };
 
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       expect(result.results.length).toBe(2);
       expect(result.results[0].name).toBe("test A");

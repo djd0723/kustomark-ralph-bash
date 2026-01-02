@@ -36,7 +36,7 @@ Content for section two.`;
   ];
 
   describe("constructor", () => {
-    test("creates a new debug session with valid inputs", () => {
+    test("creates a new debug session with valid inputs", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
       expect(session.getFilePath()).toBe("/test/file.md");
@@ -46,13 +46,13 @@ Content for section two.`;
       expect(session.getFileState().current).toBe(testContent);
     });
 
-    test("throws error for empty patches array", () => {
+    test("throws error for empty patches array", async () => {
       expect(() => {
         new DebugSession("/test/file.md", testContent, []);
       }).toThrow("Cannot create debug session with empty patches array");
     });
 
-    test("throws error for invalid start index", () => {
+    test("throws error for invalid start index", async () => {
       expect(() => {
         new DebugSession("/test/file.md", testContent, testPatches, -1);
       }).toThrow("Invalid start index");
@@ -62,14 +62,14 @@ Content for section two.`;
       }).toThrow("Invalid start index");
     });
 
-    test("creates session with custom start index", () => {
+    test("creates session with custom start index", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches, 1);
       expect(session.getCurrentIndex()).toBe(1);
     });
   });
 
   describe("getCurrentPatch", () => {
-    test("returns the current patch", () => {
+    test("returns the current patch", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
       const patch = session.getCurrentPatch();
 
@@ -77,7 +77,7 @@ Content for section two.`;
       expect(patch?.op).toBe("replace");
     });
 
-    test("returns current patch when at last index", () => {
+    test("returns current patch when at last index", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches, 2);
 
       // At index 2 (last patch), getCurrentPatch should return the patch
@@ -91,9 +91,9 @@ Content for section two.`;
   });
 
   describe("previewCurrentPatch", () => {
-    test("previews patch without modifying state", () => {
+    test("previews patch without modifying state", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
-      const preview = session.previewCurrentPatch();
+      const preview = await session.previewCurrentPatch();
 
       expect(preview.content).toContain("Goodbye World");
       expect(preview.count).toBe(1);
@@ -101,20 +101,20 @@ Content for section two.`;
       expect(session.getFileState().modified).toContain("Goodbye World");
     });
 
-    test("previews last patch when at last index", () => {
+    test("previews last patch when at last index", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches, 2);
 
       // Should preview the section removal (third patch)
-      const preview = session.previewCurrentPatch();
+      const preview = await session.previewCurrentPatch();
       expect(preview.content).not.toContain("Section Two");
       expect(preview.count).toBe(1);
     });
   });
 
   describe("applyCurrentPatch", () => {
-    test("applies patch and updates state", () => {
+    test("applies patch and updates state", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
-      const result = session.applyCurrentPatch("Testing apply");
+      const result = await session.applyCurrentPatch("Testing apply");
 
       expect(result).toBe(true);
       expect(session.getFileState().current).toContain("Goodbye World");
@@ -123,18 +123,18 @@ Content for section two.`;
       expect(session.getDecisions()[0]?.reason).toBe("Testing apply");
     });
 
-    test("applies last patch when at last index", () => {
+    test("applies last patch when at last index", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches, 2);
 
       // Should be able to apply the last patch
-      const result = session.applyCurrentPatch();
+      const result = await session.applyCurrentPatch();
       expect(result).toBe(true);
       expect(session.getFileState().current).not.toContain("Section Two");
     });
   });
 
   describe("skipCurrentPatch", () => {
-    test("skips patch without modifying content", () => {
+    test("skips patch without modifying content", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
       const result = session.skipCurrentPatch("Not needed");
 
@@ -147,7 +147,7 @@ Content for section two.`;
   });
 
   describe("navigation", () => {
-    test("next() moves to next patch", () => {
+    test("next() moves to next patch", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
       const result = session.next();
 
@@ -155,7 +155,7 @@ Content for section two.`;
       expect(session.getCurrentIndex()).toBe(1);
     });
 
-    test("next() returns false at the end", () => {
+    test("next() returns false at the end", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches, 2);
       const result = session.next();
 
@@ -163,27 +163,27 @@ Content for section two.`;
       expect(session.getCurrentIndex()).toBe(2);
     });
 
-    test("previous() moves to previous patch", () => {
+    test("previous() moves to previous patch", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches, 1);
-      const result = session.previous();
+      const result = await session.previous();
 
       expect(result).toBe(true);
       expect(session.getCurrentIndex()).toBe(0);
     });
 
-    test("previous() returns false at the start", () => {
+    test("previous() returns false at the start", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
-      const result = session.previous();
+      const result = await session.previous();
 
       expect(result).toBe(false);
       expect(session.getCurrentIndex()).toBe(0);
     });
 
-    test("previous() rebuilds state correctly", () => {
+    test("previous() rebuilds state correctly", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
       // Apply first patch (index 0)
-      session.applyCurrentPatch();
+      await session.applyCurrentPatch();
       expect(session.getFileState().current).toContain("Goodbye World");
 
       // Move to next (index 1)
@@ -191,7 +191,7 @@ Content for section two.`;
       expect(session.getCurrentIndex()).toBe(1);
 
       // Apply second patch (index 1)
-      session.applyCurrentPatch();
+      await session.applyCurrentPatch();
       expect(session.getFileState().current).toContain("sample document");
       expect(session.getFileState().current).toContain("Goodbye World");
 
@@ -200,7 +200,7 @@ Content for section two.`;
       expect(session.getCurrentIndex()).toBe(2);
 
       // Go back to previous (index 1)
-      session.previous();
+      await session.previous();
       expect(session.getCurrentIndex()).toBe(1);
 
       // State should be after first patch only (because we rebuild up to index 1, not including index 1)
@@ -208,32 +208,32 @@ Content for section two.`;
       expect(session.getFileState().current).toContain("test document"); // Not "sample" (second patch not reapplied)
     });
 
-    test("jumpTo() moves to specific index", () => {
+    test("jumpTo() moves to specific index", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
-      const result = session.jumpTo(2);
+      const result = await session.jumpTo(2);
 
       expect(result).toBe(true);
       expect(session.getCurrentIndex()).toBe(2);
     });
 
-    test("jumpTo() returns false for invalid index", () => {
+    test("jumpTo() returns false for invalid index", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
-      expect(session.jumpTo(-1)).toBe(false);
-      expect(session.jumpTo(10)).toBe(false);
+      expect(await session.jumpTo(-1)).toBe(false);
+      expect(await session.jumpTo(10)).toBe(false);
     });
   });
 
   describe("hasNext and hasPrevious", () => {
-    test("hasNext() returns correct value", () => {
+    test("hasNext() returns correct value", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
       expect(session.hasNext()).toBe(true);
-      session.jumpTo(2);
+      await session.jumpTo(2);
       expect(session.hasNext()).toBe(false);
     });
 
-    test("hasPrevious() returns correct value", () => {
+    test("hasPrevious() returns correct value", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
       expect(session.hasPrevious()).toBe(false);
@@ -243,20 +243,20 @@ Content for section two.`;
   });
 
   describe("decisions", () => {
-    test("hasDecision() checks for current patch decision", () => {
+    test("hasDecision() checks for current patch decision", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
       expect(session.hasDecision()).toBe(false);
-      session.applyCurrentPatch();
+      await session.applyCurrentPatch();
       expect(session.hasDecision()).toBe(true);
     });
 
-    test("getCurrentDecision() returns decision for current patch", () => {
+    test("getCurrentDecision() returns decision for current patch", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
       expect(session.getCurrentDecision()).toBeUndefined();
 
-      session.applyCurrentPatch("test reason");
+      await session.applyCurrentPatch("test reason");
       const decision = session.getCurrentDecision();
 
       expect(decision).toBeDefined();
@@ -267,7 +267,7 @@ Content for section two.`;
   });
 
   describe("getStats", () => {
-    test("returns correct statistics", () => {
+    test("returns correct statistics", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
       let stats = session.getStats();
@@ -278,7 +278,7 @@ Content for section two.`;
       expect(stats.progress).toBe(0);
 
       // Apply one patch
-      session.applyCurrentPatch();
+      await session.applyCurrentPatch();
       session.next();
 
       stats = session.getStats();
@@ -299,7 +299,7 @@ Content for section two.`;
   });
 
   describe("saveDecisions and loadDecisions", () => {
-    test("saves and loads decisions correctly", () => {
+    test("saves and loads decisions correctly", async () => {
       const tmpDir = mkdtempSync(join(tmpdir(), "debug-test-"));
       const decisionsPath = join(tmpDir, "decisions.yaml");
 
@@ -307,7 +307,7 @@ Content for section two.`;
         const session = new DebugSession("/test/file.md", testContent, testPatches);
 
         // Make some decisions
-        session.applyCurrentPatch("First decision");
+        await session.applyCurrentPatch("First decision");
         session.next();
         session.skipCurrentPatch("Second decision");
         session.next();
@@ -317,7 +317,7 @@ Content for section two.`;
 
         // Create new session and load decisions
         const newSession = new DebugSession("/test/file.md", testContent, testPatches);
-        const loaded = newSession.loadDecisions(decisionsPath);
+        const loaded = await newSession.loadDecisions(decisionsPath);
 
         expect(loaded).toBe(true);
         expect(newSession.getDecisions()).toHaveLength(2);
@@ -329,24 +329,24 @@ Content for section two.`;
       }
     });
 
-    test("returns false for non-existent file", () => {
+    test("returns false for non-existent file", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
-      const result = session.loadDecisions("/non/existent/file.yaml");
+      const result = await session.loadDecisions("/non/existent/file.yaml");
 
       expect(result).toBe(false);
     });
 
-    test("returns false for file path mismatch", () => {
+    test("returns false for file path mismatch", async () => {
       const tmpDir = mkdtempSync(join(tmpdir(), "debug-test-"));
       const decisionsPath = join(tmpDir, "decisions.yaml");
 
       try {
         const session1 = new DebugSession("/test/file1.md", testContent, testPatches);
-        session1.applyCurrentPatch();
+        await session1.applyCurrentPatch();
         session1.saveDecisions(decisionsPath);
 
         const session2 = new DebugSession("/test/file2.md", testContent, testPatches);
-        const result = session2.loadDecisions(decisionsPath);
+        const result = await session2.loadDecisions(decisionsPath);
 
         expect(result).toBe(false);
       } finally {
@@ -356,13 +356,13 @@ Content for section two.`;
   });
 
   describe("reset", () => {
-    test("resets session to initial state", () => {
+    test("resets session to initial state", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
       // Make some changes
-      session.applyCurrentPatch();
+      await session.applyCurrentPatch();
       session.next();
-      session.applyCurrentPatch();
+      await session.applyCurrentPatch();
 
       // Reset
       session.reset();
@@ -374,16 +374,16 @@ Content for section two.`;
   });
 
   describe("getFinalContent", () => {
-    test("returns final content with all applied patches", () => {
+    test("returns final content with all applied patches", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
-      session.applyCurrentPatch();
+      await session.applyCurrentPatch();
       session.next();
       session.skipCurrentPatch();
       session.next();
-      session.applyCurrentPatch();
+      await session.applyCurrentPatch();
 
-      const finalContent = session.getFinalContent();
+      const finalContent = await session.getFinalContent();
 
       // Should have first patch (replace Hello World)
       expect(finalContent).toContain("Goodbye World");
@@ -393,7 +393,7 @@ Content for section two.`;
       expect(finalContent).not.toContain("Section Two");
     });
 
-    test("returns original content when no patches applied", () => {
+    test("returns original content when no patches applied", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
 
       session.skipCurrentPatch();
@@ -402,15 +402,15 @@ Content for section two.`;
       session.next();
       session.skipCurrentPatch();
 
-      const finalContent = session.getFinalContent();
+      const finalContent = await session.getFinalContent();
       expect(finalContent).toBe(testContent);
     });
   });
 
   describe("getState", () => {
-    test("returns complete debug state", () => {
+    test("returns complete debug state", async () => {
       const session = new DebugSession("/test/file.md", testContent, testPatches);
-      session.applyCurrentPatch("test");
+      await session.applyCurrentPatch("test");
 
       const state = session.getState();
 

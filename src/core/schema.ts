@@ -2511,6 +2511,91 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            {
+              type: "object",
+              required: ["op", "command"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "exec",
+                  description: "Execute a shell command to transform content via stdin/stdout",
+                },
+                command: {
+                  type: "string",
+                  description:
+                    "Shell command to execute. Content is piped to stdin, transformed output is read from stdout. Command must exit with code 0 for success.",
+                },
+                timeout: {
+                  type: "number",
+                  description: "Timeout in milliseconds (default: 30000)",
+                  default: 30000,
+                  minimum: 100,
+                  maximum: 300000,
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
           ],
         },
       },

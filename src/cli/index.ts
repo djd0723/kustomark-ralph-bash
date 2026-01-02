@@ -1008,20 +1008,20 @@ function applyFileOperations(
 /**
  * Apply patches to resources using the core patch engine
  */
-function applyPatches(
+async function applyPatches(
   resources: Map<string, string>,
   patches: PatchOperation[],
   onNoMatch: OnNoMatchStrategy,
   options: CLIOptions,
   progressReporter?: ReturnType<typeof createProgressReporter>,
-): {
+): Promise<{
   resources: Map<string, string>;
   patchesApplied: number;
   patchesSkipped: number;
   warnings: ValidationWarning[];
   validationErrors: ValidationError[];
   operationCounts: Record<string, number>;
-} {
+}> {
   const patchedResources = new Map<string, string>();
   let totalPatchesApplied = 0;
   let totalPatchesSkipped = 0;
@@ -1061,7 +1061,7 @@ function applyPatches(
 
     // Apply all applicable patches using the core patch engine
     const verbose = options.verbosity >= 2;
-    const result = coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
+    const result = await coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
     patchedResources.set(filePath, result.content);
     totalPatchesApplied += result.applied;
 
@@ -1200,7 +1200,7 @@ async function applyPatchesParallel(
 
         // Apply all applicable patches sequentially for this file
         const verbose = options.verbosity >= 2;
-        const result = coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
+        const result = await coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
 
         // Calculate skipped patches (patches that didn't match + condition-skipped patches)
         const skipped = applicablePatches.length - result.applied - result.conditionSkipped;
@@ -2160,7 +2160,13 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           options,
           progress,
         )
-      : applyPatches(resourcesToProcess, contentOps, config.onNoMatch || "warn", options, progress);
+      : await applyPatches(
+          resourcesToProcess,
+          contentOps,
+          config.onNoMatch || "warn",
+          options,
+          progress,
+        );
 
     // Merge file operation counts with content operation counts
     const operationCounts = { ...fileOpCounts, ...contentOpCounts };
@@ -2706,12 +2712,13 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
 
     // Apply patches
     log("Applying patches...", 2, options);
-    const { resources: patchedResources, validationErrors: patchValidationErrors } = applyPatches(
-      originalResources,
-      config.patches || [],
-      config.onNoMatch || "warn",
-      options,
-    );
+    const { resources: patchedResources, validationErrors: patchValidationErrors } =
+      await applyPatches(
+        originalResources,
+        config.patches || [],
+        config.onNoMatch || "warn",
+        options,
+      );
 
     // Collect all validation errors (from patches and global validators)
     const allValidationErrors: ValidationError[] = [...patchValidationErrors];
@@ -2983,7 +2990,7 @@ async function testCommand(_path: string, options: CLIOptions): Promise<number> 
       log(`Running ${suite.tests.length} test(s)...`, 2, options);
 
       // Run the test suite
-      const result = runTestSuite(suite);
+      const result = await runTestSuite(suite);
 
       // Output results
       if (options.format === "json") {
@@ -3218,7 +3225,7 @@ async function testCommand(_path: string, options: CLIOptions): Promise<number> 
     log(`Applying ${patches.length} patch(es)...`, 2, options);
 
     try {
-      const patchResult = coreApplyPatches(inputContent, patches, "warn");
+      const patchResult = await coreApplyPatches(inputContent, patches, "warn");
 
       // Show results
       if (options.format === "json") {
@@ -3856,7 +3863,7 @@ async function performWatchBuild(
       patchesApplied,
       warnings,
       validationErrors: patchValidationErrors,
-    } = applyPatches(resources, config.patches || [], config.onNoMatch || "warn", options);
+    } = await applyPatches(resources, config.patches || [], config.onNoMatch || "warn", options);
 
     // Collect all validation errors (from patches and global validators)
     const allValidationErrors: ValidationError[] = [...patchValidationErrors];

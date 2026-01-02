@@ -293,7 +293,7 @@ export async function executePreviewCommand(
     // Apply patches to get modified content
     const modifiedFiles = new Map<string, string>();
     for (const [path, content] of originalFiles.entries()) {
-      const result = applyPatches(content, config.patches || [], "warn", verbose);
+      const result = await applyPatches(content, config.patches || [], "warn", verbose);
       modifiedFiles.set(path, result.content);
     }
 

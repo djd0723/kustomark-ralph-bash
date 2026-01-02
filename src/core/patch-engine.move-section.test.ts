@@ -7,7 +7,7 @@ import { applyMoveSection, applyPatches } from "./patch-engine.js";
 import type { PatchOperation } from "./types.js";
 
 describe("applyMoveSection", () => {
-  test("moves a section after another section (basic move)", () => {
+  test("moves a section after another section (basic move)", async () => {
     const content = `# Section A
 Content A
 
@@ -34,7 +34,7 @@ Content C`;
     expect(cIndex).toBeLessThan(aIndex);
   });
 
-  test("moves a section with children", () => {
+  test("moves a section with children", async () => {
     const content = `# Section A
 Content A
 ## Child A1
@@ -71,7 +71,7 @@ Content C`;
     expect(a1Index).toBeLessThan(a2Index);
   });
 
-  test("moves a section backward (from later to earlier position)", () => {
+  test("moves a section backward (from later to earlier position)", async () => {
     const content = `# Section A
 Content A
 
@@ -95,7 +95,7 @@ Content C`;
     expect(cIndex).toBeLessThan(bIndex);
   });
 
-  test("moves a section forward (from earlier to later position)", () => {
+  test("moves a section forward (from earlier to later position)", async () => {
     const content = `# Section A
 Content A
 
@@ -119,7 +119,7 @@ Content C`;
     expect(aIndex).toBeLessThan(cIndex);
   });
 
-  test("returns zero count when source section not found", () => {
+  test("returns zero count when source section not found", async () => {
     const content = `# Section A
 Content A
 
@@ -132,7 +132,7 @@ Content B`;
     expect(result.content).toBe(content);
   });
 
-  test("returns zero count when target section not found", () => {
+  test("returns zero count when target section not found", async () => {
     const content = `# Section A
 Content A
 
@@ -145,7 +145,7 @@ Content B`;
     expect(result.content).toBe(content);
   });
 
-  test("returns zero count when both sections not found", () => {
+  test("returns zero count when both sections not found", async () => {
     const content = `# Section A
 Content A
 
@@ -158,7 +158,7 @@ Content B`;
     expect(result.content).toBe(content);
   });
 
-  test("returns zero count when trying to move a section after itself", () => {
+  test("returns zero count when trying to move a section after itself", async () => {
     const content = `# Section A
 Content A
 
@@ -171,7 +171,7 @@ Content B`;
     expect(result.content).toBe(content);
   });
 
-  test("returns zero count when trying to move a section after its own child", () => {
+  test("returns zero count when trying to move a section after its own child", async () => {
     const content = `# Parent
 Parent content
 ## Child
@@ -186,7 +186,7 @@ Other content`;
     expect(result.content).toBe(content);
   });
 
-  test("moves section with custom IDs", () => {
+  test("moves section with custom IDs", async () => {
     const content = `# First Section {#custom-1}
 Content 1
 
@@ -210,7 +210,7 @@ Content 3`;
     expect(idx3).toBeLessThan(idx1);
   });
 
-  test("handles multiple sections in document", () => {
+  test("handles multiple sections in document", async () => {
     const content = `# Section 1
 Content 1
 
@@ -238,7 +238,7 @@ Content 5`;
     expect(idx4).toBeLessThan(idx2);
   });
 
-  test("preserves content and formatting when moving", () => {
+  test("preserves content and formatting when moving", async () => {
     const content = `# Section A
 This is **bold** text.
 - List item 1
@@ -261,7 +261,7 @@ block
     expect(result.content).toContain("```code");
   });
 
-  test("moves deeply nested sections with all descendants", () => {
+  test("moves deeply nested sections with all descendants", async () => {
     const content = `# Level 1A
 Content 1A
 ## Level 2A
@@ -294,7 +294,7 @@ Content 1C`;
     expect(idx2a).toBeLessThan(idx3a);
   });
 
-  test("moves adjacent sections", () => {
+  test("moves adjacent sections", async () => {
     const content = `# Section A
 Content A
 
@@ -316,7 +316,7 @@ Content C`;
     expect(bIndex).toBeLessThan(aIndex);
   });
 
-  test("handles sections with varying levels", () => {
+  test("handles sections with varying levels", async () => {
     const content = `# Top Level
 Content
 
@@ -347,7 +347,7 @@ Other content`;
 });
 
 describe("move-section with applyPatches", () => {
-  test("applies move-section patch", () => {
+  test("applies move-section patch", async () => {
     const content = `# Introduction
 Welcome
 
@@ -361,7 +361,7 @@ The end`;
       { op: "move-section", id: "introduction", after: "conclusion" },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(0);
@@ -373,7 +373,7 @@ The end`;
     expect(conclusionIndex).toBeLessThan(introIndex);
   });
 
-  test("generates warning when source section not found with onNoMatch=warn", () => {
+  test("generates warning when source section not found with onNoMatch=warn", async () => {
     const content = `# Section A
 Content A
 
@@ -382,7 +382,7 @@ Content B`;
 
     const patches: PatchOperation[] = [{ op: "move-section", id: "missing", after: "section-b" }];
 
-    const result = applyPatches(content, patches, "warn");
+    const result = await applyPatches(content, patches, "warn");
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
@@ -390,7 +390,7 @@ Content B`;
     expect(result.warnings[0]?.message).toContain("matched 0 times");
   });
 
-  test("throws error when section not found with onNoMatch=error", () => {
+  test("throws error when section not found with onNoMatch=error", async () => {
     const content = `# Section A
 Content A`;
 
@@ -399,7 +399,7 @@ Content A`;
     expect(() => applyPatches(content, patches, "error")).toThrow("matched 0 times");
   });
 
-  test("skips non-matching move-section with onNoMatch=skip", () => {
+  test("skips non-matching move-section with onNoMatch=skip", async () => {
     const content = `# Section A
 Content A
 
@@ -411,14 +411,14 @@ Content B`;
       { op: "replace", old: "Content A", new: "Modified A" },
     ];
 
-    const result = applyPatches(content, patches, "warn");
+    const result = await applyPatches(content, patches, "warn");
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(0);
     expect(result.content).toContain("Modified A");
   });
 
-  test("applies multiple move-section operations in sequence", () => {
+  test("applies multiple move-section operations in sequence", async () => {
     const content = `# A
 Content A
 
@@ -436,7 +436,7 @@ Content D`;
       { op: "move-section", id: "d", after: "b" }, // Order: B, D, C, A
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(2);
     expect(result.warnings).toHaveLength(0);
@@ -452,7 +452,7 @@ Content D`;
     expect(cIndex).toBeLessThan(aIndex);
   });
 
-  test("combines move-section with other patch operations", () => {
+  test("combines move-section with other patch operations", async () => {
     const content = `# Introduction
 Old intro text
 
@@ -468,7 +468,7 @@ The end`;
       { op: "append-to-section", id: "details", content: "\nAppended details" },
     ];
 
-    const result = applyPatches(content, patches);
+    const result = await applyPatches(content, patches);
 
     expect(result.applied).toBe(3);
     expect(result.content).toContain("New intro text");
@@ -482,19 +482,19 @@ The end`;
     expect(introIndex).toBeLessThan(conclusionIndex);
   });
 
-  test("handles edge case: moving section after itself returns count 0", () => {
+  test("handles edge case: moving section after itself returns count 0", async () => {
     const content = `# Section A
 Content`;
 
     const patches: PatchOperation[] = [{ op: "move-section", id: "section-a", after: "section-a" }];
 
-    const result = applyPatches(content, patches, "warn");
+    const result = await applyPatches(content, patches, "warn");
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
   });
 
-  test("respects per-patch onNoMatch override", () => {
+  test("respects per-patch onNoMatch override", async () => {
     const content = `# Section A
 Content A
 
@@ -506,7 +506,7 @@ Content B`;
       { op: "move-section", id: "missing2", after: "section-b", onNoMatch: "warn" },
     ];
 
-    const result = applyPatches(content, patches, "error");
+    const result = await applyPatches(content, patches, "error");
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
