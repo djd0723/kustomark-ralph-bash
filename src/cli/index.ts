@@ -53,6 +53,7 @@ import { runValidators } from "../core/validators.js";
 import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
 import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
+import { webCommand } from "./web-command.js";
 
 // ============================================================================
 // Types
@@ -78,6 +79,10 @@ interface CLIOptions {
   cleanCache?: boolean; // Clear cache before building (default: false)
   cacheDir?: string; // Custom cache directory
   interactive?: boolean; // For init -i/--interactive option
+  dev?: boolean; // For web --dev option
+  port?: number; // For web --port option
+  host?: string; // For web --host option
+  open?: boolean; // For web --open option
 }
 
 interface BuildStats {
@@ -203,6 +208,10 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     cleanCache: false,
     cacheDir: undefined,
     interactive: false,
+    dev: false,
+    port: undefined,
+    host: undefined,
+    open: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -361,6 +370,32 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       }
     } else if (arg === "-i" || arg === "--interactive") {
       options.interactive = true;
+    } else if (arg === "--dev" || arg === "-d") {
+      options.dev = true;
+    } else if (arg === "--port" || arg.startsWith("--port=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.port = Number.parseInt(value, 10);
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.port = Number.parseInt(nextArg, 10);
+          i++;
+        }
+      }
+    } else if (arg === "--host" || arg.startsWith("--host=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.host = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg) {
+          options.host = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--open" || arg === "-o") {
+      options.open = true;
     }
   }
 
@@ -2704,6 +2739,7 @@ Usage:
   kustomark explain [path]    Show resolution chain and patch details
   kustomark schema            Export JSON Schema for editor integration
   kustomark init [path]       Create a new kustomark.yaml config
+  kustomark web [path]        Launch web UI for visual editing
 
 Explain Flags:
   --file <filename>           Show lineage for specific file
@@ -2717,6 +2753,12 @@ Init Flags:
   -i, --interactive           Interactive wizard mode
   --base <path>               Create overlay referencing base config
   --output <path>             Set output directory in config
+
+Web Flags:
+  --dev, -d                   Run in development mode with hot reload
+  --port <port>               Server port (default: 3000)
+  --host <host>               Server host (default: localhost)
+  --open, -o                  Open browser automatically
 
 Flags:
   --format <text|json>        Output format (default: text)
@@ -2788,6 +2830,14 @@ Exit Codes:
       return schemaCommand(options);
     case "init":
       return await initCommand(path, options);
+    case "web":
+      return await webCommand(path, {
+        dev: options.dev,
+        port: options.port,
+        host: options.host,
+        open: options.open,
+        verbose: options.verbosity >= 2,
+      });
     default:
       console.error(`Unknown command: ${command}`);
       console.error(`Run 'kustomark --help' for usage information`);

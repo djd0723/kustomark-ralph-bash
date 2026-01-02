@@ -30,6 +30,10 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
 - [IDE Integration](#ide-integration)
   - [VSCode Extension](#vscode-extension)
   - [JSON Schema](#json-schema)
+- [Web UI](#web-ui)
+  - [Starting the Web UI](#starting-the-web-ui)
+  - [Features](#features-1)
+  - [Development](#development-1)
 - [Design Principles](#design-principles)
 - [Contributing](#contributing)
 
@@ -1450,6 +1454,137 @@ kustomark schema > kustomark.schema.json
 
 # Configure your editor to use it for kustomark.yaml files
 ```
+
+## Web UI
+
+Kustomark includes a visual web interface for editing configurations, previewing changes, and managing patch operations through an intuitive GUI.
+
+### Starting the Web UI
+
+**Development Mode** (with hot-reload):
+
+```bash
+# Start both backend and frontend dev servers
+kustomark web --dev
+
+# Or using npm scripts
+bun run dev:web
+```
+
+This launches:
+- Backend API server: `http://localhost:3000`
+- Frontend dev server: `http://localhost:5173` (with Vite hot-reload)
+
+**Production Mode**:
+
+```bash
+# Build the web UI
+bun run build:web
+
+# Run production server
+kustomark web
+
+# Or
+bun run start:web
+```
+
+Production server runs at `http://localhost:3000` and serves both API and static assets.
+
+**Custom Configuration**:
+
+```bash
+# Custom port and host
+kustomark web --port 8080 --host 0.0.0.0
+
+# Open browser automatically
+kustomark web --open
+
+# Verbose logging
+kustomark web -v
+```
+
+### Features
+
+The Web UI provides:
+
+1. **Visual Config Editor**
+   - YAML configuration preview
+   - Patch list management with drag-and-drop
+   - Add, edit, delete, and reorder patches
+
+2. **Comprehensive Patch Form**
+   - Support for all 18 patch operation types
+   - Context-aware field rendering based on operation
+   - Common fields (id, extends, include, exclude, onNoMatch, group, validate)
+   - Real-time validation
+
+3. **Three View Modes**
+   - **Editor**: YAML config with patch management
+   - **Diff**: Side-by-side diff viewer showing changes
+   - **Preview**: Rendered markdown preview
+
+4. **Build Integration**
+   - Execute builds with optional flags (incremental, clean, group filtering)
+   - View build results and statistics
+   - See validation errors and warnings
+
+5. **File Browser** (Planned)
+   - Browse resources and output files
+   - View file contents and history
+
+### Development
+
+The Web UI is built with:
+
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS
+- **Backend**: Express, Node.js, WebSocket support
+- **Components**: Monaco Editor, React Markdown, Diff Viewer
+
+**Directory Structure**:
+
+```
+src/web/
+├── client/          # React frontend
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── components/
+│   │   │   ├── editor/    # PatchEditor, PatchList, PatchForm
+│   │   │   ├── preview/   # DiffViewer, MarkdownPreview
+│   │   │   └── common/    # Button, shared components
+│   │   ├── services/      # API client
+│   │   └── types/         # TypeScript definitions
+│   ├── package.json
+│   └── vite.config.ts
+└── server/          # Express backend
+    ├── services/    # Build, config, file services
+    ├── routes/      # API endpoints
+    ├── middleware/  # Validation, error handling
+    └── index.ts     # Server entry point
+```
+
+**Build Scripts**:
+
+```bash
+# Build client only
+bun run build:web:client
+
+# Build server only
+bun run build:web:server
+
+# Build both
+bun run build:web
+
+# Development mode (both servers)
+bun run dev:web
+
+# Client dev server only
+bun run dev:web:client
+
+# Server dev server only
+bun run dev:web:server
+```
+
+For more details, see [WEB_UI_README.md](WEB_UI_README.md).
 
 ## Design Principles
 

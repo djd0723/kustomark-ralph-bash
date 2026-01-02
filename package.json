@@ -9,7 +9,14 @@
   "scripts": {
     "build": "bun build src/cli/index.ts --outdir dist/cli --target node --minify && chmod +x dist/cli/index.js",
     "build:lsp": "bun build src/lsp/server.ts --outdir dist/lsp --target node --minify",
-    "build:all": "bun run build && bun run build:lsp",
+    "build:web:client": "cd src/web/client && bun run build",
+    "build:web:server": "bun build src/web/server/index.ts --outdir dist/web --target node --minify",
+    "build:web": "bun run build:web:client && bun run build:web:server",
+    "build:all": "bun run build && bun run build:lsp && bun run build:web",
+    "dev:web:client": "cd src/web/client && bun run dev",
+    "dev:web:server": "bun run src/web/server/index.ts",
+    "dev:web": "bash scripts/dev-web.sh",
+    "start:web": "node dist/web/index.js",
     "check": "tsc --noEmit && biome check src",
     "test": "bun test",
     "test:watch": "bun test --watch",
@@ -20,17 +27,24 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/bun": "latest",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/micromatch": "^4.0.9",
-    "@types/node": "^25.0.3"
+    "@types/node": "^25.0.3",
+    "@types/ws": "^8.5.13"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
+    "chokidar": "^4.0.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
     "js-yaml": "^4.1.0",
     "micromatch": "^4.0.8",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-protocol": "^3.17.5",
-    "vscode-languageserver-textdocument": "^1.0.12"
+    "vscode-languageserver-textdocument": "^1.0.12",
+    "ws": "^8.18.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

@@ -1,0 +1,26 @@
+{
+  "name": "kustomark-web-server",
+  "version": "0.1.0",
+  "description": "Web server for kustomark web UI",
+  "type": "module",
+  "main": "server.ts",
+  "scripts": {
+    "start": "node server.ts",
+    "dev": "bun --watch server.ts",
+    "build": "bun build server.ts --outdir dist --target node"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "ws": "^8.18.0",
+    "js-yaml": "^4.1.0",
+    "micromatch": "^4.0.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/ws": "^8.5.13",
+    "@types/js-yaml": "^4.0.9",
+    "@types/micromatch": "^4.0.9"
+  }
+}
