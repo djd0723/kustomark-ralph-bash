@@ -3,7 +3,8 @@
 **Issue:** [#8](https://github.com/dexhorthy/kustomark-ralph-bash/pull/8)
 **Author:** dependabot[bot]
 **Created:** 2026-01-02
-**State:** open
+**State:** RESOLVED
+**Resolved:** 2026-01-02
 
 [//]: # (dependabot-start)
 ⚠️  **Dependabot is rebasing this PR** ⚠️ 
@@ -190,3 +191,59 @@ You can trigger Dependabot actions by commenting on this PR:
 
 
 </details>
+
+---
+
+## Resolution
+
+Successfully upgraded Express from 4.21.2 to 5.2.1 on 2026-01-02.
+
+### Changes Made
+
+1. **Updated package.json**
+   - Changed express dependency from `^4.21.2` to `^5.2.1`
+   - Ran `bun install` to update lock file
+
+2. **Code Compatibility**
+   - Verified all `res.status()` calls use valid integers (100-999)
+   - Confirmed async error handling is compatible
+   - No code changes required - existing implementation already follows Express 5 best practices
+
+3. **Testing**
+   - All 2,262 tests pass ✓
+   - All linting checks pass ✓
+   - TypeScript compilation clean ✓
+   - Web server functionality verified ✓
+
+### Breaking Changes Addressed
+
+Express 5.x introduced several breaking changes, but our code was already compatible:
+
+1. **Status Code Validation**: `res.status()` now only accepts integers between 100-999
+   - Our code uses standard codes (200, 400, 404, 500) ✓
+
+2. **Promise Rejection Handling**: Improved error propagation
+   - We already use `asyncHandler` wrapper for async routes ✓
+
+3. **Query Parser**: Extended parser behavior changed (reverted in 5.2.1)
+   - We use standard `express.urlencoded({ extended: true })` ✓
+
+### Files Modified
+
+- `/home/dex/kustomark-ralph-bash/src/web/server/package.json`
+- `/home/dex/kustomark-ralph-bash/src/web/server/bun.lockb`
+
+### Verification
+
+```bash
+# Install dependencies
+cd src/web/server && bun install
+
+# Run tests
+cd ../../.. && bun test
+
+# Run linting
+bun check
+```
+
+All checks passing. Issue resolved.

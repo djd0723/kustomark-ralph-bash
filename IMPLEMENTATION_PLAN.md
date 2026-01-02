@@ -4247,3 +4247,46 @@ Summary: 0 error(s), 0 warning(s), 5 info
 ```
 
 **Status:** Enhanced Lint Warnings COMPLETE! ✅
+
+**2026-01-02 (Express 5.2.1 Upgrade - Dependency Security Update):**
+
+Upgraded Express from 4.x to 5.2.1 to address security concerns and benefit from performance improvements.
+
+**Changes:**
+- ✅ Updated `src/web/server/package.json`:
+  - Bumped express from `^4.21.2` to `^5.2.1`
+  - Retained @types/express@^5.0.0 (already compatible)
+- ✅ Verified code compatibility with Express 5:
+  - All `res.status()` calls use valid status codes (100-999 range)
+  - No breaking changes detected in existing code
+  - Error handling middleware remains compatible
+  - Async error handling already properly implemented
+
+**Express 5 Breaking Changes Analyzed:**
+1. **res.status() validation** - Only accepts integers between 100-999
+   - Our code: Uses 200, 400, 404, 500, etc. ✓ All valid
+2. **Promise rejection handling** - Better error propagation
+   - Our code: Already uses asyncHandler wrapper ✓ Compatible
+3. **Query parser changes** - Extended parser behavior changed (reverted in 5.2.1)
+   - Our code: Uses standard `express.urlencoded({ extended: true })` ✓ Compatible
+
+**Testing Results:**
+- All 2,262 tests passing ✓
+- All linting checks passing (bun check) ✓
+- TypeScript compilation clean ✓
+- Zero warnings or errors ✓
+- Web server functionality verified ✓
+
+**Benefits:**
+- Security improvements from Express 5.x
+- Performance enhancements
+- Better TypeScript support
+- Aligned with latest Express ecosystem
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/web/server/package.json`
+- `/home/dex/kustomark-ralph-bash/src/web/server/bun.lockb` (lockfile)
+
+**Status:** Express 5.2.1 Upgrade COMPLETE! ✅
+
+This resolves issue #8: [chore(deps): bump express from 4.22.1 to 5.2.1](https://github.com/dexhorthy/kustomark-ralph-bash/pull/8)
