@@ -25,14 +25,38 @@ import type {
 import { validateNotContains } from "./validators.js";
 
 /**
- * Parse markdown content to find all sections with their boundaries
+ * Parse markdown content to find all sections with their boundaries.
  *
- * Supports:
- * - GitHub-style header slugs (auto-generated from header text)
- * - Custom IDs with {#custom-id} syntax
+ * This function identifies all markdown headers (levels 1-6) and creates section
+ * objects that include the header ID, level, and line boundaries. It supports both
+ * GitHub-style auto-generated slugs and custom IDs using the {#custom-id} syntax.
+ *
+ * Section boundaries are determined by finding the next header at the same or higher
+ * level (lower number). Child sections (higher level numbers) are included within
+ * their parent section's boundaries.
  *
  * @param content - The markdown content to parse
- * @returns Array of sections with their IDs and boundaries
+ * @returns Array of sections with their IDs, levels, and line boundaries
+ *
+ * @example
+ * ```typescript
+ * const markdown = `# Introduction
+ * Some intro text
+ *
+ * ## Getting Started {#start}
+ * Setup instructions
+ *
+ * # Usage
+ * Usage details`;
+ *
+ * const sections = parseSections(markdown);
+ * // Returns:
+ * // [
+ * //   { id: 'introduction', level: 1, startLine: 0, endLine: 5, headerText: '# Introduction' },
+ * //   { id: 'start', level: 2, startLine: 3, endLine: 5, headerText: '## Getting Started {#start}' },
+ * //   { id: 'usage', level: 1, startLine: 5, endLine: 7, headerText: '# Usage' }
+ * // ]
+ * ```
  */
 export function parseSections(content: string): MarkdownSection[] {
   const lines = content.split("\n");
@@ -97,16 +121,33 @@ export function parseSections(content: string): MarkdownSection[] {
 }
 
 /**
- * Generate a GitHub-style slug from header text
+ * Generate a GitHub-style slug from header text.
  *
- * Rules:
+ * This function converts header text into a URL-friendly slug following GitHub's
+ * markdown anchor link conventions. The slug can be used as a section ID for
+ * linking and patch operations.
+ *
+ * Transformation rules:
  * - Convert to lowercase
  * - Replace spaces with hyphens
  * - Remove special characters except hyphens and underscores
+ * - Collapse multiple consecutive hyphens into one
  * - Remove leading/trailing hyphens
  *
- * @param text - The header text
- * @returns The slug
+ * @param text - The header text to convert into a slug
+ * @returns The generated slug
+ *
+ * @example
+ * ```typescript
+ * generateSlug('Getting Started')
+ * // Returns: 'getting-started'
+ *
+ * generateSlug('API Reference (v2.0)')
+ * // Returns: 'api-reference-v20'
+ *
+ * generateSlug('  Multiple   Spaces  ')
+ * // Returns: 'multiple-spaces'
+ * ```
  */
 export function generateSlug(text: string): string {
   return (
@@ -125,23 +166,48 @@ export function generateSlug(text: string): string {
 }
 
 /**
- * Find a section by ID
+ * Find a section by ID within an array of parsed sections.
  *
- * @param sections - Array of sections
- * @param id - The section ID to find
- * @returns The section if found, undefined otherwise
+ * This is a utility function that searches for a section with a matching ID.
+ * IDs can be either auto-generated slugs or custom IDs defined in the markdown.
+ *
+ * @param sections - Array of sections to search through
+ * @param id - The section ID to find (case-sensitive)
+ * @returns The matching section if found, undefined otherwise
+ *
+ * @example
+ * ```typescript
+ * const sections = parseSections(markdown);
+ * const section = findSection(sections, 'getting-started');
+ *
+ * if (section) {
+ *   console.log(`Found section at line ${section.startLine}`);
+ * }
+ * ```
  */
 export function findSection(sections: MarkdownSection[], id: string): MarkdownSection | undefined {
   return sections.find((section) => section.id === id);
 }
 
 /**
- * Apply a replace patch operation
+ * Apply a replace patch operation using exact string matching.
+ *
+ * This function replaces all occurrences of an exact string with a new string.
+ * The search is case-sensitive and matches the literal text without any special
+ * character interpretation. All occurrences in the content are replaced.
  *
  * @param content - The content to patch
- * @param old - The string to find
+ * @param old - The exact string to find and replace
  * @param newStr - The string to replace with
- * @returns Object with patched content and number of replacements
+ * @returns Object with patched content and the number of replacements made
+ *
+ * @example
+ * ```typescript
+ * const content = 'Hello world! Hello everyone!';
+ * const result = applyReplace(content, 'Hello', 'Hi');
+ * console.log(result.content); // 'Hi world! Hi everyone!'
+ * console.log(result.count);   // 2
+ * ```
  */
 export function applyReplace(
   content: string,
@@ -166,13 +232,34 @@ export function applyReplace(
 }
 
 /**
- * Apply a replace-regex patch operation
+ * Apply a replace-regex patch operation using regular expressions.
+ *
+ * This function replaces text matching a regular expression pattern with a replacement
+ * string. The replacement string can include special regex replacement patterns like
+ * $1, $2 for captured groups. The global flag is automatically added to ensure all
+ * matches are replaced and counted.
  *
  * @param content - The content to patch
- * @param pattern - The regex pattern
- * @param replacement - The replacement string
- * @param flags - Regex flags (g, i, m, s)
- * @returns Object with patched content and number of replacements
+ * @param pattern - The regex pattern to match (as a string)
+ * @param replacement - The replacement string (supports regex capture groups like $1, $2)
+ * @param flags - Optional regex flags (i for case-insensitive, m for multiline, s for dotall). The 'g' flag is automatically added.
+ * @returns Object with patched content and the number of replacements made
+ *
+ * @example
+ * ```typescript
+ * // Simple pattern matching
+ * const content = 'Error: File not found\nWarning: Deprecated API';
+ * const result = applyReplaceRegex(content, 'Error|Warning', 'Notice');
+ * console.log(result.content); // 'Notice: File not found\nNotice: Deprecated API'
+ * console.log(result.count);   // 2
+ *
+ * // Using capture groups
+ * const content2 = 'v1.0.0 and v2.5.3';
+ * const result2 = applyReplaceRegex(content2, 'v(\\d+\\.\\d+\\.\\d+)', 'version $1');
+ * console.log(result2.content); // 'version 1.0.0 and version 2.5.3'
+ * ```
+ *
+ * @throws {SyntaxError} If the regex pattern is invalid
  */
 export function applyReplaceRegex(
   content: string,
@@ -193,12 +280,37 @@ export function applyReplaceRegex(
 }
 
 /**
- * Apply a remove-section patch operation
+ * Apply a remove-section patch operation to delete a markdown section.
  *
- * @param content - The content to patch
- * @param id - The section ID to remove
- * @param includeChildren - Whether to remove child sections (default: true)
- * @returns Object with patched content and number of sections removed
+ * This function removes a markdown section (header and content) identified by its ID.
+ * By default, it also removes all child sections (subsections). If includeChildren is
+ * false, only the content up to the first child section is removed, preserving the
+ * child sections.
+ *
+ * @param content - The markdown content to patch
+ * @param id - The section ID to remove (slug or custom ID)
+ * @param includeChildren - Whether to remove child sections along with the parent (default: true)
+ * @returns Object with patched content and count (1 if removed, 0 if section not found)
+ *
+ * @example
+ * ```typescript
+ * const markdown = `# Introduction
+ * Intro text
+ *
+ * ## Getting Started
+ * Setup info
+ *
+ * # Usage
+ * Usage info`;
+ *
+ * // Remove section with children
+ * const result1 = applyRemoveSection(markdown, 'introduction', true);
+ * // Removes "# Introduction" and "## Getting Started"
+ *
+ * // Remove section without children
+ * const result2 = applyRemoveSection(markdown, 'introduction', false);
+ * // Removes only "# Introduction" header and "Intro text", keeps "## Getting Started"
+ * ```
  */
 export function applyRemoveSection(
   content: string,
@@ -237,12 +349,37 @@ export function applyRemoveSection(
 }
 
 /**
- * Apply a replace-section patch operation
+ * Apply a replace-section patch operation to replace a section's content.
  *
- * @param content - The content to patch
- * @param id - The section ID to replace
- * @param newContent - The new content for the section
- * @returns Object with patched content and count (1 if replaced, 0 if not found)
+ * This function replaces the content of a markdown section while keeping its header.
+ * The section header itself is preserved, but all content from after the header up to
+ * the next section (or end of document) is replaced with the new content. Child sections
+ * are removed.
+ *
+ * @param content - The markdown content to patch
+ * @param id - The section ID to find (slug or custom ID)
+ * @param newContent - The new content to insert after the header
+ * @returns Object with patched content and count (1 if replaced, 0 if section not found)
+ *
+ * @example
+ * ```typescript
+ * const markdown = `# Installation
+ * Old installation steps
+ *
+ * ## Prerequisites
+ * Old prereqs
+ *
+ * # Usage
+ * Usage info`;
+ *
+ * const result = applyReplaceSection(markdown, 'installation', 'New installation steps\n');
+ * // Result:
+ * // # Installation
+ * // New installation steps
+ * //
+ * // # Usage
+ * // Usage info
+ * ```
  */
 export function applyReplaceSection(
   content: string,
@@ -273,12 +410,39 @@ export function applyReplaceSection(
 }
 
 /**
- * Apply a prepend-to-section patch operation
+ * Apply a prepend-to-section patch operation to add content at the start of a section.
  *
- * @param content - The content to patch
- * @param id - The section ID to prepend to
- * @param prependContent - The content to prepend
- * @returns Object with patched content and count (1 if prepended, 0 if not found)
+ * This function inserts new content immediately after the section header, before any
+ * existing content. The section header is preserved, and all existing content is pushed
+ * down.
+ *
+ * @param content - The markdown content to patch
+ * @param id - The section ID to prepend to (slug or custom ID)
+ * @param prependContent - The content to insert at the beginning of the section
+ * @returns Object with patched content and count (1 if prepended, 0 if section not found)
+ *
+ * @example
+ * ```typescript
+ * const markdown = `# Installation
+ * Follow these steps:
+ *
+ * 1. Download
+ * 2. Install`;
+ *
+ * const result = applyPrependToSection(
+ *   markdown,
+ *   'installation',
+ *   '**Note:** Requires Node.js 18+\n\n'
+ * );
+ * // Result:
+ * // # Installation
+ * // **Note:** Requires Node.js 18+
+ * //
+ * // Follow these steps:
+ * //
+ * // 1. Download
+ * // 2. Install
+ * ```
  */
 export function applyPrependToSection(
   content: string,
@@ -302,12 +466,39 @@ export function applyPrependToSection(
 }
 
 /**
- * Apply an append-to-section patch operation
+ * Apply an append-to-section patch operation to add content at the end of a section.
  *
- * @param content - The content to patch
- * @param id - The section ID to append to
- * @param appendContent - The content to append
- * @returns Object with patched content and count (1 if appended, 0 if not found)
+ * This function inserts new content at the end of a section, right before the next
+ * section header (or end of document). The content is inserted after all existing
+ * content in the section.
+ *
+ * @param content - The markdown content to patch
+ * @param id - The section ID to append to (slug or custom ID)
+ * @param appendContent - The content to insert at the end of the section
+ * @returns Object with patched content and count (1 if appended, 0 if section not found)
+ *
+ * @example
+ * ```typescript
+ * const markdown = `# Installation
+ * Download and install the package.
+ *
+ * # Usage
+ * Run the application.`;
+ *
+ * const result = applyAppendToSection(
+ *   markdown,
+ *   'installation',
+ *   '\n**Tip:** Use --verbose for detailed output.\n'
+ * );
+ * // Result:
+ * // # Installation
+ * // Download and install the package.
+ * //
+ * // **Tip:** Use --verbose for detailed output.
+ * //
+ * // # Usage
+ * // Run the application.
+ * ```
  */
 export function applyAppendToSection(
   content: string,
@@ -904,13 +1095,56 @@ export function applyChangeSectionLevel(
 }
 
 /**
- * Apply a single patch operation to content
+ * Apply a single patch operation to content.
+ *
+ * This function applies one patch operation to the provided content. It handles:
+ * - Conditional execution based on the patch's 'when' condition
+ * - Per-patch validation after application
+ * - No-match handling strategies (warn, error, skip)
+ * - Generation of helpful suggestions when patches fail to match
+ *
+ * If a patch has a 'when' condition that is not met, the patch is skipped and the
+ * content is returned unchanged. Validation is only performed if the patch actually
+ * modifies the content (count > 0).
  *
  * @param content - The content to patch
  * @param patch - The patch operation to apply
- * @param defaultOnNoMatch - Default behavior when patch doesn't match
- * @param verbose - Whether to log verbose messages (for condition skipping)
- * @returns Object with patched content, count, optional warning, validation errors, and conditionSkipped flag
+ * @param defaultOnNoMatch - Default behavior when patch doesn't match: 'warn' (default), 'error', or 'skip'
+ * @param verbose - Whether to log verbose messages to console (for condition skipping)
+ * @returns Object containing the patched content, count of changes, optional warning, validation errors, and conditionSkipped flag
+ *
+ * @example
+ * ```typescript
+ * const content = 'Hello world';
+ * const patch: PatchOperation = {
+ *   op: 'replace',
+ *   old: 'world',
+ *   new: 'kustomark'
+ * };
+ *
+ * const result = applySinglePatch(content, patch);
+ * console.log(result.content); // 'Hello kustomark'
+ * console.log(result.count);   // 1
+ * console.log(result.conditionSkipped); // false
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Example with condition
+ * const patch: PatchOperation = {
+ *   op: 'replace',
+ *   old: 'foo',
+ *   new: 'bar',
+ *   when: { contains: 'special' }
+ * };
+ *
+ * const result = applySinglePatch('normal content', patch);
+ * // Patch is skipped because content doesn't contain 'special'
+ * console.log(result.conditionSkipped); // true
+ * console.log(result.count); // 0
+ * ```
+ *
+ * @throws {Error} If the patch operation type is unknown or if onNoMatch is 'error' and the patch doesn't match
  */
 export function applySinglePatch(
   content: string,
@@ -1150,16 +1384,74 @@ function getPatchDescription(patch: PatchOperation): string {
 }
 
 /**
- * Apply multiple patches to content in order
+ * Apply multiple patches to content in order.
  *
- * Patches are applied sequentially, with each patch operating on the result
- * of the previous patch. Validation happens after each patch is applied.
+ * This is the main entry point for applying a series of patch operations to content.
+ * Patches are applied sequentially, with each patch operating on the result of the
+ * previous patch. This function handles:
+ * - Patch inheritance resolution (extends field)
+ * - Sequential application of all patches
+ * - Collection of warnings for patches that don't match
+ * - Collection of validation errors
+ * - Tracking of condition-skipped patches
  *
- * @param content - The content to patch
- * @param patches - Array of patch operations to apply
- * @param defaultOnNoMatch - Default behavior when patches don't match (default: 'warn')
- * @param verbose - Whether to log verbose messages (for condition skipping)
- * @returns PatchResult with patched content, count of applied patches, warnings, validation errors, and condition-skipped count
+ * The function first resolves any patch inheritance (patches with 'extends' fields),
+ * then applies each patch in order. Validation happens after each patch is applied,
+ * and any validation errors are collected and returned.
+ *
+ * @param content - The initial content to patch
+ * @param patches - Array of patch operations to apply in order
+ * @param defaultOnNoMatch - Default behavior when patches don't match: 'warn' (default), 'error', or 'skip'
+ * @param verbose - Whether to log verbose messages to console (for condition skipping)
+ * @returns PatchResult object with the final patched content, count of successfully applied patches,
+ *          array of warnings, array of validation errors, and count of condition-skipped patches
+ *
+ * @example
+ * ```typescript
+ * const content = `# Introduction
+ * Welcome to the guide.
+ *
+ * # Installation
+ * Install steps here.`;
+ *
+ * const patches: PatchOperation[] = [
+ *   {
+ *     op: 'replace',
+ *     old: 'guide',
+ *     new: 'documentation'
+ *   },
+ *   {
+ *     op: 'append-to-section',
+ *     id: 'installation',
+ *     content: '\nRun: npm install'
+ *   }
+ * ];
+ *
+ * const result = applyPatches(content, patches);
+ * console.log(result.applied); // 2
+ * console.log(result.warnings.length); // 0
+ * console.log(result.validationErrors.length); // 0
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Example with validation errors
+ * const patches: PatchOperation[] = [
+ *   {
+ *     op: 'replace',
+ *     old: 'foo',
+ *     new: 'bar',
+ *     validate: {
+ *       notContains: 'baz'
+ *     }
+ *   }
+ * ];
+ *
+ * const result = applyPatches('foo and baz', patches);
+ * console.log(result.validationErrors.length); // 1 (because result contains 'baz')
+ * ```
+ *
+ * @throws {Error} If any patch operation is unknown or if a patch with onNoMatch='error' doesn't match
  */
 export function applyPatches(
   content: string,

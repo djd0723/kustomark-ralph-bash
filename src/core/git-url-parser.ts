@@ -11,6 +11,27 @@ import type { ParsedGitUrl } from "./types.js";
 
 /**
  * Checks if a URL string is a Git URL
+ *
+ * Determines whether a URL is a git repository URL based on its format.
+ * Recognizes both explicit git:: prefixes and GitHub shorthand notation.
+ *
+ * @param {string} url - The URL to check
+ * @returns {boolean} true if the URL is a git URL, false otherwise
+ *
+ * @example
+ * ```typescript
+ * isGitUrl('git::https://github.com/org/repo.git'); // true
+ * isGitUrl('github.com/org/repo'); // true
+ * isGitUrl('https://example.com/file.tar.gz'); // false
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Check URL type before parsing
+ * if (isGitUrl(url)) {
+ *   const parsed = parseGitUrl(url);
+ * }
+ * ```
  */
 export function isGitUrl(url: string): boolean {
   if (!url || typeof url !== "string") {
@@ -33,8 +54,67 @@ export function isGitUrl(url: string): boolean {
 /**
  * Parses a Git URL into its components
  *
- * @param url - The Git URL to parse
- * @returns Parsed Git URL object or null if invalid
+ * Parses a git repository URL and extracts all relevant components including
+ * host, organization, repository name, optional subpath, and ref (branch/tag/commit).
+ * Supports multiple git URL formats and automatically normalizes them to HTTPS clone URLs.
+ *
+ * @param {string} url - The Git URL to parse. Supports three formats:
+ *   - GitHub shorthand: `github.com/org/repo//path?ref=v1.0.0`
+ *   - HTTPS: `git::https://github.com/org/repo.git//subdir?ref=main`
+ *   - SSH: `git::git@github.com:org/repo.git//path?ref=abc1234`
+ * @returns {ParsedGitUrl | null} Parsed Git URL object containing:
+ *   - type: Always 'git'
+ *   - protocol: 'https' or 'ssh'
+ *   - host: Git host (e.g., 'github.com')
+ *   - org: Organization or user name
+ *   - repo: Repository name
+ *   - path: Optional subdirectory path within the repository
+ *   - ref: Git ref (branch, tag, or commit SHA), defaults to 'main'
+ *   - fullUrl: Full HTTPS URL to the repository
+ *   - cloneUrl: URL to use for cloning (always HTTPS)
+ *   Returns null if the URL is invalid or cannot be parsed.
+ *
+ * @example
+ * ```typescript
+ * // Parse GitHub shorthand
+ * const parsed = parseGitUrl('github.com/facebook/react//packages/react?ref=v18.0.0');
+ * console.log(parsed);
+ * // {
+ * //   type: 'git',
+ * //   protocol: 'https',
+ * //   host: 'github.com',
+ * //   org: 'facebook',
+ * //   repo: 'react',
+ * //   path: 'packages/react',
+ * //   ref: 'v18.0.0',
+ * //   fullUrl: 'https://github.com/facebook/react.git',
+ * //   cloneUrl: 'https://github.com/facebook/react.git'
+ * // }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Parse HTTPS git URL
+ * const parsed = parseGitUrl('git::https://github.com/org/repo.git?ref=main');
+ * console.log(parsed?.ref); // 'main'
+ * console.log(parsed?.cloneUrl); // 'https://github.com/org/repo.git'
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Parse SSH git URL (converts to HTTPS for cloning)
+ * const parsed = parseGitUrl('git::git@github.com:org/repo.git//docs');
+ * console.log(parsed?.protocol); // 'ssh'
+ * console.log(parsed?.cloneUrl); // 'https://github.com/org/repo.git'
+ * console.log(parsed?.path); // 'docs'
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Invalid URL returns null
+ * const parsed = parseGitUrl('not-a-git-url');
+ * console.log(parsed); // null
+ * ```
  */
 export function parseGitUrl(url: string): ParsedGitUrl | null {
   if (!url || typeof url !== "string") {

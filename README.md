@@ -3747,6 +3747,13 @@ When submitting an issue, please include:
 6. Update documentation
 7. Submit a pull request
 
+## API Documentation
+
+For detailed API documentation of the core library, see:
+
+- **[API Reference](./docs/api/index.html)** - Full TypeDoc-generated API documentation
+- **[API Overview](./docs/README.md)** - Quick overview of main modules and functions
+
 ## License
 
 MIT
@@ -3755,6 +3762,7 @@ MIT
 
 - [Specifications](./specs/)
 - [M1 MVP Spec](./specs/m1-mvp.md)
+- [API Documentation](./docs/api/index.html)
 - [GitHub Repository](https://github.com/yourusername/kustomark)
 
 ---

@@ -85,6 +85,18 @@ type ArchiveFormat = "tar.gz" | "tgz" | "tar" | "zip";
 
 /**
  * Get the default cache directory for HTTP archives
+ *
+ * Returns the standard cache location where HTTP archives are stored locally.
+ * The cache directory is located at ~/.cache/kustomark/http with subdirectories
+ * for 'archives' (downloaded files) and 'extracted' (extracted contents).
+ *
+ * @returns {string} The absolute path to the default HTTP cache directory
+ *
+ * @example
+ * ```typescript
+ * const cacheDir = getDefaultCacheDir();
+ * console.log(cacheDir); // /home/user/.cache/kustomark/http
+ * ```
  */
 export function getDefaultCacheDir(): string {
   return join(homedir(), ".cache", "kustomark", "http");
@@ -313,12 +325,47 @@ async function downloadFile(
 /**
  * Fetch an HTTP archive and extract its contents
  *
- * @param url - URL of the archive to fetch (.tar.gz, .tgz, .tar, .zip)
- * @param options - Fetch options
- * @returns HttpFetchResult with extracted files, cache status, and checksum
+ * Downloads and extracts an archive file from a URL to the local cache. Supports
+ * multiple archive formats (.tar.gz, .tgz, .tar, .zip) and optional extraction of
+ * specific subdirectories. Includes checksum verification, authentication support,
+ * and lock file integration for reproducible builds.
+ *
+ * @param {string} url - URL of the archive to fetch. Must end with a supported extension:
+ *   .tar.gz, .tgz, .tar, or .zip
+ * @param {HttpFetchOptions} [options={}] - Fetch options including:
+ *   - cacheDir: Custom cache directory (defaults to ~/.cache/kustomark/http)
+ *   - authToken: Bearer token for authentication (overrides KUSTOMARK_HTTP_TOKEN env var)
+ *   - sha256: SHA256 checksum to validate the downloaded file
+ *   - subpath: Subpath to extract from the archive (e.g., "docs/")
+ *   - update: Whether to update an existing cached archive
+ *   - timeout: Timeout in milliseconds for HTTP requests
+ *   - headers: Additional HTTP headers
+ *   - lockFile: Lock file to use for pinned versions
+ *   - updateLock: Whether to update the lock file (fetch latest)
+ *   - offline: Offline mode - fail if remote fetch is needed
+ * @returns {Promise<HttpFetchResult>} Result containing:
+ *   - files: Array of extracted files with their paths and contents
+ *   - cached: Whether the archive was fetched from remote or used from cache
+ *   - checksum: The SHA256 checksum of the downloaded archive
+ *   - lockEntry: Lock file entry for this fetch
+ *
+ * @throws {HttpFetchError} If the URL has an unsupported format, download fails,
+ *   checksum verification fails, or offline mode prevents fetching
  *
  * @example
  * ```typescript
+ * // Basic usage - fetch and extract all files
+ * const result = await fetchHttpArchive(
+ *   'https://example.com/archive.tar.gz'
+ * );
+ * for (const file of result.files) {
+ *   console.log(file.path, file.content);
+ * }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Fetch with subpath and checksum verification
  * const result = await fetchHttpArchive(
  *   'https://example.com/archive.tar.gz',
  *   {
@@ -327,10 +374,29 @@ async function downloadFile(
  *     authToken: process.env.GITHUB_TOKEN,
  *   }
  * );
+ * console.log(`Found ${result.files.length} files in docs/`);
+ * ```
  *
- * for (const file of result.files) {
- *   console.log(file.path, file.content);
- * }
+ * @example
+ * ```typescript
+ * // Fetch with custom headers and timeout
+ * const result = await fetchHttpArchive(
+ *   'https://api.example.com/releases/v1.0.0/package.zip',
+ *   {
+ *     headers: { 'X-Custom-Header': 'value' },
+ *     timeout: 120000,
+ *     update: true
+ *   }
+ * );
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Offline mode - only use cached archives
+ * const result = await fetchHttpArchive(
+ *   'https://example.com/archive.tar.gz',
+ *   { offline: true }
+ * );
  * ```
  */
 export async function fetchHttpArchive(
@@ -471,9 +537,34 @@ export async function fetchHttpArchive(
 /**
  * Clear the HTTP archive cache
  *
- * @param cacheDir - Cache directory to clear (defaults to ~/.cache/kustomark/http)
- * @param pattern - Optional pattern to match cache keys (partial hash match)
- * @returns Number of cache entries cleared
+ * Removes cached HTTP archives and their extracted contents from the local cache
+ * directory. You can optionally specify a pattern to only clear matching entries.
+ * This is useful for freeing up disk space or forcing fresh downloads.
+ *
+ * @param {string} [cacheDir] - Cache directory to clear (defaults to ~/.cache/kustomark/http)
+ * @param {string} [pattern] - Optional pattern to match cache keys (partial hash match).
+ *   If provided, only cache entries containing this pattern will be cleared.
+ * @returns {Promise<number>} Number of cache entries cleared (both archives and extracted directories)
+ *
+ * @example
+ * ```typescript
+ * // Clear all cached archives
+ * const cleared = await clearHttpCache();
+ * console.log(`Cleared ${cleared} cache entries`);
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Clear specific cache entries by partial hash
+ * const cleared = await clearHttpCache(undefined, 'a1b2c3');
+ * console.log(`Cleared ${cleared} matching entries`);
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Clear cache from custom directory
+ * const cleared = await clearHttpCache('/custom/cache/dir');
+ * ```
  */
 export async function clearHttpCache(cacheDir?: string, pattern?: string): Promise<number> {
   const dir = cacheDir ?? getDefaultCacheDir();
@@ -516,8 +607,26 @@ export async function clearHttpCache(cacheDir?: string, pattern?: string): Promi
 /**
  * List cached HTTP archives
  *
- * @param cacheDir - Cache directory to list (defaults to ~/.cache/kustomark/http)
- * @returns Array of cache keys
+ * Returns a list of all cached HTTP archives in the cache directory.
+ * Each entry represents a cached archive identified by its cache key
+ * (a hash of the source URL).
+ *
+ * @param {string} [cacheDir] - Cache directory to list (defaults to ~/.cache/kustomark/http)
+ * @returns {Promise<string[]>} Array of cache keys representing cached archives
+ *
+ * @example
+ * ```typescript
+ * // List all cached archives
+ * const cached = await listHttpCache();
+ * console.log(cached);
+ * // ['a1b2c3d4e5f6g7h8', '9i0j1k2l3m4n5o6p']
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // List cached archives from a custom cache directory
+ * const cached = await listHttpCache('/custom/cache/dir');
+ * ```
  */
 export async function listHttpCache(cacheDir?: string): Promise<string[]> {
   const dir = cacheDir ?? getDefaultCacheDir();
@@ -538,9 +647,38 @@ export async function listHttpCache(cacheDir?: string): Promise<string[]> {
 /**
  * Get metadata about a cached archive
  *
- * @param url - The URL of the archive
- * @param cacheDir - Cache directory (defaults to ~/.cache/kustomark/http)
- * @returns Object with cache information or null if not cached
+ * Checks if a specific URL is cached and returns information about the cached
+ * archive including its checksum and file path. Useful for verifying cache
+ * status before fetching.
+ *
+ * @param {string} url - The URL of the archive to check
+ * @param {string} [cacheDir] - Cache directory (defaults to ~/.cache/kustomark/http)
+ * @returns {Promise<{exists: boolean; checksum?: string; path?: string} | null>}
+ *   Object with cache information:
+ *   - exists: Whether the archive is cached
+ *   - checksum: SHA256 checksum of the cached archive (if exists)
+ *   - path: Absolute path to the cached archive file (if exists)
+ *
+ * @example
+ * ```typescript
+ * // Check if an archive is cached
+ * const info = await getCacheInfo('https://example.com/archive.tar.gz');
+ * if (info?.exists) {
+ *   console.log(`Cached at ${info.path}`);
+ *   console.log(`Checksum: ${info.checksum}`);
+ * } else {
+ *   console.log('Not cached');
+ * }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Check cache with custom directory
+ * const info = await getCacheInfo(
+ *   'https://example.com/archive.tar.gz',
+ *   '/custom/cache/dir'
+ * );
+ * ```
  */
 export async function getCacheInfo(
   url: string,

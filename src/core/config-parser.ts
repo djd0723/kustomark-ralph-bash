@@ -13,11 +13,28 @@ import type {
 } from "./types.js";
 
 /**
- * Parses a YAML string into a KustomarkConfig object
+ * Parses a YAML string into a KustomarkConfig object.
  *
- * @param yamlContent - YAML content as string
- * @returns Parsed KustomarkConfig object
- * @throws Error if YAML is malformed
+ * This function converts raw YAML content into a typed KustomarkConfig object that
+ * can be validated and processed. The parsed config must be a YAML object at the
+ * top level.
+ *
+ * @param yamlContent - The YAML content as a string to be parsed
+ * @returns The parsed KustomarkConfig object (not yet validated)
+ * @throws {Error} If the YAML is malformed or if the content is not a YAML object
+ *
+ * @example
+ * ```typescript
+ * const yamlContent = `
+ * apiVersion: kustomark/v1
+ * kind: Kustomization
+ * resources:
+ *   - docs/**.md
+ * `;
+ *
+ * const config = parseConfig(yamlContent);
+ * console.log(config.resources); // ['docs/**.md']
+ * ```
  */
 export function parseConfig(yamlContent: string): KustomarkConfig {
   try {
@@ -39,10 +56,47 @@ export function parseConfig(yamlContent: string): KustomarkConfig {
 }
 
 /**
- * Validates a parsed KustomarkConfig object
+ * Validates a parsed KustomarkConfig object.
  *
- * @param config - The config object to validate
- * @returns ValidationResult with errors and warnings
+ * Performs comprehensive validation of a Kustomark configuration, checking for:
+ * - Required fields (apiVersion, kind, resources)
+ * - Correct field types and values
+ * - Valid patch operations and their required fields
+ * - Security configuration
+ * - Watch hooks configuration
+ * - Patch inheritance and circular dependency detection
+ * - Resource authentication settings
+ *
+ * @param config - The KustomarkConfig object to validate
+ * @returns ValidationResult object containing:
+ *   - valid: boolean indicating if config is valid (no errors)
+ *   - errors: array of validation errors that must be fixed
+ *   - warnings: array of non-critical warnings
+ *
+ * @example
+ * ```typescript
+ * const config = parseConfig(yamlContent);
+ * const result = validateConfig(config);
+ *
+ * if (!result.valid) {
+ *   console.error('Validation errors:', result.errors);
+ *   result.warnings.forEach(w => console.warn(w.message));
+ * }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Valid config example
+ * const validConfig = {
+ *   apiVersion: 'kustomark/v1',
+ *   kind: 'Kustomization',
+ *   resources: ['docs/**.md']
+ * };
+ *
+ * const result = validateConfig(validConfig);
+ * console.log(result.valid); // true
+ * console.log(result.errors); // []
+ * ```
  */
 export function validateConfig(config: KustomarkConfig): ValidationResult {
   const errors: ValidationError[] = [];

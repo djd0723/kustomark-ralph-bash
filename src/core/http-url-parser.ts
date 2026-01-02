@@ -22,8 +22,28 @@ export type ArchiveType = "tar.gz" | "tgz" | "tar" | "zip";
 /**
  * Checks if a URL string is an HTTP archive URL
  *
- * @param url - The URL to check
- * @returns True if the URL is an HTTP archive URL
+ * Determines whether a URL points to a supported archive file by checking
+ * if it starts with http:// or https:// and contains a recognized archive
+ * extension (.tar.gz, .tgz, .tar, or .zip).
+ *
+ * @param {string} url - The URL to check
+ * @returns {boolean} true if the URL is an HTTP archive URL, false otherwise
+ *
+ * @example
+ * ```typescript
+ * isHttpArchiveUrl('https://example.com/archive.tar.gz'); // true
+ * isHttpArchiveUrl('https://example.com/package.zip'); // true
+ * isHttpArchiveUrl('git::https://github.com/org/repo.git'); // false
+ * isHttpArchiveUrl('https://example.com/file.txt'); // false
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Check URL type before parsing
+ * if (isHttpArchiveUrl(url)) {
+ *   const parsed = parseHttpArchiveUrl(url);
+ * }
+ * ```
  */
 export function isHttpArchiveUrl(url: string): boolean {
   if (!url || typeof url !== "string") {
@@ -48,12 +68,72 @@ export function isHttpArchiveUrl(url: string): boolean {
 /**
  * Parses an HTTP archive URL into its components
  *
- * Supports formats:
- * - https://example.com/releases/v1.0.0/skills.tar.gz
- * - https://example.com/release.tar.gz//subdir/
+ * Parses an HTTP archive URL and extracts all relevant components including
+ * the base URL, archive type, optional subpath, and query parameters. The URL
+ * must point to a supported archive format and can optionally specify a
+ * subdirectory to extract using the '//' delimiter.
  *
- * @param url - The HTTP archive URL to parse
- * @returns Parsed HTTP archive URL object or null if invalid
+ * @param {string} url - The HTTP archive URL to parse. Supported formats:
+ *   - Direct: `https://example.com/releases/v1.0.0/package.tar.gz`
+ *   - With subpath: `https://example.com/archive.tar.gz//subdir/`
+ *   - With query params: `https://example.com/file.zip?token=abc`
+ *   - Combined: `https://example.com/archive.tar.gz?token=abc//subdir/`
+ * @returns {ParsedHttpArchiveUrl | null} Parsed HTTP archive URL object containing:
+ *   - type: Always 'http-archive'
+ *   - url: The base URL to the archive file (without subpath or query params)
+ *   - subpath: Optional subdirectory path to extract from the archive
+ *   - archiveType: The archive format ('tar.gz', 'tgz', 'tar', or 'zip')
+ *   - queryParams: Object containing query parameters from the URL
+ *   Returns null if the URL is invalid or has an unsupported format.
+ *
+ * @example
+ * ```typescript
+ * // Parse simple archive URL
+ * const parsed = parseHttpArchiveUrl('https://example.com/release-v1.0.0.tar.gz');
+ * console.log(parsed);
+ * // {
+ * //   type: 'http-archive',
+ * //   url: 'https://example.com/release-v1.0.0.tar.gz',
+ * //   archiveType: 'tar.gz',
+ * //   queryParams: {}
+ * // }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Parse with subpath
+ * const parsed = parseHttpArchiveUrl('https://example.com/archive.tar.gz//docs/api/');
+ * console.log(parsed?.subpath); // 'docs/api/'
+ * console.log(parsed?.archiveType); // 'tar.gz'
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Parse with query parameters
+ * const parsed = parseHttpArchiveUrl('https://api.github.com/repos/org/repo/tarball?token=abc123');
+ * console.log(parsed?.queryParams); // { token: 'abc123' }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Parse zip archive with subpath and query
+ * const parsed = parseHttpArchiveUrl('https://example.com/package.zip?v=1.0//lib/');
+ * console.log(parsed);
+ * // {
+ * //   type: 'http-archive',
+ * //   url: 'https://example.com/package.zip',
+ * //   subpath: 'lib/',
+ * //   archiveType: 'zip',
+ * //   queryParams: { v: '1.0' }
+ * // }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Invalid URL returns null
+ * const parsed = parseHttpArchiveUrl('https://example.com/file.txt');
+ * console.log(parsed); // null (not an archive)
+ * ```
  */
 export function parseHttpArchiveUrl(url: string): ParsedHttpArchiveUrl | null {
   if (!url || typeof url !== "string") {

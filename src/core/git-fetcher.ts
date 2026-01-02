@@ -63,6 +63,17 @@ export interface GitFetchOptions {
 
 /**
  * Get the default cache directory for git repositories
+ *
+ * Returns the standard cache location where git repositories are stored
+ * locally. The cache directory is located at ~/.cache/kustomark/git.
+ *
+ * @returns {string} The absolute path to the default git cache directory
+ *
+ * @example
+ * ```typescript
+ * const cacheDir = getDefaultCacheDir();
+ * console.log(cacheDir); // /home/user/.cache/kustomark/git
+ * ```
  */
 export function getDefaultCacheDir(): string {
   return join(homedir(), ".cache", "kustomark", "git");
@@ -330,17 +341,62 @@ async function calculateGitContentHash(repoPath: string, subpath?: string): Prom
 /**
  * Fetch a git repository and return the path to the cached copy
  *
- * @param gitUrl - Git URL to fetch (GitHub shorthand, git::https://, or git::git@)
- * @param options - Fetch options
- * @returns GitFetchResult with repo path, cache status, and resolved SHA
+ * Clones or updates a git repository to the local cache, checks out the specified
+ * ref (branch, tag, or commit), and returns metadata about the fetch operation.
+ * Supports GitHub shorthand URLs, HTTPS git URLs, and SSH git URLs with optional
+ * sparse checkout for specific subdirectories.
+ *
+ * @param {string} gitUrl - Git URL to fetch. Supports multiple formats:
+ *   - GitHub shorthand: `github.com/org/repo//path?ref=v1.0.0`
+ *   - HTTPS: `git::https://github.com/org/repo.git//subdir?ref=main`
+ *   - SSH: `git::git@github.com:org/repo.git//path?ref=abc1234`
+ * @param {GitFetchOptions} [options={}] - Fetch options including:
+ *   - cacheDir: Custom cache directory (defaults to ~/.cache/kustomark/git)
+ *   - update: Whether to update an existing cached repository
+ *   - timeout: Timeout in milliseconds for git operations
+ *   - lockFile: Lock file to use for pinned versions
+ *   - updateLock: Whether to update the lock file (fetch latest)
+ *   - offline: Offline mode - fail if remote fetch is needed
+ *   - authToken: Authentication token (for HTTPS git operations)
+ * @returns {Promise<GitFetchResult>} Result containing:
+ *   - repoPath: Path to the cached repository
+ *   - cached: Whether the repository was fetched from remote or used from cache
+ *   - resolvedSha: The resolved commit SHA
+ *   - lockEntry: Lock file entry for this fetch
+ *
+ * @throws {GitFetchError} If the URL is invalid, git operations fail, or offline mode prevents fetching
  *
  * @example
  * ```typescript
+ * // Fetch a repository using GitHub shorthand
  * const result = await fetchGitRepository(
  *   'github.com/org/repo//path?ref=v1.0.0'
  * );
  * console.log(result.repoPath); // ~/.cache/kustomark/git/github_com_org_repo
  * console.log(result.resolvedSha); // abc123...
+ * console.log(result.cached); // false (first fetch)
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Fetch with authentication and update existing cache
+ * const result = await fetchGitRepository(
+ *   'git::https://github.com/org/private-repo.git?ref=main',
+ *   {
+ *     authToken: process.env.GITHUB_TOKEN,
+ *     update: true,
+ *     timeout: 120000
+ *   }
+ * );
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Fetch in offline mode (uses cache only)
+ * const result = await fetchGitRepository(
+ *   'github.com/org/repo?ref=v1.0.0',
+ *   { offline: true }
+ * );
  * ```
  */
 export async function fetchGitRepository(
@@ -439,8 +495,34 @@ export async function fetchGitRepository(
 /**
  * Clear the git cache
  *
- * @param cacheDir - Cache directory to clear (defaults to ~/.cache/kustomark/git)
- * @param pattern - Optional pattern to match cache keys (e.g., 'github_com_org_repo')
+ * Removes cached git repositories from the local cache directory. You can optionally
+ * specify a pattern to only clear matching repositories. This is useful for freeing
+ * up disk space or forcing fresh clones.
+ *
+ * @param {string} [cacheDir] - Cache directory to clear (defaults to ~/.cache/kustomark/git)
+ * @param {string} [pattern] - Optional pattern to match cache keys (e.g., 'github_com_org_repo').
+ *   If provided, only cache entries containing this pattern will be cleared.
+ * @returns {Promise<number>} The number of cache entries cleared
+ *
+ * @example
+ * ```typescript
+ * // Clear all cached repositories
+ * const cleared = await clearGitCache();
+ * console.log(`Cleared ${cleared} repositories`);
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Clear only repositories from github.com
+ * const cleared = await clearGitCache(undefined, 'github_com');
+ * console.log(`Cleared ${cleared} GitHub repositories`);
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Clear repositories from a specific organization
+ * const cleared = await clearGitCache(undefined, 'github_com_myorg');
+ * ```
  */
 export async function clearGitCache(cacheDir?: string, pattern?: string): Promise<number> {
   const dir = cacheDir ?? getDefaultCacheDir();
@@ -468,8 +550,26 @@ export async function clearGitCache(cacheDir?: string, pattern?: string): Promis
 /**
  * List cached git repositories
  *
- * @param cacheDir - Cache directory to list (defaults to ~/.cache/kustomark/git)
- * @returns Array of cache keys
+ * Returns a list of all cached git repositories in the cache directory.
+ * Each entry represents a cached repository identified by its cache key
+ * in the format: {host}_{org}_{repo}.
+ *
+ * @param {string} [cacheDir] - Cache directory to list (defaults to ~/.cache/kustomark/git)
+ * @returns {Promise<string[]>} Array of cache keys representing cached repositories
+ *
+ * @example
+ * ```typescript
+ * // List all cached repositories
+ * const cached = await listGitCache();
+ * console.log(cached);
+ * // ['github_com_org_repo1', 'github_com_org_repo2']
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // List cached repositories from a custom cache directory
+ * const cached = await listGitCache('/custom/cache/dir');
+ * ```
  */
 export async function listGitCache(cacheDir?: string): Promise<string[]> {
   const dir = cacheDir ?? getDefaultCacheDir();

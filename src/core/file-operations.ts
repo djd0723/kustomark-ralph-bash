@@ -26,9 +26,30 @@ export interface FileOperationResult {
 /**
  * Validates a path to prevent path traversal attacks
  *
- * @param filePath - The path to validate
+ * Ensures that a given file path does not escape the base directory using ".." or
+ * other path traversal techniques. This is a critical security function that prevents
+ * malicious templates from accessing files outside their allowed scope.
+ *
+ * @param filePath - The path to validate (can be relative or absolute)
  * @param baseDir - The base directory that the path should be relative to
- * @throws Error if the path attempts to escape the base directory
+ * @throws {Error} If the path attempts to escape the base directory
+ *
+ * @example
+ * ```typescript
+ * // Valid path
+ * validatePath('docs/readme.md', '/home/user/project');
+ * // No error
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Invalid path - attempts to escape
+ * try {
+ *   validatePath('../../etc/passwd', '/home/user/project');
+ * } catch (error) {
+ *   console.error(error.message); // "Path traversal detected..."
+ * }
+ * ```
  */
 export function validatePath(filePath: string, baseDir: string): void {
   // Resolve both paths to absolute paths
@@ -52,14 +73,33 @@ export function validatePath(filePath: string, baseDir: string): void {
 /**
  * Apply a copy-file operation
  *
- * Copies a single source file to a destination path.
- * The source is relative to the project root, the destination is relative to the output.
+ * Copies a single source file to a destination path. The source file is added to the
+ * file map with the new destination, while keeping the original mapping intact.
+ * Both paths are validated to prevent path traversal attacks.
  *
  * @param fileMap - Current file map (src -> dest)
  * @param src - Source file path (relative to project root)
- * @param dest - Destination file path (relative to output)
+ * @param dest - Destination file path (relative to output directory)
  * @param baseDir - Base directory for path validation (project root)
- * @returns Updated file map and count of files copied
+ * @returns Updated file map and count of files copied (always 1)
+ * @throws {Error} If paths fail validation (path traversal attempt)
+ *
+ * @example
+ * ```typescript
+ * const fileMap = new Map([
+ *   ['src/readme.md', 'readme.md']
+ * ]);
+ *
+ * const result = applyCopyFile(
+ *   fileMap,
+ *   'src/readme.md',
+ *   'docs/readme.md',
+ *   '/home/user/project'
+ * );
+ *
+ * console.log(result.count); // 1
+ * console.log(result.fileMap.get('src/readme.md')); // "docs/readme.md"
+ * ```
  */
 export function applyCopyFile(
   fileMap: Map<string, string>,
@@ -89,13 +129,41 @@ export function applyCopyFile(
  * Apply a rename-file operation
  *
  * Renames files matching a glob pattern. Only the filename is replaced, not the entire path.
- * For example, if match is "*.md" and rename is "README.md", then "docs/guide.md" becomes "docs/README.md"
+ * The directory structure is preserved. All matching files are renamed to the same filename.
+ * The rename parameter must be a filename only, not a path.
  *
  * @param fileMap - Current file map (src -> dest)
  * @param match - Glob pattern to match source files
  * @param rename - New filename (not a full path, just the filename)
  * @param baseDir - Base directory for path validation (project root)
  * @returns Updated file map and count of files renamed
+ * @throws {Error} If rename contains path separators or path traversal patterns
+ *
+ * @example
+ * ```typescript
+ * const fileMap = new Map([
+ *   ['docs/guide.md', 'docs/guide.md'],
+ *   ['docs/api.md', 'docs/api.md'],
+ *   ['src/index.ts', 'src/index.ts']
+ * ]);
+ *
+ * const result = applyRenameFile(fileMap, '*.md', 'README.md', '/project');
+ *
+ * console.log(result.count); // 2
+ * console.log(result.fileMap.get('docs/guide.md')); // "docs/README.md"
+ * console.log(result.fileMap.get('docs/api.md')); // "docs/README.md"
+ * console.log(result.fileMap.get('src/index.ts')); // "src/index.ts" (unchanged)
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Invalid rename target throws error
+ * try {
+ *   applyRenameFile(fileMap, '*.md', 'path/to/file.md', '/project');
+ * } catch (error) {
+ *   console.error(error.message); // "Invalid rename target..."
+ * }
+ * ```
  */
 export function applyRenameFile(
   fileMap: Map<string, string>,
@@ -146,12 +214,35 @@ export function applyRenameFile(
 /**
  * Apply a delete-file operation
  *
- * Removes files matching a glob pattern from the file map.
+ * Removes files matching a glob pattern from the file map. Matched files are excluded
+ * from the output. The glob pattern is matched against the source file paths.
  *
  * @param fileMap - Current file map (src -> dest)
  * @param match - Glob pattern to match files to delete
  * @param _baseDir - Base directory for path validation (project root) - unused but kept for API consistency
  * @returns Updated file map and count of files deleted
+ *
+ * @example
+ * ```typescript
+ * const fileMap = new Map([
+ *   ['readme.md', 'readme.md'],
+ *   ['temp.tmp', 'temp.tmp'],
+ *   ['notes.txt', 'notes.txt']
+ * ]);
+ *
+ * const result = applyDeleteFile(fileMap, '*.tmp', '/project');
+ *
+ * console.log(result.count); // 1
+ * console.log(result.fileMap.has('temp.tmp')); // false
+ * console.log(result.fileMap.has('readme.md')); // true
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Delete multiple files with glob pattern
+ * const result = applyDeleteFile(fileMap, 'deep glob pattern', '/project');
+ * // Deletes matching files in any directory
+ * ```
  */
 export function applyDeleteFile(
   fileMap: Map<string, string>,
@@ -189,14 +280,39 @@ export function applyDeleteFile(
 /**
  * Apply a move-file operation
  *
- * Moves files matching a glob pattern to a new destination directory.
- * The filename is preserved, only the directory path changes.
+ * Moves files matching a glob pattern to a new destination directory. The filename
+ * is preserved, only the directory path changes. All matched files are moved to the
+ * same destination directory.
  *
  * @param fileMap - Current file map (src -> dest)
  * @param match - Glob pattern to match files to move
- * @param dest - Destination directory (relative to output)
+ * @param dest - Destination directory (relative to output directory)
  * @param baseDir - Base directory for path validation (project root)
  * @returns Updated file map and count of files moved
+ * @throws {Error} If destination path fails validation (path traversal attempt)
+ *
+ * @example
+ * ```typescript
+ * const fileMap = new Map([
+ *   ['src/readme.md', 'src/readme.md'],
+ *   ['src/guide.md', 'src/guide.md'],
+ *   ['index.html', 'index.html']
+ * ]);
+ *
+ * const result = applyMoveFile(fileMap, 'src/*.md', 'docs', '/project');
+ *
+ * console.log(result.count); // 2
+ * console.log(result.fileMap.get('src/readme.md')); // "docs/readme.md"
+ * console.log(result.fileMap.get('src/guide.md')); // "docs/guide.md"
+ * console.log(result.fileMap.get('index.html')); // "index.html" (unchanged)
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Move all markdown files to a new location
+ * const result = applyMoveFile(fileMap, 'deep glob pattern', 'documentation', '/project');
+ * // All matching .md files moved to documentation/ directory
+ * ```
  */
 export function applyMoveFile(
   fileMap: Map<string, string>,

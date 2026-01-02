@@ -64,10 +64,42 @@ interface DiffHunk {
 /**
  * Generate a unified diff between two text strings
  *
+ * Creates a unified diff in git diff format, showing changes between original and
+ * modified content. Uses the Longest Common Subsequence (LCS) algorithm to identify
+ * differences and includes 3 lines of context around each change.
+ *
  * @param original - Original content
  * @param modified - Modified content
- * @param filepath - Path to the file (for diff header)
- * @returns Unified diff string in git diff format
+ * @param filepath - Path to the file (used in diff header as a/filepath and b/filepath)
+ * @returns Unified diff string in git diff format, or empty string if no changes
+ *
+ * @example
+ * ```typescript
+ * const original = `line 1
+ * line 2
+ * line 3`;
+ *
+ * const modified = `line 1
+ * line 2 modified
+ * line 3`;
+ *
+ * const diff = generateDiff(original, modified, 'test.txt');
+ * console.log(diff);
+ * // --- a/test.txt
+ * // +++ b/test.txt
+ * // @@ -1,3 +1,3 @@
+ * //  line 1
+ * // -line 2
+ * // +line 2 modified
+ * //  line 3
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // No changes returns empty string
+ * const diff = generateDiff('same', 'same', 'file.txt');
+ * console.log(diff); // ""
+ * ```
  */
 export function generateDiff(original: string, modified: string, filepath: string): string {
   // Split into lines, preserving empty lines
@@ -114,8 +146,49 @@ export function generateDiff(original: string, modified: string, filepath: strin
 /**
  * Generate diffs for multiple files
  *
- * @param files - Array of file objects with path and content
- * @returns Structured diff result
+ * Processes multiple file changes and generates structured diff results. Automatically
+ * detects file status (added, modified, deleted) based on the presence of original
+ * and modified content. Files with no actual changes are excluded from the result.
+ *
+ * @param files - Array of file objects with path and optional original/modified content
+ * @returns Structured diff result with hasChanges flag and array of file diffs
+ *
+ * @example
+ * ```typescript
+ * const files = [
+ *   {
+ *     path: 'new-file.txt',
+ *     modified: 'This is new content'
+ *   },
+ *   {
+ *     path: 'modified-file.txt',
+ *     original: 'Old content',
+ *     modified: 'New content'
+ *   },
+ *   {
+ *     path: 'deleted-file.txt',
+ *     original: 'This will be deleted'
+ *   }
+ * ];
+ *
+ * const result = generateFileDiff(files);
+ * console.log(result.hasChanges); // true
+ * console.log(result.files.length); // 3
+ * console.log(result.files[0].status); // "added"
+ * console.log(result.files[1].status); // "modified"
+ * console.log(result.files[2].status); // "deleted"
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Files with no changes are excluded
+ * const files = [
+ *   { path: 'unchanged.txt', original: 'same', modified: 'same' }
+ * ];
+ * const result = generateFileDiff(files);
+ * console.log(result.hasChanges); // false
+ * console.log(result.files.length); // 0
+ * ```
  */
 export function generateFileDiff(
   files: Array<{

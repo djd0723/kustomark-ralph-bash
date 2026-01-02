@@ -25,17 +25,32 @@ export interface FrontmatterResult {
 /**
  * Parse YAML frontmatter from markdown content
  *
- * Frontmatter must be at the start of the document and enclosed in --- delimiters:
- * ```
- * ---
- * key: value
- * ---
- * Content here
- * ```
+ * Frontmatter must be at the start of the document and enclosed in --- delimiters.
+ * Returns an empty object if no frontmatter is found.
  *
  * @param content - The markdown content with frontmatter
  * @returns Parsed frontmatter object, or empty object if no frontmatter found
- * @throws Error if frontmatter YAML is malformed
+ * @throws {Error} If frontmatter YAML is malformed or invalid
+ *
+ * @example
+ * ```typescript
+ * const markdown = `---
+ * title: My Post
+ * author: Alice
+ * ---
+ * # Content here`;
+ *
+ * const frontmatter = parseFrontmatter(markdown);
+ * console.log(frontmatter); // { title: 'My Post', author: 'Alice' }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // No frontmatter
+ * const markdown = '# Just content';
+ * const frontmatter = parseFrontmatter(markdown);
+ * console.log(frontmatter); // {}
+ * ```
  */
 export function parseFrontmatter(content: string): Record<string, unknown> {
   const result = extractFrontmatter(content);
@@ -45,18 +60,41 @@ export function parseFrontmatter(content: string): Record<string, unknown> {
 /**
  * Convert an object to YAML frontmatter format
  *
- * Produces a string wrapped in --- delimiters:
- * ```
- * ---
- * key: value
- * nested:
- *   key: value
- * ---
- * ```
+ * Produces a string wrapped in --- delimiters. Returns an empty string if the
+ * data object is empty or null. Key order is preserved during serialization.
  *
  * @param data - The object to convert to frontmatter
- * @returns YAML frontmatter string with delimiters
- * @throws Error if data cannot be serialized to YAML
+ * @returns YAML frontmatter string with delimiters, or empty string if data is empty
+ * @throws {Error} If data cannot be serialized to YAML
+ *
+ * @example
+ * ```typescript
+ * const data = {
+ *   title: 'My Post',
+ *   author: 'Alice',
+ *   metadata: {
+ *     tags: ['javascript', 'typescript']
+ *   }
+ * };
+ *
+ * const yaml = stringifyFrontmatter(data);
+ * console.log(yaml);
+ * // ---
+ * // title: My Post
+ * // author: Alice
+ * // metadata:
+ * //   tags:
+ * //     - javascript
+ * //     - typescript
+ * // ---
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Empty object returns empty string
+ * const yaml = stringifyFrontmatter({});
+ * console.log(yaml); // ""
+ * ```
  */
 export function stringifyFrontmatter(data: Record<string, unknown>): string {
   if (!data || Object.keys(data).length === 0) {
@@ -82,9 +120,36 @@ export function stringifyFrontmatter(data: Record<string, unknown>): string {
 /**
  * Extract frontmatter and body separately from markdown content
  *
- * @param content - The markdown content
+ * Splits markdown content into frontmatter data and body text. If no frontmatter
+ * is present, returns an empty object for data and the entire content as body.
+ *
+ * @param content - The markdown content to parse
  * @returns Object with parsed frontmatter data and body content
- * @throws Error if frontmatter YAML is malformed
+ * @throws {Error} If frontmatter YAML is malformed or not a valid object
+ *
+ * @example
+ * ```typescript
+ * const markdown = `---
+ * title: My Post
+ * author: Alice
+ * ---
+ * # Introduction
+ *
+ * This is the content.`;
+ *
+ * const result = extractFrontmatter(markdown);
+ * console.log(result.data); // { title: 'My Post', author: 'Alice' }
+ * console.log(result.body); // "# Introduction\n\nThis is the content."
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // No frontmatter
+ * const markdown = '# Just content';
+ * const result = extractFrontmatter(markdown);
+ * console.log(result.data); // {}
+ * console.log(result.body); // "# Just content"
+ * ```
  */
 export function extractFrontmatter(content: string): FrontmatterResult {
   // Match frontmatter pattern: starts with ---, content, ends with ---
@@ -135,14 +200,53 @@ export function extractFrontmatter(content: string): FrontmatterResult {
 /**
  * Insert or replace frontmatter in markdown content
  *
- * If content already has frontmatter, it will be replaced.
- * If content has no frontmatter, it will be added at the beginning.
- * If frontmatter data is empty, existing frontmatter will be removed.
+ * If content already has frontmatter, it will be replaced with the new frontmatter.
+ * If content has no frontmatter, the new frontmatter will be added at the beginning.
+ * If the frontmatter object is empty, any existing frontmatter will be removed.
  *
- * @param content - The markdown content
- * @param frontmatter - The frontmatter object to insert
- * @returns Content with frontmatter inserted/replaced
- * @throws Error if frontmatter cannot be serialized
+ * @param content - The markdown content to modify
+ * @param frontmatter - The frontmatter object to insert or replace
+ * @returns Content with frontmatter inserted/replaced, or just body if frontmatter is empty
+ * @throws {Error} If frontmatter cannot be serialized to YAML
+ *
+ * @example
+ * ```typescript
+ * // Add frontmatter to content without it
+ * const content = '# My Post\n\nContent here.';
+ * const newContent = insertFrontmatter(content, { title: 'My Post', author: 'Alice' });
+ * console.log(newContent);
+ * // ---
+ * // title: My Post
+ * // author: Alice
+ * // ---
+ * // # My Post
+ * //
+ * // Content here.
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Replace existing frontmatter
+ * const content = `---
+ * title: Old Title
+ * ---
+ * Content`;
+ *
+ * const newContent = insertFrontmatter(content, { title: 'New Title', author: 'Bob' });
+ * // Frontmatter is replaced, content remains
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Remove frontmatter by passing empty object
+ * const content = `---
+ * title: My Post
+ * ---
+ * Content`;
+ *
+ * const newContent = insertFrontmatter(content, {});
+ * console.log(newContent); // "Content"
+ * ```
  */
 export function insertFrontmatter(content: string, frontmatter: Record<string, unknown>): string {
   const { body } = extractFrontmatter(content);

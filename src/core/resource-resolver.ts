@@ -10,26 +10,92 @@ import { SecurityValidationError, validateResourceSecurity } from "./security.js
 import type { LockFile, LockFileEntry, SecurityConfig } from "./types.js";
 
 /**
- * Represents a resolved markdown file resource
+ * Represents a resolved markdown file resource.
+ *
+ * This interface describes a markdown file that has been successfully resolved
+ * from a resource pattern. It contains both the file's location and content,
+ * along with metadata about how it was resolved.
+ *
+ * @example
+ * ```typescript
+ * const resource: ResolvedResource = {
+ *   path: '/project/docs/api.md',
+ *   content: '# API Documentation\n\n...',
+ *   source: 'docs/**.md',
+ *   baseDir: '/project'
+ * };
+ * ```
  */
 export interface ResolvedResource {
-  /** Absolute path to the markdown file */
+  /**
+   * Absolute path to the markdown file on the filesystem
+   */
   path: string;
-  /** Content of the markdown file */
+
+  /**
+   * The complete content of the markdown file as a string
+   */
   content: string;
-  /** Source pattern or config that resolved to this resource */
+
+  /**
+   * The original resource pattern or URL that resolved to this file.
+   * This helps trace which configuration entry led to this resource.
+   *
+   * @example 'docs/**.md'
+   * @example 'git@github.com:user/repo.git//docs'
+   * @example './README.md'
+   */
   source: string;
-  /** Base directory to compute relative paths from (optional) */
+
+  /**
+   * The base directory used to resolve relative paths for this resource.
+   * Optional - primarily used for resources from nested configs or remote sources.
+   *
+   * @example '/project'
+   * @example '/tmp/git-cache/repo-abc123'
+   */
   baseDir?: string;
 }
 
 /**
- * Error thrown when resource resolution fails
+ * Error thrown when resource resolution fails.
+ *
+ * This custom error class provides additional context about which resource
+ * failed to resolve and optionally includes the underlying cause of the failure.
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await resolveResources(resources, baseDir, fileMap);
+ * } catch (error) {
+ *   if (error instanceof ResourceResolutionError) {
+ *     console.error(`Failed to resolve: ${error.resource}`);
+ *     console.error(`Reason: ${error.message}`);
+ *     if (error.cause) {
+ *       console.error(`Caused by: ${error.cause.message}`);
+ *     }
+ *   }
+ * }
+ * ```
  */
 export class ResourceResolutionError extends Error {
+  /**
+   * The resource pattern or URL that failed to resolve
+   */
   public readonly resource: string;
+
+  /**
+   * The underlying error that caused this resolution to fail, if any
+   */
   public override readonly cause?: Error;
 
+  /**
+   * Creates a new ResourceResolutionError.
+   *
+   * @param message - A descriptive error message explaining what went wrong
+   * @param resource - The resource pattern or URL that failed to resolve
+   * @param cause - Optional underlying error that caused the resolution failure
+   */
   constructor(message: string, resource: string, cause?: Error) {
     super(message);
     this.name = "ResourceResolutionError";
@@ -71,26 +137,106 @@ interface ResolveOptions {
 }
 
 /**
- * Resolves resource patterns to a flat list of markdown files
+ * Resolves resource patterns to a flat list of markdown files.
  *
- * @param resources - Array of glob patterns, file paths, directory references, or resource objects
- * @param baseDir - Base directory to resolve relative paths against (absolute path)
- * @param fileMap - Map of absolute file paths to their content
- * @param options - Resolution options
- * @returns Array of resolved markdown resources
- * @throws {ResourceResolutionError} If resource resolution fails
+ * This is the core function for resolving Kustomark resources. It handles multiple
+ * resource types including:
+ * - Glob patterns (e.g., `**\/*.md`, `docs/*.md`)
+ * - Direct file paths (e.g., `./README.md`)
+ * - Directory references with kustomark.yaml (e.g., `./docs/`)
+ * - Git repository URLs (e.g., `git@github.com:user/repo.git//path`)
+ * - HTTP archive URLs (e.g., `https://example.com/archive.tar.gz//subpath`)
+ * - Resource objects with authentication and integrity checking
+ *
+ * The function also handles:
+ * - Negation patterns (prefixed with `!`) to exclude files
+ * - Recursive config resolution with circular reference detection
+ * - Lock file generation for reproducible builds
+ * - Security validation for remote resources
+ * - Deduplication of resolved files
+ *
+ * @param resources - Array of resource patterns, which can be:
+ *   - String patterns (glob, file path, directory, or URL)
+ *   - ResourceObject with url, auth, and sha256 fields
+ * @param baseDir - Absolute path to the base directory for resolving relative paths
+ * @param fileMap - Map containing file paths as keys and their content as values.
+ *   This map is mutated by adding newly fetched files.
+ * @param options - Optional configuration object with properties:
+ *   - maxDepth: Maximum recursion depth for nested configs (default: 10)
+ *   - currentDepth: Internal tracking of current recursion level
+ *   - visited: Set of visited config paths for cycle detection
+ *   - gitFetchOptions: Options for git repository fetching
+ *   - httpFetchOptions: Options for HTTP archive fetching
+ *   - lockFile: Existing lock file to use for resolution
+ *   - updateLock: Whether to generate lock entries for new fetches
+ *   - lockEntries: Array to collect lock entries (mutated)
+ *   - security: Security configuration for validating remote resources
+ *
+ * @returns Promise that resolves to an array of ResolvedResource objects, each containing:
+ *   - path: Absolute path to the markdown file
+ *   - content: The file's content as a string
+ *   - source: The original pattern that resolved to this file
+ *   - baseDir: The base directory used for relative path resolution
+ *
+ * @throws {ResourceResolutionError} When:
+ *   - Maximum recursion depth is exceeded (circular references)
+ *   - A resource pattern cannot be resolved
+ *   - A git repository cannot be fetched
+ *   - An HTTP archive cannot be downloaded
+ *   - Security validation fails
+ *   - A referenced kustomark config is invalid
  *
  * @example
  * ```typescript
+ * // Basic usage with glob patterns
  * const fileMap = new Map([
  *   ['/project/docs/api.md', '# API Docs'],
  *   ['/project/docs/README.md', '# README'],
+ *   ['/project/docs/guide.md', '# Guide'],
  * ]);
  *
  * const resources = await resolveResources(
- *   ['**\/*.md', '!**\/README.md'],
+ *   ['docs/**.md', '!docs/README.md'],
  *   '/project',
  *   fileMap
+ * );
+ * // Returns: [api.md, guide.md] (README.md excluded)
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Fetching from Git repository
+ * const fileMap = new Map();
+ * const resources = await resolveResources(
+ *   ['git@github.com:user/repo.git//docs'],
+ *   '/project',
+ *   fileMap,
+ *   { gitFetchOptions: { cacheDir: '/tmp/cache' } }
+ * );
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Using resource objects with authentication
+ * const resources = await resolveResources(
+ *   [{
+ *     url: 'https://example.com/docs.tar.gz//content',
+ *     auth: { type: 'bearer', tokenEnv: 'API_TOKEN' },
+ *     sha256: 'abc123...'
+ *   }],
+ *   '/project',
+ *   new Map()
+ * );
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Recursive config resolution
+ * const resources = await resolveResources(
+ *   ['./subproject/'], // References ./subproject/kustomark.yaml
+ *   '/project',
+ *   fileMap,
+ *   { maxDepth: 5 }
  * );
  * ```
  */
