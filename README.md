@@ -2043,19 +2043,24 @@ The Web UI provides:
    - Common fields (id, extends, include, exclude, onNoMatch, group, validate)
    - Real-time validation
 
-3. **Three View Modes**
+3. **Four View Modes**
    - **Editor**: YAML config with patch management
    - **Diff**: Side-by-side diff viewer showing changes
    - **Preview**: Rendered markdown preview
+   - **Files**: File browser with tree view and file content viewer
 
 4. **Build Integration**
    - Execute builds with optional flags (incremental, clean, group filtering)
    - View build results and statistics
    - See validation errors and warnings
 
-5. **File Browser** (Planned)
-   - Browse resources and output files
-   - View file contents and history
+5. **File Browser**
+   - Tree view of project files and directories
+   - Expand/collapse directories to explore structure
+   - Click files to view content with syntax highlighting
+   - Copy file contents to clipboard
+   - Automatically filters out build artifacts (node_modules, .git, dist, etc.)
+   - Security: Path traversal protection prevents accessing files outside project
 
 ### Development
 

@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import * as YAML from "yaml";
 import { Button } from "./components/common/Button";
 import { PatchEditor } from "./components/editor/PatchEditor";
+import FileBrowser from "./components/editor/FileBrowser";
 import { DiffViewer } from "./components/preview/DiffViewer";
 import { MarkdownPreview } from "./components/preview/MarkdownPreview";
+import FileViewer from "./components/preview/FileViewer";
 import { api } from "./services/api";
 import type {
   BuildResult,
@@ -13,7 +15,7 @@ import type {
   ValidationResult,
 } from "./types/config";
 
-type ViewMode = "editor" | "diff" | "preview";
+type ViewMode = "editor" | "diff" | "preview" | "files";
 
 export const App: React.FC = () => {
   const [configPath] = useState("kustomark.yaml");
@@ -26,6 +28,7 @@ export const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [originalContent, setOriginalContent] = useState("");
   const [previewContent, setPreviewContent] = useState("");
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
 
   // Load config on mount
   useEffect(() => {
@@ -277,6 +280,16 @@ export const App: React.FC = () => {
               >
                 Preview
               </button>
+              <button
+                onClick={() => setViewMode("files")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === "files"
+                    ? "bg-white text-primary-600 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Files
+              </button>
             </div>
           </div>
 
@@ -304,6 +317,19 @@ export const App: React.FC = () => {
 
             {viewMode === "preview" && (
               <MarkdownPreview content={getCurrentContent()} title="Config Preview" />
+            )}
+
+            {viewMode === "files" && (
+              <div className="h-full flex">
+                {/* Left panel - File Browser (30%) */}
+                <div className="w-[30%] border-r border-gray-200 overflow-hidden">
+                  <FileBrowser onSelectFile={setSelectedFilePath} />
+                </div>
+                {/* Right panel - File Viewer (70%) */}
+                <div className="w-[70%] overflow-hidden">
+                  <FileViewer filePath={selectedFilePath} />
+                </div>
+              </div>
             )}
           </div>
         </div>

@@ -138,7 +138,12 @@ function validatePath(baseDir: string, filePath: string): string {
 
   // Check for path traversal
   const relativePath = relative(absoluteBase, absolutePath);
-  if (relativePath.startsWith("..") || normalize(relativePath) !== relativePath) {
+  // Empty string means we're accessing the base directory itself (valid)
+  // Otherwise, check for parent directory traversal
+  if (
+    relativePath !== "" &&
+    (relativePath.startsWith("..") || normalize(relativePath) !== relativePath)
+  ) {
     throw new HttpError(403, `Path traversal detected: ${filePath}`);
   }
 

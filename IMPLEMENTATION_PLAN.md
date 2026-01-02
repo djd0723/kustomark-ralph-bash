@@ -1560,3 +1560,103 @@ This document tracks the implementation of kustomark based on the spec milestone
   - Comprehensive test coverage (unit, integration, validation)
   - Complete documentation with real-world examples
   - Ready for production use in all build workflows
+
+**2026-01-02 (Web UI File Browser - Future Work - COMPLETE!):**
+- ✅ Implemented Web UI File Browser feature (originally marked as "Planned" in Web UI):
+
+  **Server-Side Implementation (~330 lines of TypeScript):**
+  - Created `/home/dex/kustomark-ralph-bash/src/web/server/routes/files.ts` (330 lines)
+    - `GET /api/files?path=...` - Get file content (uses existing readFile from file-service)
+    - `GET /api/files/list?path=...` - List files in directory with FileNode[] response
+    - `GET /api/files/tree?path=...` - Recursive directory tree with nested FileNode structure
+    - `buildFileTree()` - Recursively scan directories and build tree (max depth: 10)
+    - `validatePath()` - Security: prevent path traversal attacks
+    - `shouldFilterDirectory()` - Filter out build artifacts (node_modules, .git, dist, out, .next, build, .cache, coverage, .nyc_output)
+    - Sorted alphabetically with directories first at all levels
+    - Proper error handling with HTTP status codes (200, 400, 403, 404, 500)
+  - Updated `/home/dex/kustomark-ralph-bash/src/web/server/server.ts`
+    - Integrated file routes with `app.use("/api/files", createFileRoutes(config))`
+  - Fixed path validation bug in `/home/dex/kustomark-ralph-bash/src/web/server/services/file-service.ts`
+    - Now correctly allows accessing base directory with "." or empty string
+
+  **Client-Side Implementation (~400 lines of TypeScript/React):**
+  - Created `/home/dex/kustomark-ralph-bash/src/web/client/src/components/editor/FileBrowser.tsx` (230 lines)
+    - Tree view component with expand/collapse functionality
+    - Folder icons (📁) and file icons (📄) with arrow indicators (▶/▼)
+    - Highlights selected file with primary-colored border
+    - Shows directory item counts in parentheses
+    - Loading and error states with appropriate UI
+    - Hover effects and cursor pointer for clickable items
+    - Props: `onSelectFile`, `selectedPath`, `rootPath`
+  - Created `/home/dex/kustomark-ralph-bash/src/web/client/src/components/preview/FileViewer.tsx` (170 lines)
+    - Read-only file content viewer with syntax highlighting
+    - Auto-detects language from file extension (20+ languages supported)
+    - Copy to clipboard button with confirmation feedback
+    - Loading, error, and empty states
+    - Monospace font matching DiffViewer component
+    - Props: `filePath: string | null`
+  - Updated `/home/dex/kustomark-ralph-bash/src/web/client/src/App.tsx`
+    - Added "Files" view mode alongside Editor, Diff, Preview
+    - Split-panel layout: FileBrowser (30%) | FileViewer (70%)
+    - State management for selected file path
+    - Consistent styling with existing design patterns
+
+  **Comprehensive Testing (~500 lines):**
+  - Created `/home/dex/kustomark-ralph-bash/tests/web/file-browser.test.ts` (61 tests, 211 assertions)
+    - GET /files endpoint tests (10 tests): content retrieval, path validation, error cases
+    - GET /files/list endpoint tests (13 tests): listing, filtering, sorting, metadata
+    - GET /files/tree endpoint tests (12 tests): recursive tree, depth limit, sorting
+    - Path validation and security tests (14 tests): traversal prevention, encoding attacks
+    - Edge cases and error handling (9 tests): Unicode, long paths, symlinks, large files
+    - Integration tests (3 tests): workflow, consistency, complex structures
+  - Added `supertest` and `@types/supertest` dependencies for HTTP endpoint testing
+  - All 1166 tests passing (61 new tests, up from 1105)
+  - All 4936 expect() calls successful (up from 4725)
+
+  **Documentation:**
+  - Updated `/home/dex/kustomark-ralph-bash/README.md`
+    - Changed "Three View Modes" to "Four View Modes" with Files view
+    - Updated "File Browser (Planned)" to "File Browser" with full feature list
+    - Documented tree view, syntax highlighting, clipboard, filtering, security
+  - Updated `/home/dex/kustomark-ralph-bash/WEB_UI_README.md`
+    - Added "File Browser" to Features list
+
+  **File Browser Features Implemented:**
+  1. Three API endpoints (GET /files, /files/list, /files/tree)
+  2. Recursive directory tree with configurable depth limit
+  3. Security: Path traversal protection with 403 errors
+  4. Automatic filtering of build artifacts and dependencies
+  5. Alphabetical sorting with directories first
+  6. React tree view component with expand/collapse
+  7. File content viewer with syntax highlighting for 20+ languages
+  8. Copy to clipboard functionality
+  9. Loading, error, and empty states for all UI components
+  10. Split-panel layout integrated into main App
+  11. Comprehensive test coverage (61 tests)
+
+  **Files Created:**
+  - `/home/dex/kustomark-ralph-bash/src/web/server/routes/files.ts` (330 lines)
+  - `/home/dex/kustomark-ralph-bash/src/web/client/src/components/editor/FileBrowser.tsx` (230 lines)
+  - `/home/dex/kustomark-ralph-bash/src/web/client/src/components/preview/FileViewer.tsx` (170 lines)
+  - `/home/dex/kustomark-ralph-bash/tests/web/file-browser.test.ts` (61 tests)
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/web/server/server.ts` - Added file routes integration
+  - `/home/dex/kustomark-ralph-bash/src/web/server/services/file-service.ts` - Fixed path validation
+  - `/home/dex/kustomark-ralph-bash/src/web/client/src/App.tsx` - Added Files view mode
+  - `/home/dex/kustomark-ralph-bash/README.md` - Updated Web UI documentation
+  - `/home/dex/kustomark-ralph-bash/WEB_UI_README.md` - Updated Features list
+
+  **Testing Results:**
+  - All 1166 tests passing (61 new tests, up from 1105)
+  - 4936 expect() calls successful (up from 4725)
+  - Main project linting clean for core/cli/lsp
+  - Web UI has cosmetic warnings only (pre-existing in config.ts and index.ts)
+
+  **Status:** COMPLETE! ✅
+  - Full file browser implementation with tree view and file viewer
+  - Comprehensive security with path traversal protection
+  - Production-ready with full test coverage
+  - Seamlessly integrated into Web UI
+  - Documentation complete in README.md and WEB_UI_README.md
+  - Ready for use in development and production environments

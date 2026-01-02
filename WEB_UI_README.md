@@ -10,6 +10,7 @@ Visual editor for Kustomark configurations with real-time preview and validation
 - **Diff Viewer**: Compare changes before saving
 - **Build Integration**: Execute builds directly from the UI
 - **WebSocket Support**: Live updates and notifications
+- **File Browser**: Browse project files with tree view and file preview
 
 ## Quick Start
 
