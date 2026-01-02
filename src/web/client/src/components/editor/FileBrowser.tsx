@@ -40,7 +40,14 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     }
   };
 
-  const itemCount = hasChildren ? node.children!.length : 0;
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+
+  const itemCount = hasChildren && node.children ? node.children.length : 0;
 
   return (
     <div>
@@ -52,11 +59,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         )}
         style={{ paddingLeft: `${level * 16 + (isSelected ? 12 : 16)}px` }}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        // biome-ignore lint/a11y/useSemanticElements: Using div for layout flexibility with keyboard events
+        role="button"
+        tabIndex={0}
       >
         {isDirectory && (
-          <span className="mr-2 text-gray-400 text-xs">
-            {isExpanded ? "▼" : "▶"}
-          </span>
+          <span className="mr-2 text-gray-400 text-xs">{isExpanded ? "▼" : "▶"}</span>
         )}
         <span className="mr-2" role="img" aria-label={isDirectory ? "folder" : "file"}>
           {isDirectory ? "📁" : "📄"}
@@ -67,9 +76,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         )}
       </div>
 
-      {isDirectory && isExpanded && hasChildren && (
+      {isDirectory && isExpanded && hasChildren && node.children && (
         <div>
-          {node.children!.map((child) => (
+          {node.children.map((child) => (
             <TreeNode
               key={child.path}
               node={child}
@@ -146,6 +155,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
+            <title>Error loading files</title>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"

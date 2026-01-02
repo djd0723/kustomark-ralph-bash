@@ -79,103 +79,125 @@ export const PatchList: React.FC<PatchListProps> = ({
           <ul className="divide-y divide-gray-200">
             {patches.map((patch, index) => (
               <li
+                // biome-ignore lint/suspicious/noArrayIndexKey: Patches array is stable, items added at end only
                 key={index}
                 className={clsx(
                   "p-4 cursor-pointer hover:bg-gray-50 transition-colors",
                   selectedIndex === index && "bg-primary-50 border-l-4 border-primary-600",
                 )}
-                onClick={() => onSelect(index)}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">
-                      {getPatchLabel(patch, index)}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1 truncate">
-                      {getPatchDescription(patch)}
-                    </div>
-                    {patch.group && (
-                      <div className="mt-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                          {patch.group}
-                        </span>
+                <button
+                  type="button"
+                  onClick={() => onSelect(index)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onSelect(index);
+                    }
+                  }}
+                  className="w-full text-left"
+                  style={{ padding: "0" }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {getPatchLabel(patch, index)}
                       </div>
-                    )}
-                  </div>
+                      <div className="text-xs text-gray-500 mt-1 truncate">
+                        {getPatchDescription(patch)}
+                      </div>
+                      {patch.group && (
+                        <div className="mt-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            {patch.group}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="ml-2 flex flex-col space-y-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMoveUp(index);
-                      }}
-                      disabled={index === 0}
-                      className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                      title="Move up"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                    <div className="ml-2 flex flex-col space-y-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMoveUp(index);
+                        }}
+                        disabled={index === 0}
+                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move up"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 15l7-7 7 7"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMoveDown(index);
-                      }}
-                      disabled={index === patches.length - 1}
-                      className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                      title="Move down"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-label="Move up"
+                        >
+                          <title>Move up</title>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 15l7-7 7 7"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMoveDown(index);
+                        }}
+                        disabled={index === patches.length - 1}
+                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move down"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm("Delete this patch?")) {
-                          onDelete(index);
-                        }
-                      }}
-                      className="p-1 rounded hover:bg-red-100 text-red-600"
-                      title="Delete"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-label="Move down"
+                        >
+                          <title>Move down</title>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("Delete this patch?")) {
+                            onDelete(index);
+                          }
+                        }}
+                        className="p-1 rounded hover:bg-red-100 text-red-600"
+                        title="Delete"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-label="Delete"
+                        >
+                          <title>Delete</title>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </button>
               </li>
             ))}
           </ul>

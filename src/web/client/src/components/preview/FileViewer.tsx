@@ -120,7 +120,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ filePath }) => {
         </div>
         <div className="flex-1 flex items-center justify-center bg-white">
           <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
             <p className="mt-2 text-sm text-gray-500">Loading file...</p>
           </div>
         </div>
@@ -176,12 +176,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({ filePath }) => {
         >
           {copied ? (
             <>
-              <svg
-                className="h-4 w-4 mr-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <title>Checkmark icon</title>
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -193,12 +189,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({ filePath }) => {
             </>
           ) : (
             <>
-              <svg
-                className="h-4 w-4 mr-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <title>Copy icon</title>
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"

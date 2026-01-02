@@ -15,6 +15,7 @@ import { readFile } from "../services/file-service.js";
 import type {
   ConfigSaveRequest,
   ConfigSaveResponse,
+  ErrorResponse,
   FileContent,
   ServerConfig,
   TypedRequest,
@@ -33,14 +34,14 @@ export function createConfigRoutes(config: ServerConfig): Router {
    * Query params:
    *   - path: Config file path (relative to base directory, required)
    */
-  router.get("/", (req: TypedRequest, res: Response<FileContent>) => {
+  router.get("/", (req: TypedRequest, res: Response<FileContent | ErrorResponse>) => {
     const path = req.query.path;
 
     if (!path || typeof path !== "string") {
       res.status(400).json({
         error: "Missing or invalid 'path' query parameter",
         status: 400,
-      } as any);
+      });
       return;
     }
 
@@ -84,7 +85,7 @@ export function createConfigRoutes(config: ServerConfig): Router {
     const path = body?.path;
     const content = body?.content;
 
-    let validation;
+    let validation: ValidateResponse;
 
     if (path && typeof path === "string") {
       // Validate file

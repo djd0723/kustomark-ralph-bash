@@ -2,11 +2,11 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import * as YAML from "yaml";
 import { Button } from "./components/common/Button";
-import { PatchEditor } from "./components/editor/PatchEditor";
 import FileBrowser from "./components/editor/FileBrowser";
+import { PatchEditor } from "./components/editor/PatchEditor";
 import { DiffViewer } from "./components/preview/DiffViewer";
-import { MarkdownPreview } from "./components/preview/MarkdownPreview";
 import FileViewer from "./components/preview/FileViewer";
+import { MarkdownPreview } from "./components/preview/MarkdownPreview";
 import { api } from "./services/api";
 import type {
   BuildResult,
@@ -190,6 +190,7 @@ export const App: React.FC = () => {
                   </p>
                   <ul className="text-sm text-yellow-800 space-y-1">
                     {validation.errors.slice(0, 5).map((err, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: Sliced array creates stable subset at render time
                       <li key={i}>
                         {err.field && <span className="font-medium">{err.field}: </span>}
                         {err.message}
@@ -211,6 +212,7 @@ export const App: React.FC = () => {
                   </p>
                   <ul className="text-sm text-blue-800 space-y-1">
                     {validation.warnings.slice(0, 3).map((warn, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: Sliced array creates stable subset at render time
                       <li key={i}>{warn.message}</li>
                     ))}
                   </ul>
@@ -251,6 +253,7 @@ export const App: React.FC = () => {
           <div className="border-b border-gray-200 bg-gray-50 px-4 py-2">
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => setViewMode("editor")}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   viewMode === "editor"
@@ -261,6 +264,7 @@ export const App: React.FC = () => {
                 YAML Editor
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode("diff")}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   viewMode === "diff"
@@ -271,6 +275,7 @@ export const App: React.FC = () => {
                 Diff View
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode("preview")}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   viewMode === "preview"
@@ -281,6 +286,7 @@ export const App: React.FC = () => {
                 Preview
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode("files")}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   viewMode === "files"

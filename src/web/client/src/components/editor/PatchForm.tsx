@@ -50,7 +50,10 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
     );
   }
 
-  const handleFieldChange = (field: string, value: any) => {
+  const handleFieldChange = (
+    field: string,
+    value: string | number | boolean | string[] | Record<string, unknown> | undefined,
+  ) => {
     const updated = { ...formData, [field]: value };
     setFormData(updated);
     onChange(updated as PatchOperation);
@@ -67,10 +70,13 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
   const renderCommonFields = () => (
     <>
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Patch ID (optional)</label>
+        <label htmlFor="patch-id" className="block text-sm font-medium text-gray-700 mb-1">
+          Patch ID (optional)
+        </label>
         <input
+          id="patch-id"
           type="text"
-          value={(formData as any).id || ""}
+          value={((formData as Record<string, unknown>).id as string) || ""}
           onChange={(e) => handleFieldChange("id", e.target.value || undefined)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="unique-patch-id"
@@ -79,14 +85,17 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Extends (optional)</label>
+        <label htmlFor="extends-field" className="block text-sm font-medium text-gray-700 mb-1">
+          Extends (optional)
+        </label>
         <input
+          id="extends-field"
           type="text"
           value={
-            (formData as any).extends
-              ? Array.isArray((formData as any).extends)
-                ? (formData as any).extends.join(", ")
-                : (formData as any).extends
+            (formData as Record<string, unknown>).extends
+              ? Array.isArray((formData as Record<string, unknown>).extends)
+                ? ((formData as Record<string, unknown>).extends as string[]).join(", ")
+                : ((formData as Record<string, unknown>).extends as string)
               : ""
           }
           onChange={(e) => {
@@ -104,16 +113,17 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="include-pattern" className="block text-sm font-medium text-gray-700 mb-1">
           Include Pattern (optional)
         </label>
         <input
+          id="include-pattern"
           type="text"
           value={
-            (formData as any).include
-              ? Array.isArray((formData as any).include)
-                ? (formData as any).include.join(", ")
-                : (formData as any).include
+            (formData as Record<string, unknown>).include
+              ? Array.isArray((formData as Record<string, unknown>).include)
+                ? ((formData as Record<string, unknown>).include as string[]).join(", ")
+                : ((formData as Record<string, unknown>).include as string)
               : ""
           }
           onChange={(e) => {
@@ -131,16 +141,17 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="exclude-pattern" className="block text-sm font-medium text-gray-700 mb-1">
           Exclude Pattern (optional)
         </label>
         <input
+          id="exclude-pattern"
           type="text"
           value={
-            (formData as any).exclude
-              ? Array.isArray((formData as any).exclude)
-                ? (formData as any).exclude.join(", ")
-                : (formData as any).exclude
+            (formData as Record<string, unknown>).exclude
+              ? Array.isArray((formData as Record<string, unknown>).exclude)
+                ? ((formData as Record<string, unknown>).exclude as string[]).join(", ")
+                : ((formData as Record<string, unknown>).exclude as string)
               : ""
           }
           onChange={(e) => {
@@ -158,11 +169,12 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="on-no-match" className="block text-sm font-medium text-gray-700 mb-1">
           On No Match (optional)
         </label>
         <select
-          value={(formData as any).onNoMatch || ""}
+          id="on-no-match"
+          value={(formData as Record<string, unknown>).onNoMatch || ""}
           onChange={(e) => handleFieldChange("onNoMatch", e.target.value || undefined)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
         >
@@ -175,10 +187,13 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Group (optional)</label>
+        <label htmlFor="group-field" className="block text-sm font-medium text-gray-700 mb-1">
+          Group (optional)
+        </label>
         <input
+          id="group-field"
           type="text"
-          value={(formData as any).group || ""}
+          value={(formData as Record<string, unknown>).group || ""}
           onChange={(e) => handleFieldChange("group", e.target.value || undefined)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="feature-flags"
@@ -187,12 +202,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          htmlFor="validation-not-contains"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
           Validation - Not Contains (optional)
         </label>
         <input
+          id="validation-not-contains"
           type="text"
-          value={(formData as any).validate?.notContains || ""}
+          value={(formData as Record<string, unknown>).validate?.notContains || ""}
           onChange={(e) => {
             const value = e.target.value || undefined;
             handleFieldChange("validate", value ? { notContains: value } : undefined);
@@ -211,11 +230,15 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="replace-old-string"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Old String <span className="text-red-500">*</span>
               </label>
               <textarea
-                value={(formData as any).old || ""}
+                id="replace-old-string"
+                value={(formData as Record<string, unknown>).old || ""}
                 onChange={(e) => handleFieldChange("old", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 rows={3}
@@ -223,11 +246,15 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="replace-new-string"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 New String <span className="text-red-500">*</span>
               </label>
               <textarea
-                value={(formData as any).new || ""}
+                id="replace-new-string"
+                value={(formData as Record<string, unknown>).new || ""}
                 onChange={(e) => handleFieldChange("new", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 rows={3}
@@ -241,36 +268,45 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="regex-pattern"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Pattern <span className="text-red-500">*</span>
               </label>
               <input
+                id="regex-pattern"
                 type="text"
-                value={(formData as any).pattern || ""}
+                value={(formData as Record<string, unknown>).pattern || ""}
                 onChange={(e) => handleFieldChange("pattern", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="(\d{4})-(\d{2})-(\d{2})"
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="regex-replacement"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Replacement <span className="text-red-500">*</span>
               </label>
               <input
+                id="regex-replacement"
                 type="text"
-                value={(formData as any).replacement || ""}
+                value={(formData as Record<string, unknown>).replacement || ""}
                 onChange={(e) => handleFieldChange("replacement", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="$2/$3/$1"
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="regex-flags" className="block text-sm font-medium text-gray-700 mb-1">
                 Flags (optional)
               </label>
               <input
+                id="regex-flags"
                 type="text"
-                value={(formData as any).flags || ""}
+                value={(formData as Record<string, unknown>).flags || ""}
                 onChange={(e) => handleFieldChange("flags", e.target.value || undefined)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="gi"
@@ -286,12 +322,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="remove-section-id"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Section ID <span className="text-red-500">*</span>
               </label>
               <input
+                id="remove-section-id"
                 type="text"
-                value={(formData as any).id || ""}
+                value={(formData as Record<string, unknown>).id || ""}
                 onChange={(e) => handleFieldChange("id", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="getting-started"
@@ -304,7 +344,7 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={(formData as any).includeChildren !== false}
+                  checked={(formData as Record<string, unknown>).includeChildren !== false}
                   onChange={(e) => handleFieldChange("includeChildren", e.target.checked)}
                   className="mr-2"
                 />
@@ -320,12 +360,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="section-op-id"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Section ID <span className="text-red-500">*</span>
               </label>
               <input
+                id="section-op-id"
                 type="text"
-                value={(formData as any).id || ""}
+                value={(formData as Record<string, unknown>).id || ""}
                 onChange={(e) => handleFieldChange("id", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="getting-started"
@@ -335,11 +379,15 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               </p>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="section-op-content"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Content <span className="text-red-500">*</span>
               </label>
               <textarea
-                value={(formData as any).content || ""}
+                id="section-op-content"
+                value={(formData as Record<string, unknown>).content || ""}
                 onChange={(e) => handleFieldChange("content", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 rows={8}
@@ -353,26 +401,34 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="frontmatter-key"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Key <span className="text-red-500">*</span>
               </label>
               <input
+                id="frontmatter-key"
                 type="text"
-                value={(formData as any).key || ""}
+                value={(formData as Record<string, unknown>).key || ""}
                 onChange={(e) => handleFieldChange("key", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="title"
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="frontmatter-value"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Value <span className="text-red-500">*</span>
               </label>
               <textarea
+                id="frontmatter-value"
                 value={
-                  typeof (formData as any).value === "string"
-                    ? (formData as any).value
-                    : JSON.stringify((formData as any).value, null, 2) || ""
+                  typeof (formData as Record<string, unknown>).value === "string"
+                    ? (formData as Record<string, unknown>).value
+                    : JSON.stringify((formData as Record<string, unknown>).value, null, 2) || ""
                 }
                 onChange={(e) => {
                   const value = e.target.value;
@@ -395,12 +451,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
       case "remove-frontmatter":
         return (
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="remove-frontmatter-key"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Key <span className="text-red-500">*</span>
             </label>
             <input
+              id="remove-frontmatter-key"
               type="text"
-              value={(formData as any).key || ""}
+              value={(formData as Record<string, unknown>).key || ""}
               onChange={(e) => handleFieldChange("key", e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="draft"
@@ -412,24 +472,32 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="rename-frontmatter-old"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Old Key <span className="text-red-500">*</span>
               </label>
               <input
+                id="rename-frontmatter-old"
                 type="text"
-                value={(formData as any).old || ""}
+                value={(formData as Record<string, unknown>).old || ""}
                 onChange={(e) => handleFieldChange("old", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="author"
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="rename-frontmatter-new"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 New Key <span className="text-red-500">*</span>
               </label>
               <input
+                id="rename-frontmatter-new"
                 type="text"
-                value={(formData as any).new || ""}
+                value={(formData as Record<string, unknown>).new || ""}
                 onChange={(e) => handleFieldChange("new", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="authors"
@@ -441,11 +509,15 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
       case "merge-frontmatter":
         return (
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="merge-frontmatter-values"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Values (JSON) <span className="text-red-500">*</span>
             </label>
             <textarea
-              value={JSON.stringify((formData as any).values, null, 2) || "{}"}
+              id="merge-frontmatter-values"
+              value={JSON.stringify((formData as Record<string, unknown>).values, null, 2) || "{}"}
               onChange={(e) => {
                 try {
                   const parsed = JSON.parse(e.target.value);
@@ -466,24 +538,32 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="delete-between-start"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Start Marker <span className="text-red-500">*</span>
               </label>
               <input
+                id="delete-between-start"
                 type="text"
-                value={(formData as any).start || ""}
+                value={(formData as Record<string, unknown>).start || ""}
                 onChange={(e) => handleFieldChange("start", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="<!-- START -->"
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="delete-between-end"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 End Marker <span className="text-red-500">*</span>
               </label>
               <input
+                id="delete-between-end"
                 type="text"
-                value={(formData as any).end || ""}
+                value={(formData as Record<string, unknown>).end || ""}
                 onChange={(e) => handleFieldChange("end", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="<!-- END -->"
@@ -493,7 +573,7 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={(formData as any).inclusive !== false}
+                  checked={(formData as Record<string, unknown>).inclusive !== false}
                   onChange={(e) => handleFieldChange("inclusive", e.target.checked)}
                   className="mr-2"
                 />
@@ -507,35 +587,47 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="replace-between-start"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Start Marker <span className="text-red-500">*</span>
               </label>
               <input
+                id="replace-between-start"
                 type="text"
-                value={(formData as any).start || ""}
+                value={(formData as Record<string, unknown>).start || ""}
                 onChange={(e) => handleFieldChange("start", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="<!-- START -->"
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="replace-between-end"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 End Marker <span className="text-red-500">*</span>
               </label>
               <input
+                id="replace-between-end"
                 type="text"
-                value={(formData as any).end || ""}
+                value={(formData as Record<string, unknown>).end || ""}
                 onChange={(e) => handleFieldChange("end", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="<!-- END -->"
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="replace-between-content"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Content <span className="text-red-500">*</span>
               </label>
               <textarea
-                value={(formData as any).content || ""}
+                id="replace-between-content"
+                value={(formData as Record<string, unknown>).content || ""}
                 onChange={(e) => handleFieldChange("content", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 rows={6}
@@ -546,7 +638,7 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={(formData as any).inclusive !== false}
+                  checked={(formData as Record<string, unknown>).inclusive !== false}
                   onChange={(e) => handleFieldChange("inclusive", e.target.checked)}
                   className="mr-2"
                 />
@@ -560,24 +652,32 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="replace-line-match"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Match (exact line) <span className="text-red-500">*</span>
               </label>
               <input
+                id="replace-line-match"
                 type="text"
-                value={(formData as any).match || ""}
+                value={(formData as Record<string, unknown>).match || ""}
                 onChange={(e) => handleFieldChange("match", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="Old line content"
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="replace-line-replacement"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Replacement <span className="text-red-500">*</span>
               </label>
               <input
+                id="replace-line-replacement"
                 type="text"
-                value={(formData as any).replacement || ""}
+                value={(formData as Record<string, unknown>).replacement || ""}
                 onChange={(e) => handleFieldChange("replacement", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="New line content"
@@ -591,12 +691,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="insert-match"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Match (exact string)
               </label>
               <input
+                id="insert-match"
                 type="text"
-                value={(formData as any).match || ""}
+                value={(formData as Record<string, unknown>).match || ""}
                 onChange={(e) => {
                   handleFieldChange("match", e.target.value || undefined);
                   if (e.target.value) {
@@ -609,12 +713,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               <p className="text-xs text-gray-500 mt-1">Mutually exclusive with pattern</p>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="insert-pattern"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Pattern (regex)
               </label>
               <input
+                id="insert-pattern"
                 type="text"
-                value={(formData as any).pattern || ""}
+                value={(formData as Record<string, unknown>).pattern || ""}
                 onChange={(e) => {
                   handleFieldChange("pattern", e.target.value || undefined);
                   if (e.target.value) {
@@ -627,10 +735,11 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               <p className="text-xs text-gray-500 mt-1">Mutually exclusive with match</p>
             </div>
             <div className="mb-4">
-              <label className="flex items-center">
+              <label htmlFor="insert-regex-checkbox" className="flex items-center">
                 <input
+                  id="insert-regex-checkbox"
                   type="checkbox"
-                  checked={(formData as any).regex === true}
+                  checked={(formData as Record<string, unknown>).regex === true}
                   onChange={(e) => handleFieldChange("regex", e.target.checked || undefined)}
                   className="mr-2"
                 />
@@ -638,11 +747,15 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               </label>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="insert-content"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Content <span className="text-red-500">*</span>
               </label>
               <textarea
-                value={(formData as any).content || ""}
+                id="insert-content"
+                value={(formData as Record<string, unknown>).content || ""}
                 onChange={(e) => handleFieldChange("content", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 rows={4}
@@ -656,12 +769,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="move-section-id"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Section ID <span className="text-red-500">*</span>
               </label>
               <input
+                id="move-section-id"
                 type="text"
-                value={(formData as any).id || ""}
+                value={(formData as Record<string, unknown>).id || ""}
                 onChange={(e) => handleFieldChange("id", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="section-to-move"
@@ -669,12 +786,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               <p className="text-xs text-gray-500 mt-1">Section to move</p>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="move-section-after"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 After <span className="text-red-500">*</span>
               </label>
               <input
+                id="move-section-after"
                 type="text"
-                value={(formData as any).after || ""}
+                value={(formData as Record<string, unknown>).after || ""}
                 onChange={(e) => handleFieldChange("after", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="target-section"
@@ -688,12 +809,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="rename-header-id"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Section ID <span className="text-red-500">*</span>
               </label>
               <input
+                id="rename-header-id"
                 type="text"
-                value={(formData as any).id || ""}
+                value={(formData as Record<string, unknown>).id || ""}
                 onChange={(e) => handleFieldChange("id", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="old-header-id"
@@ -701,12 +826,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               <p className="text-xs text-gray-500 mt-1">Section to rename</p>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="rename-header-text"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 New Header Text <span className="text-red-500">*</span>
               </label>
               <input
+                id="rename-header-text"
                 type="text"
-                value={(formData as any).new || ""}
+                value={(formData as Record<string, unknown>).new || ""}
                 onChange={(e) => handleFieldChange("new", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="New Header Text"
@@ -719,12 +848,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
         return (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="change-level-id"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Section ID <span className="text-red-500">*</span>
               </label>
               <input
+                id="change-level-id"
                 type="text"
-                value={(formData as any).id || ""}
+                value={(formData as Record<string, unknown>).id || ""}
                 onChange={(e) => handleFieldChange("id", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="section-id"
@@ -732,12 +865,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
               <p className="text-xs text-gray-500 mt-1">Section to modify</p>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="change-level-delta"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Delta <span className="text-red-500">*</span>
               </label>
               <input
+                id="change-level-delta"
                 type="number"
-                value={(formData as any).delta || 0}
+                value={(formData as Record<string, unknown>).delta || 0}
                 onChange={(e) => handleFieldChange("delta", Number.parseInt(e.target.value, 10))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="-1"
@@ -759,15 +896,16 @@ export const PatchForm: React.FC<PatchFormProps> = ({ patch, onChange }) => {
       <h3 className="text-lg font-semibold text-gray-900 mb-6">Edit Patch</h3>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="operation-type" className="block text-sm font-medium text-gray-700 mb-1">
           Operation Type <span className="text-red-500">*</span>
         </label>
         <select
+          id="operation-type"
           value={formData.op || "replace"}
           onChange={(e) => {
             const op = e.target.value;
             // Reset to minimal patch with new op
-            const newPatch: any = { op };
+            const newPatch: Partial<PatchOperation> = { op };
 
             // Set defaults based on operation type
             switch (op) {

@@ -7,11 +7,23 @@ import { createServer } from "node:http";
 import { resolve } from "node:path";
 import cors from "cors";
 import express from "express";
+import type { Application } from "express";
 import { WebSocketServer } from "ws";
 import { errorHandler } from "./middleware/error-handler.js";
 import { createBuildRoutes } from "./routes/build.js";
 import { createConfigRoutes } from "./routes/config.js";
 import type { ServerConfig, WebSocketMessage } from "./types.js";
+
+/**
+ * Extended Express Application with WebSocket broadcast capability
+ */
+declare global {
+  namespace Express {
+    interface Application {
+      wsBroadcast?: (message: WebSocketMessage) => void;
+    }
+  }
+}
 
 /**
  * Create and configure the Express application
@@ -120,7 +132,7 @@ async function main(): Promise<void> {
     };
 
     // Store broadcast function on app for use in routes
-    (app as any).wsBroadcast = broadcast;
+    app.wsBroadcast = broadcast;
   }
 
   // Start listening
