@@ -51,17 +51,16 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
   return (
     <div>
-      <div
+      <button
+        type="button"
         className={clsx(
-          "flex items-center py-1.5 px-3 cursor-pointer hover:bg-gray-100 transition-colors",
+          "flex items-center py-1.5 px-3 cursor-pointer hover:bg-gray-100 transition-colors w-full text-left border-0 bg-transparent",
           isSelected && "bg-primary-50 border-l-4 border-primary-600",
           !isSelected && "pl-4",
         )}
         style={{ paddingLeft: `${level * 16 + (isSelected ? 12 : 16)}px` }}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
-        role="button"
-        tabIndex={0}
       >
         {isDirectory && (
           <span className="mr-2 text-gray-400 text-xs">{isExpanded ? "▼" : "▶"}</span>
@@ -73,7 +72,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         {isDirectory && hasChildren && (
           <span className="ml-2 text-xs text-gray-500">({itemCount})</span>
         )}
-      </div>
+      </button>
 
       {isDirectory && isExpanded && hasChildren && node.children && (
         <div>
