@@ -6,6 +6,82 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 ## Recent Enhancements
 
+**2026-01-02 (Security & Validation Documentation - COMPLETE!):**
+- ✅ **NEW DOCUMENTATION**: Comprehensive documentation for fully-implemented but undocumented security and validation features
+- ✅ **Security Configuration Section**: Added complete documentation for security restrictions
+  - `security.allowedHosts` - Whitelist approved hostnames for remote resources
+  - `security.allowedProtocols` - Whitelist approved protocols (https, http, git, ssh)
+  - Protocol detection: Standard URLs, Git URLs, SSH format, GitHub shorthand
+  - Host extraction: Strips authentication credentials and port numbers
+  - Error handling: Clear violation reporting with exit code 1
+- ✅ **Global Validators Section**: Added complete documentation for content validators
+  - `notContains` validator - Ensure content doesn't contain forbidden patterns
+  - `frontmatterRequired` validator - Require specific frontmatter fields (supports dot notation)
+  - Global vs per-patch validation explained
+  - Validation error reporting
+- ✅ **Use Cases & Examples**: Real-world scenarios documented
+  - Enterprise compliance (corporate-approved sources only)
+  - CI/CD pipelines (prevent supply chain attacks)
+  - Development vs production configurations
+  - Prevent placeholder text (TODO, FIXME markers)
+  - Ensure metadata quality (required frontmatter fields)
+  - Content compliance (no sensitive info, proper attribution)
+  - Multi-environment validation
+- ✅ **Combined Examples**: Comprehensive example showing security + validation together
+  - Security restrictions on remote sources
+  - Multiple validators enforcing content standards
+  - Per-patch validation to verify patch success
+  - Best practices for production deployments
+- ✅ **Best Practices Section**: Seven key recommendations
+  - Defense in depth (control inputs + verify outputs)
+  - Fail fast with strict validation
+  - Environment-specific configurations
+  - Global vs per-patch validation strategies
+  - Descriptive validator names
+  - Testing validators before deployment
+  - Documenting standards in configs
+- ✅ **Documentation Structure**:
+  - New "Security & Validation" section in README (342 lines)
+  - Inserted between "Configuration" and "Patch Operations" sections
+  - Added to Table of Contents
+  - Updated Field Reference table to include `security` and `validators` fields
+  - Cross-linked from configuration section
+- ✅ **Implementation Status**:
+  - Feature implementation: `/home/dex/kustomark-ralph-bash/src/core/security.ts` (192 lines)
+  - Feature implementation: `/home/dex/kustomark-ralph-bash/src/core/validators.ts` (254 lines)
+  - Full test coverage: `/home/dex/kustomark-ralph-bash/tests/core/security.test.ts`
+  - Full test coverage: `/home/dex/kustomark-ralph-bash/tests/core/validators.test.ts`
+  - Already integrated into build/diff/fetch commands
+- ✅ **Testing Results**:
+  - All 2762 tests passing ✓
+  - All linting checks passing (`bun check`) ✓
+  - TypeScript compilation clean ✓
+  - 8971 expect() calls successful ✓
+  - No code changes required - documentation only
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/README.md` - Added comprehensive Security & Validation section (342 lines)
+  - Security Configuration subsection with examples
+  - Global Validators subsection with examples
+  - Combined example showing both features
+  - Best practices and use cases
+  - Updated Table of Contents
+  - Updated Field Reference table
+
+**Impact:**
+This documentation unlocks critical enterprise features that were already fully implemented and tested but completely undocumented. Users can now:
+- **Enterprise Adoption**: Configure security restrictions for compliance requirements
+- **Supply Chain Security**: Prevent access to untrusted remote sources
+- **Content Quality**: Enforce standards declaratively with validators
+- **CI/CD Integration**: Validate builds automatically in pipelines
+- **Multi-Environment Workflows**: Use different security/validation rules per environment
+
+**Status:** Security & Validation Documentation COMPLETE! ✅
+
+This high-value documentation improvement makes kustomark enterprise-ready by documenting the security features required for corporate adoption, while also improving content quality through validator documentation. Zero code changes were needed - the features were already fully implemented and tested.
+
+----
+
 **2026-01-02 (Build History & Rollback System - NEW FEATURE!):**
 - ✅ **NEW FEATURE**: Comprehensive build history tracking and management system
 - ✅ **Core Module**: Implemented `/home/dex/kustomark-ralph-bash/src/core/build-history.ts` (1,081 lines)

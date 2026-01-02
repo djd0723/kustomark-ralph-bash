@@ -24,6 +24,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark analyze](#kustomark-analyze-path)
   - [kustomark template](#kustomark-template)
 - [Configuration](#configuration)
+- [Security & Validation](#security--validation)
 - [Patch Operations](#patch-operations)
 - [Table Operations](#table-operations)
 - [File Operations](#file-operations)
@@ -1628,6 +1629,8 @@ onNoMatch: warn  # skip | warn | error
 | `output` | yes* | string | Output directory (*required for build) |
 | `resources` | yes | array | Globs, paths, or other kustomark configs |
 | `patches` | no | array | Ordered list of patch operations |
+| `security` | no | object | Security restrictions for remote resources (see [Security & Validation](#security--validation)) |
+| `validators` | no | array | Global validators for content quality (see [Security & Validation](#security--validation)) |
 | `onNoMatch` | no | string | Default: `warn`. Options: `skip`, `warn`, `error` |
 
 ### Resource Types
@@ -1648,6 +1651,348 @@ All patch operations support these optional fields:
 | `include` | string or array | Glob pattern(s) to include specific files |
 | `exclude` | string or array | Glob pattern(s) to exclude specific files |
 | `onNoMatch` | string | Override default behavior: `skip`, `warn`, or `error` |
+
+## Security & Validation
+
+Kustomark provides robust security and validation features to ensure safe remote resource fetching and enforce content quality standards.
+
+### Security Configuration
+
+Control which remote resources can be fetched by restricting allowed hosts and protocols. This is critical for enterprise environments, CI/CD pipelines, and any scenario where you need to prevent access to untrusted sources.
+
+#### Configuration Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `security.allowedHosts` | string[] | Whitelist of allowed hostnames for remote resources |
+| `security.allowedProtocols` | string[] | Whitelist of allowed protocols (`https`, `http`, `git`, `ssh`) |
+
+#### Security Example
+
+```yaml
+apiVersion: kustomark/v1
+kind: Kustomization
+output: ./output
+
+# Security: Restrict remote resource access
+security:
+  allowedHosts:
+    - github.com
+    - gitlab.com
+    - internal.company.com
+  allowedProtocols:
+    - https
+    - git
+
+resources:
+  - github.com/company/docs//public?ref=v1.0.0  # ✓ Allowed
+  # - malicious.com/repo  # ✗ Would fail: host not in allowedHosts
+  # - http://github.com/repo  # ✗ Would fail: http protocol not allowed
+
+patches:
+  - op: replace
+    old: "upstream"
+    new: "local"
+```
+
+#### Security Features
+
+**Protocol Detection:**
+- Standard URLs: `https://github.com/...` → `https`
+- Git URLs: `git::https://...` → `https`
+- SSH format: `git@github.com:...` → `ssh`
+- GitHub shorthand: `github.com/org/repo` → `https`
+
+**Host Extraction:**
+- Strips authentication: `user:pass@github.com` → `github.com`
+- Strips ports: `example.com:8080` → `example.com`
+- Works with all URL formats and shorthands
+
+**Error Handling:**
+When a resource fails security validation, kustomark will:
+1. Report the specific violation (host or protocol)
+2. Show the rejected resource URL
+3. List the allowed hosts/protocols
+4. Exit with error code 1 (build fails)
+
+#### Use Cases
+
+**Enterprise Compliance:**
+```yaml
+# Only allow corporate-approved sources
+security:
+  allowedHosts:
+    - github.com/mycompany
+    - gitlab.internal.company.com
+  allowedProtocols:
+    - https  # No insecure HTTP or SSH
+```
+
+**CI/CD Pipelines:**
+```yaml
+# Prevent supply chain attacks
+security:
+  allowedHosts:
+    - github.com
+    - npmjs.com
+  allowedProtocols:
+    - https  # Only secure protocols in production
+```
+
+**Development vs Production:**
+```yaml
+# development/kustomark.yaml - More permissive
+security:
+  allowedProtocols:
+    - https
+    - git
+    - ssh
+
+# production/kustomark.yaml - Locked down
+security:
+  allowedHosts:
+    - github.com
+  allowedProtocols:
+    - https
+```
+
+### Global Validators
+
+Enforce content quality standards across all output files. Validators run AFTER patches are applied and check the final content. Use validators to ensure output meets your requirements.
+
+#### Validator Types
+
+| Validator | Purpose | Configuration |
+|-----------|---------|---------------|
+| `notContains` | Ensure content doesn't contain forbidden patterns | String to search for |
+| `frontmatterRequired` | Require specific frontmatter fields | Array of field names (supports dot notation) |
+
+#### Validator Configuration
+
+```yaml
+apiVersion: kustomark/v1
+kind: Kustomization
+output: ./output
+
+# Global validators: Apply to all output files
+validators:
+  - name: no-internal-references
+    notContains: "internal.company.com"
+
+  - name: no-placeholder-text
+    notContains: "TODO:"
+
+  - name: required-metadata
+    frontmatterRequired:
+      - title
+      - description
+      - version
+
+  - name: nested-frontmatter-check
+    frontmatterRequired:
+      - author.name
+      - author.email
+
+resources:
+  - "**/*.md"
+
+patches:
+  - op: replace
+    old: "upstream"
+    new: "production"
+```
+
+#### Validator Behavior
+
+**Global vs Per-Patch Validation:**
+
+```yaml
+# Global validators: Run on ALL files after ALL patches
+validators:
+  - name: final-content-check
+    notContains: "DRAFT"
+
+patches:
+  - op: replace
+    old: "foo"
+    new: "bar"
+    # Per-patch validation: Only checks files this patch modifies
+    validate:
+      notContains: "foo"  # Ensures replacement worked
+```
+
+**Validation Errors:**
+When validation fails, kustomark will:
+1. Report which validator failed
+2. Show the specific error (forbidden pattern found, or missing frontmatter keys)
+3. Indicate which file failed validation
+4. Exit with error code 1
+
+#### Frontmatter Validation
+
+Validators support dot notation for nested frontmatter fields:
+
+```yaml
+validators:
+  - name: author-info-required
+    frontmatterRequired:
+      - title                    # Top-level field
+      - author.name              # Nested: author.name
+      - author.email             # Nested: author.email
+      - metadata.created_at      # Deeply nested
+```
+
+Example frontmatter that would pass:
+```yaml
+---
+title: "My Document"
+author:
+  name: "Jane Doe"
+  email: "jane@example.com"
+metadata:
+  created_at: "2025-01-02"
+---
+```
+
+#### Validator Use Cases
+
+**Prevent Placeholder Text:**
+```yaml
+validators:
+  - name: no-todos
+    notContains: "TODO"
+  - name: no-fixmes
+    notContains: "FIXME"
+  - name: no-placeholders
+    notContains: "{{REPLACE_ME}}"
+```
+
+**Ensure Metadata Quality:**
+```yaml
+validators:
+  - name: documentation-metadata
+    frontmatterRequired:
+      - title
+      - description
+      - last_updated
+      - version
+```
+
+**Content Compliance:**
+```yaml
+validators:
+  - name: no-sensitive-info
+    notContains: "CONFIDENTIAL"
+  - name: no-internal-links
+    notContains: "http://internal"
+  - name: proper-attribution
+    frontmatterRequired:
+      - author
+      - license
+```
+
+**Multi-Environment Validation:**
+```yaml
+# Ensure environment-specific content was replaced
+validators:
+  - name: no-dev-content
+    notContains: "localhost"
+  - name: no-staging-urls
+    notContains: "staging.example.com"
+  - name: production-ready
+    frontmatterRequired:
+      - environment  # Must specify environment
+```
+
+### Combined Security & Validation Example
+
+Complete example showing both security restrictions and content validation:
+
+```yaml
+apiVersion: kustomark/v1
+kind: Kustomization
+output: ./public-docs
+
+# Security: Only allow trusted sources
+security:
+  allowedHosts:
+    - github.com
+    - gitlab.company.com
+  allowedProtocols:
+    - https
+
+# Validation: Enforce content standards
+validators:
+  # Ensure no internal references leak to public docs
+  - name: no-internal-refs
+    notContains: "internal.company.com"
+
+  # Require complete metadata
+  - name: required-doc-metadata
+    frontmatterRequired:
+      - title
+      - description
+      - version
+      - author.name
+
+  # Ensure all placeholders were replaced
+  - name: no-placeholders
+    notContains: "{{REPLACE"
+
+  # No draft content in production
+  - name: no-drafts
+    notContains: "DRAFT"
+
+resources:
+  - github.com/company/docs//templates?ref=v2.0.0
+  - ./local-overrides/*.md
+
+patches:
+  # Replace company name
+  - op: replace
+    old: "Acme Corp"
+    new: "MyCompany Inc"
+    validate:
+      notContains: "Acme Corp"  # Ensure replacement worked
+
+  # Update version references
+  - op: frontmatter-merge
+    data:
+      version: "2.0.0"
+      last_updated: "2025-01-02"
+
+  # Replace internal URLs with public URLs
+  - op: replace
+    old: "https://internal.company.com"
+    new: "https://docs.mycompany.com"
+
+onNoMatch: error  # Fail fast if patches don't apply
+```
+
+### Security & Validation Best Practices
+
+1. **Defense in Depth:** Use both security restrictions (control inputs) and validators (verify outputs)
+
+2. **Fail Fast:** Set `onNoMatch: error` when using strict validation to catch issues early
+
+3. **Environment-Specific Configs:** Use different security/validation rules for dev vs production:
+   ```bash
+   # Development: More permissive
+   kustomark build ./dev/
+
+   # Production: Locked down
+   kustomark build ./production/
+   ```
+
+4. **Combine Global and Per-Patch Validation:**
+   - Global validators: Enforce universal standards (metadata, no sensitive info)
+   - Per-patch validation: Verify specific patches worked correctly
+
+5. **Use Descriptive Validator Names:** Makes error messages clear when validation fails
+
+6. **Test Your Validators:** Use `kustomark validate` to test configuration before running builds
+
+7. **Document Your Standards:** Keep a comment in your config explaining why each validator exists
 
 ## Patch Operations
 
