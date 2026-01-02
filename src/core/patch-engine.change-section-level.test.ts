@@ -253,7 +253,7 @@ Install steps`;
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain("matched 0 times");
+    expect(result.warnings[0]?.message).toContain("matched 0 times");
   });
 
   test("throws error for non-existent section with onNoMatch=error", () => {
@@ -321,7 +321,7 @@ Content`;
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain("missing2");
+    expect(result.warnings[0]?.message).toContain("missing2");
     expect(result.content).toContain("### Header 2");
   });
 

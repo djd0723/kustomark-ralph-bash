@@ -215,3 +215,12 @@ export {
 } from "./security.js";
 
 export type { SecurityConfig } from "./types.js";
+
+// Export suggestion engine functions
+export {
+  calculateLevenshteinDistance,
+  findSimilarStrings,
+  generateSectionSuggestions,
+  generateFrontmatterKeySuggestions,
+  generatePatchSuggestions,
+} from "./suggestion-engine.js";

@@ -12,12 +12,14 @@
 import * as yaml from "js-yaml";
 import { evaluateCondition } from "./condition-evaluator.js";
 import { resolveInheritance } from "./patch-inheritance.js";
+import { generatePatchSuggestions } from "./suggestion-engine.js";
 import type {
   MarkdownSection,
   OnNoMatchStrategy,
   PatchOperation,
   PatchResult,
   ValidationError,
+  ValidationWarning,
 } from "./types.js";
 import { validateNotContains } from "./validators.js";
 
@@ -999,7 +1001,7 @@ export function applySinglePatch(
 ): {
   content: string;
   count: number;
-  warning?: string;
+  warning?: ValidationWarning;
   validationErrors: ValidationError[];
   conditionSkipped: boolean;
 } {
@@ -1126,15 +1128,21 @@ export function applySinglePatch(
   }
 
   // Handle no-match scenarios
-  let warning: string | undefined;
+  let warning: ValidationWarning | undefined;
   if (result.count === 0) {
     const patchDesc = getPatchDescription(patch);
+    const errorMsg = `Patch '${patchDesc}' matched 0 times`;
 
     if (onNoMatch === "error") {
-      throw new Error(`Patch '${patchDesc}' matched 0 times`);
+      throw new Error(errorMsg);
     }
     if (onNoMatch === "warn") {
-      warning = `Patch '${patchDesc}' matched 0 times`;
+      // Generate intelligent suggestions for the failed patch
+      const suggestions = generatePatchSuggestions(patch, content, errorMsg);
+      warning = {
+        message: errorMsg,
+        suggestions: suggestions.length > 0 ? suggestions : undefined,
+      };
     }
     // 'skip' - no warning or error
   }
@@ -1246,7 +1254,7 @@ export function applyPatches(
   let currentContent = content;
   let appliedCount = 0;
   let conditionSkippedCount = 0;
-  const warnings: string[] = [];
+  const warnings: ValidationWarning[] = [];
   const validationErrors: ValidationError[] = [];
 
   for (const patch of resolvedPatches) {

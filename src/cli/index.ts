@@ -69,6 +69,7 @@ import type {
   RenameFilePatch,
   ValidationError,
   ValidationResult,
+  ValidationWarning,
   WatchHooks,
 } from "../core/types.js";
 import { runValidators } from "../core/validators.js";
@@ -143,7 +144,7 @@ interface BuildResult {
   success: boolean;
   filesWritten: number;
   patchesApplied: number;
-  warnings: string[];
+  warnings: ValidationWarning[];
   validationErrors: ValidationError[];
   stats?: BuildStats; // Optional stats when --stats flag is used
 }
@@ -673,14 +674,14 @@ function applyPatches(
   resources: Map<string, string>;
   patchesApplied: number;
   patchesSkipped: number;
-  warnings: string[];
+  warnings: ValidationWarning[];
   validationErrors: ValidationError[];
   operationCounts: Record<string, number>;
 } {
   const patchedResources = new Map<string, string>();
   let totalPatchesApplied = 0;
   let totalPatchesSkipped = 0;
-  const allWarnings: string[] = [];
+  const allWarnings: ValidationWarning[] = [];
   const allValidationErrors: ValidationError[] = [];
   const operationCounts: Record<string, number> = {};
 
@@ -780,7 +781,7 @@ async function applyPatchesParallel(
   resources: Map<string, string>;
   patchesApplied: number;
   patchesSkipped: number;
-  warnings: string[];
+  warnings: ValidationWarning[];
   validationErrors: ValidationError[];
   operationCounts: Record<string, number>;
 }> {
@@ -809,7 +810,7 @@ async function applyPatchesParallel(
             content,
             applied: 0,
             skipped: 0,
-            warnings: [] as string[],
+            warnings: [] as ValidationWarning[],
             validationErrors: [] as ValidationError[],
             operations: {} as Record<string, number>,
           };
@@ -852,7 +853,7 @@ async function applyPatchesParallel(
   const patchedResources = new Map<string, string>();
   let totalPatchesApplied = 0;
   let totalPatchesSkipped = 0;
-  const allWarnings: string[] = [];
+  const allWarnings: ValidationWarning[] = [];
   const allValidationErrors: ValidationError[] = [];
   const operationCounts: Record<string, number> = {};
 
@@ -1981,7 +1982,12 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         if (warnings.length > 0) {
           console.log("\nWarnings:");
           for (const warning of warnings) {
-            console.log(`  ${warning}`);
+            console.log(`  ${warning.message}`);
+            if (warning.suggestions && warning.suggestions.length > 0) {
+              for (const suggestion of warning.suggestions) {
+                console.log(`    - ${suggestion}`);
+              }
+            }
           }
         }
         if (allValidationErrors.length > 0) {

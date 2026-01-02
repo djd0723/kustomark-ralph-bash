@@ -386,8 +386,8 @@ Content B`;
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain("move-section 'missing' after 'section-b'");
-    expect(result.warnings[0]).toContain("matched 0 times");
+    expect(result.warnings[0]?.message).toContain("move-section 'missing' after 'section-b'");
+    expect(result.warnings[0]?.message).toContain("matched 0 times");
   });
 
   test("throws error when section not found with onNoMatch=error", () => {
@@ -510,6 +510,6 @@ Content B`;
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain("missing2");
+    expect(result.warnings[0]?.message).toContain("missing2");
   });
 });

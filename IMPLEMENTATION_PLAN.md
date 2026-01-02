@@ -2231,3 +2231,70 @@ This document tracks the implementation of kustomark based on the spec milestone
   - Operation-specific completions provide targeted suggestions
   - 100% test coverage with all edge cases handled
 
+
+**2026-01-02 (Smart Error Recovery with Patch Suggestions - Future Work - COMPLETE!):**
+- ✅ Implemented Smart Error Recovery feature (High impact, low-medium effort from Future Enhancement Analysis):
+
+  **Core Implementation (~300 lines of TypeScript):**
+  - Created `/home/dex/kustomark-ralph-bash/src/core/suggestion-engine.ts` (300 lines)
+    - `calculateLevenshteinDistance(a, b)` - Computes edit distance using dynamic programming
+    - `findSimilarStrings(target, candidates, maxDistance)` - Fuzzy string matching with configurable thresholds
+    - `generateSectionSuggestions(sectionId, content)` - Suggests similar section IDs from document
+    - `generateFrontmatterKeySuggestions(key, frontmatter)` - Suggests similar frontmatter keys
+    - `generatePatchSuggestions(patch, content, error)` - Context-aware suggestions based on patch type
+
+  **Type System Updates:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/types.ts`
+    - Added `suggestions?: string[]` field to `ValidationWarning` interface
+    - Changed `PatchResult.warnings` from `string[]` to `ValidationWarning[]` for structured data
+    - Enables rich, actionable error messages with intelligent suggestions
+
+  **Patch Engine Integration:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/patch-engine.ts`
+    - Integrated suggestion generation into `applySinglePatch` function
+    - Warnings now include intelligent suggestions when patches have 0 matches
+    - Works for all section operations and frontmatter operations
+    - Preserves backward compatibility with existing warning system
+
+  **CLI Output Enhancement:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/cli/index.ts`
+    - Text output displays suggestions below warnings with clear formatting
+    - JSON output includes `suggestions` array in warning objects
+    - Maintains clean separation between warnings and suggestions
+
+  **Debug Mode Compatibility:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/cli/debug-state.ts`
+    - Fixed type compatibility with new `ValidationWarning` structure
+    - Extracts warning message for backward compatibility in debug UI
+
+  **Core Module Exports:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/index.ts`
+    - Exported all suggestion engine functions for external use
+    - Available for integration with web UI and LSP server
+
+  **Comprehensive Testing:**
+  - Created `/home/dex/kustomark-ralph-bash/tests/core/suggestion-engine.test.ts` (48 unit tests)
+  - Updated `/home/dex/kustomark-ralph-bash/tests/patch-engine.test.ts` (10 integration tests)
+  - All 1,556 tests passing (58 new tests added)
+  - 6,235 expect() calls successful
+
+  **Smart Features Implemented:**
+  1. **Intelligent Thresholds:** Automatically adjusts similarity thresholds based on string length
+  2. **Context-Aware:** Different suggestion strategies for different patch types
+  3. **User-Friendly Output:** Clear, actionable suggestions
+  4. **Case-Insensitive Matching:** Handles capitalization differences
+  5. **Typo Detection:** Catches common typos
+
+  **Files Created:**
+  - `/home/dex/kustomark-ralph-bash/src/core/suggestion-engine.ts` (300 lines)
+  - `/home/dex/kustomark-ralph-bash/tests/core/suggestion-engine.test.ts` (48 tests)
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/core/types.ts`
+  - `/home/dex/kustomark-ralph-bash/src/core/patch-engine.ts`
+  - `/home/dex/kustomark-ralph-bash/src/core/index.ts`
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts`
+  - `/home/dex/kustomark-ralph-bash/src/cli/debug-state.ts`
+  - `/home/dex/kustomark-ralph-bash/tests/patch-engine.test.ts` (10 tests)
+
+  **Status:** COMPLETE! ✅ Production-ready with comprehensive test coverage.

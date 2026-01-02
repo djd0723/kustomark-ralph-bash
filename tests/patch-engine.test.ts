@@ -287,7 +287,7 @@ describe('applyPatches', () => {
     expect(result.content).toBe('hi world');
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain('matched 0 times');
+    expect(result.warnings[0]?.message).toContain('matched 0 times');
   });
 
   test('skips patches with no matches when onNoMatch=skip', () => {
@@ -323,7 +323,7 @@ describe('applyPatches', () => {
     const result = applyPatches(content, patches, 'error');
 
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain('missing');
+    expect(result.warnings[0]?.message).toContain('missing');
   });
 
   test('applies complex section operations', () => {
@@ -855,7 +855,7 @@ Content`;
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain('matched 0 times');
+    expect(result.warnings[0]?.message).toContain('matched 0 times');
   });
 
   test('skips non-matching frontmatter operations with onNoMatch=skip', () => {
@@ -1540,7 +1540,7 @@ line 2`;
 
     expect(result.applied).toBe(0);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain('matched 0 times');
+    expect(result.warnings[0]?.message).toContain('matched 0 times');
   });
 
   test('throws error for no match with onNoMatch=error', () => {
@@ -1632,7 +1632,7 @@ line 2`;
 
     expect(result.applied).toBe(1);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain('missing2');
+    expect(result.warnings[0]?.message).toContain('missing2');
     expect(result.content).toContain('REPLACED');
   });
 });
@@ -2299,6 +2299,231 @@ version: 2.0
 
       expect(result.applied).toBe(1);
       expect(result.content).toBe('Modified');
+    });
+  });
+
+  describe('Smart Error Recovery - Suggestions in Warnings', () => {
+    test('generates suggestions for section operation with typo', () => {
+      const content = `
+# Installation
+
+Some content
+
+# Configuration
+
+More content
+`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'remove-section',
+          id: 'instalation', // typo
+          onNoMatch: 'warn',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'warn');
+
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]?.message).toContain("matched 0 times");
+      expect(result.warnings[0]?.suggestions).toBeDefined();
+      expect(result.warnings[0]?.suggestions?.length).toBeGreaterThan(0);
+      expect(result.warnings[0]?.suggestions?.[0]).toContain("installation");
+    });
+
+    test('generates suggestions for frontmatter operation with typo', () => {
+      const content = `---
+title: Test Document
+author: John Doe
+---
+
+Content
+`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'remove-frontmatter',
+          key: 'athour', // typo
+          onNoMatch: 'warn',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'warn');
+
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]?.message).toContain("matched 0 times");
+      expect(result.warnings[0]?.suggestions).toBeDefined();
+      expect(result.warnings[0]?.suggestions?.length).toBeGreaterThan(0);
+      expect(result.warnings[0]?.suggestions?.[0]).toContain("author");
+    });
+
+    test('generates case-insensitive suggestions for replace operation', () => {
+      const content = "hello world";
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace',
+          old: 'HELLO',
+          new: 'goodbye',
+          onNoMatch: 'warn',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'warn');
+
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]?.suggestions).toBeDefined();
+      expect(result.warnings[0]?.suggestions?.length).toBeGreaterThan(0);
+      expect(result.warnings[0]?.suggestions?.[0]).toContain("different casing");
+    });
+
+    test('lists available sections when no similar section found', () => {
+      const content = `
+# Introduction
+
+# Getting Started
+
+# Advanced Topics
+`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace-section',
+          id: 'completely-different',
+          content: 'new content',
+          onNoMatch: 'warn',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'warn');
+
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]?.suggestions).toBeDefined();
+      expect(result.warnings[0]?.suggestions?.length).toBeGreaterThan(0);
+      expect(result.warnings[0]?.suggestions?.[0]).toContain("Available sections:");
+    });
+
+    test('provides helpful message when no sections exist', () => {
+      const content = "Just plain text with no sections";
+      const patches: PatchOperation[] = [
+        {
+          op: 'prepend-to-section',
+          id: 'anything',
+          content: 'prepend this',
+          onNoMatch: 'warn',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'warn');
+
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]?.suggestions).toBeDefined();
+      expect(result.warnings[0]?.suggestions).toContain("No sections found in the document");
+    });
+
+    test('identifies missing markers for delete-between operation', () => {
+      const content = "content without markers";
+      const patches: PatchOperation[] = [
+        {
+          op: 'delete-between',
+          start: '<!-- START -->',
+          end: '<!-- END -->',
+          onNoMatch: 'warn',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'warn');
+
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]?.suggestions).toBeDefined();
+      expect(result.warnings[0]?.suggestions?.length).toBeGreaterThan(0);
+      expect(result.warnings[0]?.suggestions?.[0]).toContain("Neither");
+    });
+
+    test('suggests similar lines for replace-line operation', () => {
+      const content = `import { foo } from 'bar';
+export const test = 'value';`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'replace-line',
+          match: "import { foo } from 'bar'",
+          replacement: "import { baz } from 'qux'",
+          onNoMatch: 'warn',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'warn');
+
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]?.suggestions).toBeDefined();
+      expect(result.warnings[0]?.suggestions?.length).toBeGreaterThan(0);
+    });
+
+    test('no suggestions for successful patches', () => {
+      const content = `
+# Installation
+
+Some content
+`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'remove-section',
+          id: 'installation', // correct ID
+          onNoMatch: 'warn',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'warn');
+
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    test('no warnings when onNoMatch is skip', () => {
+      const content = `
+# Installation
+
+Some content
+`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'remove-section',
+          id: 'nonexistent',
+          onNoMatch: 'skip',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'skip');
+
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    test('multiple patches with suggestions', () => {
+      const content = `
+# Installation
+
+Content
+
+# Configuration
+
+More content
+`;
+      const patches: PatchOperation[] = [
+        {
+          op: 'remove-section',
+          id: 'instalation', // typo
+          onNoMatch: 'warn',
+        },
+        {
+          op: 'replace-section',
+          id: 'configuraton', // typo
+          content: 'new content',
+          onNoMatch: 'warn',
+        },
+      ];
+
+      const result = applyPatches(content, patches, 'warn');
+
+      expect(result.warnings).toHaveLength(2);
+      expect(result.warnings[0]?.suggestions).toBeDefined();
+      expect(result.warnings[1]?.suggestions).toBeDefined();
+      expect(result.warnings[0]?.suggestions?.[0]).toContain("installation");
+      expect(result.warnings[1]?.suggestions?.[0]).toContain("configuration");
     });
   });
 });

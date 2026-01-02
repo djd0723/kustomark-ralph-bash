@@ -173,7 +173,7 @@ export class DebugSession {
     return {
       content: result.content,
       count: result.count,
-      warning: result.warning,
+      warning: result.warning?.message,
     };
   }
 

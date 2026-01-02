@@ -487,6 +487,8 @@ export interface ValidationWarning {
   validator?: string;
   /** Warning message */
   message: string;
+  /** Intelligent suggestions for fixing the issue */
+  suggestions?: string[];
 }
 
 /**
@@ -510,7 +512,7 @@ export interface PatchResult {
   /** Number of patches that were successfully applied */
   applied: number;
   /** Warnings from patches with onNoMatch=warn that had no matches */
-  warnings: string[];
+  warnings: ValidationWarning[];
   /** Validation errors from per-patch validation */
   validationErrors: ValidationError[];
   /** Number of patches skipped due to condition evaluation */
