@@ -148,8 +148,8 @@ interface CLIOptions {
   force?: boolean; // For template install --force option
   nonInteractive?: boolean; // For template init --non-interactive option
   progress?: boolean; // For --progress option (show progress feedback)
-  minRisk?: "low" | "medium" | "high"; // For analyze --min-risk option (minimum risk level to show)
-  sort?: "risk" | "complexity" | "impact" | "coverage"; // For analyze --sort option (sort by field)
+  minRisk?: "low" | "medium" | "high" | string; // For analyze --min-risk option (minimum risk level to show)
+  sort?: "risk" | "complexity" | "impact" | "coverage" | string; // For analyze --sort option (sort by field)
 }
 
 interface BuildStats {
@@ -603,35 +603,52 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     } else if (arg === "--min-risk" || arg.startsWith("--min-risk=")) {
       if (arg.includes("=")) {
         const value = arg.split("=")[1];
-        if (value && (value === "low" || value === "medium" || value === "high")) {
-          options.minRisk = value;
+        if (value) {
+          if (value === "low" || value === "medium" || value === "high") {
+            options.minRisk = value;
+          } else {
+            options.minRisk = value; // Set invalid value to be caught later
+          }
         }
       } else if (i + 1 < args.length) {
         const nextArg = args[i + 1];
-        if (nextArg && (nextArg === "low" || nextArg === "medium" || nextArg === "high")) {
-          options.minRisk = nextArg;
+        if (nextArg) {
+          if (nextArg === "low" || nextArg === "medium" || nextArg === "high") {
+            options.minRisk = nextArg;
+          } else {
+            options.minRisk = nextArg; // Set invalid value to be caught later
+          }
           i++;
         }
       }
     } else if (arg === "--sort" || arg.startsWith("--sort=")) {
       if (arg.includes("=")) {
         const value = arg.split("=")[1];
-        if (
-          value &&
-          (value === "risk" || value === "complexity" || value === "impact" || value === "coverage")
-        ) {
-          options.sort = value;
+        if (value) {
+          if (
+            value === "risk" ||
+            value === "complexity" ||
+            value === "impact" ||
+            value === "coverage"
+          ) {
+            options.sort = value;
+          } else {
+            options.sort = value; // Set invalid value to be caught later
+          }
         }
       } else if (i + 1 < args.length) {
         const nextArg = args[i + 1];
-        if (
-          nextArg &&
-          (nextArg === "risk" ||
+        if (nextArg) {
+          if (
+            nextArg === "risk" ||
             nextArg === "complexity" ||
             nextArg === "impact" ||
-            nextArg === "coverage")
-        ) {
-          options.sort = nextArg;
+            nextArg === "coverage"
+          ) {
+            options.sort = nextArg;
+          } else {
+            options.sort = nextArg; // Set invalid value to be caught later
+          }
           i++;
         }
       }

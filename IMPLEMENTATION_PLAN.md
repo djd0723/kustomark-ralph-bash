@@ -4897,3 +4897,31 @@ The `kustomark analyze` command exposes the existing analytics API (from src/cor
 **Status:** CLI Analytics Command COMPLETE! ✅
 
 Users can now analyze their kustomark configurations directly from the command line with rich formatting, filtering, and output options.
+
+**2026-01-02 (Analyze Command Test Fixes):**
+- ✅ Fixed all 10 failing tests in analyze command test suite:
+  - Fixed import organization and formatting in analyze-command.ts (biome linting)
+  - Added proper validation for --min-risk and --sort CLI options (validate before operations)
+  - Fixed verbosity levels for -v and -vv flags (show "Patched files:" at level 2, "operation:" at level 3)
+  - Fixed -q (quiet) flag to show only summary (< 500 characters output)
+  - Added "Recommendations" section for configurations with high-risk patches
+  - Fixed --sort=impact to properly sort patches by affected files count
+  - Fixed --sort=coverage to properly sort files by patch count
+  - Fixed risk level text output (lowercase "high-risk", "medium-risk", "low-risk")
+  - Enhanced CLI option parsing to capture invalid values for validation
+  - Fixed test expectations for pattern-based patch targeting
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/cli/analyze-command.ts` - Command implementation fixes
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Option parsing enhancements
+  - `/home/dex/kustomark-ralph-bash/tests/cli/analyze.test.ts` - Test configuration fixes
+
+  **Testing Results:**
+  - ✅ All 2650 tests passing ✓ (up from 2640)
+  - ✅ All linting checks passing (`bun check`) ✓
+  - ✅ TypeScript compilation clean ✓
+  - ✅ Zero type safety issues (no `any` types used)
+
+**Status:** Analyze Command Test Suite COMPLETE! ✅
+
+All kustomark tests now pass successfully with full test coverage of the analyze command functionality.

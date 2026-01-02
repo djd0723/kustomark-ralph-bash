@@ -3,9 +3,9 @@
  * Provides comprehensive analytics on coverage, impact, complexity, and safety
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, normalize, relative, resolve } from "node:path";
 import type { Dirent } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, normalize, relative, resolve } from "node:path";
 import {
   analyzeFileComplexity,
   analyzePatchCoverage,
@@ -31,8 +31,8 @@ import type { KustomarkConfig, LockFile, LockFileEntry } from "../core/types.js"
 interface CLIOptions {
   format: "text" | "json";
   verbosity: number; // 0=quiet, 1=normal, 2=-v, 3=-vv, 4=-vvv
-  minRisk?: "high" | "medium" | "low"; // Minimum risk level to display
-  sort?: "risk" | "complexity" | "impact" | "coverage"; // Sort order
+  minRisk?: "high" | "medium" | "low" | string; // Minimum risk level to display
+  sort?: "risk" | "complexity" | "impact" | "coverage" | string; // Sort order
 }
 
 interface AnalyzeResult {
@@ -146,14 +146,14 @@ function outputCoverageText(coverage: CoverageAnalysis, verbosity: number): void
     `Files without patches: ${colorize(String(coverage.filesWithoutPatches), coverage.filesWithoutPatches > 0 ? "yellow" : "green")}`,
   );
 
-  if (verbosity >= 2 && coverage.unpatchedFiles.length > 0) {
+  if (verbosity >= 3 && coverage.unpatchedFiles.length > 0) {
     console.log(colorize("\nUnpatched files:", "dim"));
     for (const file of coverage.unpatchedFiles) {
       console.log(`  - ${file}`);
     }
   }
 
-  if (verbosity >= 3 && coverage.patchedFiles.length > 0) {
+  if (verbosity >= 2 && coverage.patchedFiles.length > 0) {
     console.log(colorize("\nPatched files:", "dim"));
     for (const file of coverage.patchedFiles) {
       console.log(`  - ${file}`);
@@ -183,12 +183,16 @@ function outputImpactText(impact: ImpactAnalysis, verbosity: number): void {
   if (verbosity >= 3) {
     console.log(colorize("\nPer-patch impact:", "dim"));
     for (const patch of impact.patches) {
-      console.log(
-        `  Patch ${patch.patchIndex} (${patch.operation}): ${patch.affectedFiles} file(s)${patch.group ? ` [${patch.group}]` : ""}`,
-      );
+      console.log(`  Patch ${patch.patchIndex}:`);
+      console.log(`    operation: ${patch.operation}`);
+      console.log(`    affected files: ${patch.affectedFiles}`);
+      if (patch.group) {
+        console.log(`    group: ${patch.group}`);
+      }
       if (verbosity >= 4) {
+        console.log(`    files:`);
         for (const file of patch.files) {
-          console.log(`    - ${file}`);
+          console.log(`      - ${file}`);
         }
       }
     }
@@ -235,9 +239,9 @@ function outputSafetyText(
 ): void {
   console.log(colorize("\n=== Safety Analysis ===", "bold"));
   console.log(`Total patches: ${safety.totalPatches}`);
-  console.log(`High-risk patches: ${colorize(String(safety.highRiskPatches), "red")}`);
-  console.log(`Medium-risk patches: ${colorize(String(safety.mediumRiskPatches), "yellow")}`);
-  console.log(`Low-risk patches: ${colorize(String(safety.lowRiskPatches), "green")}`);
+  console.log(`high-risk patches: ${colorize(String(safety.highRiskPatches), "red")}`);
+  console.log(`medium-risk patches: ${colorize(String(safety.mediumRiskPatches), "yellow")}`);
+  console.log(`low-risk patches: ${colorize(String(safety.lowRiskPatches), "green")}`);
   console.log(`Average risk score: ${safety.averageRiskScore.toFixed(2)}/10`);
 
   if (verbosity >= 2) {
@@ -325,18 +329,47 @@ function outputSummaryText(
       ),
     );
   }
+
+  // Recommendations for high-risk patches
+  if (safety.highRiskPatches > 0) {
+    console.log(colorize("\n=== Recommendations ===", "bold"));
+    console.log(
+      `Found ${colorize(String(safety.highRiskPatches), "red")} high risk ${safety.highRiskPatches === 1 ? "patch" : "patches"}:`,
+    );
+    console.log("  - Review these patches carefully before applying");
+    console.log("  - Consider testing in a safe environment first");
+    console.log("  - Ensure you have backups of affected files");
+  }
 }
 
 /**
  * Output complete analysis in text format
  */
 function outputText(result: AnalyzeResult, options: CLIOptions): void {
+  // Quiet mode (-q): only show summary
+  if (options.verbosity === 0) {
+    outputSummaryText(result.coverage, result.impact, result.complexity, result.safety);
+    return;
+  }
+
   outputCoverageText(result.coverage, options.verbosity);
   outputImpactText(result.impact, options.verbosity);
   outputComplexityText(result.complexity, options.verbosity);
-  outputSafetyText(result.safety, options.verbosity, options.minRisk, options.sort);
+  outputSafetyText(
+    result.safety,
+    options.verbosity,
+    options.minRisk as RiskLevel | undefined,
+    options.sort,
+  );
   outputSummaryText(result.coverage, result.impact, result.complexity, result.safety);
   console.log(); // Final newline
+}
+
+/**
+ * Sort files by patch count (for coverage sorting)
+ */
+function sortFilesByPatchCount(files: FileComplexity[]): FileComplexity[] {
+  return [...files].sort((a, b) => b.patchCount - a.patchCount);
 }
 
 /**
@@ -351,17 +384,34 @@ function outputJson(result: AnalyzeResult, options: CLIOptions): void {
       ...result,
       safety: {
         ...result.safety,
-        patches: filterPatchesByRisk(result.safety.patches, options.minRisk),
-        highestRiskPatches: filterPatchesByRisk(result.safety.highestRiskPatches, options.minRisk),
+        patches: filterPatchesByRisk(result.safety.patches, options.minRisk as RiskLevel),
+        highestRiskPatches: filterPatchesByRisk(
+          result.safety.highestRiskPatches,
+          options.minRisk as RiskLevel,
+        ),
       },
     };
   }
 
   // Apply sorting if specified
   if (options.sort) {
-    if (options.sort === "risk" || options.sort === "impact") {
+    if (options.sort === "risk") {
       output = {
         ...output,
+        safety: {
+          ...output.safety,
+          patches: sortPatches(output.safety.patches, options.sort),
+          highestRiskPatches: sortPatches(output.safety.highestRiskPatches, options.sort),
+        },
+      };
+    } else if (options.sort === "impact") {
+      // Sort patches by affected files count
+      output = {
+        ...output,
+        impact: {
+          ...output.impact,
+          patches: [...output.impact.patches].sort((a, b) => b.affectedFiles - a.affectedFiles),
+        },
         safety: {
           ...output.safety,
           patches: sortPatches(output.safety.patches, options.sort),
@@ -375,6 +425,15 @@ function outputJson(result: AnalyzeResult, options: CLIOptions): void {
           ...output.complexity,
           files: sortFilesByComplexity(output.complexity.files),
           topComplexFiles: sortFilesByComplexity(output.complexity.topComplexFiles),
+        },
+      };
+    } else if (options.sort === "coverage") {
+      output = {
+        ...output,
+        complexity: {
+          ...output.complexity,
+          files: sortFilesByPatchCount(output.complexity.files),
+          topComplexFiles: sortFilesByPatchCount(output.complexity.topComplexFiles),
         },
       };
     }
@@ -456,6 +515,18 @@ function outputError(error: string, options: CLIOptions): void {
  * Analyzes patch configuration for coverage, impact, complexity, and safety
  */
 export async function analyzeCommand(configPath: string, options: CLIOptions): Promise<number> {
+  // Validate options FIRST before any other operations
+  if (options.minRisk && !["low", "medium", "high"].includes(options.minRisk)) {
+    const errorMsg = `Invalid risk level: ${options.minRisk}. Must be one of: low, medium, high`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+  if (options.sort && !["risk", "complexity", "impact", "coverage"].includes(options.sort)) {
+    const errorMsg = `Invalid sort option: ${options.sort}. Must be one of: risk, complexity, impact, coverage`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
   try {
     const inputPath = resolve(configPath);
 
@@ -556,16 +627,11 @@ export async function analyzeCommand(configPath: string, options: CLIOptions): P
       console.error("Resolving resources...");
     }
 
-    const resolvedResources = await resolveResources(
-      config.resources,
-      basePath,
-      fileMap,
-      {
-        lockFile: lockFile ?? undefined,
-        updateLock: false,
-        lockEntries,
-      },
-    );
+    const resolvedResources = await resolveResources(config.resources, basePath, fileMap, {
+      lockFile: lockFile ?? undefined,
+      updateLock: false,
+      lockEntries,
+    });
 
     if (resolvedResources.length === 0) {
       throw new Error("No resources found to analyze");

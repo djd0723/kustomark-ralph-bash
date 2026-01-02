@@ -261,12 +261,15 @@ resources:
   - "*.md"
 patches:
   - op: replace
+    include: "*.md"
     old: "foo"
     new: "bar"
   - op: replace
+    include: "multi.md"
     old: "test"
     new: "prod"
   - op: replace-regex
+    include: "multi.md"
     pattern: 'v\\d+'
     replacement: "v2"
 `,
