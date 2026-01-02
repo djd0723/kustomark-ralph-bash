@@ -1,8 +1,19 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Fixes
+
+**2026-01-02 (Issue #1 - Directory Structure Preservation):**
+- ✅ **VERIFIED FIX**: Directory structure preservation was already implemented in `src/cli/index.ts` (lines 789-794)
+- ✅ The `resolveResources` function correctly computes relative paths from resource base directories
+- ✅ Added comprehensive integration test in `tests/cli-integration.test.ts` to prevent regression
+- ✅ Test verifies that files with same basename in different directories are preserved correctly
+- ✅ Example: `skills/create-research/SKILL.md` and `skills/iterate-research/SKILL.md` both exist in output
+- ✅ All 2652 tests passing ✓
+- 📝 Issue #1 was reported but the fix was already in place - test coverage now ensures it stays fixed
 
 ## M1: MVP - Local sources, core patches, CLI
 

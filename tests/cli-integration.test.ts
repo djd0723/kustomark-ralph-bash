@@ -9,7 +9,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { parseConfig, validateConfig } from '../src/core/config-parser.js';
 import { resolveResources } from '../src/core/resource-resolver.js';
 import { applyPatches } from '../src/core/patch-engine.js';
@@ -1171,3 +1171,150 @@ function filterPatchesForFile(
     return true;
   });
 }
+
+describe('Directory Structure Preservation (Issue #1)', () => {
+  test('should preserve relative directory structure when resolving resources', async () => {
+    // Create a temporary test directory
+    const testDir = join('/tmp', `kustomark-test-structure-${Date.now()}`);
+    const skillsDir = join(testDir, 'skills');
+    const createResearchDir = join(skillsDir, 'create-research');
+    const createRefsDir = join(createResearchDir, 'references');
+    const iterateResearchDir = join(skillsDir, 'iterate-research');
+    const iterateRefsDir = join(iterateResearchDir, 'references');
+    const outputDir = join(testDir, 'output');
+
+    try {
+      // Setup directory structure
+      mkdirSync(createRefsDir, { recursive: true });
+      mkdirSync(iterateRefsDir, { recursive: true });
+
+      // Write test files
+      writeFileSync(
+        join(createResearchDir, 'SKILL.md'),
+        '# Create Research Skill\n\nThis is the create-research skill.\n',
+      );
+      writeFileSync(
+        join(createRefsDir, 'research_template.md'),
+        '# Research Template\n\nTemplate for create-research.\n',
+      );
+      writeFileSync(
+        join(createRefsDir, 'research_final_answer.md'),
+        '# Final Answer (Create)\n\nFinal answer for create-research.\n',
+      );
+      writeFileSync(
+        join(iterateResearchDir, 'SKILL.md'),
+        '# Iterate Research Skill\n\nThis is the iterate-research skill.\n',
+      );
+      writeFileSync(
+        join(iterateRefsDir, 'research_final_answer.md'),
+        '# Final Answer (Iterate)\n\nFinal answer for iterate-research.\n',
+      );
+
+      // Write config
+      const configContent = `apiVersion: kustomark/v1
+kind: Kustomization
+output: output
+resources:
+  - skills/**/*.md
+`;
+      writeFileSync(join(testDir, 'kustomark.yaml'), configContent);
+
+      // Parse config
+      const config = parseConfig(configContent);
+
+      // Build file map
+      const fileMap = new Map<string, string>();
+      const addFilesToMap = (dir: string) => {
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name);
+          if (entry.isDirectory()) {
+            addFilesToMap(fullPath);
+          } else if (entry.isFile() && entry.name.endsWith('.md')) {
+            fileMap.set(fullPath, readFileSync(fullPath, 'utf-8'));
+          }
+        }
+      };
+      addFilesToMap(skillsDir);
+
+      // Resolve resources
+      const resources = await resolveResources(config.resources, testDir, fileMap);
+
+      // Apply patches (none in this case) and build output map
+      const patchedResources = new Map<string, string>();
+
+      for (const resource of resources) {
+        // Apply patches to each resource
+        const result = applyPatches(
+          resource.content,
+          config.patches || [],
+          config.onNoMatch || 'warn',
+        );
+
+        // Compute relative path from testDir
+        const relativePath = resource.baseDir
+          ? relative(resource.baseDir, resource.path)
+          : relative(testDir, resource.path);
+
+        patchedResources.set(relativePath, result.content);
+      }
+
+      // Write output files
+      mkdirSync(outputDir, { recursive: true });
+      for (const [filePath, content] of patchedResources.entries()) {
+        const fullOutputPath = join(outputDir, filePath);
+        mkdirSync(dirname(fullOutputPath), { recursive: true });
+        writeFileSync(fullOutputPath, content);
+      }
+
+      // Verify directory structure is preserved
+      expect(existsSync(join(outputDir, 'skills/create-research/SKILL.md'))).toBe(true);
+      expect(
+        existsSync(join(outputDir, 'skills/create-research/references/research_template.md')),
+      ).toBe(true);
+      expect(
+        existsSync(join(outputDir, 'skills/create-research/references/research_final_answer.md')),
+      ).toBe(true);
+      expect(existsSync(join(outputDir, 'skills/iterate-research/SKILL.md'))).toBe(true);
+      expect(
+        existsSync(join(outputDir, 'skills/iterate-research/references/research_final_answer.md')),
+      ).toBe(true);
+
+      // Verify both files with the same basename exist and have different content
+      const createFinalAnswer = readFileSync(
+        join(outputDir, 'skills/create-research/references/research_final_answer.md'),
+        'utf-8',
+      );
+      const iterateFinalAnswer = readFileSync(
+        join(outputDir, 'skills/iterate-research/references/research_final_answer.md'),
+        'utf-8',
+      );
+
+      expect(createFinalAnswer).toContain('Final Answer (Create)');
+      expect(iterateFinalAnswer).toContain('Final Answer (Iterate)');
+      expect(createFinalAnswer).not.toBe(iterateFinalAnswer);
+
+      // Verify no files were flattened (only 5 files should exist in correct paths)
+      const allOutputFiles: string[] = [];
+      const collectFiles = (dir: string) => {
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name);
+          if (entry.isDirectory()) {
+            collectFiles(fullPath);
+          } else if (entry.isFile()) {
+            allOutputFiles.push(fullPath);
+          }
+        }
+      };
+      collectFiles(outputDir);
+
+      expect(allOutputFiles).toHaveLength(5);
+    } finally {
+      // Cleanup
+      if (existsSync(testDir)) {
+        rmSync(testDir, { recursive: true, force: true });
+      }
+    }
+  });
+});
