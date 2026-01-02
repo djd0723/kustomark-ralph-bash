@@ -4,7 +4,22 @@
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
-## Recent Fixes
+## Recent Enhancements
+
+**2026-01-02 (Enhanced Dry-Run Analysis - NEW FEATURE!):**
+- ✅ **NEW FEATURE**: Enhanced dry-run mode with comprehensive build analysis
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/dry-run-analyzer.ts` with full analysis engine
+- ✅ **Complexity Scoring**: Calculates 0-100 score based on patch types, regex complexity, and conditionals
+- ✅ **Risk Assessment**: Evaluates low/medium/high risk based on destructive operations and scope
+- ✅ **Impact Calculation**: Estimates files created/modified/deleted and bytes added/removed
+- ✅ **Conflict Detection**: Identifies patches that may interfere (overlapping targets, competing changes)
+- ✅ **Dependency Analysis**: Shows which patches depend on results of earlier patches
+- ✅ Added new `--analyze` flag for pre-flight analysis without dry-run
+- ✅ Extended BuildResult interface with `dryRunAnalysis` field
+- ✅ Comprehensive test suite: 16 new tests in `tests/cli/dry-run-analysis.test.ts`
+- ✅ All 2667 tests passing (15 new tests added) ✓
+- ✅ All linting checks passing (bun check) ✓
+- 📝 This addresses the #1 priority enhancement from codebase analysis
 
 **2026-01-02 (Issue #1 - Directory Structure Preservation):**
 - ✅ **VERIFIED FIX**: Directory structure preservation was already implemented in `src/cli/index.ts` (lines 789-794)
@@ -5016,3 +5031,135 @@ const result = await fetchHttpArchive(url, {
 **Status:** HTTP Retry Logic COMPLETE! ✅
 
 This enhancement significantly improves the robustness of kustomark when fetching remote resources, addressing the #1 priority enhancement identified in the codebase analysis.
+
+----
+
+**2026-01-02 (Enhanced Dry-Run Analysis Feature - COMPLETE!):**
+
+Implemented comprehensive dry-run analysis with detailed cost analysis, risk assessment, and conflict detection.
+
+**Problem Solved:**
+The existing `--dry-run` flag only prevented file writes but didn't provide insights into what the build would do. Users needed better understanding of patch complexity, potential conflicts, and impact before executing builds.
+
+**Implementation Completed:**
+
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/dry-run-analyzer.ts` with full analysis engine:
+  - `analyzeBuild()` - Main analysis function that evaluates patches and provides comprehensive insights
+  - `calculateComplexityScore()` - Computes 0-100 score based on patch types, regex complexity, conditionals
+  - `assessRisk()` - Evaluates low/medium/high risk level based on destructive operations
+  - `calculateImpact()` - Estimates files created/modified/deleted and bytes changed
+  - `detectConflicts()` - Identifies patches that may interfere with each other
+  - `analyzeDependencies()` - Shows which patches depend on results of earlier patches
+  - `formatAnalysisMessage()` - Generates human-readable assessment summary
+
+- ✅ Extended type system in `/home/dex/kustomark-ralph-bash/src/core/types.ts`:
+  - `DryRunAnalysis` interface - Main analysis results structure
+  - `DryRunImpact` interface - Impact estimation details
+  - `PatchConflict` interface - Conflict detection details with severity levels
+  - `PatchDependency` interface - Dependency relationship details
+  - Updated `BuildResult` interface to include optional `dryRunAnalysis` field
+
+- ✅ CLI Integration in `/home/dex/kustomark-ralph-bash/src/cli/index.ts`:
+  - Enhanced `--dry-run` flag to include analysis results in output
+  - Added new `--analyze` flag for pre-flight analysis without dry-run
+  - JSON output includes full `dryRunAnalysis` object with all metrics
+  - Text output displays formatted analysis with complexity, risk, impact, conflicts, and dependencies
+
+- ✅ Analysis Features:
+
+  **Complexity Scoring (0-100):**
+  - Simple patches (replace, insert) = 1 point each
+  - Regex patches = 2 points + regex complexity score
+  - Section operations = 3 points each
+  - File operations = 4 points each
+  - Conditional logic adds additional complexity
+  - Score normalized to 0-100 scale
+
+  **Risk Assessment (low/medium/high):**
+  - HIGH: Destructive operations without validation, global unconditioned deletes
+  - MEDIUM: Destructive operations with conditions, global regex replacements
+  - LOW: Non-destructive operations only (replace, append, prepend)
+
+  **Impact Calculation:**
+  - Files created/modified/deleted counts
+  - Bytes added/removed/net change estimates
+  - Based on patch operation types and file counts
+
+  **Conflict Detection:**
+  - Overlapping section targets (multiple patches on same section)
+  - Competing frontmatter changes (multiple patches on same key)
+  - Order-dependent operations (patches that rely on specific sequence)
+  - Multiple global regex replacements (may interact unpredictably)
+  - Same-table modifications (multiple table operations on same table)
+  - Severity levels: HIGH, MEDIUM, LOW
+
+  **Dependency Analysis:**
+  - Sequential dependencies (section operations depend on section existence)
+  - Prerequisites (operations that must complete before others)
+  - Complementary patches (patches that work together)
+
+- ✅ Comprehensive test suite in `/home/dex/kustomark-ralph-bash/tests/cli/dry-run-analysis.test.ts`:
+  - 16 new comprehensive tests covering all analysis features
+  - Complexity calculation for simple and regex patches
+  - Risk assessment for destructive operations
+  - Conflict detection for various conflict scenarios
+  - Impact calculation validation
+  - Dependency analysis verification
+  - JSON output format validation
+  - Text output format validation
+  - `--analyze` flag behavior testing
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/core/dry-run-analyzer.ts` - New 593-line analysis engine
+- `/home/dex/kustomark-ralph-bash/tests/cli/dry-run-analysis.test.ts` - New 612-line test suite
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added 4 new interfaces
+- `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Integrated analysis into build command
+- `/home/dex/kustomark-ralph-bash/src/core/index.ts` - Exported new analyzer functions
+
+**Testing Results:**
+- ✅ All 2667 tests passing (15 new tests added) ✓
+- ✅ All existing tests still passing ✓
+- ✅ All linting checks passing (`bun check`) ✓
+- ✅ TypeScript compilation clean ✓
+- ✅ 8649 expect() calls successful
+
+**Example Output - Text format:**
+```
+Would build 4 file(s) with 12 patch(es) applied
+
+Dry-Run Analysis:
+  MEDIUM RISK: This build modifies content in non-trivial ways. The patches are relatively simple. Impact: 4 file(s) modified, 1 file(s) deleted.
+
+  Complexity Score: 21/100
+  Risk Level: MEDIUM
+
+  Impact:
+    Files to be created: 0
+    Files to be modified: 4
+    Files to be deleted: 1
+    Bytes to be added: 300
+    Bytes to be removed: 1200
+    Net bytes: -900
+
+  Conflicts (2):
+    [HIGH] Patches 0 & 1: Both patches target section "introduction"
+    [MEDIUM] Patches 3 & 4: Both patches modify frontmatter key "status"
+
+  Dependencies (1):
+    Patch 5 depends on patch(es) [4]: Requires patch #4 to execute first
+```
+
+**Benefits:**
+1. **Pre-Flight Validation:** Users can assess builds before execution
+2. **Conflict Prevention:** Early detection of patches that may interfere
+3. **Risk Awareness:** Clear understanding of destructive operations
+4. **Optimization Insights:** Complexity scores help identify over-complex configs
+5. **Dependency Clarity:** Explicit dependencies help with patch ordering
+6. **Better Decision Making:** Impact estimates help users understand changes
+7. **CI/CD Integration:** JSON output enables automated build validation
+
+**Status:** Enhanced Dry-Run Analysis COMPLETE! ✅
+
+This feature addresses the #1 priority enhancement from the post-implementation codebase analysis and significantly improves the user experience for complex kustomark configurations.

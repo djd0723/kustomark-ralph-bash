@@ -36,6 +36,7 @@ import {
   validateConfig as coreValidateConfig,
 } from "../core/config-parser.js";
 import { generateFileDiff } from "../core/diff-generator.js";
+import { analyzeBuild } from "../core/dry-run-analyzer.js";
 import {
   applyCopyFile,
   applyDeleteFile,
@@ -63,6 +64,7 @@ import type {
   BuildCacheEntry,
   CopyFilePatch,
   DeleteFilePatch,
+  DryRunAnalysis,
   KustomarkConfig,
   LockFile,
   LockFileEntry,
@@ -133,6 +135,7 @@ interface CLIOptions {
   noHooks?: boolean; // For watch --no-hooks option
   offline?: boolean; // For build --offline option (fail if remote fetch needed)
   dryRun?: boolean; // For build --dry-run option (preview changes without writing files)
+  analyze?: boolean; // For build --analyze option (run analysis without dry-run)
   suite?: string; // For test --suite option (test suite file path)
   patch?: string; // For test --patch option (inline YAML patch)
   patchFile?: string; // For test --patch-file option (patch file path)
@@ -185,6 +188,7 @@ interface BuildResult {
   validationErrors: ValidationError[];
   stats?: BuildStats; // Optional stats when --stats flag is used
   dryRun?: boolean; // True if --dry-run flag was used
+  dryRunAnalysis?: DryRunAnalysis; // Analysis results when --dry-run or --analyze is used
 }
 
 interface DiffResult {
@@ -284,6 +288,7 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     saveDecisions: undefined,
     loadDecisions: undefined,
     offline: false,
+    analyze: false,
     suite: undefined,
     patch: undefined,
     patchFile: undefined,
@@ -338,6 +343,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.offline = true;
     } else if (arg === "--dry-run") {
       options.dryRun = true;
+    } else if (arg === "--analyze") {
+      options.analyze = true;
     } else if (arg === "--no-hooks") {
       options.noHooks = true;
     } else if (arg === "--file" || arg.startsWith("--file=")) {
@@ -2336,6 +2343,14 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       }
     }
 
+    // Run dry-run analysis if requested
+    let dryRunAnalysis: DryRunAnalysis | undefined;
+    if (options.dryRun || options.analyze) {
+      const allPatches = config.patches || [];
+      const fileCount = processedResources.size;
+      dryRunAnalysis = analyzeBuild(allPatches, fileCount);
+    }
+
     // Output results
     const result: BuildResult = {
       success: true,
@@ -2345,6 +2360,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       validationErrors: allValidationErrors,
       stats,
       ...(options.dryRun && { dryRun: true }),
+      ...(dryRunAnalysis && { dryRunAnalysis }),
     };
 
     if (options.format === "json") {
@@ -2421,6 +2437,42 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
             for (const [reason, count] of reasons) {
               console.log(`    ${reason}: ${count}`);
             }
+          }
+        }
+      }
+
+      // Output dry-run analysis in text mode
+      if (dryRunAnalysis) {
+        console.log("\nDry-Run Analysis:");
+        console.log(`  ${dryRunAnalysis.assessment}`);
+        console.log(`\n  Complexity Score: ${dryRunAnalysis.complexityScore}/100`);
+        console.log(`  Risk Level: ${dryRunAnalysis.riskLevel.toUpperCase()}`);
+
+        console.log("\n  Impact:");
+        console.log(`    Files to be created: ${dryRunAnalysis.impact.filesCreated}`);
+        console.log(`    Files to be modified: ${dryRunAnalysis.impact.filesModified}`);
+        console.log(`    Files to be deleted: ${dryRunAnalysis.impact.filesDeleted}`);
+        console.log(`    Bytes to be added: ${dryRunAnalysis.impact.bytesAdded}`);
+        console.log(`    Bytes to be removed: ${dryRunAnalysis.impact.bytesRemoved}`);
+        console.log(
+          `    Net bytes: ${dryRunAnalysis.impact.netBytes > 0 ? "+" : ""}${dryRunAnalysis.impact.netBytes}`,
+        );
+
+        if (dryRunAnalysis.conflicts.length > 0) {
+          console.log(`\n  Conflicts (${dryRunAnalysis.conflicts.length}):`);
+          for (const conflict of dryRunAnalysis.conflicts) {
+            console.log(
+              `    [${conflict.severity.toUpperCase()}] Patches ${conflict.patchIndices[0]} & ${conflict.patchIndices[1]}: ${conflict.description}`,
+            );
+          }
+        }
+
+        if (dryRunAnalysis.dependencies.length > 0) {
+          console.log(`\n  Dependencies (${dryRunAnalysis.dependencies.length}):`);
+          for (const dep of dryRunAnalysis.dependencies) {
+            console.log(
+              `    Patch ${dep.dependentPatch} depends on patch(es) [${dep.dependsOn.join(", ")}]: ${dep.description}`,
+            );
           }
         }
       }

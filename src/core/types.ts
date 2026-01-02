@@ -965,3 +965,67 @@ export interface AnalyticsReport {
   /** Timestamp when the analysis was generated (ISO 8601) */
   generatedAt: string;
 }
+
+/**
+ * Details about a detected conflict between patches
+ */
+export interface PatchConflict {
+  /** Indices of the conflicting patches */
+  patchIndices: [number, number];
+  /** Type of conflict */
+  type: "overlapping-targets" | "competing-changes" | "order-dependent";
+  /** Description of the conflict */
+  description: string;
+  /** Severity of the conflict */
+  severity: "high" | "medium" | "low";
+}
+
+/**
+ * Details about dependencies between patches
+ */
+export interface PatchDependency {
+  /** Index of the dependent patch */
+  dependentPatch: number;
+  /** Indices of patches it depends on */
+  dependsOn: number[];
+  /** Type of dependency */
+  type: "sequential" | "prerequisite" | "complementary";
+  /** Description of the dependency */
+  description: string;
+}
+
+/**
+ * Impact details for dry-run analysis
+ */
+export interface DryRunImpact {
+  /** Estimated number of files to be created */
+  filesCreated: number;
+  /** Estimated number of files to be modified */
+  filesModified: number;
+  /** Estimated number of files to be deleted */
+  filesDeleted: number;
+  /** Estimated bytes to be added */
+  bytesAdded: number;
+  /** Estimated bytes to be removed */
+  bytesRemoved: number;
+  /** Net change in bytes */
+  netBytes: number;
+}
+
+/**
+ * Dry-run analysis results
+ */
+export interface DryRunAnalysis {
+  /** Complexity score (0-100, higher = more complex) */
+  complexityScore: number;
+  /** Risk level assessment */
+  riskLevel: RiskLevel;
+  /** Impact details */
+  impact: DryRunImpact;
+  /** Detected conflicts */
+  conflicts: PatchConflict[];
+  /** Dependency relationships */
+  dependencies: PatchDependency[];
+  /** Overall assessment message */
+  assessment: string;
+}
