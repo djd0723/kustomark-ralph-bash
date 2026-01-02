@@ -13,7 +13,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, within, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PatchList } from "../../src/web/client/src/components/editor/PatchList";
 import type { PatchOperation } from "../../src/web/client/src/types/config";
@@ -63,6 +63,7 @@ describe("PatchList Component", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.restoreAllMocks();
   });
 

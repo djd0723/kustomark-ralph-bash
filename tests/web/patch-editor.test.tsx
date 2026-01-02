@@ -9,9 +9,9 @@
  * - Edge cases (empty patch list, invalid operations)
  */
 
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { PatchEditor } from "../../src/web/client/src/components/editor/PatchEditor";
 import type { PatchOperation } from "../../src/web/client/src/types/config";
@@ -60,6 +60,10 @@ describe("PatchEditor Component", () => {
 
   beforeEach(() => {
     mockOnPatchesChange = mock(() => {});
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   describe("Initial Render and Empty State", () => {

@@ -11,8 +11,8 @@
  * - onChange callback behavior
  */
 
-import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { PatchForm } from "../../src/web/client/src/components/editor/PatchForm";
 import type { PatchOperation } from "../../src/web/client/src/types/config";
@@ -22,6 +22,10 @@ describe("PatchForm Component", () => {
 
   beforeEach(() => {
     mockOnChange = vi.fn();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   describe("Rendering States", () => {
