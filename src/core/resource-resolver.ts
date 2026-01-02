@@ -4,6 +4,8 @@ import { isAbsolute, join, normalize, resolve } from "node:path";
 import micromatch from "micromatch";
 import { type GitFetchOptions, fetchGitRepository } from "./git-fetcher.js";
 import { isGitUrl, parseGitUrl } from "./git-url-parser.js";
+import { type HttpFetchOptions, fetchHttpArchive } from "./http-fetcher.js";
+import { isHttpArchiveUrl, parseHttpArchiveUrl } from "./http-url-parser.js";
 
 /**
  * Represents a resolved markdown file resource
@@ -52,6 +54,8 @@ interface ResolveOptions {
   visited?: Set<string>;
   /** Git fetch options */
   gitFetchOptions?: GitFetchOptions;
+  /** HTTP fetch options */
+  httpFetchOptions?: HttpFetchOptions;
 }
 
 /**
@@ -173,6 +177,53 @@ export async function resolveResources(
           error instanceof Error ? error : undefined,
         );
       }
+      continue; // Skip to next pattern after processing git URL
+    }
+
+    // Check if pattern is an HTTP archive URL
+    if (isHttpArchiveUrl(pattern)) {
+      // Validate that the HTTP archive URL is parseable
+      const parsedHttp = parseHttpArchiveUrl(pattern);
+      if (!parsedHttp) {
+        throw new ResourceResolutionError(
+          `Malformed HTTP archive URL: ${pattern}. Please check the URL format.`,
+          pattern,
+        );
+      }
+
+      try {
+        // Fetch and extract the HTTP archive
+        const fetchResult = await fetchHttpArchive(pattern, {
+          ...options.httpFetchOptions,
+          subpath: parsedHttp.subpath,
+        });
+
+        // Add each extracted file to the file map and resolved resources
+        for (const file of fetchResult.files) {
+          // Create a normalized path for the file
+          const normalizedPath = normalize(join(normalizedBaseDir, file.path));
+
+          // Add to file map
+          fileMap.set(normalizedPath, file.content);
+
+          // Add to resolved resources
+          resolvedResources.push({
+            path: normalizedPath,
+            content: file.content,
+            source: pattern,
+          });
+        }
+      } catch (error) {
+        if (error instanceof ResourceResolutionError) {
+          throw error;
+        }
+        throw new ResourceResolutionError(
+          `Failed to fetch HTTP archive: ${error instanceof Error ? error.message : String(error)}`,
+          pattern,
+          error instanceof Error ? error : undefined,
+        );
+      }
+      continue; // Skip to next pattern after processing HTTP URL
     }
 
     // Check if pattern is a reference to another kustomark config (directory)
@@ -213,6 +264,7 @@ export async function resolveResources(
               currentDepth: currentDepth + 1,
               visited: newVisited,
               gitFetchOptions: options.gitFetchOptions,
+              httpFetchOptions: options.httpFetchOptions,
             });
 
             resolvedResources.push(...nestedResources);

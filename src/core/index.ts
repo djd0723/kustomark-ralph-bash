@@ -50,6 +50,7 @@ export type {
   PatchResult,
   MarkdownSection,
   ParsedGitUrl,
+  ParsedHttpArchiveUrl,
 } from "./types.js";
 
 // Export config parser functions
@@ -94,6 +95,9 @@ export {
 // Export git URL parser functions
 export { isGitUrl, parseGitUrl } from "./git-url-parser.js";
 
+// Export HTTP archive URL parser functions
+export { isHttpArchiveUrl, parseHttpArchiveUrl } from "./http-url-parser.js";
+
 // Export git fetcher functions and types
 export {
   fetchGitRepository,
@@ -104,3 +108,16 @@ export {
   type GitFetchResult,
   type GitFetchOptions,
 } from "./git-fetcher.js";
+
+// Export HTTP archive fetcher functions and types
+export {
+  fetchHttpArchive,
+  clearHttpCache,
+  listHttpCache,
+  getCacheInfo,
+  getDefaultCacheDir as getDefaultHttpCacheDir,
+  HttpFetchError,
+  type HttpFetchResult,
+  type HttpFetchOptions,
+  type ExtractedFile,
+} from "./http-fetcher.js";

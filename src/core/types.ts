@@ -383,3 +383,19 @@ export interface ParsedGitUrl {
   /** Clone URL for git operations (same as fullUrl) */
   cloneUrl: string;
 }
+
+/**
+ * Parsed HTTP archive URL components for remote sources
+ */
+export interface ParsedHttpArchiveUrl {
+  /** Resource type - always 'http-archive' for HTTP archive URLs */
+  type: "http-archive";
+  /** Base URL of the archive file (without subpath or query params) */
+  url: string;
+  /** Subpath within archive (after //) */
+  subpath?: string;
+  /** Archive type (.tar.gz, .tgz, .tar, .zip) */
+  archiveType: "tar.gz" | "tgz" | "tar" | "zip";
+  /** Query parameters for auth or other configuration */
+  queryParams: Record<string, string>;
+}

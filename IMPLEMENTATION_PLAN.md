@@ -133,17 +133,23 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Export all git fetcher functions from core/index.ts
    - ✅ Comprehensive test coverage (14 new tests in git-fetcher.test.ts)
 
-3. **[TODO] HTTP Archive Support**
-   - Support `.tar.gz`, `.tgz`, `.tar`, `.zip` archives
-   - Download and extract archives
-   - Handle authentication (bearer tokens, etc.)
-   - Validate checksums
+3. **[DONE] HTTP Archive Support** ✅
+   - ✅ Implemented HTTP archive URL parser (http-url-parser.ts)
+   - ✅ Support `.tar.gz`, `.tgz`, `.tar`, `.zip` archives
+   - ✅ Download and extract archives with caching
+   - ✅ Handle authentication (bearer tokens via env vars or options)
+   - ✅ Validate SHA256 checksums
+   - ✅ Support subpath filtering (e.g., archive.tar.gz//subdir/)
+   - ✅ Cache management (list, clear, get info)
+   - ✅ Integrated into resource-resolver.ts
+   - ✅ Comprehensive test suite (88 new tests, 589 total tests passing)
 
-4. **[TODO] Caching System**
-   - Implement cache directory (`~/.cache/kustomark/`)
-   - Cache git repositories
-   - Cache HTTP archives
-   - Implement cache commands (list, clear)
+4. **[DONE] Caching System** ✅
+   - ✅ Cache directory (`~/.cache/kustomark/`) implemented
+   - ✅ Git repository caching (in `~/.cache/kustomark/git/`)
+   - ✅ HTTP archive caching (in `~/.cache/kustomark/http/`)
+   - ✅ Cache commands (list, clear) for both git and HTTP
+   - ✅ Cache info retrieval for HTTP archives
 
 5. **[TODO] Lock File Generation**
    - Generate `kustomark.lock.yaml`
@@ -280,12 +286,16 @@ This document tracks the implementation of kustomark based on the spec milestone
 **Status:**
 - **M1 COMPLETE! ✅**
 - **M2 COMPLETE! ✅**
-- **M3 GIT FETCHING COMPLETE! ✅**
+- **M3 REMOTE SOURCES NEARLY COMPLETE! ✅**
   - Git URL parsing and validation: DONE ✅
   - Git repository fetching: DONE ✅
-  - Next: HTTP archive support and lock file generation
+  - HTTP archive support: DONE ✅
+  - HTTP URL parsing: DONE ✅
+  - HTTP archive fetching with caching: DONE ✅
+  - Caching system: DONE ✅
+  - Next: Lock file generation
 
-**Next Priority:** M3 HTTP Archive Support (.tar.gz, .zip) and Lock File Generation
+**Next Priority:** M3 Lock File Generation (kustomark.lock.yaml)
 
 **2026-01-02 (M3 Git Repository Fetching):**
 - ✅ Created `/home/dex/kustomark-ralph-bash/src/core/git-fetcher.ts` with complete git operations:
@@ -316,3 +326,31 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ All 501 tests passing ✓
 - ✅ All linting checks passing (bun check) ✓
 - ✅ Type-safe implementation with proper error handling
+
+**2026-01-02 (M3 HTTP Archive Support):**
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/http-url-parser.ts` with HTTP archive URL parsing:
+  - `isHttpArchiveUrl()` - Detects HTTP archive URLs (.tar.gz, .tgz, .tar, .zip)
+  - `parseHttpArchiveUrl()` - Parses HTTP archive URLs with subpath and query param support
+  - Supports subpath notation (e.g., `https://example.com/archive.tar.gz//subdir/`)
+  - 66 comprehensive tests in http-url-parser.test.ts
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/http-fetcher.ts` with HTTP archive operations:
+  - `fetchHttpArchive()` - Download and extract archives with caching support
+  - `clearHttpCache()` - Clear cached archives (all or by pattern)
+  - `listHttpCache()` - List all cached archives
+  - `getCacheInfo()` - Get metadata about cached archives
+  - `HttpFetchError` - Custom error class for HTTP operations
+  - Supports authentication via bearer tokens (env var or options)
+  - SHA256 checksum validation
+  - Caches archives in `~/.cache/kustomark/http/`
+  - Subpath filtering for archive extraction
+  - 22 comprehensive tests in tests/http-fetcher.test.ts
+- ✅ Integrated HTTP archive support into resource-resolver.ts:
+  - Automatically fetches HTTP archives when detected in resources
+  - Respects subpath specifications
+  - Adds extracted files to the file map for processing
+  - Comprehensive error handling
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/index.ts` to export HTTP functions and types
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/types.ts` with ParsedHttpArchiveUrl interface
+- ✅ All 589 tests passing (88 new HTTP-related tests) ✓
+- ✅ All linting checks passing (bun check) ✓
+- ✅ Type-safe implementation with comprehensive error handling
