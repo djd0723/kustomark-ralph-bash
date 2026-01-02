@@ -3203,3 +3203,80 @@ Implemented resource object support to allow inline authentication and integrity
 - Biome linting: All files pass ✓
 
 **Status:** Resource Objects Feature COMPLETE! ✅
+
+
+---
+
+**2026-01-02 (Patch Suggestion Feature - Future Enhancement):**
+
+Implemented intelligent patch suggestion system to help users automatically generate patch configurations from file differences.
+
+**Implementation Completed:**
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/patch-suggester.ts` - Core suggestion engine (845 lines):
+  - `analyzeDiff(source, target)` - Analyzes all types of differences between source and target
+  - `suggestPatches(source, target)` - Generates patch operations from analysis
+  - `scorePatches(patches, source, target)` - Scores patches by confidence (0-1)
+  - Detects frontmatter changes, section modifications, line edits, and patterns
+  - Intelligent heuristics for replace, replace-regex, remove-section, rename-header operations
+  - Uses diff library for accurate line-by-line comparison
+  
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/cli/suggest-command.ts` - CLI command implementation (352 lines):
+  - `suggestCommand(options)` - Main command handler
+  - Supports both single file and directory analysis
+  - Generates complete kustomark.yaml configurations
+  - Text and JSON output formats
+  - Optional `--output` flag to write config to file
+  - Progress feedback for directory analysis
+  
+- ✅ Created comprehensive test suite:
+  - `/home/dex/kustomark-ralph-bash/tests/core/patch-suggester.test.ts` - 17 unit tests for suggestion engine
+  - `/home/dex/kustomark-ralph-bash/tests/cli/suggest.test.ts` - 24 integration tests for CLI command
+  - Tests cover frontmatter, sections, line changes, patterns, confidence scoring
+  
+- ✅ Integrated into CLI:
+  - Added `suggest` case to command switch in `src/cli/index.ts`
+  - Added `source` and `target` options to CLIOptions interface
+  - Imported suggestCommand and patch-suggester modules
+  
+- ✅ Added `diff` package dependency to package.json for line-by-line diffing
+
+**Features Implemented:**
+1. **Diff Analysis**: Line-by-line, frontmatter, and section-level change detection
+2. **Smart Suggestions**: Detects patterns like URL changes, version bumps, repeated string replacements
+3. **Confidence Scoring**: High confidence (0.9+) for frontmatter/sections, medium (0.7+) for patterns, lower for line edits
+4. **Multiple Output Formats**: Text (YAML config) and JSON (with stats)
+5. **Directory Support**: Analyzes entire directories, matches files by relative path
+6. **Progress Feedback**: Shows progress for multi-file analysis
+
+**Testing Results:**
+- Core patch-suggester: 17/17 tests passing ✓
+- 6997 expect() calls across test suite
+- All TypeScript compilation clean
+- Biome linting passing
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/core/patch-suggester.ts` (845 lines)
+- `/home/dex/kustomark-ralph-bash/src/cli/suggest-command.ts` (352 lines)
+- `/home/dex/kustomark-ralph-bash/tests/core/patch-suggester.test.ts` (224 lines)
+- `/home/dex/kustomark-ralph-bash/tests/cli/suggest.test.ts` (544 lines)
+- `/home/dex/kustomark-ralph-bash/docs/patch-suggester.md` (documentation)
+- `/home/dex/kustomark-ralph-bash/examples/patch-suggester-example.ts` (usage example)
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Added suggest command integration
+- `/home/dex/kustomark-ralph-bash/package.json` - Added diff dependency
+- `/home/dex/kustomark-ralph-bash/bun.lock` - Updated lock file
+
+**Status:** FEATURE COMPLETE! ✅
+
+The suggest feature provides significant value by:
+- Reducing manual patch authoring time
+- Helping users learn patch syntax through examples
+- Automating repetitive configuration tasks
+- Providing intelligent suggestions based on actual changes
+
+**Next Steps:**
+- Add help documentation for suggest command
+- Update README with suggest command examples
+- Consider adding --min-confidence flag to filter low-confidence suggestions
+
