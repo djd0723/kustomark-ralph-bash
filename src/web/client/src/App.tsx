@@ -1,5 +1,6 @@
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import * as YAML from "yaml";
 import { Button } from "./components/common/Button";
 import FileBrowser from "./components/editor/FileBrowser";
@@ -81,7 +82,7 @@ export const App: React.FC = () => {
 
       await api.config.save(configPath, content);
       setOriginalContent(content);
-      alert("Config saved successfully!");
+      toast.success("Config saved successfully!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save config");
     } finally {
@@ -102,7 +103,7 @@ export const App: React.FC = () => {
       setValidation(result);
 
       if (result.valid) {
-        alert("Config is valid!");
+        toast.success("Config is valid!");
       } else {
         setError(`Validation failed with ${result.errors.length} errors`);
       }
@@ -133,7 +134,7 @@ export const App: React.FC = () => {
       });
 
       setBuildResult(result);
-      alert(
+      toast.success(
         `Build completed! ${result.filesWritten} files written, ${result.patchesApplied} patches applied in ${result.duration}ms`,
       );
     } catch (err) {
@@ -151,6 +152,30 @@ export const App: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: "#fff",
+            color: "#363636",
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: "#10b981",
+              secondary: "#fff",
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: "#ef4444",
+              secondary: "#fff",
+            },
+          },
+        }}
+      />
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="px-6 py-4">
