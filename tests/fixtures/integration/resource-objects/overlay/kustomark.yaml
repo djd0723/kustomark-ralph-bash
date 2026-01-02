@@ -1,0 +1,23 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+output: ./output
+
+resources:
+  # Base resources (string format)
+  - ../base/
+  # Resource object with URL (demonstrates resource object syntax)
+  - url: "*.md"
+
+patches:
+  - op: replace
+    old: "Base Document"
+    new: "Modified Document"
+    include: "document.md"
+
+  - op: replace
+    old: "Local Resource"
+    new: "Processed Local Resource"
+    include: "local.md"
+
+onNoMatch: warn

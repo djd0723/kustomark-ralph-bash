@@ -70,6 +70,7 @@ import type {
   OnNoMatchStrategy,
   PatchOperation,
   RenameFilePatch,
+  ResourceItem,
   ValidationError,
   ValidationResult,
   ValidationWarning,
@@ -618,13 +619,15 @@ function validateConfig(
  * Find all kustomark config files referenced in the resources
  * Returns absolute paths to all base config files
  */
-function findReferencedConfigs(resources: string[], basePath: string): string[] {
+function findReferencedConfigs(resources: ResourceItem[], basePath: string): string[] {
   const configPaths: string[] = [];
 
   for (const resource of resources) {
+    // Extract URL from ResourceItem
+    const resourceUrl = getResourceUrl(resource);
     // Check if resource is a directory reference (ends with / or contains ../)
-    if (resource.endsWith("/") || resource.includes("../")) {
-      const resolvedDir = isAbsolute(resource) ? resource : resolve(basePath, resource);
+    if (resourceUrl.endsWith("/") || resourceUrl.includes("../")) {
+      const resolvedDir = isAbsolute(resourceUrl) ? resourceUrl : resolve(basePath, resourceUrl);
 
       // Look for kustomark.yaml or kustomark.yml
       const yamlPath = join(resolvedDir, "kustomark.yaml");
@@ -1377,8 +1380,9 @@ async function buildResolutionChain(
     if (config.resources && config.resources.length > 0) {
       for (const resource of config.resources) {
         // Check if this is a directory reference (potential base config)
-        if (isDirectoryReference(resource)) {
-          const resolvedDir = resolvePathFromBase(resource, currentBase);
+        const resourceUrl = getResourceUrl(resource);
+        if (isDirectoryReference(resourceUrl)) {
+          const resolvedDir = resolvePathFromBase(resourceUrl, currentBase);
           const baseConfigPath = findKustomarkConfigHelper(resolvedDir, fileMap);
 
           if (baseConfigPath) {
@@ -1402,6 +1406,13 @@ async function buildResolutionChain(
 
   await loadConfig(configPath, basePath);
   return chain;
+}
+
+/**
+ * Extracts URL string from a ResourceItem (handles both string and ResourceObject)
+ */
+function getResourceUrl(resource: ResourceItem): string {
+  return typeof resource === "string" ? resource : resource.url;
 }
 
 /**
@@ -3365,8 +3376,9 @@ async function watchCommand(path: string, options: CLIOptions): Promise<number> 
         // Watch base configs if this is an overlay
         if (config.resources && config.resources.length > 0) {
           for (const resource of config.resources) {
-            if (isDirectoryReference(resource)) {
-              const resolvedDir = resolvePathFromBase(resource, basePath);
+            const resourceUrl = getResourceUrl(resource);
+            if (isDirectoryReference(resourceUrl)) {
+              const resolvedDir = resolvePathFromBase(resourceUrl, basePath);
               const baseConfigPath = findKustomarkConfigHelper(resolvedDir, fileMap);
 
               if (baseConfigPath) {
@@ -3652,14 +3664,15 @@ async function fetchCommand(path: string, options: CLIOptions): Promise<number> 
 
     // Identify remote resources
     for (const resource of config.resources) {
+      const resourceUrl = getResourceUrl(resource);
       if (
-        resource.startsWith("git::") ||
-        resource.startsWith("http://") ||
-        resource.startsWith("https://") ||
-        resource.match(/^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\//) || // github.com/org/repo style
-        resource.startsWith("git@")
+        resourceUrl.startsWith("git::") ||
+        resourceUrl.startsWith("http://") ||
+        resourceUrl.startsWith("https://") ||
+        resourceUrl.match(/^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\//) || // github.com/org/repo style
+        resourceUrl.startsWith("git@")
       ) {
-        remoteResources.push(resource);
+        remoteResources.push(resourceUrl);
       }
     }
 

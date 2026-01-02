@@ -317,7 +317,7 @@ describe('validateConfig', () => {
       });
     });
 
-    test('fails when resource item is not a string', () => {
+    test('fails when resource item is not a string or object', () => {
       const config = {
         apiVersion: 'kustomark/v1',
         kind: 'Kustomization',
@@ -329,7 +329,7 @@ describe('validateConfig', () => {
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
         field: 'resources[1]',
-        message: 'resource must be a string',
+        message: 'resource must be a string or an object',
       });
     });
 
@@ -344,6 +344,339 @@ describe('validateConfig', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.filter(e => e.field.startsWith('resources['))).toHaveLength(3);
+    });
+  });
+
+  describe('ResourceObject validation', () => {
+    test('accepts valid resource object with url only', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          { url: 'https://example.com/doc.md' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('accepts resource object with sha256', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          { url: 'https://example.com/doc.md', sha256: 'abc123def456' },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+    });
+
+    test('accepts resource object with bearer auth', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          {
+            url: 'https://example.com/doc.md',
+            auth: { type: 'bearer', tokenEnv: 'GITHUB_TOKEN' },
+          },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+    });
+
+    test('accepts resource object with basic auth', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          {
+            url: 'https://example.com/doc.md',
+            auth: { type: 'basic', username: 'user', passwordEnv: 'PASSWORD' },
+          },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+    });
+
+    test('accepts mix of string and object resources', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          'docs/*.md',
+          { url: 'https://example.com/doc.md', sha256: 'abc123' },
+          'README.md',
+          {
+            url: 'https://private.com/secure.md',
+            auth: { type: 'bearer', tokenEnv: 'TOKEN' },
+          },
+        ],
+      };
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(true);
+    });
+
+    test('fails when resource object missing url', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [{ sha256: 'abc123' }],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].url',
+        message: 'resource object requires \'url\' field',
+      });
+    });
+
+    test('fails when resource object url is not a string', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [{ url: 123 }],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].url',
+        message: '\'url\' must be a string',
+      });
+    });
+
+    test('fails when sha256 is not a string', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [{ url: 'https://example.com/doc.md', sha256: 123 }],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].sha256',
+        message: '\'sha256\' must be a string',
+      });
+    });
+
+    test('fails when sha256 is empty', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [{ url: 'https://example.com/doc.md', sha256: '' }],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].sha256',
+        message: '\'sha256\' cannot be empty',
+      });
+    });
+
+    test('fails when auth is not an object', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [{ url: 'https://example.com/doc.md', auth: 'invalid' }],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth',
+        message: 'auth must be an object',
+      });
+    });
+
+    test('fails when auth missing type', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [{ url: 'https://example.com/doc.md', auth: { tokenEnv: 'TOKEN' } }],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth.type',
+        message: 'auth requires \'type\' field',
+      });
+    });
+
+    test('fails when auth type is invalid', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [{ url: 'https://example.com/doc.md', auth: { type: 'invalid' } }],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth.type',
+        message: '\'type\' must be either "bearer" or "basic", got "invalid"',
+      });
+    });
+
+    test('fails when bearer auth missing tokenEnv', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [{ url: 'https://example.com/doc.md', auth: { type: 'bearer' } }],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth.tokenEnv',
+        message: 'bearer auth requires \'tokenEnv\' field',
+      });
+    });
+
+    test('fails when basic auth missing username', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          { url: 'https://example.com/doc.md', auth: { type: 'basic', passwordEnv: 'PASS' } },
+        ],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth.username',
+        message: 'basic auth requires \'username\' field',
+      });
+    });
+
+    test('fails when basic auth missing passwordEnv', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          { url: 'https://example.com/doc.md', auth: { type: 'basic', username: 'user' } },
+        ],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth.passwordEnv',
+        message: 'basic auth requires \'passwordEnv\' field',
+      });
+    });
+
+    test('fails when bearer auth has basic auth fields', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          {
+            url: 'https://example.com/doc.md',
+            auth: { type: 'bearer', tokenEnv: 'TOKEN', username: 'user' },
+          },
+        ],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth',
+        message: 'bearer auth should not have \'username\' or \'passwordEnv\' fields',
+      });
+    });
+
+    test('fails when basic auth has bearer auth fields', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          {
+            url: 'https://example.com/doc.md',
+            auth: {
+              type: 'basic',
+              username: 'user',
+              passwordEnv: 'PASS',
+              tokenEnv: 'TOKEN',
+            },
+          },
+        ],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth',
+        message: 'basic auth should not have \'tokenEnv\' field',
+      });
+    });
+
+    test('fails when tokenEnv is empty', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [{ url: 'https://example.com/doc.md', auth: { type: 'bearer', tokenEnv: '' } }],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth.tokenEnv',
+        message: '\'tokenEnv\' cannot be empty',
+      });
+    });
+
+    test('fails when passwordEnv is empty', () => {
+      const config = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: [
+          {
+            url: 'https://example.com/doc.md',
+            auth: { type: 'basic', username: 'user', passwordEnv: '' },
+          },
+        ],
+      } as unknown as KustomarkConfig;
+
+      const result = validateConfig(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: 'resources[0].auth.passwordEnv',
+        message: '\'passwordEnv\' cannot be empty',
+      });
     });
   });
 

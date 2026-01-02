@@ -168,9 +168,61 @@ export function generateSchema(): object {
           "List of resource patterns, file paths, or kustomark configs to include. Supports glob patterns, local paths, git URLs, and HTTP archives.",
         minItems: 1,
         items: {
-          type: "string",
-          description:
-            "Resource pattern (glob), local path, kustomark directory, git URL (github.com/org/repo//path?ref=branch), or HTTP archive URL",
+          oneOf: [
+            {
+              type: "string",
+              description:
+                "Resource pattern (glob), local path, kustomark directory, git URL (github.com/org/repo//path?ref=branch), or HTTP archive URL",
+            },
+            {
+              type: "object",
+              description:
+                "Resource object with URL and optional authentication/integrity metadata",
+              required: ["url"],
+              properties: {
+                url: {
+                  type: "string",
+                  description:
+                    "Resource URL - supports glob patterns, local paths, git URLs (github.com/org/repo//path?ref=branch), or HTTP archive URLs",
+                },
+                sha256: {
+                  type: "string",
+                  description:
+                    "SHA-256 hash for resource integrity verification. When specified, the downloaded resource must match this hash.",
+                  pattern: "^[a-fA-F0-9]{64}$",
+                },
+                auth: {
+                  type: "object",
+                  description: "Authentication configuration for accessing protected resources",
+                  required: ["type"],
+                  properties: {
+                    type: {
+                      type: "string",
+                      enum: ["bearer", "basic"],
+                      description:
+                        "Authentication type: 'bearer' for token-based auth, 'basic' for username/password auth",
+                    },
+                    tokenEnv: {
+                      type: "string",
+                      description:
+                        "Environment variable name containing the bearer token (used when type is 'bearer')",
+                    },
+                    username: {
+                      type: "string",
+                      description: "Username for basic authentication (used when type is 'basic')",
+                    },
+                    passwordEnv: {
+                      type: "string",
+                      description:
+                        "Environment variable name containing the password for basic authentication (used when type is 'basic')",
+                    },
+                  },
+                  additionalProperties: false,
+                },
+              },
+              additionalProperties: false,
+            },
+          ],
         },
       },
       onNoMatch: {

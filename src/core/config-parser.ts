@@ -91,14 +91,9 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
       message: "resources array cannot be empty",
     });
   } else {
-    // Validate each resource is a string
+    // Validate each resource is either a string or a valid ResourceObject
     config.resources.forEach((resource, index) => {
-      if (typeof resource !== "string") {
-        errors.push({
-          field: `resources[${index}]`,
-          message: "resource must be a string",
-        });
-      } else {
+      if (typeof resource === "string") {
         // Validate git URLs
         if (isGitUrl(resource)) {
           const parsed = parseGitUrl(resource);
@@ -112,6 +107,59 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
             // No warning needed - git fetching is fully implemented
           }
         }
+      } else if (typeof resource === "object" && resource !== null) {
+        // Validate ResourceObject
+        const resourceObj = resource as unknown as Record<string, unknown>;
+
+        // Validate required 'url' field
+        if (!resourceObj.url) {
+          errors.push({
+            field: `resources[${index}].url`,
+            message: "resource object requires 'url' field",
+          });
+        } else if (typeof resourceObj.url !== "string") {
+          errors.push({
+            field: `resources[${index}].url`,
+            message: "'url' must be a string",
+          });
+        } else {
+          // Validate git URLs in object form
+          if (isGitUrl(resourceObj.url)) {
+            const parsed = parseGitUrl(resourceObj.url);
+            if (!parsed) {
+              errors.push({
+                field: `resources[${index}].url`,
+                message: `Invalid git URL format: "${resourceObj.url}"`,
+              });
+            }
+          }
+        }
+
+        // Validate optional 'sha256' field
+        if (resourceObj.sha256 !== undefined) {
+          if (typeof resourceObj.sha256 !== "string") {
+            errors.push({
+              field: `resources[${index}].sha256`,
+              message: "'sha256' must be a string",
+            });
+          } else if (resourceObj.sha256.trim() === "") {
+            errors.push({
+              field: `resources[${index}].sha256`,
+              message: "'sha256' cannot be empty",
+            });
+          }
+        }
+
+        // Validate optional 'auth' field
+        if (resourceObj.auth !== undefined) {
+          const authErrors = validateResourceAuth(resourceObj.auth, `resources[${index}].auth`);
+          errors.push(...authErrors);
+        }
+      } else {
+        errors.push({
+          field: `resources[${index}]`,
+          message: "resource must be a string or an object",
+        });
       }
     });
   }
@@ -643,6 +691,129 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         });
       }
       break;
+  }
+
+  return errors;
+}
+
+/**
+ * Validates a ResourceAuth object
+ *
+ * @param auth - The auth object to validate
+ * @param fieldPath - Field path for error messages
+ * @returns Array of validation errors
+ */
+function validateResourceAuth(auth: unknown, fieldPath: string): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  if (!auth || typeof auth !== "object") {
+    errors.push({
+      field: fieldPath,
+      message: "auth must be an object",
+    });
+    return errors;
+  }
+
+  const authObj = auth as Record<string, unknown>;
+
+  // Validate required 'type' field
+  if (!authObj.type) {
+    errors.push({
+      field: `${fieldPath}.type`,
+      message: "auth requires 'type' field",
+    });
+  } else if (typeof authObj.type !== "string") {
+    errors.push({
+      field: `${fieldPath}.type`,
+      message: "'type' must be a string",
+    });
+  } else if (authObj.type !== "bearer" && authObj.type !== "basic") {
+    errors.push({
+      field: `${fieldPath}.type`,
+      message: `'type' must be either "bearer" or "basic", got "${authObj.type}"`,
+    });
+  }
+
+  // Validate optional 'tokenEnv' field
+  if (authObj.tokenEnv !== undefined) {
+    if (typeof authObj.tokenEnv !== "string") {
+      errors.push({
+        field: `${fieldPath}.tokenEnv`,
+        message: "'tokenEnv' must be a string",
+      });
+    } else if (authObj.tokenEnv.trim() === "") {
+      errors.push({
+        field: `${fieldPath}.tokenEnv`,
+        message: "'tokenEnv' cannot be empty",
+      });
+    }
+  }
+
+  // Validate optional 'username' field
+  if (authObj.username !== undefined) {
+    if (typeof authObj.username !== "string") {
+      errors.push({
+        field: `${fieldPath}.username`,
+        message: "'username' must be a string",
+      });
+    } else if (authObj.username.trim() === "") {
+      errors.push({
+        field: `${fieldPath}.username`,
+        message: "'username' cannot be empty",
+      });
+    }
+  }
+
+  // Validate optional 'passwordEnv' field
+  if (authObj.passwordEnv !== undefined) {
+    if (typeof authObj.passwordEnv !== "string") {
+      errors.push({
+        field: `${fieldPath}.passwordEnv`,
+        message: "'passwordEnv' must be a string",
+      });
+    } else if (authObj.passwordEnv.trim() === "") {
+      errors.push({
+        field: `${fieldPath}.passwordEnv`,
+        message: "'passwordEnv' cannot be empty",
+      });
+    }
+  }
+
+  // Validate type-specific requirements
+  if (authObj.type === "bearer") {
+    if (!authObj.tokenEnv) {
+      errors.push({
+        field: `${fieldPath}.tokenEnv`,
+        message: "bearer auth requires 'tokenEnv' field",
+      });
+    }
+    // Warn if basic auth fields are present for bearer type
+    if (authObj.username !== undefined || authObj.passwordEnv !== undefined) {
+      errors.push({
+        field: fieldPath,
+        message: "bearer auth should not have 'username' or 'passwordEnv' fields",
+      });
+    }
+  } else if (authObj.type === "basic") {
+    if (!authObj.username) {
+      errors.push({
+        field: `${fieldPath}.username`,
+        message: "basic auth requires 'username' field",
+      });
+    }
+    if (!authObj.passwordEnv) {
+      errors.push({
+        field: `${fieldPath}.passwordEnv`,
+        message: "basic auth requires 'passwordEnv' field",
+      });
+    }
+    // Warn if bearer auth fields are present for basic type
+    if (authObj.tokenEnv !== undefined) {
+      errors.push({
+        field: fieldPath,
+        message: "basic auth should not have 'tokenEnv' field",
+      });
+    }
   }
 
   return errors;

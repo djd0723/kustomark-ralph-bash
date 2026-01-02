@@ -45,9 +45,9 @@ export function buildDependencyGraph(
   const filePaths = Array.from(files.keys());
 
   // Check for config dependencies in resources field
-  const configDeps = (config.resources || []).filter(
-    (resource) => resource.endsWith("/") || resource.includes("../"),
-  );
+  const configDeps = (config.resources || [])
+    .map((resource) => (typeof resource === "string" ? resource : resource.url))
+    .filter((resource) => resource.endsWith("/") || resource.includes("../"));
   graph.configDependencies = configDeps;
 
   // Collect unique patch groups

@@ -283,4 +283,71 @@ describe("kustomark schema", () => {
     expect(output.trim().startsWith("{")).toBe(true);
     expect(output.trim().endsWith("}")).toBe(true);
   });
+
+  test("resources field supports both string and object formats", () => {
+    const output = execSync(`bun run ${CLI_PATH} schema`, {
+      encoding: "utf-8",
+    });
+
+    const schema = JSON.parse(output);
+
+    // Verify resources is an array
+    expect(schema.properties.resources).toMatchObject({
+      type: "array",
+      minItems: 1,
+    });
+
+    // Verify it has oneOf with string and object options
+    const resourceItems = schema.properties.resources.items;
+    expect(resourceItems).toHaveProperty("oneOf");
+    expect(resourceItems.oneOf).toHaveLength(2);
+
+    // First option should be a string (simple format)
+    const stringFormat = resourceItems.oneOf[0];
+    expect(stringFormat).toMatchObject({
+      type: "string",
+    });
+    expect(stringFormat.description).toContain("Resource pattern");
+
+    // Second option should be an object (resource object format)
+    const objectFormat = resourceItems.oneOf[1];
+    expect(objectFormat).toMatchObject({
+      type: "object",
+      required: ["url"],
+      additionalProperties: false,
+    });
+
+    // Verify resource object has correct properties
+    expect(objectFormat.properties).toHaveProperty("url");
+    expect(objectFormat.properties).toHaveProperty("sha256");
+    expect(objectFormat.properties).toHaveProperty("auth");
+
+    // Verify url property
+    expect(objectFormat.properties.url).toMatchObject({
+      type: "string",
+    });
+
+    // Verify sha256 property with pattern validation
+    expect(objectFormat.properties.sha256).toMatchObject({
+      type: "string",
+      pattern: "^[a-fA-F0-9]{64}$",
+    });
+
+    // Verify auth property structure
+    expect(objectFormat.properties.auth).toMatchObject({
+      type: "object",
+      required: ["type"],
+      additionalProperties: false,
+    });
+
+    // Verify auth properties
+    const authProps = objectFormat.properties.auth.properties;
+    expect(authProps.type).toMatchObject({
+      type: "string",
+      enum: ["bearer", "basic"],
+    });
+    expect(authProps).toHaveProperty("tokenEnv");
+    expect(authProps).toHaveProperty("username");
+    expect(authProps).toHaveProperty("passwordEnv");
+  });
 });

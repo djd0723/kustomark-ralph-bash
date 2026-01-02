@@ -3160,3 +3160,46 @@ kustomark build . --progress -q
 - Production-ready with comprehensive test coverage
 
 **Status:** Progress Feedback System COMPLETE! ✅
+
+---
+
+**2026-01-02 (Resource Objects Feature - Spec Compliance Enhancement):**
+
+Implemented resource object support to allow inline authentication and integrity verification in kustomark.yaml configs, closing the API gap between spec and implementation.
+
+**Problem Solved:**
+- Spec showed resources with embedded auth and SHA256 fields, but only strings were supported
+- Users had to rely solely on environment variables and lock files for auth/checksums
+- No way to specify per-resource authentication directly in config
+
+**Implementation Completed:**
+- ✅ Created new types in `/home/dex/kustomark-ralph-bash/src/core/types.ts`:
+  - `ResourceAuth` interface (type: bearer|basic, tokenEnv, username, passwordEnv)
+  - `ResourceObject` interface (url, sha256, auth)
+  - `ResourceItem` type union (string | ResourceObject)
+  - Updated `KustomarkConfig.resources` to use `ResourceItem[]`
+
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts` - Enhanced validation:
+  - Added `validateResourceAuth()` function with comprehensive rules
+  - Resource object validation (url required, sha256 optional, auth optional)
+  - Cross-contamination prevention between auth types
+
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/resource-resolver.ts` - Resource processing:
+  - Bearer token and basic auth handling for Git and HTTP
+  - SHA256 integrity verification for HTTP archives
+  - Full backward compatibility with string resources
+
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/git-fetcher.ts` - Auth support:
+  - Added `authToken?: string` to `GitFetchOptions`
+
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/schema.ts` - JSON Schema with resource objects
+
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - CLI support for ResourceItem
+
+**Testing Results:**
+- All 1850 tests passing (30 new tests) ✓
+- 6954 expect() calls successful
+- TypeScript compilation: No errors ✓
+- Biome linting: All files pass ✓
+
+**Status:** Resource Objects Feature COMPLETE! ✅

@@ -57,6 +57,8 @@ export interface GitFetchOptions {
   updateLock?: boolean;
   /** Offline mode - fail if remote fetch is needed */
   offline?: boolean;
+  /** Authentication token (for HTTPS git operations) */
+  authToken?: string;
 }
 
 /**
@@ -82,16 +84,27 @@ function getCacheKey(parsed: ParsedGitUrl): string {
  */
 async function executeGit(
   args: string[],
-  options: { cwd?: string; timeout?: number } = {},
+  options: { cwd?: string; timeout?: number; authToken?: string } = {},
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const env: Record<string, string> = {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: "0", // Disable interactive prompts
+  };
+
+  // Add auth token to environment for HTTPS operations
+  if (options.authToken) {
+    // Git can use GIT_ASKPASS with a custom script, but for simplicity
+    // we'll inject the token into the URL via git credential helper
+    // For GitHub, the token can be used as password with 'x-access-token' as username
+    env.GIT_USERNAME = "x-access-token";
+    env.GIT_PASSWORD = options.authToken;
+  }
+
   const proc = Bun.spawn(["git", ...args], {
     cwd: options.cwd,
     stdout: "pipe",
     stderr: "pipe",
-    env: {
-      ...process.env,
-      GIT_TERMINAL_PROMPT: "0", // Disable interactive prompts
-    },
+    env,
   });
 
   let killed = false;
@@ -129,12 +142,13 @@ async function cloneRepository(
   dest: string,
   sparsePath?: string,
   timeout?: number,
+  authToken?: string,
 ): Promise<void> {
   if (sparsePath) {
     // Clone with sparse checkout
     const { exitCode, stderr } = await executeGit(
       ["clone", "--no-checkout", "--filter=blob:none", url, dest],
-      { timeout },
+      { timeout, authToken },
     );
 
     if (exitCode !== 0) {
@@ -145,6 +159,7 @@ async function cloneRepository(
     const sparseResult = await executeGit(["sparse-checkout", "init", "--cone"], {
       cwd: dest,
       timeout,
+      authToken,
     });
 
     if (sparseResult.exitCode !== 0) {
@@ -159,6 +174,7 @@ async function cloneRepository(
     const setResult = await executeGit(["sparse-checkout", "set", sparsePath], {
       cwd: dest,
       timeout,
+      authToken,
     });
 
     if (setResult.exitCode !== 0) {
@@ -170,7 +186,7 @@ async function cloneRepository(
     }
   } else {
     // Standard clone
-    const { exitCode, stderr } = await executeGit(["clone", url, dest], { timeout });
+    const { exitCode, stderr } = await executeGit(["clone", url, dest], { timeout, authToken });
 
     if (exitCode !== 0) {
       throw new GitFetchError(`Failed to clone repository: ${stderr}`, "CLONE_FAILED", stderr);
@@ -181,13 +197,26 @@ async function cloneRepository(
 /**
  * Checkout a specific ref (branch, tag, or commit)
  */
-async function checkoutRef(repoPath: string, ref: string, timeout?: number): Promise<string> {
+async function checkoutRef(
+  repoPath: string,
+  ref: string,
+  timeout?: number,
+  authToken?: string,
+): Promise<string> {
   // Fetch the ref if it's not available locally
-  const fetchResult = await executeGit(["fetch", "origin", ref], { cwd: repoPath, timeout });
+  const fetchResult = await executeGit(["fetch", "origin", ref], {
+    cwd: repoPath,
+    timeout,
+    authToken,
+  });
 
   if (fetchResult.exitCode !== 0) {
     // If fetch fails, try fetching all refs (might be a tag)
-    const fetchAllResult = await executeGit(["fetch", "origin"], { cwd: repoPath, timeout });
+    const fetchAllResult = await executeGit(["fetch", "origin"], {
+      cwd: repoPath,
+      timeout,
+      authToken,
+    });
 
     if (fetchAllResult.exitCode !== 0) {
       throw new GitFetchError(
@@ -199,7 +228,11 @@ async function checkoutRef(repoPath: string, ref: string, timeout?: number): Pro
   }
 
   // Checkout the ref
-  const checkoutResult = await executeGit(["checkout", ref], { cwd: repoPath, timeout });
+  const checkoutResult = await executeGit(["checkout", ref], {
+    cwd: repoPath,
+    timeout,
+    authToken,
+  });
 
   if (checkoutResult.exitCode !== 0) {
     throw new GitFetchError(
@@ -210,7 +243,11 @@ async function checkoutRef(repoPath: string, ref: string, timeout?: number): Pro
   }
 
   // Get the resolved commit SHA
-  const revParseResult = await executeGit(["rev-parse", "HEAD"], { cwd: repoPath, timeout });
+  const revParseResult = await executeGit(["rev-parse", "HEAD"], {
+    cwd: repoPath,
+    timeout,
+    authToken,
+  });
 
   if (revParseResult.exitCode !== 0) {
     throw new GitFetchError(
@@ -354,7 +391,11 @@ export async function fetchGitRepository(
 
     // Update existing repository
     try {
-      await executeGit(["fetch", "origin"], { cwd: repoPath, timeout: options.timeout });
+      await executeGit(["fetch", "origin"], {
+        cwd: repoPath,
+        timeout: options.timeout,
+        authToken: options.authToken,
+      });
     } catch (error) {
       // If fetch fails, remove the cached repo and clone fresh
       await rm(repoPath, { recursive: true, force: true });
@@ -366,11 +407,17 @@ export async function fetchGitRepository(
 
   // Clone if needed
   if (needsClone) {
-    await cloneRepository(parsed.cloneUrl, repoPath, parsed.path, options.timeout);
+    await cloneRepository(
+      parsed.cloneUrl,
+      repoPath,
+      parsed.path,
+      options.timeout,
+      options.authToken,
+    );
   }
 
   // Checkout the specified ref
-  const resolvedSha = await checkoutRef(repoPath, ref, options.timeout);
+  const resolvedSha = await checkoutRef(repoPath, ref, options.timeout, options.authToken);
 
   // Calculate content hash and create lock entry
   const contentHash = await calculateGitContentHash(repoPath, parsed.path);

@@ -24,6 +24,11 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [Condition Types](#condition-types)
   - [Logical Operators](#logical-operators)
   - [Real-World Examples](#real-world-examples)
+- [Resources](#resources)
+  - [Resource Strings](#resource-strings)
+  - [Resource Objects](#resource-objects)
+  - [Authentication](#authentication)
+  - [Integrity Verification](#integrity-verification)
 - [Resource Resolution](#resource-resolution)
 - [Advanced Usage](#advanced-usage)
   - [Patch Groups](#patch-groups)
@@ -1919,6 +1924,275 @@ patches:
 **Debugging:**
 - Use `kustomark debug` to step through conditional patches
 - Use `kustomark diff -v` to see which patches matched
+
+## Resources
+
+Resources define the source files for your kustomization. They can be simple strings (file paths, globs, URLs) or detailed objects with authentication and integrity verification.
+
+### Resource Strings
+
+The simplest form is a string that can be:
+
+**Local file patterns:**
+```yaml
+resources:
+  - "**/*.md"           # All markdown files recursively
+  - "!**/README.md"     # Exclude pattern
+  - ./docs/guide.md     # Specific file
+  - ../base/            # Another kustomark config directory
+```
+
+**Remote git repositories:**
+```yaml
+resources:
+  # GitHub shorthand
+  - github.com/org/repo//path?ref=v1.2.0
+
+  # Full git URL with HTTPS
+  - git::https://github.com/org/repo.git//subdir?ref=main
+
+  # SSH URL
+  - git::git@github.com:org/repo.git//path?ref=abc1234
+```
+
+**HTTP archives:**
+```yaml
+resources:
+  - https://example.com/releases/v1.0.0/docs.tar.gz
+  - https://example.com/archive.tar.gz//subdir/
+  - https://example.com/package.zip//docs/
+```
+
+Supported archive formats: `.tar.gz`, `.tgz`, `.tar`, `.zip`
+
+### Resource Objects
+
+For advanced use cases, resources can be objects with additional configuration:
+
+```yaml
+resources:
+  - url: https://example.com/docs.tar.gz
+    sha256: abc123def456...
+    auth:
+      type: bearer
+      tokenEnv: GITHUB_TOKEN
+```
+
+**Resource Object Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `url` | string | **Required**. Resource URL (git, HTTP, or local path) |
+| `sha256` | string | Optional. SHA256 checksum for integrity verification |
+| `auth` | object | Optional. Authentication configuration |
+
+### Authentication
+
+Resource objects support two authentication methods for HTTP resources:
+
+#### Bearer Token Authentication
+
+Use bearer tokens for GitHub releases, private registries, or API endpoints:
+
+```yaml
+resources:
+  - url: https://private.example.com/docs.tar.gz
+    auth:
+      type: bearer
+      tokenEnv: PRIVATE_REPO_TOKEN
+```
+
+The token is read from the specified environment variable:
+
+```bash
+export PRIVATE_REPO_TOKEN="your-token-here"
+kustomark build ./team/
+```
+
+**Authentication Fields (Bearer):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Must be `"bearer"` |
+| `tokenEnv` | string | **Required**. Environment variable name containing the bearer token |
+
+#### Basic Authentication
+
+Use basic auth for HTTP resources requiring username/password:
+
+```yaml
+resources:
+  - url: https://internal.company.com/archive.tar.gz
+    auth:
+      type: basic
+      username: myuser
+      passwordEnv: COMPANY_PASSWORD
+```
+
+**Authentication Fields (Basic):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Must be `"basic"` |
+| `username` | string | **Required**. Username for basic auth |
+| `passwordEnv` | string | **Required**. Environment variable name containing the password |
+
+**Security Note:** Never hardcode credentials in your configuration files. Always use environment variables for sensitive data.
+
+### Integrity Verification
+
+Use SHA256 checksums to verify that downloaded resources haven't been tampered with:
+
+```yaml
+resources:
+  - url: https://example.com/v1.0.0/docs.tar.gz
+    sha256: 6a087ac9e5702a0c9d60fbcd48696012646ec8df1491dea472b150e79fcaf804
+```
+
+When a `sha256` field is provided:
+1. Kustomark downloads the resource
+2. Calculates the SHA256 hash of the downloaded content
+3. Compares it with the expected hash
+4. Fails the build if the hashes don't match
+
+**Getting the SHA256 hash:**
+
+```bash
+# For a local file
+sha256sum file.tar.gz
+
+# For a downloaded file
+curl -sL https://example.com/file.tar.gz | sha256sum
+```
+
+### Mixed String and Object Resources
+
+You can mix simple strings and resource objects in the same configuration:
+
+```yaml
+resources:
+  # Simple local patterns
+  - "docs/**/*.md"
+  - "!docs/internal/**"
+
+  # Git repository (string)
+  - github.com/org/repo//docs?ref=v2.0.0
+
+  # HTTP archive with checksum (object)
+  - url: https://example.com/docs.tar.gz
+    sha256: abc123def456...
+
+  # Private resource with authentication (object)
+  - url: https://private.example.com/internal-docs.tar.gz
+    auth:
+      type: bearer
+      tokenEnv: PRIVATE_TOKEN
+    sha256: def456abc123...
+
+  # Another kustomark config
+  - ../base/
+```
+
+### Complete Authentication Examples
+
+**GitHub private release with token:**
+
+```yaml
+resources:
+  - url: https://github.com/myorg/private-repo/releases/download/v1.0.0/docs.tar.gz
+    auth:
+      type: bearer
+      tokenEnv: GITHUB_TOKEN
+    sha256: 6a087ac9e5702a0c9d60fbcd48696012646ec8df1491dea472b150e79fcaf804
+```
+
+```bash
+export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+kustomark build ./team/
+```
+
+**Private registry with basic auth:**
+
+```yaml
+resources:
+  - url: https://registry.internal.company.com/packages/docs-v1.0.0.tar.gz
+    auth:
+      type: basic
+      username: ci-bot
+      passwordEnv: REGISTRY_PASSWORD
+    sha256: abc123def456abc123def456abc123def456abc123def456abc123def456abc1
+```
+
+```bash
+export REGISTRY_PASSWORD="secret-password"
+kustomark build ./production/
+```
+
+**Multiple authenticated resources:**
+
+```yaml
+resources:
+  # Public resource (no auth needed)
+  - url: https://example.com/public-docs.tar.gz
+    sha256: public123...
+
+  # GitHub private release
+  - url: https://github.com/org/private/releases/download/v1.0/docs.tar.gz
+    auth:
+      type: bearer
+      tokenEnv: GITHUB_TOKEN
+    sha256: github123...
+
+  # Internal registry
+  - url: https://internal.company.com/docs.tar.gz
+    auth:
+      type: basic
+      username: service-account
+      passwordEnv: INTERNAL_PASSWORD
+    sha256: internal123...
+```
+
+```bash
+export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+export INTERNAL_PASSWORD="secret"
+kustommark build ./production/
+```
+
+### Environment Variable Best Practices
+
+1. **Use descriptive names:** Choose clear environment variable names that indicate their purpose (e.g., `GITHUB_TOKEN`, `REGISTRY_PASSWORD`)
+
+2. **Keep credentials out of version control:** Never commit `.env` files or credentials to git
+
+3. **Use different tokens per environment:**
+   ```bash
+   # Development
+   export GITHUB_TOKEN="ghp_dev_token"
+
+   # Production
+   export GITHUB_TOKEN="ghp_prod_token"
+   ```
+
+4. **Set environment variables before running kustomark:**
+   ```bash
+   # In CI/CD pipeline
+   export GITHUB_TOKEN="${GITHUB_TOKEN_SECRET}"
+   kustomark build ./production/
+
+   # Using .env file (locally)
+   source .env
+   kustomark build ./team/
+   ```
+
+5. **Verify variables are set:**
+   ```bash
+   # Check before running
+   if [ -z "$GITHUB_TOKEN" ]; then
+     echo "Error: GITHUB_TOKEN not set"
+     exit 1
+   fi
+   kustomark build ./team/
+   ```
 
 ## Resource Resolution
 

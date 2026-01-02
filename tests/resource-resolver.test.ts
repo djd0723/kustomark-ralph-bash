@@ -353,4 +353,84 @@ resources:
       expect(resources[0]?.path).toBe(normalize("/project/api.md"));
     });
   });
+
+  describe("resource objects", () => {
+    test("accepts resource as object with url field", async () => {
+      const fileMap = new Map([
+        ["/project/docs/api.md", "# API"],
+        ["/project/docs/guide.md", "# Guide"],
+      ]);
+
+      const resources = await resolveResources(
+        [
+          { url: "docs/api.md" },
+          "docs/guide.md", // Mix with string format
+        ],
+        baseDir,
+        fileMap,
+      );
+
+      expect(resources).toHaveLength(2);
+      expect(resources.map((r) => r.path)).toContain(
+        normalize("/project/docs/api.md"),
+      );
+      expect(resources.map((r) => r.path)).toContain(
+        normalize("/project/docs/guide.md"),
+      );
+    });
+
+    test("accepts resource object with auth and sha256", async () => {
+      const fileMap = new Map([
+        ["/project/docs/api.md", "# API"],
+      ]);
+
+      // This test verifies that the resource object format is accepted
+      // Auth and sha256 would be used for remote fetching (git/http)
+      const resources = await resolveResources(
+        [
+          {
+            url: "docs/api.md",
+            auth: {
+              type: "bearer",
+              tokenEnv: "GITHUB_TOKEN",
+            },
+            sha256: "abc123",
+          },
+        ],
+        baseDir,
+        fileMap,
+      );
+
+      expect(resources).toHaveLength(1);
+      expect(resources[0]?.path).toBe(normalize("/project/docs/api.md"));
+    });
+
+    test("handles negation patterns with resource objects", async () => {
+      const fileMap = new Map([
+        ["/project/docs/api.md", "# API"],
+        ["/project/docs/README.md", "# README"],
+        ["/project/guide.md", "# Guide"],
+      ]);
+
+      const resources = await resolveResources(
+        [
+          { url: "**/*.md" },
+          "!**/README.md", // Negation patterns are always strings
+        ],
+        baseDir,
+        fileMap,
+      );
+
+      expect(resources).toHaveLength(2);
+      expect(resources.map((r) => r.path)).toContain(
+        normalize("/project/docs/api.md"),
+      );
+      expect(resources.map((r) => r.path)).toContain(
+        normalize("/project/guide.md"),
+      );
+      expect(resources.map((r) => r.path)).not.toContain(
+        normalize("/project/docs/README.md"),
+      );
+    });
+  });
 });

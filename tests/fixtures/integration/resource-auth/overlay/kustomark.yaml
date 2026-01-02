@@ -1,0 +1,23 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+output: ./output
+
+resources:
+  # Base resources (string format)
+  - ../base/
+  # Resource object format (demonstrates object syntax)
+  - url: "extra.md"
+
+patches:
+  - op: replace
+    old: "Local File"
+    new: "Updated Local File"
+    include: "local.md"
+
+  - op: replace
+    old: "Extra Content"
+    new: "Modified Extra Content"
+    include: "extra.md"
+
+onNoMatch: warn

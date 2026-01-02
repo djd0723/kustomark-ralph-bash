@@ -402,6 +402,37 @@ export interface Validator {
 }
 
 /**
+ * Authentication configuration for remote resources
+ */
+export interface ResourceAuth {
+  /** Authentication type */
+  type: "bearer" | "basic";
+  /** Environment variable name containing the bearer token */
+  tokenEnv?: string;
+  /** Username for basic authentication */
+  username?: string;
+  /** Environment variable name containing the password for basic auth */
+  passwordEnv?: string;
+}
+
+/**
+ * Resource object with URL and optional authentication/checksum
+ */
+export interface ResourceObject {
+  /** Resource URL */
+  url: string;
+  /** Optional SHA256 checksum for integrity verification */
+  sha256?: string;
+  /** Optional authentication configuration */
+  auth?: ResourceAuth;
+}
+
+/**
+ * Resource item - can be a simple string URL or a detailed object
+ */
+export type ResourceItem = string | ResourceObject;
+
+/**
  * Security configuration for remote resource validation
  */
 export interface SecurityConfig {
@@ -448,7 +479,7 @@ export interface KustomarkConfig {
   /** Output directory (required for build command) */
   output?: string;
   /** Resource patterns, file paths, or kustomark configs */
-  resources: string[];
+  resources: ResourceItem[];
   /** Ordered list of patches to apply */
   patches?: PatchOperation[];
   /** Default strategy for patches that don't match */

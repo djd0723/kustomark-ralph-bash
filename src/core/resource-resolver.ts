@@ -42,7 +42,7 @@ export class ResourceResolutionError extends Error {
  * Represents a kustomark configuration structure
  */
 interface KustomarkConfig {
-  resources?: string[];
+  resources?: (string | import("./types.js").ResourceObject)[];
   [key: string]: unknown;
 }
 
@@ -73,7 +73,7 @@ interface ResolveOptions {
 /**
  * Resolves resource patterns to a flat list of markdown files
  *
- * @param resources - Array of glob patterns, file paths, or directory references
+ * @param resources - Array of glob patterns, file paths, directory references, or resource objects
  * @param baseDir - Base directory to resolve relative paths against (absolute path)
  * @param fileMap - Map of absolute file paths to their content
  * @param options - Resolution options
@@ -95,7 +95,7 @@ interface ResolveOptions {
  * ```
  */
 export async function resolveResources(
-  resources: string[],
+  resources: (string | import("./types.js").ResourceObject)[],
   baseDir: string,
   fileMap: Map<string, string>,
   options: ResolveOptions = {},
@@ -125,14 +125,35 @@ export async function resolveResources(
   const positivePatterns: string[] = [];
 
   // Separate positive and negation patterns
-  for (const resource of resources) {
-    const trimmed = resource.trim();
-    if (!trimmed) continue;
+  // Also normalize resources to extract URL from objects
+  const normalizedResources: Array<{
+    pattern: string;
+    auth?: import("./types.js").ResourceAuth;
+    sha256?: string;
+  }> = [];
 
-    if (trimmed.startsWith("!")) {
-      negationPatterns.push(trimmed.slice(1));
+  for (const resource of resources) {
+    let pattern: string;
+    let auth: import("./types.js").ResourceAuth | undefined;
+    let sha256: string | undefined;
+
+    // Check if resource is an object or string
+    if (typeof resource === "string") {
+      pattern = resource.trim();
     } else {
-      positivePatterns.push(trimmed);
+      // It's a ResourceObject
+      pattern = resource.url.trim();
+      auth = resource.auth;
+      sha256 = resource.sha256;
+    }
+
+    if (!pattern) continue;
+
+    if (pattern.startsWith("!")) {
+      negationPatterns.push(pattern.slice(1));
+    } else {
+      positivePatterns.push(pattern);
+      normalizedResources.push({ pattern, auth, sha256 });
     }
   }
 
@@ -143,7 +164,9 @@ export async function resolveResources(
   });
 
   // Process each positive pattern
-  for (const pattern of positivePatterns) {
+  for (const resourceInfo of normalizedResources) {
+    const { pattern, auth, sha256 } = resourceInfo;
+
     // Check if pattern is a git URL
     if (isGitUrl(pattern)) {
       // Validate that the git URL is parseable
@@ -159,11 +182,30 @@ export async function resolveResources(
         // Validate security before fetching
         validateResourceSecurity(pattern, options.security);
 
-        // Fetch the git repository
-        const fetchResult = await fetchGitRepository(pattern, {
+        // Prepare git fetch options with auth if provided
+        const gitOptions: GitFetchOptions = {
           ...options.gitFetchOptions,
           update: updateLock,
-        });
+        };
+
+        // Add auth token from resource object if available
+        if (auth) {
+          if (auth.type === "bearer" && auth.tokenEnv) {
+            const token = process.env[auth.tokenEnv];
+            if (token) {
+              gitOptions.authToken = token;
+            }
+          } else if (auth.type === "basic" && auth.username && auth.passwordEnv) {
+            const password = process.env[auth.passwordEnv];
+            if (password) {
+              // For basic auth, we can construct a token in the format username:password
+              gitOptions.authToken = `${auth.username}:${password}`;
+            }
+          }
+        }
+
+        // Fetch the git repository
+        const fetchResult = await fetchGitRepository(pattern, gitOptions);
 
         // Collect lock entry if requested
         if ((updateLock || lockFile) && lockEntries) {
@@ -238,12 +280,40 @@ export async function resolveResources(
         // Validate security before fetching
         validateResourceSecurity(pattern, options.security);
 
-        // Fetch and extract the HTTP archive
-        const fetchResult = await fetchHttpArchive(pattern, {
+        // Prepare HTTP fetch options with auth and sha256 if provided
+        const httpOptions: HttpFetchOptions = {
           ...options.httpFetchOptions,
           subpath: parsedHttp.subpath,
           update: updateLock,
-        });
+        };
+
+        // Add auth token from resource object if available
+        if (auth) {
+          if (auth.type === "bearer" && auth.tokenEnv) {
+            const token = process.env[auth.tokenEnv];
+            if (token) {
+              httpOptions.authToken = token;
+            }
+          } else if (auth.type === "basic" && auth.username && auth.passwordEnv) {
+            const password = process.env[auth.passwordEnv];
+            if (password) {
+              // For HTTP basic auth, we can set headers
+              const basicAuthHeader = `Basic ${Buffer.from(`${auth.username}:${password}`).toString("base64")}`;
+              httpOptions.headers = {
+                ...httpOptions.headers,
+                Authorization: basicAuthHeader,
+              };
+            }
+          }
+        }
+
+        // Add sha256 checksum if provided
+        if (sha256) {
+          httpOptions.sha256 = sha256;
+        }
+
+        // Fetch and extract the HTTP archive
+        const fetchResult = await fetchHttpArchive(pattern, httpOptions);
 
         // Collect lock entry if requested
         if ((updateLock || lockFile) && lockEntries) {

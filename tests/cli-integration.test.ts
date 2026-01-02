@@ -713,6 +713,391 @@ describe('CLI Integration Tests', () => {
       }).toThrow('must be a filename, not a path');
     });
   });
+
+  describe('resource objects', () => {
+    test('resource object syntax with basic URL', async () => {
+      // Setup paths
+      const fixtureRoot = resolve(__dirname, 'fixtures/integration/resource-objects');
+      const baseDir = join(fixtureRoot, 'base');
+      const overlayDir = join(fixtureRoot, 'overlay');
+      const expectedDir = join(fixtureRoot, 'expected');
+      const outputDir = join(overlayDir, 'output');
+
+      // Clean output directory if it exists
+      if (existsSync(outputDir)) {
+        rmSync(outputDir, { recursive: true, force: true });
+      }
+
+      try {
+        // Step 1: Load the kustomark.yaml config
+        const configPath = join(overlayDir, 'kustomark.yaml');
+        const configContent = readFileSync(configPath, 'utf-8');
+        const config = parseConfig(configContent);
+
+        // Step 2: Validate the config
+        const validation = validateConfig(config);
+        expect(validation.valid).toBe(true);
+        expect(validation.errors).toHaveLength(0);
+
+        // Verify that config contains resource objects
+        expect(config.resources).toHaveLength(2);
+        expect(typeof config.resources[0]).toBe('string'); // ../base/
+        expect(typeof config.resources[1]).toBe('object'); // Resource object
+
+        const resourceObject = config.resources[1] as any;
+        expect(resourceObject.url).toBeDefined();
+        expect(resourceObject.url).toBe('*.md');
+
+        // Step 3: Create a file map with all markdown files
+        const fileMap = new Map<string, string>();
+
+        // Load base files
+        const baseFiles = ['document.md'];
+        for (const file of baseFiles) {
+          const filePath = join(baseDir, file);
+          const content = readFileSync(filePath, 'utf-8');
+          fileMap.set(resolve(filePath), content);
+        }
+
+        // Load overlay local file - will be matched by *.md resource object
+        const localFilePath = join(overlayDir, 'local.md');
+        const localContent = readFileSync(localFilePath, 'utf-8');
+        fileMap.set(resolve(localFilePath), localContent);
+
+        // Add config files to the file map
+        fileMap.set(resolve(configPath), configContent);
+        const baseConfigPath = join(baseDir, 'kustomark.yaml');
+        const baseConfigContent = readFileSync(baseConfigPath, 'utf-8');
+        fileMap.set(resolve(baseConfigPath), baseConfigContent);
+
+        // Step 4: Resolve resources
+        const resolvedResources = await resolveResources(
+          config.resources,
+          overlayDir,
+          fileMap
+        );
+
+        // Verify we resolved 2 markdown files (1 from base + 1 from overlay)
+        expect(resolvedResources).toHaveLength(2);
+        const resourceNames = resolvedResources.map(r => r.path.split('/').pop()).sort();
+        expect(resourceNames).toEqual(['document.md', 'local.md']);
+
+        // Step 5: Apply patches to each resource
+        const patchedResources = new Map<string, string>();
+
+        for (const resource of resolvedResources) {
+          const fileName = resource.path.split('/').pop() || '';
+
+          // Filter patches that apply to this file
+          const applicablePatches = filterPatchesForFile(
+            config.patches || [],
+            fileName
+          );
+
+          // Apply patches
+          const result = applyPatches(
+            resource.content,
+            applicablePatches,
+            config.onNoMatch || 'warn'
+          );
+
+          patchedResources.set(fileName, result.content);
+        }
+
+        // Step 6: Write output files
+        mkdirSync(outputDir, { recursive: true });
+
+        for (const [fileName, content] of patchedResources.entries()) {
+          const outputPath = join(outputDir, fileName);
+          writeFileSync(outputPath, content, 'utf-8');
+        }
+
+        // Step 7: Verify output matches expected
+        const expectedFiles = ['document.md', 'local.md'];
+
+        for (const file of expectedFiles) {
+          const outputPath = join(outputDir, file);
+          const expectedPath = join(expectedDir, file);
+
+          expect(existsSync(outputPath)).toBe(true);
+
+          const outputContent = readFileSync(outputPath, 'utf-8');
+          const expectedContent = readFileSync(expectedPath, 'utf-8');
+
+          expect(outputContent).toBe(expectedContent);
+        }
+
+        // Verify specific transformations
+        const documentOutput = readFileSync(join(outputDir, 'document.md'), 'utf-8');
+        expect(documentOutput).toContain('Modified Document');
+        expect(documentOutput).not.toContain('# Base Document');
+
+        const localOutput = readFileSync(join(outputDir, 'local.md'), 'utf-8');
+        expect(localOutput).toContain('Processed Local Resource');
+        expect(localOutput).not.toContain('# Local Resource');
+
+      } finally {
+        // Cleanup output directory
+        if (existsSync(outputDir)) {
+          rmSync(outputDir, { recursive: true, force: true });
+        }
+      }
+    });
+
+    test('resource object with SHA256 field parses correctly', async () => {
+      // Test that resource objects with SHA256 can be parsed
+      const configYaml = `apiVersion: kustomark/v1
+kind: Kustomization
+
+resources:
+  - url: "https://example.com/archive.tar.gz//docs/**/*.md"
+    sha256: abc123def456789`;
+
+      const config = parseConfig(configYaml);
+
+      // Config validation should pass
+      const validation = validateConfig(config);
+      expect(validation.valid).toBe(true);
+
+      // Verify SHA256 is preserved
+      expect(config.resources).toHaveLength(1);
+      const resource = config.resources[0] as any;
+      expect(resource.url).toBe('https://example.com/archive.tar.gz//docs/**/*.md');
+      expect(resource.sha256).toBe('abc123def456789');
+    });
+
+    test('mixed string and object resources in same config', async () => {
+      const fixtureRoot = resolve(__dirname, 'fixtures/integration/resource-auth');
+      const baseDir = join(fixtureRoot, 'base');
+      const overlayDir = join(fixtureRoot, 'overlay');
+      const expectedDir = join(fixtureRoot, 'expected');
+      const outputDir = join(overlayDir, 'output');
+
+      // Clean output directory if it exists
+      if (existsSync(outputDir)) {
+        rmSync(outputDir, { recursive: true, force: true });
+      }
+
+      // Set environment variable for bearer auth
+      const originalEnv = process.env.TEST_BEARER_TOKEN;
+      process.env.TEST_BEARER_TOKEN = 'test_token_12345';
+
+      try {
+        // Step 1: Load the kustomark.yaml config
+        const configPath = join(overlayDir, 'kustomark.yaml');
+        const configContent = readFileSync(configPath, 'utf-8');
+        const config = parseConfig(configContent);
+
+        // Step 2: Validate the config
+        const validation = validateConfig(config);
+        expect(validation.valid).toBe(true);
+        expect(validation.errors).toHaveLength(0);
+
+        // Verify mixed resource types
+        expect(config.resources).toHaveLength(2);
+        expect(typeof config.resources[0]).toBe('string'); // ../base/
+        expect(typeof config.resources[1]).toBe('object'); // Resource object
+
+        const resourceObject = config.resources[1] as any;
+        expect(resourceObject.url).toBeDefined();
+        expect(resourceObject.url).toBe('extra.md');
+
+        // Step 3: Create a file map
+        const fileMap = new Map<string, string>();
+
+        // Load base files
+        const baseFilePath = join(baseDir, 'local.md');
+        const baseContent = readFileSync(baseFilePath, 'utf-8');
+        fileMap.set(resolve(baseFilePath), baseContent);
+
+        // Load overlay extra file - will be matched by resource object
+        const extraFilePath = join(overlayDir, 'extra.md');
+        const extraContent = readFileSync(extraFilePath, 'utf-8');
+        fileMap.set(resolve(extraFilePath), extraContent);
+
+        // Add config files
+        fileMap.set(resolve(configPath), configContent);
+        const baseConfigPath = join(baseDir, 'kustomark.yaml');
+        const baseConfigContent = readFileSync(baseConfigPath, 'utf-8');
+        fileMap.set(resolve(baseConfigPath), baseConfigContent);
+
+        // Step 4: Resolve resources
+        const resolvedResources = await resolveResources(
+          config.resources,
+          overlayDir,
+          fileMap
+        );
+
+        // Verify we resolved 2 markdown files (1 from base + 1 from overlay)
+        expect(resolvedResources).toHaveLength(2);
+        const resourceNames = resolvedResources.map(r => r.path.split('/').pop()).sort();
+        expect(resourceNames).toEqual(['extra.md', 'local.md']);
+
+        // Step 5: Apply patches
+        const patchedResources = new Map<string, string>();
+
+        for (const resource of resolvedResources) {
+          const fileName = resource.path.split('/').pop() || '';
+          const applicablePatches = filterPatchesForFile(
+            config.patches || [],
+            fileName
+          );
+
+          const result = applyPatches(
+            resource.content,
+            applicablePatches,
+            config.onNoMatch || 'warn'
+          );
+
+          patchedResources.set(fileName, result.content);
+        }
+
+        // Step 6: Write output files
+        mkdirSync(outputDir, { recursive: true });
+
+        for (const [fileName, content] of patchedResources.entries()) {
+          const outputPath = join(outputDir, fileName);
+          writeFileSync(outputPath, content, 'utf-8');
+        }
+
+        // Step 7: Verify output matches expected
+        const expectedFiles = ['local.md', 'extra.md'];
+
+        for (const file of expectedFiles) {
+          const outputPath = join(outputDir, file);
+          const expectedPath = join(expectedDir, file);
+
+          expect(existsSync(outputPath)).toBe(true);
+
+          const outputContent = readFileSync(outputPath, 'utf-8');
+          const expectedContent = readFileSync(expectedPath, 'utf-8');
+
+          expect(outputContent).toBe(expectedContent);
+        }
+
+        // Verify transformations
+        const localOutput = readFileSync(join(outputDir, 'local.md'), 'utf-8');
+        expect(localOutput).toContain('Updated Local File');
+        expect(localOutput).not.toContain('# Local File');
+
+        const extraOutput = readFileSync(join(outputDir, 'extra.md'), 'utf-8');
+        expect(extraOutput).toContain('Modified Extra Content');
+        expect(extraOutput).not.toContain('# Extra Content');
+
+      } finally {
+        // Restore environment variable
+        if (originalEnv !== undefined) {
+          process.env.TEST_BEARER_TOKEN = originalEnv;
+        } else {
+          delete process.env.TEST_BEARER_TOKEN;
+        }
+
+        // Cleanup output directory
+        if (existsSync(outputDir)) {
+          rmSync(outputDir, { recursive: true, force: true });
+        }
+      }
+    });
+
+    test('resource object with bearer auth parses correctly', async () => {
+      // Test that bearer auth configuration can be parsed
+      const config = parseConfig(`apiVersion: kustomark/v1
+kind: Kustomization
+
+resources:
+  - url: "https://api.github.com/repos/org/repo/tarball/main"
+    auth:
+      type: bearer
+      tokenEnv: GITHUB_TOKEN`);
+
+      const validation = validateConfig(config);
+      expect(validation.valid).toBe(true);
+
+      // Verify auth configuration
+      const resourceObject = config.resources[0] as any;
+      expect(resourceObject.auth).toBeDefined();
+      expect(resourceObject.auth.type).toBe('bearer');
+      expect(resourceObject.auth.tokenEnv).toBe('GITHUB_TOKEN');
+    });
+
+    test('resource object with basic auth parses correctly', async () => {
+      // Test that basic auth configuration can be parsed
+      const config = parseConfig(`apiVersion: kustomark/v1
+kind: Kustomization
+
+resources:
+  - url: "https://private-registry.com/archive.tar.gz"
+    auth:
+      type: basic
+      username: testuser
+      passwordEnv: REGISTRY_PASSWORD`);
+
+      const validation = validateConfig(config);
+      expect(validation.valid).toBe(true);
+
+      // Verify auth configuration
+      const resourceObject = config.resources[0] as any;
+      expect(resourceObject.auth).toBeDefined();
+      expect(resourceObject.auth.type).toBe('basic');
+      expect(resourceObject.auth.username).toBe('testuser');
+      expect(resourceObject.auth.passwordEnv).toBe('REGISTRY_PASSWORD');
+    });
+
+    test('resource object with combined SHA256 and bearer auth parses correctly', async () => {
+      // Test that combined SHA256 and auth can be parsed
+      const config = parseConfig(`apiVersion: kustomark/v1
+kind: Kustomization
+
+resources:
+  - url: "https://secure.example.com/archive.tar.gz"
+    sha256: abc123def456789
+    auth:
+      type: bearer
+      tokenEnv: SECURE_TOKEN`);
+
+      const validation = validateConfig(config);
+      expect(validation.valid).toBe(true);
+
+      // Verify resource object configuration
+      const resourceObject = config.resources[0] as any;
+      expect(resourceObject.url).toBeDefined();
+      expect(resourceObject.sha256).toBe('abc123def456789');
+      expect(resourceObject.auth).toBeDefined();
+      expect(resourceObject.auth.type).toBe('bearer');
+      expect(resourceObject.auth.tokenEnv).toBe('SECURE_TOKEN');
+    });
+
+    test('auth validation errors are caught', async () => {
+      // Test that invalid auth configuration is caught
+      const invalidConfigs = [
+        // Missing type
+        `apiVersion: kustomark/v1
+kind: Kustomization
+resources:
+  - url: "https://example.com/archive.tar.gz"
+    auth:
+      tokenEnv: TOKEN`,
+
+        // Invalid type
+        `apiVersion: kustomark/v1
+kind: Kustomization
+resources:
+  - url: "https://example.com/archive.tar.gz"
+    auth:
+      type: invalid
+      tokenEnv: TOKEN`,
+      ];
+
+      for (const configYaml of invalidConfigs) {
+        const config = parseConfig(configYaml);
+        const validation = validateConfig(config);
+
+        // These should fail validation
+        expect(validation.valid).toBe(false);
+        expect(validation.errors.length).toBeGreaterThan(0);
+      }
+    });
+  });
 });
 
 /**

@@ -776,8 +776,8 @@ resources:
 
       const diagnostics = provider.provideDiagnostics('test.yaml', content);
 
-      // Find the error about non-string resource
-      const resourceError = diagnostics.find(d => d.message.includes('resource must be a string'));
+      // Find the error about non-string/object resource
+      const resourceError = diagnostics.find(d => d.message.includes('resource must be a string or an object'));
       expect(resourceError).toBeDefined();
       expect(resourceError?.range.start.line).toBeGreaterThanOrEqual(3);
     });
@@ -937,7 +937,7 @@ resources:
 
       expect(diagnostics).toHaveLength(1);
       expect(diagnostics[0]?.severity).toBe(DiagnosticSeverity.Error);
-      expect(diagnostics[0]?.message).toContain('resource must be a string');
+      expect(diagnostics[0]?.message).toContain('resource must be a string or an object');
     });
 
     test('reports error for invalid git URL format', () => {
