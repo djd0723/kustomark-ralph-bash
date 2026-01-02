@@ -10,6 +10,10 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [CLI Commands](#cli-commands)
+  - [kustomark build](#kustomark-build-path)
+  - [kustomark diff](#kustomark-diff-path)
+  - [kustomark validate](#kustomark-validate-path)
+  - [kustomark init](#kustomark-init-path)
 - [Configuration](#configuration)
 - [Patch Operations](#patch-operations)
 - [Resource Resolution](#resource-resolution)
@@ -178,6 +182,59 @@ kustomark validate ./team/ --format=json
 ```
 
 **Exit code:** Returns 0 if valid, 1 if invalid.
+
+### `kustomark init [path]`
+
+Create a new kustomark configuration file.
+
+```bash
+# Interactive mode - guided wizard
+kustomark init -i
+kustomark init --interactive
+
+# Non-interactive mode - base configuration
+kustomark init .
+
+# Non-interactive mode - overlay configuration
+kustomark init ./overlay --base=../base --output=./output
+```
+
+**Options:**
+- `-i`, `--interactive` - Launch interactive wizard with prompts
+- `--base <path>` - Create overlay config referencing base (non-interactive)
+- `--output <path>` - Set output directory (non-interactive)
+- `--format <text|json>` - Output format (default: text)
+
+**Interactive Mode:**
+
+The interactive wizard guides you through creating a configuration with prompts for:
+- Configuration type (base or overlay)
+- Output directory
+- Resource patterns (for base configs)
+- Base configuration path (for overlays)
+- Starter patches with detailed configuration options
+- Error handling strategy (skip/warn/error)
+
+Interactive mode is ideal for first-time users or when you want to explore available options.
+
+**Non-Interactive Mode:**
+
+Use flags to create configurations programmatically:
+- Without `--base`: Creates a base configuration with `*.md` resources
+- With `--base`: Creates an overlay configuration that extends the base
+
+**Examples:**
+
+```bash
+# Create base config interactively
+kustomark init -i
+
+# Create base config with defaults
+kustomark init ./base
+
+# Create overlay config referencing a base
+kustomark init ./team --base=../base --output=./output
+```
 
 ## Configuration
 

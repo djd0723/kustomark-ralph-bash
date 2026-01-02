@@ -356,9 +356,9 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 **Next Priority:**
 - ✅ VSCode Extension packaging for LSP server - **COMPLETE! 2026-01-02**
+- ✅ Interactive init wizard (Low complexity from Future Candidates) - **COMPLETE! 2026-01-02**
 - Web UI (High complexity from Future Candidates)
 - Interactive debug mode (Medium complexity from Future Candidates)
-- Interactive init wizard (Low complexity from Future Candidates)
 
 **2026-01-02 (Patch Groups Feature - Future Work):**
 - ✅ Implemented Patch Groups feature (Medium complexity from Future Candidates list):
@@ -865,3 +865,55 @@ This document tracks the implementation of kustomark based on the spec milestone
   - Build automation complete
   - Documentation complete in README.md
   - Ready for distribution and marketplace publishing
+
+**2026-01-02 (Interactive Init Wizard - Future Work):**
+- ✅ Implemented Interactive Init Wizard feature (Low complexity from Future Candidates list):
+  - Created `/home/dex/kustomark-ralph-bash/src/cli/init-command.ts` - Extracted non-interactive init logic
+  - Created `/home/dex/kustomark-ralph-bash/src/cli/init-interactive.ts` - Interactive wizard with @clack/prompts
+  - Added `-i`/`--interactive` flag to CLI for launching wizard
+  - Interactive wizard features:
+    - Config type selection (base vs overlay)
+    - Output directory prompt with validation
+    - Base config path prompt for overlays (with existence check)
+    - Resource pattern multiselect for base configs (*.md, **/*.md, docs/**/*.md, custom)
+    - Optional starter patch configuration for overlays
+    - Support for 6 common patch operations (replace, remove-section, set-frontmatter, replace-regex, prepend-to-section, append-to-section)
+    - Per-patch detail collection with validation
+    - onNoMatch strategy selection (skip/warn/error)
+    - Graceful Ctrl+C cancellation at any step
+    - Beautiful CLI UX with intro/outro messages and helpful hints
+  - Updated `/home/dex/kustomark-ralph-bash/src/cli/index.ts`:
+    - Added `interactive?: boolean` to CLIOptions interface
+    - Added `-i`/`--interactive` flag parsing
+    - Imported init-command and init-interactive modules
+    - Updated initCommand to route to interactive/non-interactive
+    - Updated help text with interactive flag documentation
+  - All 875 tests passing ✓
+  - All linting checks passing (bun check) ✓
+  - Type-safe implementation with proper @clack/prompts integration
+
+  **Implementation Details:**
+  - Used @clack/prompts v0.11.0 for beautiful interactive CLI
+  - Conditional prompts based on user selections (overlay-specific, base-specific)
+  - Input validation for all prompts (required fields, file existence, regex patterns)
+  - YAML parsing for frontmatter values in set-frontmatter operation
+  - Automatic directory creation for config and output directories
+  - Helpful placeholder examples and hints for all prompts
+  - Error handling with user-friendly messages
+
+  **Files Created:**
+  - `/home/dex/kustomark-ralph-bash/src/cli/init-command.ts` (199 lines) - Non-interactive init logic
+  - `/home/dex/kustomark-ralph-bash/src/cli/init-interactive.ts` (606 lines) - Interactive wizard
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Added routing, flag parsing, imports
+  - `/home/dex/kustomark-ralph-bash/package.json` - Added @clack/prompts dependency
+  - `/home/dex/kustomark-ralph-bash/README.md` - Added interactive init documentation
+
+  **Status:** COMPLETE! ✅
+  - Full interactive init wizard implemented
+  - Beautiful UX with @clack/prompts
+  - Backward compatible with non-interactive mode
+  - All tests and linting passing
+  - Documentation updated
+
