@@ -60,6 +60,22 @@ function extractProtocol(resourceUrl: string): string | null {
 }
 
 /**
+ * Strips authentication credentials and port numbers from a hostname
+ *
+ * @param hostPart - The hostname part that may include user:pass@ or :port
+ * @returns The clean hostname
+ */
+function cleanHostname(hostPart: string): string {
+  // Remove authentication credentials (user:pass@)
+  const withoutAuth = hostPart.replace(/^[^@]+@/, "");
+
+  // Remove port number (:8080)
+  const withoutPort = withoutAuth.replace(/:\d+$/, "");
+
+  return withoutPort;
+}
+
+/**
  * Extracts the hostname from a URL or resource string
  *
  * @param resourceUrl - The resource URL to extract the hostname from
@@ -73,32 +89,32 @@ function extractHost(resourceUrl: string): string | null {
     // git::https://github.com/... or git::http://...
     const httpMatch = afterGit.match(/^https?:\/\/([^/]+)/);
     if (httpMatch?.[1]) {
-      return httpMatch[1];
+      return cleanHostname(httpMatch[1]);
     }
 
     // git::git@github.com:...
     const sshMatch = afterGit.match(/^git@([^:]+):/);
     if (sshMatch?.[1]) {
-      return sshMatch[1];
+      return cleanHostname(sshMatch[1]);
     }
   }
 
   // Handle standard URLs (https://github.com/...)
   const urlMatch = resourceUrl.match(/^[a-z]+:\/\/([^/]+)/);
   if (urlMatch?.[1]) {
-    return urlMatch[1];
+    return cleanHostname(urlMatch[1]);
   }
 
   // Handle SSH format (git@github.com:...)
   const sshMatch = resourceUrl.match(/^[a-zA-Z0-9._-]+@([^:]+):/);
   if (sshMatch?.[1]) {
-    return sshMatch[1];
+    return cleanHostname(sshMatch[1]);
   }
 
   // Handle GitHub shorthand (github.com/org/repo)
   const githubMatch = resourceUrl.match(/^([a-zA-Z0-9.-]+)\//);
   if (githubMatch?.[1]) {
-    return githubMatch[1];
+    return cleanHostname(githubMatch[1]);
   }
 
   return null;

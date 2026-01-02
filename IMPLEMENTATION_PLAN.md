@@ -3395,3 +3395,85 @@ Test Case 3: Substantial content changes ✓
 **Status:** Suggest Command Bug Fixes COMPLETE! ✅
 
 The suggest command now correctly produces appropriate patch operations for different types of changes, with simple text replacements using `replace` operations instead of incorrectly suggesting `rename-header` or `replace-section` operations.
+
+
+---
+
+**2026-01-02 (Security Module Comprehensive Test Coverage - Code Quality Improvement):**
+
+Implemented comprehensive test coverage for the security validation module and enhanced host extraction to properly handle edge cases.
+
+**Problem Analysis:**
+
+The security module (`src/core/security.ts`) was fully implemented with:
+- `validateResourceSecurity()` function for validating URLs against security policies
+- `SecurityValidationError` custom error class
+- Support for `allowedHosts` and `allowedProtocols` configuration
+- Protocol and host extraction from various URL formats
+
+However, there were NO tests for this critical security feature, and the host extraction didn't handle:
+- URLs with port numbers (e.g., `https://example.com:8080/repo`)
+- URLs with authentication credentials (e.g., `https://user:pass@github.com/repo`)
+
+**Implementation:**
+
+1. ✅ Enhanced security module (`/home/dex/kustomark-ralph-bash/src/core/security.ts`):
+   - Added `cleanHostname()` helper function to strip authentication credentials and port numbers
+   - Updated `extractHost()` to use `cleanHostname()` for all host extraction paths
+   - Now properly handles URLs with ports and authentication in all formats
+
+2. ✅ Created comprehensive test suite (`/home/dex/kustomark-ralph-bash/tests/core/security.test.ts`):
+   - **41 tests** covering all aspects of security validation
+   - **92 expect() calls** for thorough assertions
+
+   **Test Coverage:**
+   - SecurityValidationError class (2 tests)
+   - No security config behavior (3 tests)
+   - Protocol validation (11 tests):
+     - HTTPS-only, HTTP rejection
+     - Git and SSH protocol support
+     - GitHub shorthand handling
+     - Multiple protocol allowlists
+     - Protocol detection errors
+   - Host validation (9 tests):
+     - GitHub-only, non-GitHub rejection
+     - Multiple host allowlists
+     - SSH format host extraction
+     - git:: HTTPS and SSH format extraction
+     - Host detection errors
+   - Combined host and protocol validation (4 tests)
+   - Real-world URL formats (8 tests):
+     - GitHub HTTPS, shorthand, git::, SSH formats
+     - HTTP archive URLs with subpaths
+     - Malicious pattern detection (typosquatting, different TLD, subdomain attacks)
+   - Edge cases (4 tests):
+     - URLs with port numbers
+     - URLs with authentication credentials
+     - URLs with query parameters and fragments
+     - Case sensitivity for protocols and hosts
+
+**Security Improvements:**
+
+The comprehensive tests verify protection against common attack vectors:
+- **Typosquatting**: `githab.com` → rejected when only `github.com` allowed
+- **TLD variations**: `github.org` → rejected when only `github.com` allowed
+- **Subdomain attacks**: `malicious.github.com` → rejected (not exact match)
+- **Protocol downgrade**: `http://` → rejected when only `https://` allowed
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/tests/core/security.test.ts` (560 lines)
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/security.ts` - Added cleanHostname() function and updated extractHost()
+
+**Testing Results:**
+- Security module tests: 41/41 passing ✓
+- Full test suite: 1932/1932 tests passing (41 new tests added) ✓
+- 7155 expect() calls successful ✓
+- All linting checks passing (bun check) ✓
+- TypeScript compilation clean ✓
+
+**Status:** Security Module Test Coverage COMPLETE! ✅
+
+The security module now has comprehensive test coverage ensuring that URL validation works correctly across all supported URL formats and properly protects against common security threats. This critical security feature is now fully tested and production-ready.
+
