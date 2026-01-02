@@ -75,20 +75,38 @@ export function parseGitUrl(url: string): ParsedGitUrl | null {
  * Parses GitHub shorthand format: github.com/org/repo//path?ref=v1.2.0
  */
 function parseGitHubShorthand(url: string): ParsedGitUrl | null {
-  // Split on '//' to separate repo URL from path
-  const parts = url.split("//");
-  const repoAndQuery = parts[0];
-  const subpath = parts.length > 1 ? parts.slice(1).join("//") : undefined;
+  // Split on '//' to separate repo URL from path, but we need to extract
+  // ref from both parts to handle cases like:
+  // - github.com/org/repo?ref=v1//path
+  // - github.com/org/repo//path?ref=v1
+  // - github.com/org/repo?ref=v1//path?ref=v2 (v2 wins)
 
-  if (!repoAndQuery) {
+  const parts = url.split("//");
+  const repoPartWithQuery = parts[0];
+  const subpathWithQuery = parts.length > 1 ? parts.slice(1).join("//") : undefined;
+
+  if (!repoPartWithQuery) {
     return null;
   }
 
-  // Extract ref from query string
-  const { baseUrl, ref } = extractRefFromQuery(repoAndQuery);
+  // Extract ref from repo part
+  const { baseUrl: repoUrl, ref: refFromRepo } = extractRefFromQuery(repoPartWithQuery);
+
+  // Extract ref and path from subpath part
+  let subpath: string | undefined;
+  let refFromSubpath: string | undefined;
+
+  if (subpathWithQuery) {
+    const extracted = extractRefFromQuery(subpathWithQuery);
+    subpath = extracted.baseUrl || undefined;
+    refFromSubpath = extracted.ref;
+  }
+
+  // Prefer ref from subpath, fall back to repo ref, then default to main
+  const ref = refFromSubpath || refFromRepo || "main";
 
   // Parse: github.com/org/repo
-  const urlParts = baseUrl.split("/");
+  const urlParts = repoUrl.split("/");
   if (urlParts.length < 3) {
     return null;
   }
@@ -104,9 +122,6 @@ function parseGitHubShorthand(url: string): ParsedGitUrl | null {
   // Remove .git suffix if present
   const cleanRepo = repo.endsWith(".git") ? repo.slice(0, -4) : repo;
 
-  // Extract path from subpath (remove query string if present)
-  const path = subpath ? extractRefFromQuery(subpath).baseUrl : undefined;
-
   const fullUrl = `https://${host}/${org}/${cleanRepo}.git`;
 
   return {
@@ -115,8 +130,8 @@ function parseGitHubShorthand(url: string): ParsedGitUrl | null {
     host,
     org,
     repo: cleanRepo,
-    path,
-    ref: ref || "main", // Default to 'main' if no ref specified
+    path: subpath,
+    ref,
     fullUrl,
     cloneUrl: fullUrl,
   };
@@ -127,9 +142,7 @@ function parseGitHubShorthand(url: string): ParsedGitUrl | null {
  */
 function parseGitHttpsUrl(url: string): ParsedGitUrl | null {
   // Special handling: If URL has no subpath, it won't have '//' delimiter after the protocol
-  // We need to preserve the protocol:// part
-  let repoUrlPart: string;
-  let subpath: string | undefined;
+  // We need to preserve the protocol:// part and extract ref from both repo and subpath parts
 
   // Check if there's a subpath delimiter (// after the repo URL)
   // The first // is the protocol (https://), so we look for additional //
@@ -141,33 +154,37 @@ function parseGitHttpsUrl(url: string): ParsedGitUrl | null {
   const afterProtocol = url.slice(protocolEndIndex + 3); // Skip past '://'
   const subpathIndex = afterProtocol.indexOf("//");
 
+  let repoPartWithQuery: string;
+  let subpathWithQuery: string | undefined;
+
   if (subpathIndex !== -1) {
     // Has subpath
-    repoUrlPart = url.slice(0, protocolEndIndex + 3 + subpathIndex);
-    subpath = afterProtocol.slice(subpathIndex + 2); // Skip past '//'
+    repoPartWithQuery = url.slice(0, protocolEndIndex + 3 + subpathIndex);
+    subpathWithQuery = afterProtocol.slice(subpathIndex + 2); // Skip past '//'
   } else {
     // No subpath
-    repoUrlPart = url;
-    subpath = undefined;
+    repoPartWithQuery = url;
+    subpathWithQuery = undefined;
   }
 
-  // Extract ref from query string in subpath
-  const path = subpath ? extractRefFromQuery(subpath).baseUrl : undefined;
+  // Extract ref from repo part
+  const { baseUrl: repoUrl, ref: refFromRepo } = extractRefFromQuery(repoPartWithQuery);
 
-  // Parse the base URL (before first //)
-  const { baseUrl: repoUrl, ref: refFromRepoUrl } = extractRefFromQuery(repoUrlPart);
+  // Extract ref and path from subpath part
+  let subpath: string | undefined;
+  let refFromSubpath: string | undefined;
 
-  // Extract ref from query string in repo URL
-  const { ref: refFromSubpath } = subpath ? extractRefFromQuery(subpath) : { ref: undefined };
+  if (subpathWithQuery) {
+    const extracted = extractRefFromQuery(subpathWithQuery);
+    subpath = extracted.baseUrl || undefined;
+    refFromSubpath = extracted.ref;
+  }
 
-  // Ref can be in either location, prefer subpath
-  const ref = refFromSubpath || refFromRepoUrl || "main";
-
-  // Parse URL to extract protocol, host, org, repo
-  const urlToParse = repoUrl;
+  // Prefer ref from subpath, fall back to repo ref, then default to main
+  const ref = refFromSubpath || refFromRepo || "main";
 
   // Handle protocol
-  const httpsMatch = urlToParse.match(/^(https?):\/\/(.+)$/);
+  const httpsMatch = repoUrl.match(/^(https?):\/\/(.+)$/);
   if (!httpsMatch) {
     return null;
   }
@@ -204,7 +221,7 @@ function parseGitHttpsUrl(url: string): ParsedGitUrl | null {
     host,
     org,
     repo,
-    path,
+    path: subpath,
     ref,
     fullUrl,
     cloneUrl: fullUrl,
@@ -215,23 +232,31 @@ function parseGitHttpsUrl(url: string): ParsedGitUrl | null {
  * Parses git SSH URL: git@github.com:org/repo.git//path?ref=abc1234
  */
 function parseGitSshUrl(url: string): ParsedGitUrl | null {
-  // Split on '//' to separate repo URL from path
-  const parts = url.split("//");
-  const repoAndQuery = parts[0];
-  const subpath = parts.length > 1 ? parts.slice(1).join("//") : undefined;
+  // Split on '//' to separate repo URL from path, and extract ref from both parts
 
-  if (!repoAndQuery) {
+  const parts = url.split("//");
+  const repoPartWithQuery = parts[0];
+  const subpathWithQuery = parts.length > 1 ? parts.slice(1).join("//") : undefined;
+
+  if (!repoPartWithQuery) {
     return null;
   }
 
-  // Extract ref from query string
-  const { baseUrl: repoUrl, ref: refFromRepoUrl } = extractRefFromQuery(repoAndQuery);
-  const { baseUrl: pathUrl, ref: refFromSubpath } = subpath
-    ? extractRefFromQuery(subpath)
-    : { baseUrl: undefined, ref: undefined };
+  // Extract ref from repo part
+  const { baseUrl: repoUrl, ref: refFromRepo } = extractRefFromQuery(repoPartWithQuery);
 
-  // Ref can be in either location, prefer subpath
-  const ref = refFromSubpath || refFromRepoUrl || "main";
+  // Extract ref and path from subpath part
+  let subpath: string | undefined;
+  let refFromSubpath: string | undefined;
+
+  if (subpathWithQuery) {
+    const extracted = extractRefFromQuery(subpathWithQuery);
+    subpath = extracted.baseUrl || undefined;
+    refFromSubpath = extracted.ref;
+  }
+
+  // Prefer ref from subpath, fall back to repo ref, then default to main
+  const ref = refFromSubpath || refFromRepo || "main";
 
   // Parse: git@github.com:org/repo.git
   const sshMatch = repoUrl.match(/^git@([^:]+):(.+)$/);
@@ -270,7 +295,7 @@ function parseGitSshUrl(url: string): ParsedGitUrl | null {
     host,
     org,
     repo,
-    path: pathUrl,
+    path: subpath,
     ref,
     fullUrl,
     cloneUrl: fullUrl,

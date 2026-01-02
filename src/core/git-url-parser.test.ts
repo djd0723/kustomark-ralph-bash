@@ -4,7 +4,7 @@
  * This comprehensive test suite covers:
  * - GitHub shorthand format: github.com/org/repo//path?ref=v1.2.0
  * - SSH URL format: git::git@github.com:org/repo.git//path?ref=abc1234
- * - HTTPS URL format: git::https://... (currently has parsing bugs, see tests)
+ * - HTTPS URL format: git::https://github.com/org/repo.git//subdir?ref=main
  * - Edge cases: invalid URLs, missing parts, malformed refs
  * - Default ref behavior (defaults to 'main')
  * - Query parameter extraction
@@ -13,12 +13,9 @@
  * - Special characters in repo names, paths, and refs
  * - Type safety and behavior guarantees
  *
- * Known Issues:
- * - git::https:// and git::http:// URLs are currently broken due to '//' splitting
- *   conflicting with the protocol separator. These tests document the current
- *   broken behavior.
- * - Ref query parameters must appear before the '//' path separator to be recognized.
- *   Refs placed after '//' are currently ignored.
+ * The parser correctly handles ref parameters regardless of position:
+ * - Ref can appear before or after the '//' path separator
+ * - Query parameters are extracted from the full URL before splitting on '//'
  *
  * Total: 83 tests covering both functions (isGitUrl and parseGitUrl)
  */
@@ -204,8 +201,8 @@ describe("parseGitUrl", () => {
       });
     });
 
-    test("ignores ref query parameter when placed after // path separator", () => {
-      // Note: Current implementation only reads ref from the base URL part, not from path
+    test("parses ref query parameter when placed after // path separator", () => {
+      // The parser now correctly extracts ref from anywhere in the URL
       const result = parseGitUrl("github.com/facebook/react//docs?ref=v18.2.0");
 
       expect(result).toEqual({
@@ -215,7 +212,7 @@ describe("parseGitUrl", () => {
         org: "facebook",
         repo: "react",
         path: "docs",
-        ref: "main", // Falls back to default since ref is after //
+        ref: "v18.2.0", // Now correctly parsed even after //
         fullUrl: "https://github.com/facebook/react.git",
         cloneUrl: "https://github.com/facebook/react.git",
       });
@@ -281,6 +278,45 @@ describe("parseGitUrl", () => {
         fullUrl: "https://github.com/facebook/react.git",
         cloneUrl: "https://github.com/facebook/react.git",
       });
+    });
+
+    test("parses git::https:// URL with path and ref after //", () => {
+      const result = parseGitUrl("git::https://github.com/facebook/react.git//docs?ref=v18.2.0");
+
+      expect(result).toEqual({
+        type: "git",
+        protocol: "https",
+        host: "github.com",
+        org: "facebook",
+        repo: "react",
+        path: "docs",
+        ref: "v18.2.0",
+        fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
+      });
+    });
+
+    test("parses git::https:// URL with ref before //", () => {
+      const result = parseGitUrl("git::https://github.com/facebook/react.git?ref=v18.2.0//docs");
+
+      expect(result).toEqual({
+        type: "git",
+        protocol: "https",
+        host: "github.com",
+        org: "facebook",
+        repo: "react",
+        path: "docs",
+        ref: "v18.2.0",
+        fullUrl: "https://github.com/facebook/react.git",
+        cloneUrl: "https://github.com/facebook/react.git",
+      });
+    });
+
+    test("when ref appears twice in git::https:// URL, last occurrence wins", () => {
+      const result = parseGitUrl("git::https://github.com/facebook/react.git?ref=v1.0.0//docs?ref=v2.0.0");
+
+      expect(result?.ref).toBe("v2.0.0");
+      expect(result?.path).toBe("docs");
     });
   });
 
@@ -504,6 +540,7 @@ describe("parseGitUrl", () => {
     test("handles empty path after //", () => {
       const result = parseGitUrl("github.com/facebook/react//");
 
+      // Empty string after // is converted to undefined by || undefined
       expect(result?.path).toBeUndefined();
     });
 
@@ -525,18 +562,26 @@ describe("parseGitUrl", () => {
       expect(result?.ref).toBe("main");
     });
 
-    test("handles path with query string containing ref (ref ignored after //)", () => {
+    test("handles path with query string containing ref (ref parsed correctly)", () => {
       const result = parseGitUrl("github.com/facebook/react//docs/guide?ref=v2.0.0");
 
       expect(result?.path).toBe("docs/guide");
-      // Ref after // is currently ignored, defaults to main
-      expect(result?.ref).toBe("main");
+      // Ref is now correctly parsed even after //
+      expect(result?.ref).toBe("v2.0.0");
     });
 
     test("handles ref before // separator with path", () => {
       const result = parseGitUrl("github.com/facebook/react?ref=v2.0.0//docs/guide");
 
       expect(result?.path).toBe("docs/guide");
+      expect(result?.ref).toBe("v2.0.0");
+    });
+
+    test("when ref appears twice, last occurrence wins", () => {
+      const result = parseGitUrl("github.com/facebook/react?ref=v1.0.0//docs?ref=v2.0.0");
+
+      expect(result?.path).toBe("docs");
+      // URLSearchParams uses the last occurrence
       expect(result?.ref).toBe("v2.0.0");
     });
   });

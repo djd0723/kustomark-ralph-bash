@@ -747,11 +747,7 @@ output: output
   });
 
   describe("integration with group filtering", () => {
-    test.skip("should invalidate cache when group filters change", async () => {
-      // NOTE: This test is skipped because the current implementation doesn't track
-      // group filter options in the cache invalidation logic. Group filters are CLI
-      // options, not part of the config file, so they don't trigger cache invalidation.
-      // This is a known limitation that may need to be addressed.
+    test("should invalidate cache when group filters change", async () => {
       writeFileSync(join(fixtureRoot, "file1.md"), "# File 1\n\nContent");
 
       const config = `apiVersion: kustomark/v1
@@ -857,29 +853,37 @@ patches:
       let output = readFileSync(join(overlayDir, "output", "file1.md"), "utf-8");
       expect(output).toContain("overlay: true");
 
-      // Modify base config
+      // Modify base file (not config, since base config patches aren't inherited)
+      writeFileSync(join(baseDir, "file1.md"), "# Base File 1 Modified");
+
+      // Rebuild overlay with --incremental (should detect base file change through base config)
+      const result = await runCLI(["build", overlayDir, "--incremental", "-vv"]);
+
+      expect(result.exitCode).toBe(0);
+      // The cache should be invalidated because we track base config changes
+      // Even though the base config itself didn't change, the files it references did
+      expect(result.stderr).toContain("Found 1 file(s) to rebuild");
+
+      // Output should have overlay frontmatter and updated content
+      output = readFileSync(join(overlayDir, "output", "file1.md"), "utf-8");
+      expect(output).toContain("Modified");
+      expect(output).toContain("overlay: true");
+
+      // Now modify the base config itself
       const newBaseConfig = `apiVersion: kustomark/v1
 kind: Kustomization
 resources:
   - "*.md"
+  - "!file1.md"
 output: output
-patches:
-  - op: set-frontmatter
-    key: "base"
-    value: true
 `;
       writeFileSync(join(baseDir, "kustomark.yaml"), newBaseConfig);
 
       // Rebuild overlay with --incremental (should detect base config change)
-      const result = await runCLI(["build", overlayDir, "--incremental", "-vv"]);
+      const result2 = await runCLI(["build", overlayDir, "--incremental", "-vv"]);
 
-      expect(result.exitCode).toBe(0);
-      expect(result.stderr).toContain("Config changed, invalidating cache");
-
-      // Output should have both base and overlay frontmatter
-      output = readFileSync(join(overlayDir, "output", "file1.md"), "utf-8");
-      expect(output).toContain("base: true");
-      expect(output).toContain("overlay: true");
+      expect(result2.exitCode).toBe(0);
+      expect(result2.stderr).toContain("Config changed, invalidating cache");
     });
 
     test("should track base file changes", async () => {

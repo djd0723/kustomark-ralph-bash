@@ -48,14 +48,33 @@ export function calculatePatchHash(patch: PatchOperation): string {
  * Creates an empty build cache with the given config hash
  *
  * @param configHash - SHA256 hash of the config file content
+ * @param configHashes - Optional map of config paths to their hashes (for tracking base configs)
+ * @param enabledGroups - Optional enabled groups for filtering
+ * @param disabledGroups - Optional disabled groups for filtering
  * @returns Empty BuildCache object
  */
-export function createEmptyCache(configHash: string): BuildCache {
-  return {
+export function createEmptyCache(
+  configHash: string,
+  configHashes?: Record<string, string>,
+  enabledGroups?: string[],
+  disabledGroups?: string[],
+): BuildCache {
+  const cache: BuildCache = {
     version: 1,
     configHash,
+    ...(configHashes && { configHashes }),
     entries: [],
   };
+
+  // Only add groupFilters if at least one is specified
+  if (enabledGroups || disabledGroups) {
+    cache.groupFilters = {
+      enabled: enabledGroups,
+      disabled: disabledGroups,
+    };
+  }
+
+  return cache;
 }
 
 /**
@@ -136,6 +155,19 @@ async function parseBuildCache(content: string | Promise<string>): Promise<Build
       throw new Error("Build cache must have a string 'configHash' field");
     }
 
+    // Validate configHashes (optional)
+    if (cache.configHashes !== undefined) {
+      if (typeof cache.configHashes !== "object" || cache.configHashes === null) {
+        throw new Error("Build cache 'configHashes' must be an object if present");
+      }
+      // Validate each entry in configHashes
+      for (const [key, value] of Object.entries(cache.configHashes)) {
+        if (typeof key !== "string" || typeof value !== "string") {
+          throw new Error("Build cache 'configHashes' must map strings to strings");
+        }
+      }
+    }
+
     // Validate entries
     if (!Array.isArray(cache.entries)) {
       throw new Error("Build cache must have an 'entries' array");
@@ -191,11 +223,18 @@ async function parseBuildCache(content: string | Promise<string>): Promise<Build
       });
     }
 
-    return {
+    const result: BuildCache = {
       version: cache.version,
       configHash: cache.configHash,
       entries: validatedEntries,
     };
+    if (cache.configHashes) {
+      result.configHashes = cache.configHashes as Record<string, string>;
+    }
+    if (cache.groupFilters) {
+      result.groupFilters = cache.groupFilters as { enabled?: string[]; disabled?: string[] };
+    }
+    return result;
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error(`JSON parsing error: ${error.message}`);
@@ -220,6 +259,8 @@ function serializeBuildCache(cache: BuildCache): string {
   const sortedCache: BuildCache = {
     version: cache.version,
     configHash: cache.configHash,
+    ...(cache.configHashes && { configHashes: cache.configHashes }),
+    ...(cache.groupFilters && { groupFilters: cache.groupFilters }),
     entries: [...entries].sort((a, b) => a.file.localeCompare(b.file)),
   };
 
@@ -278,6 +319,8 @@ export function updateBuildCache(
   return {
     version: cache.version,
     configHash: cache.configHash,
+    ...(cache.configHashes && { configHashes: cache.configHashes }),
+    ...(cache.groupFilters && { groupFilters: cache.groupFilters }),
     entries: updatedEntries,
   };
 }
@@ -295,6 +338,8 @@ export function pruneCache(cache: BuildCache, currentFiles: Set<string>): BuildC
   return {
     version: cache.version,
     configHash: cache.configHash,
+    ...(cache.configHashes && { configHashes: cache.configHashes }),
+    ...(cache.groupFilters && { groupFilters: cache.groupFilters }),
     entries: prunedEntries,
   };
 }
@@ -488,24 +533,101 @@ export function detectChangedFiles(
  * @param config - Current configuration object (unused, for API consistency)
  * @param configPath - Path to the config file
  * @param cache - Build cache to compare against
+ * @param allConfigPaths - Optional array of all config paths in the resolution chain (including base configs)
  * @returns true if config has changed, false otherwise
  */
 export function hasConfigChanged(
   _config: KustomarkConfig,
   configPath: string,
   cache: BuildCache,
+  allConfigPaths?: string[],
 ): boolean {
   // Read the config file and compute its hash
   try {
     const configContent = readFileSync(configPath, "utf-8");
     const currentConfigHash = calculateFileHash(configContent);
 
-    // Compare with cached config hash
-    return currentConfigHash !== cache.configHash;
+    // Compare with cached config hash (main config)
+    if (currentConfigHash !== cache.configHash) {
+      return true;
+    }
+
+    // If we have additional config paths (base configs in overlays), check them too
+    if (allConfigPaths && allConfigPaths.length > 0 && cache.configHashes) {
+      for (const path of allConfigPaths) {
+        const cachedHash = cache.configHashes[path];
+        if (!cachedHash) {
+          // New config path that wasn't tracked before
+          return true;
+        }
+
+        try {
+          const content = readFileSync(path, "utf-8");
+          const currentHash = calculateFileHash(content);
+          if (currentHash !== cachedHash) {
+            // Config file has changed
+            return true;
+          }
+        } catch (error) {
+          // If we can't read the config file, assume it has changed
+          return true;
+        }
+      }
+    }
+
+    return false;
   } catch (error) {
-    // If we can't read the config file, assume it has changed
+    // If we can't read the main config file, assume it has changed
     return true;
   }
+}
+
+/**
+ * Checks if group filters have changed
+ *
+ * @param enabledGroups - Current enabled groups
+ * @param disabledGroups - Current disabled groups
+ * @param cache - Build cache to compare against
+ * @returns true if group filters have changed, false otherwise
+ */
+export function haveGroupFiltersChanged(
+  enabledGroups: Set<string> | undefined,
+  disabledGroups: Set<string> | undefined,
+  cache: BuildCache,
+): boolean {
+  const cachedFilters = cache.groupFilters;
+
+  // Convert current groups to sorted arrays for comparison
+  const currentEnabled = enabledGroups ? Array.from(enabledGroups).sort() : undefined;
+  const currentDisabled = disabledGroups ? Array.from(disabledGroups).sort() : undefined;
+
+  // If no filters in cache and no current filters, they match
+  if (!cachedFilters && !currentEnabled && !currentDisabled) {
+    return false;
+  }
+
+  // If one has filters and the other doesn't, they've changed
+  if (!cachedFilters && (currentEnabled || currentDisabled)) {
+    return true;
+  }
+
+  if (cachedFilters && !currentEnabled && !currentDisabled) {
+    return true;
+  }
+
+  // Compare enabled groups
+  const cachedEnabled = cachedFilters?.enabled?.sort();
+  if (JSON.stringify(cachedEnabled) !== JSON.stringify(currentEnabled)) {
+    return true;
+  }
+
+  // Compare disabled groups
+  const cachedDisabled = cachedFilters?.disabled?.sort();
+  if (JSON.stringify(cachedDisabled) !== JSON.stringify(currentDisabled)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -621,13 +743,13 @@ function findCacheEntry(cache: BuildCache, filePath: string): BuildCacheEntry | 
  * a file might need to be rebuilt:
  * - Source file content changed (compare hashes)
  * - Config file changed (compare config hash)
+ * - Base config changed (for overlays, compare base config hashes)
  * - Applicable patches changed (compare patch hashes)
  * - Dependencies changed (check graph)
  * - Cache version mismatch (cache.version !== current version)
  * - Group filters changed (compare enabled/disabled groups)
  *
- * Note: Remote resource updates and referenced config changes are not yet
- * implemented but could be added by comparing lock file entries.
+ * Note: Remote resource updates could be added by comparing lock file entries.
  *
  * @param resources - Map of file paths to their current content
  * @param patches - Array of patch operations from config
@@ -637,6 +759,7 @@ function findCacheEntry(cache: BuildCache, filePath: string): BuildCacheEntry | 
  * @param graph - Dependency graph
  * @param enabledGroups - Optional set of enabled patch groups
  * @param disabledGroups - Optional set of disabled patch groups
+ * @param allConfigPaths - Optional array of all config paths in the resolution chain (including base configs)
  * @returns Object containing sets of files to rebuild and unchanged files, plus reasons
  */
 export function determineFilesToRebuild(
@@ -648,6 +771,7 @@ export function determineFilesToRebuild(
   graph: DependencyGraph,
   enabledGroups?: Set<string>,
   disabledGroups?: Set<string>,
+  allConfigPaths?: string[],
 ): RebuildDetermination {
   const rebuild = new Set<string>();
   const unchanged = new Set<string>();
@@ -727,9 +851,17 @@ export function determineFilesToRebuild(
   };
 
   // Check if config changed - if so, rebuild everything
-  if (hasConfigChanged(config, configPath, cache)) {
+  if (hasConfigChanged(config, configPath, cache, allConfigPaths)) {
     for (const filePath of resources.keys()) {
       addReason(filePath, "Configuration file changed");
+    }
+    return { rebuild, unchanged, reasons };
+  }
+
+  // Check if group filters changed - if so, rebuild everything
+  if (haveGroupFiltersChanged(enabledGroups, disabledGroups, cache)) {
+    for (const filePath of resources.keys()) {
+      addReason(filePath, "Group filters changed");
     }
     return { rebuild, unchanged, reasons };
   }

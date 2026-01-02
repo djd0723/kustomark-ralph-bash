@@ -454,8 +454,17 @@ export interface BuildCache {
   version: number;
   /** SHA256 hash of config file content */
   configHash: string;
+  /** Map of config paths to their hashes (for tracking base configs in overlays) */
+  configHashes?: Record<string, string>;
   /** Cached build entries */
   entries: BuildCacheEntry[];
+  /** Group filters used during build (for cache invalidation) */
+  groupFilters?: {
+    /** Enabled groups (whitelist mode) */
+    enabled?: string[];
+    /** Disabled groups (blacklist mode) */
+    disabled?: string[];
+  };
 }
 
 /**

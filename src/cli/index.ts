@@ -18,12 +18,13 @@ import {
 } from "node:fs";
 import { mkdir as mkdirAsync, writeFile as writeFileAsync } from "node:fs/promises";
 import { cpus } from "node:os";
-import { dirname, join, normalize, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import micromatch from "micromatch";
 import {
   calculateFileHash,
   clearProjectCache,
   createEmptyCache,
+  haveGroupFiltersChanged,
   loadBuildCache,
   pruneCache,
   saveBuildCache,
@@ -457,6 +458,36 @@ function validateConfig(
   }
 
   return result;
+}
+
+/**
+ * Find all kustomark config files referenced in the resources
+ * Returns absolute paths to all base config files
+ */
+function findReferencedConfigs(
+  resources: string[],
+  basePath: string,
+): string[] {
+  const configPaths: string[] = [];
+
+  for (const resource of resources) {
+    // Check if resource is a directory reference (ends with / or contains ../)
+    if (resource.endsWith("/") || resource.includes("../")) {
+      const resolvedDir = isAbsolute(resource) ? resource : resolve(basePath, resource);
+
+      // Look for kustomark.yaml or kustomark.yml
+      const yamlPath = join(resolvedDir, "kustomark.yaml");
+      const ymlPath = join(resolvedDir, "kustomark.yml");
+
+      if (existsSync(yamlPath)) {
+        configPaths.push(normalize(yamlPath));
+      } else if (existsSync(ymlPath)) {
+        configPaths.push(normalize(ymlPath));
+      }
+    }
+  }
+
+  return configPaths;
 }
 
 /**
@@ -1344,6 +1375,21 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
     const invalidationResults = new Map<string, { needsRebuild: boolean; reason?: string }>();
     let cacheCleared = false;
 
+    // Find all referenced configs (base configs in overlays)
+    const referencedConfigPaths = findReferencedConfigs(config.resources, basePath);
+    const allConfigHashes: Record<string, string> = {};
+
+    // Hash all referenced configs
+    for (const refConfigPath of referencedConfigPaths) {
+      try {
+        const refConfigContent = readFileSync(refConfigPath, "utf-8");
+        allConfigHashes[refConfigPath] = calculateFileHash(refConfigContent);
+      } catch (error) {
+        // If we can't read a referenced config, skip it (will be caught later)
+        console.warn(`Warning: Could not read referenced config at ${refConfigPath}`);
+      }
+    }
+
     if (options.incremental) {
       // Clear cache if requested
       if (options.cleanCache) {
@@ -1372,6 +1418,33 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
               log("Config changed, invalidating cache", 2, options);
               buildCache = null;
             }
+
+            // Check if group filters changed
+            if (
+              buildCache &&
+              haveGroupFiltersChanged(
+                options.enableGroups ? new Set(options.enableGroups) : undefined,
+                options.disableGroups ? new Set(options.disableGroups) : undefined,
+                buildCache,
+              )
+            ) {
+              log("Group filters changed, invalidating cache", 2, options);
+              buildCache = null;
+            }
+
+            // Check if any base config changed
+            if (buildCache && referencedConfigPaths.length > 0) {
+              for (const refConfigPath of referencedConfigPaths) {
+                const cachedHash = buildCache.configHashes?.[refConfigPath];
+                const currentHash = allConfigHashes[refConfigPath];
+
+                if (!cachedHash || cachedHash !== currentHash) {
+                  log("Config changed, invalidating cache", 2, options);
+                  buildCache = null;
+                  break;
+                }
+              }
+            }
           } else {
             log("No cache found, performing full build", 2, options);
           }
@@ -1385,7 +1458,12 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
 
       // Create empty cache if needed
       if (!buildCache) {
-        buildCache = createEmptyCache(configHash);
+        buildCache = createEmptyCache(
+          configHash,
+          referencedConfigPaths.length > 0 ? allConfigHashes : undefined,
+          options.enableGroups,
+          options.disableGroups,
+        );
       }
     }
 
