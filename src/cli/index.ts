@@ -85,6 +85,8 @@ import { areOverlappingPatches, areRedundantPatches } from "./lint-command.js";
 import { createProgressReporter } from "./progress.js";
 import { suggestCommand } from "./suggest-command.js";
 import { templateApply, templateList, templateShow } from "./template-commands.js";
+import { templateInitCommand } from "./template-init-command.js";
+import { templateInstallCommand } from "./template-install-command.js";
 import { executeOnBuildHooks, executeOnChangeHooks, executeOnErrorHooks } from "./watch-hooks.js";
 import { webCommand } from "./web-command.js";
 
@@ -134,6 +136,8 @@ interface CLIOptions {
   var?: Record<string, string>; // For template apply --var key=value
   overwrite?: boolean; // For template apply --overwrite option
   category?: string; // For template list --category option
+  force?: boolean; // For template install --force option
+  nonInteractive?: boolean; // For template init --non-interactive option
   progress?: boolean; // For --progress option (show progress feedback)
 }
 
@@ -587,6 +591,10 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       }
     } else if (arg === "--overwrite") {
       options.overwrite = true;
+    } else if (arg === "--force") {
+      options.force = true;
+    } else if (arg === "--non-interactive") {
+      options.nonInteractive = true;
     } else if (arg === "--category" || arg.startsWith("--category=")) {
       if (arg.includes("=")) {
         const value = arg.split("=")[1];
@@ -4073,9 +4081,32 @@ async function main(): Promise<number> {
           const outputDir = positionalArgs[2] || options.output || ".";
           return await templateApply(templateName, outputDir, templateOptions);
         }
+        case "init": {
+          const outputPath = positionalArgs[1] || ".";
+          const initOptions = {
+            format: options.format,
+            verbosity: options.verbosity,
+            nonInteractive: options.nonInteractive,
+          };
+          return await templateInitCommand(outputPath, initOptions);
+        }
+        case "install": {
+          const url = positionalArgs[1];
+          if (!url) {
+            console.error("Error: URL is required");
+            console.error("Usage: kustomark template install <url>");
+            return 1;
+          }
+          const installOptions = {
+            format: options.format,
+            verbosity: options.verbosity,
+            force: options.force,
+          };
+          return await templateInstallCommand(url, installOptions);
+        }
         default:
           console.error(`Unknown template subcommand: ${subcommand}`);
-          console.error("Valid subcommands: list, show, apply");
+          console.error("Valid subcommands: list, show, apply, init, install");
           console.error("Run 'kustomark help template' for usage information");
           return 1;
       }

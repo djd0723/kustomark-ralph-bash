@@ -6,6 +6,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as yaml from "js-yaml";
@@ -367,14 +368,18 @@ kustomark build production/ --output ./dist/production
 }
 
 /**
- * Discovers templates from the builtin directory
- * Scans for template.yaml files and parses them
+ * Discovers templates from all sources
+ * Scans built-in, user global, and project local template directories
  *
- * @returns Map of template ID to template metadata and path
+ * @param cwd - Current working directory (defaults to process.cwd())
+ * @returns Map of template ID to template metadata and path, with proper priority
  */
-function discoverBuiltinTemplates(): Map<string, { metadata: TemplateMetadata; path: string }> {
-  const templates = new Map<string, { metadata: TemplateMetadata; path: string }>();
+function discoverTemplates(
+  cwd?: string,
+): Map<string, { metadata: TemplateMetadata; path: string }> {
+  const allTemplates = new Map<string, { metadata: TemplateMetadata; path: string }>();
 
+  // 1. Discover built-in templates (lowest priority)
   // Determine the builtin directory path
   // This needs to work in both development (src/) and production (dist/) environments
   const possiblePaths = [
@@ -395,69 +400,44 @@ function discoverBuiltinTemplates(): Map<string, { metadata: TemplateMetadata; p
     }
   }
 
-  // If no builtin directory found, return empty map
-  if (!builtinDir) {
-    // Don't warn in production if hardcoded templates are available
-    return templates;
-  }
-
-  try {
-    // Read all directories in builtin/
-    const entries = readdirSync(builtinDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-
-      const templateDir = join(builtinDir, entry.name);
-      const templateYamlPath = join(templateDir, "template.yaml");
-
-      // Skip if template.yaml doesn't exist
-      if (!existsSync(templateYamlPath)) {
-        console.warn(`Template directory ${entry.name} missing template.yaml, skipping`);
-        continue;
-      }
-
-      try {
-        // Read and parse template.yaml
-        const yamlContent = readFileSync(templateYamlPath, "utf-8");
-        const templateYaml = yaml.load(yamlContent) as TemplateYaml;
-
-        // Validate basic structure
-        if (!templateYaml?.metadata?.name) {
-          console.warn(`Invalid template.yaml in ${entry.name}: missing metadata.name`);
-          continue;
-        }
-
-        // Build file list from template.yaml
-        const fileList = templateYaml.files?.map((f) => f.dest) || [];
-
-        // Create metadata object
-        const metadata: TemplateMetadata = {
-          id: templateYaml.metadata.name,
-          name: templateYaml.metadata.description || templateYaml.metadata.name,
-          description: templateYaml.metadata.description || "",
-          source: "built-in",
-          tags: templateYaml.metadata.tags || [],
-          files: fileList,
-        };
-
-        templates.set(templateYaml.metadata.name, {
-          metadata,
-          path: templateDir,
-        });
-      } catch (error) {
-        console.warn(
-          `Error parsing template.yaml in ${entry.name}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+  if (builtinDir) {
+    if (process.env.KUSTOMARK_VERBOSE) {
+      console.log(`Scanning built-in templates at: ${builtinDir}`);
     }
-  } catch (error) {
-    console.warn(
-      `Error reading builtin templates directory: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    const builtinTemplates = discoverTemplatesInDirectory(builtinDir, "built-in");
+    for (const [id, template] of builtinTemplates) {
+      allTemplates.set(id, template);
+    }
   }
 
-  return templates;
+  // 2. Discover user global templates (medium priority - can override built-ins)
+  const userDirs = getUserTemplateDirectories(cwd);
+
+  if (process.env.KUSTOMARK_VERBOSE) {
+    console.log(`Scanning user global templates at: ${userDirs.homeDir}`);
+  }
+  const userGlobalTemplates = discoverTemplatesInDirectory(userDirs.homeDir, "user");
+  for (const [id, template] of userGlobalTemplates) {
+    if (allTemplates.has(id) && process.env.KUSTOMARK_VERBOSE) {
+      console.log(`User global template '${id}' overrides built-in template`);
+    }
+    allTemplates.set(id, template);
+  }
+
+  // 3. Discover project local templates (highest priority - can override all)
+  if (process.env.KUSTOMARK_VERBOSE) {
+    console.log(`Scanning project local templates at: ${userDirs.projectDir}`);
+  }
+  const projectLocalTemplates = discoverTemplatesInDirectory(userDirs.projectDir, "user");
+  for (const [id, template] of projectLocalTemplates) {
+    if (allTemplates.has(id) && process.env.KUSTOMARK_VERBOSE) {
+      const existingSource = allTemplates.get(id)?.metadata.source;
+      console.log(`Project local template '${id}' overrides ${existingSource} template`);
+    }
+    allTemplates.set(id, template);
+  }
+
+  return allTemplates;
 }
 
 /**
@@ -495,6 +475,111 @@ function loadTemplateFiles(templatePath: string, templateYaml: TemplateYaml): Te
 }
 
 /**
+ * Get user template directories
+ * Returns paths to user global and project local template directories
+ *
+ * @param cwd - Current working directory (defaults to process.cwd())
+ * @returns Object with homeDir and projectDir paths
+ */
+export function getUserTemplateDirectories(cwd?: string): { homeDir: string; projectDir: string } {
+  const currentDir = cwd || process.cwd();
+
+  return {
+    homeDir: join(homedir(), ".kustomark", "templates"),
+    projectDir: join(currentDir, "templates"),
+  };
+}
+
+/**
+ * Discovers templates from a given directory
+ * Scans for template.yaml files and parses them
+ *
+ * @param directory - Absolute path to template directory
+ * @param source - Source type ("built-in" or "user")
+ * @returns Map of template ID to template metadata and path
+ */
+function discoverTemplatesInDirectory(
+  directory: string,
+  source: "built-in" | "user",
+): Map<string, { metadata: TemplateMetadata; path: string }> {
+  const templates = new Map<string, { metadata: TemplateMetadata; path: string }>();
+
+  // Check if directory exists
+  if (!existsSync(directory)) {
+    return templates;
+  }
+
+  try {
+    // Read all directories in the template directory
+    const entries = readdirSync(directory, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const templateDir = join(directory, entry.name);
+      const templateYamlPath = join(templateDir, "template.yaml");
+
+      // Skip if template.yaml doesn't exist
+      if (!existsSync(templateYamlPath)) {
+        if (process.env.KUSTOMARK_VERBOSE) {
+          console.warn(`Template directory ${entry.name} missing template.yaml, skipping`);
+        }
+        continue;
+      }
+
+      try {
+        // Read and parse template.yaml
+        const yamlContent = readFileSync(templateYamlPath, "utf-8");
+        const templateYaml = yaml.load(yamlContent) as TemplateYaml;
+
+        // Validate basic structure
+        if (!templateYaml?.metadata?.name) {
+          console.warn(`Invalid template.yaml in ${entry.name}: missing metadata.name`);
+          continue;
+        }
+
+        // Build file list from template.yaml
+        const fileList = templateYaml.files?.map((f) => f.dest) || [];
+
+        // Create metadata object
+        const metadata: TemplateMetadata = {
+          id: templateYaml.metadata.name,
+          name: templateYaml.metadata.description || templateYaml.metadata.name,
+          description: templateYaml.metadata.description || "",
+          source,
+          tags: templateYaml.metadata.tags || [],
+          files: fileList,
+        };
+
+        templates.set(templateYaml.metadata.name, {
+          metadata,
+          path: templateDir,
+        });
+
+        if (process.env.KUSTOMARK_VERBOSE) {
+          console.log(
+            `Discovered ${source} template: ${templateYaml.metadata.name} at ${templateDir}`,
+          );
+        }
+      } catch (error) {
+        console.warn(
+          `Error parsing template.yaml in ${entry.name}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  } catch (error) {
+    // Only warn if it's not a permission error or if verbose mode is on
+    if (process.env.KUSTOMARK_VERBOSE) {
+      console.warn(
+        `Error reading templates directory ${directory}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return templates;
+}
+
+/**
  * Template Manager
  * Handles template discovery, loading, and metadata
  */
@@ -507,10 +592,11 @@ export class TemplateManager {
    */
   private getTemplateCache(): Map<string, { metadata: TemplateMetadata; path: string }> {
     if (!this.templateCache) {
-      // Discover templates from filesystem
-      this.templateCache = discoverBuiltinTemplates();
+      // Discover templates from all sources (built-in, user global, project local)
+      this.templateCache = discoverTemplates();
 
       // Add hardcoded fallback templates if they don't exist in filesystem
+      // These fallbacks ensure backward compatibility
       for (const [id, metadata] of Object.entries(BUILTIN_TEMPLATES)) {
         if (!this.templateCache.has(id)) {
           this.templateCache.set(id, {
@@ -602,7 +688,7 @@ export class TemplateManager {
 
     return {
       id,
-      source: "built-in",
+      source: templateInfo.metadata.source,
       path: templateInfo.path,
     };
   }

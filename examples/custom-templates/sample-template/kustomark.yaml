@@ -1,0 +1,32 @@
+apiVersion: kustomark/v1
+kind: Kustomization
+
+# {{api_name}} Documentation Configuration
+resources:
+  - "docs/**/*.md"
+
+# Add API metadata to all documentation
+patches:
+  - op: set-frontmatter
+    key: api
+    value: "{{api_name}}"
+
+  - op: set-frontmatter
+    key: version
+    value: "{{api_version}}"
+
+  - op: set-frontmatter
+    key: base_url
+    value: "{{base_url}}"
+
+  # Add navigation notice
+  - op: prepend
+    include: "**/*.md"
+    content: |
+      > **{{api_name}} {{api_version}}** | [API Reference](./api-reference.md)
+
+validators:
+  - type: frontmatter
+    required:
+      - api
+      - version

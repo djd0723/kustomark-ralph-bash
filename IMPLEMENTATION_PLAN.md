@@ -3477,3 +3477,88 @@ The comprehensive tests verify protection against common attack vectors:
 
 The security module now has comprehensive test coverage ensuring that URL validation works correctly across all supported URL formats and properly protects against common security threats. This critical security feature is now fully tested and production-ready.
 
+
+---
+
+**2026-01-02 (Custom Template System Enhancement - COMPLETE!):**
+
+Implemented comprehensive custom template support, allowing users to create, install, and manage their own templates beyond the built-in ones.
+
+**Problem Analysis:**
+
+The template system had built-in templates (`upstream-fork`, `skill-customization`) but lacked:
+- Discovery of user-created custom templates
+- Installation of templates from external sources (git/HTTP)
+- Scaffolding tools to help users create templates
+- Support for local and global template directories
+
+**Implementation:**
+
+1. ✅ **Custom Template Discovery** (`/home/dex/kustomark-ralph-bash/src/core/templates/manager.ts`):
+   - Added `getUserTemplateDirectories()` function returning user global (`~/.kustomark/templates/`) and project local (`./templates/`) paths
+   - Added `discoverTemplatesInDirectory()` for generic template discovery from any directory
+   - Enhanced `discoverTemplates()` to scan all three locations with proper priority (built-in < global < local)
+   - Graceful handling of missing directories - no errors if template dirs don't exist
+   - Verbose logging support via `KUSTOMARK_VERBOSE` environment variable
+   - Template override detection and logging when local/global templates override built-ins
+   - 13 new comprehensive tests for discovery system
+
+2. ✅ **Template Install Command** (`/home/dex/kustomark-ralph-bash/src/cli/template-install-command.ts`):
+   - Support for Git URLs (reuses existing `git-fetcher.ts`)
+   - Support for HTTP archives - .tar.gz, .tgz, .tar, .zip (reuses `http-fetcher.ts`)
+   - Installs to `~/.kustomark/templates/<template-name>/`
+   - Template validation using `parseTemplate()` and `validateTemplate()`
+   - `--force` flag to overwrite existing templates
+   - Comprehensive error handling for invalid URLs, missing templates, permissions
+   - Both text and JSON output formats
+
+3. ✅ **Template Init/Scaffolding Command** (`/home/dex/kustomark-ralph-bash/src/cli/template-init-command.ts`):
+   - Interactive mode (default) with @clack/prompts for metadata and variable wizard
+   - Non-interactive mode with `--non-interactive` flag for automation
+   - Generates complete template structure: template.yaml, README.md, files/ directory
+   - Email validation, kebab-case name validation, SCREAMING_SNAKE_CASE variable names
+   - Template category selection with proper enum values
+
+4. ✅ **CLI Integration**:
+   - Added `kustomark template install <url>` command
+   - Added `kustomark template init [output-dir]` command
+   - Updated help system with comprehensive documentation
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/cli/template-install-command.ts` (393 lines)
+- `/home/dex/kustomark-ralph-bash/src/cli/template-init-command.ts` (700+ lines)
+- `/home/dex/kustomark-ralph-bash/tests/core/template-manager.test.ts` (13 tests)
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/templates/manager.ts` - Discovery system
+- `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - CLI integration
+- `/home/dex/kustomark-ralph-bash/src/cli/help.ts` - Help documentation
+
+**Testing Results:**
+- 1945 tests passing (13 new tests for template discovery) ✓
+- 7186 expect() calls ✓
+- All linting checks passing (bun check) ✓
+- TypeScript compilation clean ✓
+
+**Usage Examples:**
+
+```bash
+# Create a custom template
+kustomark template init my-custom-template
+
+# Install a template from a repository
+kustomark template install https://github.com/org/template-repo.git
+
+# Install with force overwrite
+kustomark template install https://example.com/template.tar.gz --force
+
+# List all templates (includes custom ones)
+kustomark template list
+
+# Use a custom template
+kustomark template apply my-custom-template ./output --var PROJECT_NAME="My Project"
+```
+
+**Status:** Custom Template System Enhancement COMPLETE! ✅
+
+This feature significantly enhances the template system, enabling teams to create and share standardized project templates while maintaining the simplicity of the built-in templates.

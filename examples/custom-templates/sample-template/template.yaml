@@ -1,0 +1,45 @@
+apiVersion: kustomark/v1
+kind: Template
+metadata:
+  name: api-docs
+  description: API documentation template with examples
+  category: documentation
+  version: 1.0.0
+  author: Kustomark Team
+  tags:
+    - api
+    - documentation
+    - examples
+
+variables:
+  - name: api_name
+    description: Name of the API
+    type: string
+    required: true
+    example: MyAwesome API
+
+  - name: api_version
+    description: API version
+    type: string
+    required: true
+    default: v1
+    example: v1
+
+  - name: base_url
+    description: Base URL for the API
+    type: string
+    required: true
+    example: https://api.example.com
+
+files:
+  - src: kustomark.yaml
+    dest: kustomark.yaml
+    substitute: true
+
+  - src: README.md
+    dest: README.md
+    substitute: true
+
+  - src: api-reference.md
+    dest: docs/api-reference.md
+    substitute: true

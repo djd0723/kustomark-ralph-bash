@@ -1244,6 +1244,7 @@ ${formatSection("SYNOPSIS")}
   ${formatCommand("kustomark template list")} [options]
   ${formatCommand("kustomark template show")} <template> [options]
   ${formatCommand("kustomark template apply")} <template> [options]
+  ${formatCommand("kustomark template init")} [path] [options]
 
 ${formatSection("DESCRIPTION")}
   Template commands help you discover, inspect, and apply pre-built
@@ -1254,6 +1255,7 @@ ${formatSection("SUBCOMMANDS")}
   ${formatFlag("list")}               List all available templates
   ${formatFlag("show")} <template>    Show detailed information about a template
   ${formatFlag("apply")} <template>   Apply a template to create new configuration
+  ${formatFlag("init")} [path]        Create a new custom template (interactive scaffolding)
 
 ${formatSection("LIST OPTIONS")}
   ${formatFlag("--category")} <cat>     Filter by category (upstream-fork, documentation, skills, custom)
@@ -1268,6 +1270,11 @@ ${formatSection("APPLY OPTIONS")}
   ${formatFlag("--values")} <json|file>    Variable values as JSON or path to values file
   ${formatFlag("--skip-post-apply")}      Skip post-apply commands
   ${formatFlag("--format")} <text|json>    Output format (default: text)
+
+${formatSection("INIT OPTIONS")}
+  ${formatFlag("--non-interactive")}       Use defaults instead of prompts
+  ${formatFlag("--format")} <text|json>    Output format (default: text)
+  ${formatFlag("-v")}                      Verbose output
 
 ${formatSection("EXAMPLES")}
   ${formatExample("# List all available templates")}
@@ -1296,6 +1303,12 @@ ${formatSection("EXAMPLES")}
 
   ${formatExample("# Get template list as JSON")}
   ${formatCommand("kustomark template list --format=json")}
+
+  ${formatExample("# Create a new template interactively")}
+  ${formatCommand("kustomark template init my-custom-template")}
+
+  ${formatExample("# Create a template with defaults (non-interactive)")}
+  ${formatCommand("kustomark template init my-template --non-interactive")}
 
 ${formatSection("TEMPLATE CATEGORIES")}
   ${formatHighlight("upstream-fork:")}
