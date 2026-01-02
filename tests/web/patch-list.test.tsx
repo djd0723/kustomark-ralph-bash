@@ -914,9 +914,10 @@ describe("PatchList Component", () => {
         />
       );
 
-      // Empty group should still render but be empty
-      const groupBadge = screen.queryByText("");
-      // Component may or may not render empty badge - this is acceptable
+      // Empty group should not render a badge (empty string is falsy)
+      const groupBadges = screen.queryAllByText(/^$/);
+      // Component should render without crashing - no specific badge assertion needed
+      expect(screen.getByText(/#1 replace/i)).toBeInTheDocument();
     });
 
     test("should handle rapid selection changes", async () => {

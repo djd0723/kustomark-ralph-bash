@@ -12,30 +12,23 @@
  * - No file selected state
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FileViewer } from "../../src/web/client/src/components/preview/FileViewer";
 import { api } from "../../src/web/client/src/services/api";
 
-// Mock the api module
-vi.mock("../../src/web/client/src/services/api", () => ({
-  api: {
-    files: {
-      get: vi.fn(),
-    },
-  },
-}));
+// Mock the api.files.get function
+const mockApiGet = mock(() => Promise.resolve({ content: "", path: "" }));
+api.files.get = mockApiGet as any;
 
 describe("FileViewer Component", () => {
-  const mockApiGet = vi.mocked(api.files.get);
-
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockApiGet.mockClear();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    mockApiGet.mockRestore();
   });
 
   describe("No file selected state", () => {
@@ -470,14 +463,16 @@ describe("FileViewer Component", () => {
   });
 
   describe("Copy to clipboard functionality", () => {
-    let clipboardWriteText: ReturnType<typeof vi.fn>;
+    let clipboardWriteText: ReturnType<typeof mock>;
 
     beforeEach(() => {
-      clipboardWriteText = vi.fn().mockResolvedValue(undefined);
-      Object.assign(navigator, {
-        clipboard: {
+      clipboardWriteText = mock(() => Promise.resolve(undefined));
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
           writeText: clipboardWriteText,
         },
+        writable: true,
+        configurable: true,
       });
     });
 
@@ -525,7 +520,7 @@ describe("FileViewer Component", () => {
     });
 
     it("should revert to 'Copy' text after timeout", async () => {
-      vi.useFakeTimers();
+      jest.useFakeTimers();
       const user = userEvent.setup({ delay: null });
 
       mockApiGet.mockResolvedValue({
@@ -547,17 +542,17 @@ describe("FileViewer Component", () => {
       });
 
       // Fast-forward time by 2 seconds
-      vi.advanceTimersByTime(2000);
+      jest.advanceTimersByTime(2000);
 
       await waitFor(() => {
         expect(screen.getByText("Copy")).toBeInTheDocument();
       });
 
-      vi.useRealTimers();
+      jest.useRealTimers();
     });
 
     it("should handle clipboard API errors gracefully", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = spyOn(console, "error").mockImplementation(() => {});
       clipboardWriteText.mockRejectedValue(new Error("Clipboard access denied"));
 
       const user = userEvent.setup();
