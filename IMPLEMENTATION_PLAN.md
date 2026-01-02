@@ -789,7 +789,7 @@ This document tracks the implementation of kustomark based on the spec milestone
   - ✅ Create VSCode extension with extension manifest - COMPLETE!
   - ✅ Add JSON Schema integration for editor validation - COMPLETE!
   - ✅ Implement go-to-definition for resource paths - COMPLETE! 2026-01-02
-  - ⏳ Implement document symbols provider (outline view) (future enhancement)
+  - ✅ Implement document symbols provider (outline view) - COMPLETE! 2026-01-02
   - ✅ Package and publish VSCode extension - COMPLETE!
   - ✅ Document installation and usage in README.md - COMPLETE!
 
@@ -1275,4 +1275,43 @@ This document tracks the implementation of kustomark based on the spec milestone
 - `/home/dex/kustomark-ralph-bash/src/web/server/server.ts` - Fixed forEach linting issue
 
 **Status:** LSP go-to-definition COMPLETE! ✅
-- Remaining LSP enhancement: Document symbols provider (outline view) - deferred
+**Status:** LSP document symbols provider COMPLETE! ✅
+
+**2026-01-02 (LSP Document Symbols Provider - Future Work - COMPLETE!):**
+- ✅ Implemented Document Symbols Provider for LSP server (deferred item from M4):
+  - Created `/home/dex/kustomark-ralph-bash/src/lsp/document-symbols.ts` (464 lines)
+    - `DocumentSymbolsProvider` class with document analysis logic
+    - `provideDocumentSymbols()` - Main handler for document symbols requests
+    - `buildSymbolsFromConfig()` - Build structured symbols from parsed config
+    - `parseBasicYamlStructure()` - Fallback YAML parsing for invalid configs
+    - `getPatchDetail()` - Generate descriptive details for patch symbols
+    - `findFieldRange()` - Locate field ranges in YAML document
+    - `findArrayItemRange()` - Locate array item ranges in YAML document
+  - Updated `/home/dex/kustomark-ralph-bash/src/lsp/server.ts`:
+    - Added `DocumentSymbolsProvider` import and initialization
+    - Added `documentSymbolProvider: true` capability
+    - Added `onDocumentSymbol` handler for LSP symbol requests
+    - Updated header comment to reflect new feature
+  - Features implemented:
+    - Hierarchical outline view showing config structure
+    - Top-level fields (apiVersion, kind, output) with values
+    - Resources array with individual resource entries
+    - Patches array with operation types, IDs, and groups
+    - Validators array with validator types
+    - Patch details showing include/exclude patterns and operation-specific info
+    - Fallback to basic YAML structure parsing when config is invalid
+    - Proper indentation-based hierarchy tracking
+  - All 911 tests passing ✓
+  - Main project linting clean (core/cli/lsp - web UI has cosmetic warnings only)
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/lsp/document-symbols.ts` (464 lines)
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/lsp/server.ts` - Added document symbols provider integration
+
+**Status:** LSP Document Symbols Provider COMPLETE! ✅
+- All LSP features from M4 now implemented
+- Provides outline/structure view in VSCode and other LSP-compatible editors
+- Shows hierarchical config structure with patches, resources, and validators
+- Graceful fallback for invalid YAML files

@@ -26,6 +26,7 @@ import { CompletionProvider } from "./completion.js";
 import { DefinitionProvider } from "./definition.js";
 import { DiagnosticsProvider } from "./diagnostics.js";
 import { DocumentManager } from "./document-manager.js";
+import { DocumentSymbolsProvider } from "./document-symbols.js";
 import { HoverProvider } from "./hover.js";
 
 // Create LSP connection (stdio transport)
@@ -40,6 +41,7 @@ const diagnosticsProvider = new DiagnosticsProvider();
 const completionProvider = new CompletionProvider();
 const hoverProvider = new HoverProvider();
 const definitionProvider = new DefinitionProvider();
+const documentSymbolsProvider = new DocumentSymbolsProvider();
 
 // Server initialization
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
@@ -54,6 +56,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
       },
       hoverProvider: true,
       definitionProvider: true,
+      documentSymbolProvider: true,
     },
   };
 });
@@ -145,6 +148,21 @@ connection.onDefinition((params: TextDocumentPositionParams) => {
   } catch (error) {
     connection.console.error(`Error providing definition: ${error}`);
     return null;
+  }
+});
+
+// Document symbols handler
+connection.onDocumentSymbol((params) => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return [];
+  }
+
+  try {
+    return documentSymbolsProvider.provideDocumentSymbols(document);
+  } catch (error) {
+    connection.console.error(`Error providing document symbols: ${error}`);
+    return [];
   }
 });
 
