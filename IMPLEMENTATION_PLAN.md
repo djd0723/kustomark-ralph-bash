@@ -2298,3 +2298,77 @@ This document tracks the implementation of kustomark based on the spec milestone
   - `/home/dex/kustomark-ralph-bash/tests/patch-engine.test.ts` (10 tests)
 
   **Status:** COMPLETE! ✅ Production-ready with comprehensive test coverage.
+
+**2026-01-02 (Dry-Run Mode Feature - High Priority Improvement - COMPLETE!):**
+- ✅ Implemented Dry-Run Mode feature for build command:
+  - Added `--dry-run` flag to CLI argument parser
+  - Updated `CLIOptions` interface with `dryRun?: boolean` field
+  - Modified build command to skip file writes in dry-run mode
+  - Skips output directory creation when `--dry-run` is enabled
+  - Skips lock file saving in dry-run mode
+  - Skips build cache saving in dry-run mode
+  - Skips file cleaning (--clean flag) in dry-run mode
+  - Updated text output to show "Would build" instead of "Built"
+  - Added `dryRun?: boolean` field to `BuildResult` interface for JSON output
+  - Updated help text to document `--dry-run` flag
+  - Still reports accurate statistics (files that would be written, patches that would be applied)
+  - Compatible with all other build flags (--stats, --incremental, --parallel, --clean, --verbose)
+  
+  **Testing:**
+  - Created `/home/dex/kustomark-ralph-bash/tests/cli/dry-run.test.ts` with 9 comprehensive tests:
+    - Verifies files are not written in dry-run mode
+    - Verifies output directory is not created
+    - Verifies JSON output includes `dryRun: true` field
+    - Verifies text output shows "Would build" message
+    - Verifies lock file is not created
+    - Verifies --clean does not remove files
+    - Verifies --stats works correctly
+    - Verifies --incremental does not save cache
+    - Verifies verbose output shows file operations
+    - Verifies normal build (without --dry-run) writes files correctly
+  - All 1,565 tests passing (9 new dry-run tests) ✓
+  - 6,261 expect() calls successful
+  - All linting checks passing (bun check) ✓
+  - Zero TypeScript compilation errors
+  
+  **Documentation:**
+  - Updated `/home/dex/kustomark-ralph-bash/README.md` with:
+    - Added `--dry-run` flag to build command options list
+    - Added example usage: `kustomark build ./team/ --dry-run`
+    - Clear description: "Preview changes without writing files"
+  - Updated `/home/dex/kustomark-ralph-bash/src/cli/index.ts` help text:
+    - Added `--dry-run` to Lock File section
+    - Description: "Preview changes without writing files (build command)"
+  
+  **Implementation Details:**
+  - Dry-run mode prevents all file system modifications:
+    - No output files written
+    - No directories created
+    - No lock files saved
+    - No cache files updated
+    - No files removed (even with --clean)
+  - Still performs all processing:
+    - Resource resolution
+    - Patch application
+    - Validation
+    - Statistics calculation
+  - Provides accurate preview of what would be built
+  - Exit code remains 0 for successful dry-run
+  
+  **Files Created:**
+  - `/home/dex/kustomark-ralph-bash/tests/cli/dry-run.test.ts` - 9 comprehensive tests
+  
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Added dry-run logic, updated types and help
+  - `/home/dex/kustomark-ralph-bash/README.md` - Added documentation and examples
+  - `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md` - This entry
+  
+  **Use Cases:**
+  - Safely preview build results before committing
+  - Verify patches will apply correctly
+  - Test configuration changes
+  - CI/CD validation steps
+  - Learning and experimentation
+  - Debugging build issues
+  
+  **Status:** COMPLETE! ✅ High-priority feature implemented with full test coverage and documentation.

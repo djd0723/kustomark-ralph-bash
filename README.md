@@ -151,6 +151,9 @@ kustomark build ./team/ --format=json
 # Build and clean extra files
 kustomark build ./team/ --clean
 
+# Preview changes without writing files
+kustomark build ./team/ --dry-run
+
 # Verbose output
 kustomark build ./team/ -v
 ```
@@ -158,6 +161,7 @@ kustomark build ./team/ -v
 **Options:**
 - `--format <text|json>` - Output format (default: text)
 - `--clean` - Remove output files not in source
+- `--dry-run` - Preview changes without writing files
 - `-v`, `-vv`, `-vvv` - Increase verbosity
 - `-q` - Quiet mode (errors only)
 - `--parallel` - Enable parallel builds for better performance

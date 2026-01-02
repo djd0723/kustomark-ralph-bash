@@ -113,6 +113,7 @@ interface CLIOptions {
   loadDecisions?: string; // For debug --load-decisions option
   noHooks?: boolean; // For watch --no-hooks option
   offline?: boolean; // For build --offline option (fail if remote fetch needed)
+  dryRun?: boolean; // For build --dry-run option (preview changes without writing files)
 }
 
 interface BuildStats {
@@ -147,6 +148,7 @@ interface BuildResult {
   warnings: ValidationWarning[];
   validationErrors: ValidationError[];
   stats?: BuildStats; // Optional stats when --stats flag is used
+  dryRun?: boolean; // True if --dry-run flag was used
 }
 
 interface DiffResult {
@@ -286,6 +288,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.noLock = true;
     } else if (arg === "--offline") {
       options.offline = true;
+    } else if (arg === "--dry-run") {
+      options.dryRun = true;
     } else if (arg === "--no-hooks") {
       options.noHooks = true;
     } else if (arg === "--file" || arg.startsWith("--file=")) {
@@ -1751,7 +1755,9 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
 
     // Write output files
     const outputDir = resolve(basePath, config.output ?? ".");
-    mkdirSync(outputDir, { recursive: true });
+    if (!options.dryRun) {
+      mkdirSync(outputDir, { recursive: true });
+    }
 
     const sourceFiles = new Set<string>();
     let filesWritten = 0;
@@ -1764,7 +1770,27 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         )
       : allPatchedResources;
 
-    if (options.parallel) {
+    if (options.dryRun) {
+      // Dry-run mode: skip file writes, just track what would be written
+      log(`Dry-run mode: would write ${filesToWrite.size} files`, 2, options);
+
+      for (const [filePath, content] of filesToWrite.entries()) {
+        sourceFiles.add(filePath);
+        filesWritten++;
+
+        // Track bytes for stats
+        if (options.stats) {
+          totalBytes += Buffer.byteLength(content, "utf-8");
+        }
+
+        log(`  Would write ${filePath}`, 3, options);
+      }
+
+      // Track all source files for cleaning (even if not written)
+      for (const filePath of allPatchedResources.keys()) {
+        sourceFiles.add(filePath);
+      }
+    } else if (options.parallel) {
       // Parallel file writing
       const jobCount = options.jobs || cpus().length;
       log(`Writing ${filesToWrite.size} files with ${jobCount} parallel jobs`, 2, options);
@@ -1806,15 +1832,22 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       }
     }
 
-    // Clean if requested
-    if (options.clean) {
+    // Clean if requested (skip in dry-run mode)
+    if (options.clean && !options.dryRun) {
       log("Cleaning output directory...", 2, options);
       const removed = cleanOutputDir(outputDir, sourceFiles);
       log(`  Removed ${removed} files`, 3, options);
+    } else if (options.clean && options.dryRun) {
+      log("Dry-run mode: would clean output directory", 2, options);
     }
 
-    // Save lock file if needed
-    if (!options.noLock && (options.update || !lockFileExisted) && lockEntries.length > 0) {
+    // Save lock file if needed (skip in dry-run mode)
+    if (
+      !options.dryRun &&
+      !options.noLock &&
+      (options.update || !lockFileExisted) &&
+      lockEntries.length > 0
+    ) {
       log("Saving lock file...", 2, options);
       const newLockFile: LockFile = {
         version: 1,
@@ -1822,6 +1855,13 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       };
       saveLockFile(configPath, newLockFile);
       log("Lock file saved", 2, options);
+    } else if (
+      options.dryRun &&
+      !options.noLock &&
+      (options.update || !lockFileExisted) &&
+      lockEntries.length > 0
+    ) {
+      log("Dry-run mode: would save lock file", 2, options);
     }
 
     // Update and save build cache
@@ -1892,14 +1932,18 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       const currentFiles = new Set(resources.keys());
       buildCache = pruneCache(buildCache, currentFiles);
 
-      // Save cache to disk (even if no files were rebuilt)
-      try {
-        await saveBuildCache(configPath, buildCache, options.cacheDir);
-        log(`Cache saved with ${buildCache.entries.size} entries`, 3, options);
-      } catch (error) {
-        console.warn(
-          `Warning: Failed to save cache: ${error instanceof Error ? error.message : String(error)}`,
-        );
+      // Save cache to disk (even if no files were rebuilt) - skip in dry-run mode
+      if (!options.dryRun) {
+        try {
+          await saveBuildCache(configPath, buildCache, options.cacheDir);
+          log(`Cache saved with ${buildCache.entries.size} entries`, 3, options);
+        } catch (error) {
+          console.warn(
+            `Warning: Failed to save cache: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      } else {
+        log("Dry-run mode: would save build cache", 3, options);
       }
     }
 
@@ -1972,13 +2016,15 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       warnings,
       validationErrors: allValidationErrors,
       stats,
+      ...(options.dryRun && { dryRun: true }),
     };
 
     if (options.format === "json") {
       console.log(JSON.stringify(result, null, 2));
     } else {
       if (options.verbosity > 0) {
-        console.log(`Built ${filesWritten} file(s) with ${patchesApplied} patch(es) applied`);
+        const action = options.dryRun ? "Would build" : "Built";
+        console.log(`${action} ${filesWritten} file(s) with ${patchesApplied} patch(es) applied`);
         if (warnings.length > 0) {
           console.log("\nWarnings:");
           for (const warning of warnings) {
@@ -3334,6 +3380,7 @@ Lock File:
   --update                    Update kustomark.lock with latest refs
   --no-lock                   Ignore lock file (fetch latest versions)
   --offline                   Fail if remote fetch is needed (use cached resources only)
+  --dry-run                   Preview changes without writing files (build command)
 
 Remote Resources:
   Git URLs are recognized and validated but fetching is not yet implemented.
