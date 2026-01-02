@@ -121,3 +121,17 @@ export {
   type HttpFetchOptions,
   type ExtractedFile,
 } from "./http-fetcher.js";
+
+// Export lock file functions and types
+export {
+  parseLockFile,
+  serializeLockFile,
+  loadLockFile,
+  saveLockFile,
+  getLockFilePath,
+  findLockEntry,
+  updateLockEntry,
+  calculateContentHash,
+} from "./lock-file.js";
+
+export type { LockFile, LockFileEntry } from "./types.js";

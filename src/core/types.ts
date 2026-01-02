@@ -399,3 +399,27 @@ export interface ParsedHttpArchiveUrl {
   /** Query parameters for auth or other configuration */
   queryParams: Record<string, string>;
 }
+
+/**
+ * Lock file entry for a resolved resource
+ */
+export interface LockFileEntry {
+  /** Original URL from resources */
+  url: string;
+  /** Resolved reference (commit SHA for git, URL for HTTP) */
+  resolved: string;
+  /** Integrity hash in format "sha256-..." */
+  integrity: string;
+  /** Timestamp when fetched (ISO 8601) */
+  fetched: string;
+}
+
+/**
+ * Lock file structure
+ */
+export interface LockFile {
+  /** Lock file version */
+  version: number;
+  /** Locked resources */
+  resources: LockFileEntry[];
+}

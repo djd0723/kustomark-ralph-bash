@@ -151,11 +151,17 @@ This document tracks the implementation of kustomark based on the spec milestone
    - ✅ Cache commands (list, clear) for both git and HTTP
    - ✅ Cache info retrieval for HTTP archives
 
-5. **[TODO] Lock File Generation**
-   - Generate `kustomark.lock.yaml`
-   - Track resolved refs and integrity hashes
-   - Support `--update` flag to update lock file
-   - Support `--no-lock` flag to ignore lock file
+5. **[DONE] Lock File Generation** ✅
+   - ✅ Generate `kustomark.lock.yaml`
+   - ✅ Track resolved refs and integrity hashes
+   - ✅ Support `--update` flag to update lock file
+   - ✅ Support `--no-lock` flag to ignore lock file
+   - ✅ Lock file parser and serializer (lock-file.ts)
+   - ✅ Integration with git-fetcher.ts (SHA resolution and content hashing)
+   - ✅ Integration with http-fetcher.ts (checksum tracking)
+   - ✅ Integration with resource-resolver.ts (lock entry collection)
+   - ✅ CLI integration (load/save lock files)
+   - ✅ Comprehensive test coverage (661 tests passing)
 
 ## M4: Developer Experience (Future)
 - Watch mode
@@ -286,16 +292,16 @@ This document tracks the implementation of kustomark based on the spec milestone
 **Status:**
 - **M1 COMPLETE! ✅**
 - **M2 COMPLETE! ✅**
-- **M3 REMOTE SOURCES NEARLY COMPLETE! ✅**
+- **M3 COMPLETE! ✅**
   - Git URL parsing and validation: DONE ✅
   - Git repository fetching: DONE ✅
   - HTTP archive support: DONE ✅
   - HTTP URL parsing: DONE ✅
   - HTTP archive fetching with caching: DONE ✅
   - Caching system: DONE ✅
-  - Next: Lock file generation
+  - Lock file generation: DONE ✅
 
-**Next Priority:** M3 Lock File Generation (kustomark.lock.yaml)
+**Next Priority:** M4 Developer Experience (watch, explain, lint, init commands)
 
 **2026-01-02 (M3 Git Repository Fetching):**
 - ✅ Created `/home/dex/kustomark-ralph-bash/src/core/git-fetcher.ts` with complete git operations:
@@ -354,3 +360,47 @@ This document tracks the implementation of kustomark based on the spec milestone
 - ✅ All 589 tests passing (88 new HTTP-related tests) ✓
 - ✅ All linting checks passing (bun check) ✓
 - ✅ Type-safe implementation with comprehensive error handling
+
+**2026-01-02 (M3 Lock File Generation - COMPLETE!):**
+- ✅ Created `/home/dex/kustomark-ralph-bash/src/core/lock-file.ts` with full lock file functionality:
+  - `parseLockFile()` - Parse YAML lock file with comprehensive validation
+  - `serializeLockFile()` - Serialize to YAML with sorted resources for consistent diffs
+  - `loadLockFile()` - Load from filesystem, gracefully handles missing/invalid files
+  - `saveLockFile()` - Save to filesystem in same directory as config
+  - `getLockFilePath()` - Get lock file path from config path
+  - `findLockEntry()` - Find entry by URL
+  - `updateLockEntry()` - Update or add entry (immutable)
+  - `calculateContentHash()` - SHA256 hash calculation with "sha256-" prefix
+- ✅ Added LockFile and LockFileEntry types to `/home/dex/kustomark-ralph-bash/src/core/types.ts`
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/git-fetcher.ts` for lock file integration:
+  - Added lockFile and updateLock options to GitFetchOptions
+  - Returns lockEntry with resolved SHA, integrity hash, and timestamp
+  - Uses locked SHA when lock file provided and not updating
+  - Implemented calculateGitContentHash() for deterministic content hashing
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/http-fetcher.ts` for lock file integration:
+  - Added lockFile and updateLock options to HttpFetchOptions
+  - Returns lockEntry with URL, checksum, and timestamp
+  - Verifies cached checksums match lock file integrity
+  - Automatically re-fetches if integrity mismatch detected
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/resource-resolver.ts` for lock entry collection:
+  - Added lockFile, updateLock, and lockEntries parameters to ResolveOptions
+  - Passes lock options to git and HTTP fetchers
+  - Collects lock entries from all fetches into lockEntries array
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/cli/index.ts` for lock file support:
+  - Added --update flag to update lock file with latest refs
+  - Added --no-lock flag to ignore lock file completely
+  - Loads lock file before resource resolution
+  - Saves lock file after successful build (when --update or no lock file exists)
+  - Updated help text to document lock file flags
+- ✅ Updated `/home/dex/kustomark-ralph-bash/src/core/index.ts` to export lock file functions and types
+- ✅ Comprehensive test coverage in `/home/dex/kustomark-ralph-bash/tests/lock-file.test.ts`:
+  - Parsing valid and invalid lock files
+  - Serialization and round-trip tests
+  - Loading/saving from filesystem
+  - Finding and updating entries
+  - Content hash calculation
+  - Error handling for malformed files
+- ✅ All 661 tests passing ✓
+- ✅ All linting checks passing (bun check) ✓
+- ✅ Type-safe implementation with proper validation
+- ✅ Lock file format matches M3 spec exactly (version, url, resolved, integrity, fetched)

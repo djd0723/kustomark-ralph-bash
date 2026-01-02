@@ -5,11 +5,12 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseGitUrl } from "./git-url-parser.js";
-import type { ParsedGitUrl } from "./types.js";
+import { findLockEntry } from "./lock-file.js";
+import type { LockFile, LockFileEntry, ParsedGitUrl } from "./types.js";
 
 /**
  * Error thrown when git operations fail
@@ -36,6 +37,8 @@ export interface GitFetchResult {
   cached: boolean;
   /** The resolved commit SHA */
   resolvedSha: string;
+  /** Lock file entry for this fetch (for lock file generation) */
+  lockEntry?: LockFileEntry;
 }
 
 /**
@@ -48,6 +51,10 @@ export interface GitFetchOptions {
   update?: boolean;
   /** Timeout in milliseconds for git operations */
   timeout?: number;
+  /** Lock file to use for pinned versions */
+  lockFile?: LockFile;
+  /** Whether to update the lock file (fetch latest) */
+  updateLock?: boolean;
 }
 
 /**
@@ -215,6 +222,73 @@ async function checkoutRef(repoPath: string, ref: string, timeout?: number): Pro
 }
 
 /**
+ * Calculate content hash of all markdown files in a git repository path
+ *
+ * @param repoPath - Path to the repository
+ * @param subpath - Optional subpath within the repository
+ * @returns SHA256 hash (hex string without prefix)
+ */
+async function calculateGitContentHash(repoPath: string, subpath?: string): Promise<string> {
+  const searchPath = subpath ? join(repoPath, subpath) : repoPath;
+
+  // Find all .md files recursively using git ls-files for reliability
+  const lsFilesResult = await executeGit(["ls-files", "*.md"], { cwd: searchPath });
+
+  if (lsFilesResult.exitCode !== 0) {
+    // Fallback to finding files manually if git ls-files fails
+    const files: string[] = [];
+
+    async function walkDir(dir: string): Promise<void> {
+      const entries = await readdir(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+          // Skip .git directory
+          if (entry.name !== ".git") {
+            await walkDir(fullPath);
+          }
+        } else if (entry.isFile() && entry.name.endsWith(".md")) {
+          // Make path relative to searchPath
+          const relativePath = fullPath.substring(searchPath.length + 1);
+          files.push(relativePath);
+        }
+      }
+    }
+
+    await walkDir(searchPath);
+    files.sort();
+
+    // Hash all files
+    const hasher = new Bun.CryptoHasher("sha256");
+    for (const file of files) {
+      const filePath = join(searchPath, file);
+      const content = await readFile(filePath);
+      hasher.update(content);
+    }
+
+    return hasher.digest("hex");
+  }
+
+  // Parse git ls-files output
+  const files = lsFilesResult.stdout
+    .split("\n")
+    .filter((f) => f.trim().length > 0)
+    .sort();
+
+  // Hash all files in sorted order
+  const hasher = new Bun.CryptoHasher("sha256");
+  for (const file of files) {
+    const filePath = join(searchPath, file);
+    const content = await readFile(filePath);
+    hasher.update(content);
+  }
+
+  return hasher.digest("hex");
+}
+
+/**
  * Fetch a git repository and return the path to the cached copy
  *
  * @param gitUrl - Git URL to fetch (GitHub shorthand, git::https://, or git::git@)
@@ -242,7 +316,16 @@ export async function fetchGitRepository(
   const cacheDir = options.cacheDir ?? getDefaultCacheDir();
   const cacheKey = getCacheKey(parsed);
   const repoPath = join(cacheDir, cacheKey);
-  const ref = parsed.ref ?? "main";
+  let ref = parsed.ref ?? "main";
+
+  // Check lock file for pinned version
+  if (options.lockFile && !options.updateLock) {
+    const lockEntry = findLockEntry(options.lockFile, gitUrl);
+    if (lockEntry) {
+      // Use the locked SHA instead of the ref from the URL
+      ref = lockEntry.resolved;
+    }
+  }
 
   // Ensure cache directory exists
   await mkdir(cacheDir, { recursive: true });
@@ -271,10 +354,20 @@ export async function fetchGitRepository(
   // Checkout the specified ref
   const resolvedSha = await checkoutRef(repoPath, ref, options.timeout);
 
+  // Calculate content hash and create lock entry
+  const contentHash = await calculateGitContentHash(repoPath, parsed.path);
+  const lockEntry: LockFileEntry = {
+    url: gitUrl,
+    resolved: resolvedSha,
+    integrity: `sha256-${contentHash}`,
+    fetched: new Date().toISOString(),
+  };
+
   return {
     repoPath,
     cached,
     resolvedSha,
+    lockEntry,
   };
 }
 

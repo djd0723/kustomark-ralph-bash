@@ -6,6 +6,7 @@ import { type GitFetchOptions, fetchGitRepository } from "./git-fetcher.js";
 import { isGitUrl, parseGitUrl } from "./git-url-parser.js";
 import { type HttpFetchOptions, fetchHttpArchive } from "./http-fetcher.js";
 import { isHttpArchiveUrl, parseHttpArchiveUrl } from "./http-url-parser.js";
+import type { LockFile, LockFileEntry } from "./types.js";
 
 /**
  * Represents a resolved markdown file resource
@@ -56,6 +57,12 @@ interface ResolveOptions {
   gitFetchOptions?: GitFetchOptions;
   /** HTTP fetch options */
   httpFetchOptions?: HttpFetchOptions;
+  /** Lock file to use for resolution */
+  lockFile?: LockFile;
+  /** Whether to update the lock file with new entries */
+  updateLock?: boolean;
+  /** Array to collect lock entries (mutated by function) */
+  lockEntries?: LockFileEntry[];
 }
 
 /**
@@ -88,7 +95,14 @@ export async function resolveResources(
   fileMap: Map<string, string>,
   options: ResolveOptions = {},
 ): Promise<ResolvedResource[]> {
-  const { maxDepth = 10, currentDepth = 0, visited = new Set<string>() } = options;
+  const {
+    maxDepth = 10,
+    currentDepth = 0,
+    visited = new Set<string>(),
+    lockFile,
+    updateLock,
+    lockEntries = [],
+  } = options;
 
   // Normalize base directory to absolute path
   const normalizedBaseDir = isAbsolute(baseDir) ? normalize(baseDir) : resolve(baseDir);
@@ -138,7 +152,20 @@ export async function resolveResources(
 
       try {
         // Fetch the git repository
-        const fetchResult = await fetchGitRepository(pattern, options.gitFetchOptions);
+        const fetchResult = await fetchGitRepository(pattern, {
+          ...options.gitFetchOptions,
+          update: updateLock,
+        });
+
+        // Collect lock entry if requested
+        if ((updateLock || lockFile) && lockEntries) {
+          lockEntries.push({
+            url: pattern,
+            resolved: fetchResult.resolvedSha,
+            integrity: `sha256-${fetchResult.resolvedSha}`,
+            fetched: new Date().toISOString(),
+          });
+        }
 
         // Determine the directory to search for markdown files
         const searchDir = parsedGit.path
@@ -196,7 +223,18 @@ export async function resolveResources(
         const fetchResult = await fetchHttpArchive(pattern, {
           ...options.httpFetchOptions,
           subpath: parsedHttp.subpath,
+          update: updateLock,
         });
+
+        // Collect lock entry if requested
+        if ((updateLock || lockFile) && lockEntries) {
+          lockEntries.push({
+            url: pattern,
+            resolved: fetchResult.checksum,
+            integrity: `sha256-${fetchResult.checksum}`,
+            fetched: new Date().toISOString(),
+          });
+        }
 
         // Add each extracted file to the file map and resolved resources
         for (const file of fetchResult.files) {
@@ -265,6 +303,9 @@ export async function resolveResources(
               visited: newVisited,
               gitFetchOptions: options.gitFetchOptions,
               httpFetchOptions: options.httpFetchOptions,
+              lockFile,
+              updateLock,
+              lockEntries,
             });
 
             resolvedResources.push(...nestedResources);

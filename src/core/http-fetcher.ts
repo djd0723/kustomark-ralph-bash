@@ -8,6 +8,8 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
+import { findLockEntry } from "./lock-file.js";
+import type { LockFile, LockFileEntry } from "./types.js";
 
 /**
  * Error thrown when HTTP archive operations fail
@@ -54,6 +56,10 @@ export interface HttpFetchOptions {
   timeout?: number;
   /** Additional HTTP headers */
   headers?: Record<string, string>;
+  /** Lock file to use for pinned versions */
+  lockFile?: LockFile;
+  /** Whether to update the lock file (fetch latest) */
+  updateLock?: boolean;
 }
 
 /**
@@ -66,6 +72,8 @@ export interface HttpFetchResult {
   cached: boolean;
   /** The checksum of the downloaded archive */
   checksum: string;
+  /** Lock file entry for this fetch (for lock file generation) */
+  lockEntry?: LockFileEntry;
 }
 
 /**
@@ -348,7 +356,7 @@ export async function fetchHttpArchive(
   let needsDownload = !existsSync(archivePath);
 
   // Check if we should update existing cache
-  if (!needsDownload && options.update) {
+  if (!needsDownload && (options.update || options.updateLock)) {
     needsDownload = true;
     cached = false;
   } else if (!needsDownload) {
@@ -375,6 +383,41 @@ export async function fetchHttpArchive(
     );
   }
 
+  // If lock file is provided and not updating, verify integrity matches
+  if (options.lockFile && !options.updateLock) {
+    const lockEntry = findLockEntry(options.lockFile, url);
+    if (lockEntry) {
+      const expectedIntegrity = `sha256-${checksum}`;
+      if (lockEntry.integrity !== expectedIntegrity) {
+        // Checksum mismatch with lock file - clear cache and re-fetch
+        await rm(archivePath, { force: true });
+        if (existsSync(extractDir)) {
+          await rm(extractDir, { recursive: true, force: true });
+        }
+
+        // Re-download
+        await downloadFile(url, archivePath, {
+          authToken,
+          headers: options.headers,
+          timeout: options.timeout,
+        });
+
+        // Recalculate checksum
+        const newChecksum = await calculateChecksum(archivePath);
+        const newIntegrity = `sha256-${newChecksum}`;
+
+        // If still doesn't match, throw error
+        if (lockEntry.integrity !== newIntegrity) {
+          await rm(archivePath, { force: true });
+          throw new HttpFetchError(
+            `Integrity mismatch with lock file: expected ${lockEntry.integrity}, got ${newIntegrity}`,
+            "INTEGRITY_MISMATCH",
+          );
+        }
+      }
+    }
+  }
+
   // Clean and recreate extraction directory
   if (existsSync(extractDir)) {
     await rm(extractDir, { recursive: true, force: true });
@@ -386,10 +429,19 @@ export async function fetchHttpArchive(
   // Read all extracted files
   const files = await readFilesRecursively(extractDir, extractDir, options.subpath);
 
+  // Create lock file entry
+  const lockEntry: LockFileEntry = {
+    url,
+    resolved: url, // HTTP URLs resolve to themselves
+    integrity: `sha256-${checksum}`,
+    fetched: new Date().toISOString(),
+  };
+
   return {
     files,
     cached,
     checksum,
+    lockEntry,
   };
 }
 

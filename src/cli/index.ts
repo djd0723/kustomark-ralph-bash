@@ -21,10 +21,13 @@ import {
   validateConfig as coreValidateConfig,
 } from "../core/config-parser.js";
 import { generateFileDiff } from "../core/diff-generator.js";
+import { loadLockFile, saveLockFile } from "../core/lock-file.js";
 import { applyPatches as coreApplyPatches } from "../core/patch-engine.js";
 import { resolveResources as coreResolveResources } from "../core/resource-resolver.js";
 import type {
   KustomarkConfig,
+  LockFile,
+  LockFileEntry,
   OnNoMatchStrategy,
   PatchOperation,
   ValidationError,
@@ -41,6 +44,8 @@ interface CLIOptions {
   clean: boolean;
   strict: boolean;
   verbosity: number; // 0=quiet, 1=normal, 2=-v, 3=-vv, 4=-vvv
+  update: boolean;
+  noLock: boolean;
 }
 
 interface BuildResult {
@@ -81,6 +86,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
     clean: false,
     strict: false,
     verbosity: 1,
+    update: false,
+    noLock: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -113,6 +120,10 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.clean = true;
     } else if (arg === "--strict") {
       options.strict = true;
+    } else if (arg === "--update") {
+      options.update = true;
+    } else if (arg === "--no-lock") {
+      options.noLock = true;
     } else if (arg === "-q") {
       options.verbosity = 0;
     } else if (arg === "-vvv") {
@@ -160,12 +171,19 @@ function validateConfig(
 async function resolveResources(
   config: KustomarkConfig,
   basePath: string,
+  lockFile?: LockFile | null,
+  updateLock?: boolean,
+  lockEntries?: LockFileEntry[],
 ): Promise<Map<string, string>> {
   // Build file map by scanning the file system
   const fileMap = buildCompleteFileMap(basePath);
 
   // Use core resource resolver
-  const resolvedResources = await coreResolveResources(config.resources, basePath, fileMap);
+  const resolvedResources = await coreResolveResources(config.resources, basePath, fileMap, {
+    lockFile: lockFile ?? undefined,
+    updateLock,
+    lockEntries,
+  });
 
   // Convert from ResolvedResource[] to Map<string, string>
   // For now, use just the basename of each file as the key
@@ -451,9 +469,30 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       return 1;
     }
 
+    // Load lock file
+    let lockFile: LockFile | null = null;
+    const lockEntries: LockFileEntry[] = [];
+    let lockFileExisted = false;
+
+    if (!options.noLock) {
+      log("Loading lock file...", 3, options);
+      lockFile = loadLockFile(configPath);
+      lockFileExisted = lockFile !== null;
+
+      if (!lockFileExisted && options.verbosity >= 2) {
+        log("Lock file not found, will be created after build", 2, options);
+      }
+    }
+
     // Resolve resources
     log("Resolving resources...", 2, options);
-    const resources = await resolveResources(config, basePath);
+    const resources = await resolveResources(
+      config,
+      basePath,
+      lockFile,
+      options.update,
+      lockEntries,
+    );
 
     // Apply patches
     log("Applying patches...", 2, options);
@@ -503,6 +542,17 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       log("Cleaning output directory...", 2, options);
       const removed = cleanOutputDir(outputDir, sourceFiles);
       log(`  Removed ${removed} files`, 3, options);
+    }
+
+    // Save lock file if needed
+    if (!options.noLock && (options.update || !lockFileExisted) && lockEntries.length > 0) {
+      log("Saving lock file...", 2, options);
+      const newLockFile: LockFile = {
+        version: 1,
+        resources: lockEntries,
+      };
+      saveLockFile(configPath, newLockFile);
+      log("Lock file saved", 2, options);
     }
 
     // Output results
@@ -601,9 +651,24 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
       return 1;
     }
 
+    // Load lock file
+    let lockFile: LockFile | null = null;
+    const lockEntries: LockFileEntry[] = [];
+
+    if (!options.noLock) {
+      log("Loading lock file...", 3, options);
+      lockFile = loadLockFile(configPath);
+    }
+
     // Resolve resources
     log("Resolving resources...", 2, options);
-    const originalResources = await resolveResources(config, basePath);
+    const originalResources = await resolveResources(
+      config,
+      basePath,
+      lockFile,
+      options.update,
+      lockEntries,
+    );
 
     // Apply patches
     log("Applying patches...", 2, options);
@@ -918,6 +983,10 @@ Flags:
   --strict                    Enable strict validation (validate command)
   -v, -vv, -vvv              Increase verbosity
   -q                         Quiet mode (errors only)
+
+Lock File:
+  --update                    Update kustomark.lock with latest refs
+  --no-lock                   Ignore lock file (fetch latest versions)
 
 Remote Resources:
   Git URLs are recognized and validated but fetching is not yet implemented.
