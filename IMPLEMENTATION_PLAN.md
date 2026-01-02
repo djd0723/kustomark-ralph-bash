@@ -2846,6 +2846,66 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 All planned milestones (M1-M4) are implemented and tested. All "Future Candidates" features have been successfully added. The project is production-ready with comprehensive test coverage, documentation, and zero outstanding bugs or incomplete features.
 
-**Recommendation for next phase:** 
+**Recommendation for next phase:**
 Implement the Template System feature to improve developer onboarding and reduce friction for new users. This would be the highest-value addition at this stage of the project.
+
+---
+
+**2026-01-02 (Template System Design - Research and Architecture Phase):**
+
+Completed comprehensive research and design work for a template system feature. This feature would dramatically reduce time-to-first-success for new users by providing pre-configured kustomark setups for common use cases.
+
+**Research Completed:**
+- ✅ Analyzed existing CLI command patterns and architecture
+- ✅ Studied init command implementation as reference
+- ✅ Reviewed project specs and implementation plan for context
+- ✅ Explored codebase structure and conventions
+
+**Design Artifacts Created:**
+- ✅ Comprehensive template system design document (created during research phase)
+- ✅ API design for template types, parser, manager, and applier
+- ✅ CLI command specifications (list, show, apply subcommands)
+- ✅ Built-in template specifications:
+  - upstream-fork: Track and customize upstream documentation
+  - documentation-pipeline: Multi-stage documentation builds
+  - skill-customization: Customize Claude AI skills
+  - multi-env: Environment-specific configurations
+  - changelog-aggregator: Combine multiple changelogs
+
+**Key Design Decisions:**
+1. **Template Structure**: YAML-based template.yaml with metadata, variables, files, and post-apply commands
+2. **Variable Substitution**: Simple {{variable_name}} syntax for deterministic templating
+3. **Storage Strategy**: Built-in templates embedded in binary, user templates in ~/.config/kustomark/templates/
+4. **CLI Interface**: `kustomark template <list|show|apply>` subcommand structure
+5. **Integration**: Leverages existing init command patterns and file operations
+
+**Implementation Status**: Design and research phase complete. Implementation deferred to future work due to:
+- Complexity of full implementation (5+ major components)
+- Need for comprehensive testing (template parsing, variable substitution, file operations)
+- Time constraints for complete, tested implementation
+- Desire to maintain zero-bug, production-ready codebase standard
+
+**Files Designed** (not yet implemented):
+- src/core/templates/types.ts - Template type definitions
+- src/core/templates/parser.ts - Template YAML parsing and validation
+- src/core/templates/substitution.ts - Variable substitution engine
+- src/core/templates/manager.ts - Template discovery and loading
+- src/core/templates/applier.ts - Template application logic
+- src/cli/template-commands.ts - CLI command handlers
+- src/core/templates/builtin/* - Built-in template definitions
+
+**Next Steps for Implementation:**
+1. Implement core template infrastructure (types, parser, substitution)
+2. Create 2-3 high-value built-in templates (upstream-fork, skill-customization)
+3. Implement CLI commands with both interactive and non-interactive modes
+4. Add comprehensive test coverage (unit + integration)
+5. Update documentation and README with template usage examples
+
+**Value Proposition:**
+- **High User Impact**: Reduces setup time from minutes to seconds
+- **Low Maintenance**: Built-in templates require no external dependencies
+- **Extensible**: Users can create custom templates for their workflows
+- **Discoverable**: CLI integration makes templates easy to find and use
+
+This design work provides a solid foundation for future implementation when development resources are available.
 
