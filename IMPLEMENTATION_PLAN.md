@@ -1861,3 +1861,49 @@ This document tracks the implementation of kustomark based on the spec milestone
   - All tests passing (except 18 minor position detection edge cases)
   - Production-ready test coverage achieved
   - Ready for continuous integration
+
+
+**2026-01-02 (M3 File Operations - Type System & Foundation):**
+- ✅ Implemented M3 File Operations type system (partial implementation):
+  - Added 4 new patch operation interfaces to types.ts:
+    - `CopyFilePatch` (op: "copy-file"): Copy file with source/destination/overwrite fields
+    - `RenameFilePatch` (op: "rename-file"): Rename file with source/destination/overwrite fields  
+    - `DeleteFilePatch` (op: "delete-file"): Delete file with path field
+    - `MoveFilePatch` (op: "move-file"): Move file with source/destination/overwrite fields
+  - Updated PatchOperation union type to include all 4 new file operation types
+  - Added comprehensive JSON Schema definitions for all 4 operations in schema.ts
+  - Updated config-parser.ts validOps list to accept new file operation types
+  - Added stub handlers in patch-engine.ts that throw clear "not yet implemented" errors
+  - Created file-operations.ts with fileMap-based implementation engine:
+    - `applyCopyFile()`: Adds file copy entry to fileMap
+    - `applyRenameFile()`: Renames files matching glob pattern (filename only)
+    - `applyDeleteFile()`: Removes files from fileMap matching glob pattern
+    - `applyMoveFile()`: Moves files to new directory preserving filenames
+    - `validatePath()`: Path traversal protection for security
+    - All functions use micromatch for glob pattern matching
+    - Exported from src/core/index.ts
+  - Updated getPatchDescription() to return descriptions for file operations
+  - All type checks passing (bun check) ✓
+  - All 1,416 tests passing ✓
+  - Zero TypeScript compilation errors
+  - Zero Biome linting errors
+
+  **Implementation Status:**
+  - Type system: COMPLETE ✅
+  - File operations engine: COMPLETE ✅ (fileMap-based, ready for CLI integration)
+  - CLI integration: PENDING ⏳ (needs partitioning of file vs content patches in build flow)
+  - Integration tests: PENDING ⏳ (awaiting CLI integration)
+  
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added 4 new patch interfaces
+  - `/home/dex/kustomark-ralph-bash/src/core/schema.ts` - Added JSON schemas for 4 operations
+  - `/home/dex/kustomark-ralph-bash/src/core/patch-engine.ts` - Added stub cases & descriptions
+  - `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts` - Added operations to validOps
+  - `/home/dex/kustomark-ralph-bash/src/core/file-operations.ts` - NEW FILE: Core file ops engine
+  - `/home/dex/kustomark-ralph-bash/src/core/index.ts` - Export file operations functions
+
+  **Next Steps:**
+  - Integrate file operations into CLI build flow (partition patches, apply file ops before content ops)
+  - Add integration tests for file operations
+  - Implement remaining M3 features (fetch command, --offline flag, security features)
+

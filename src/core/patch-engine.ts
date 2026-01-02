@@ -1109,6 +1109,15 @@ export function applySinglePatch(
       result = applyChangeSectionLevel(content, patch.id, patch.delta);
       break;
 
+    case "copy-file":
+    case "rename-file":
+    case "delete-file":
+    case "move-file":
+      // File operations should be processed by the file operations engine, not the patch engine
+      throw new Error(
+        `File operation '${patch.op}' should be processed by the file operations engine, not the patch engine`,
+      );
+
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = patch;
@@ -1200,6 +1209,14 @@ function getPatchDescription(patch: PatchOperation): string {
       return `move-section '${patch.id}' after '${patch.after}'`;
     case "change-section-level":
       return `change-section-level '${patch.id}' by ${patch.delta}`;
+    case "copy-file":
+      return `copy-file '${patch.source}' to '${patch.destination}'`;
+    case "rename-file":
+      return `rename-file '${patch.source}' to '${patch.destination}'`;
+    case "delete-file":
+      return `delete-file '${patch.path}'`;
+    case "move-file":
+      return `move-file '${patch.source}' to '${patch.destination}'`;
     default:
       return "unknown patch";
   }

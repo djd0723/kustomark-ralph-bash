@@ -1676,6 +1676,341 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            {
+              type: "object",
+              required: ["op", "source", "destination"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "copy-file",
+                  description: "Copy a file to a new location",
+                },
+                source: {
+                  type: "string",
+                  description: "Source file path (relative to project root)",
+                },
+                destination: {
+                  type: "string",
+                  description: "Destination file path (relative to project root)",
+                },
+                overwrite: {
+                  type: "boolean",
+                  description: "Whether to overwrite if destination exists (default: false)",
+                  default: false,
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["op", "source", "destination"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "rename-file",
+                  description: "Rename a file",
+                },
+                source: {
+                  type: "string",
+                  description: "Source file path (relative to project root)",
+                },
+                destination: {
+                  type: "string",
+                  description: "Destination file path (relative to project root)",
+                },
+                overwrite: {
+                  type: "boolean",
+                  description: "Whether to overwrite if destination exists (default: false)",
+                  default: false,
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["op", "path"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "delete-file",
+                  description: "Delete a file",
+                },
+                path: {
+                  type: "string",
+                  description: "File path to delete (relative to project root)",
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["op", "source", "destination"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "move-file",
+                  description: "Move a file to a new location",
+                },
+                source: {
+                  type: "string",
+                  description: "Source file path (relative to project root)",
+                },
+                destination: {
+                  type: "string",
+                  description: "Destination file path (relative to project root)",
+                },
+                overwrite: {
+                  type: "boolean",
+                  description: "Whether to overwrite if destination exists (default: false)",
+                  default: false,
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
           ],
         },
       },

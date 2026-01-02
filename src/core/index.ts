@@ -197,3 +197,13 @@ export type {
   AnyOfCondition,
   AllOfCondition,
 } from "./types.js";
+
+// Export file operations functions and types
+export {
+  applyCopyFile,
+  applyRenameFile,
+  applyDeleteFile,
+  applyMoveFile,
+  validatePath,
+  type FileOperationResult,
+} from "./file-operations.js";

@@ -286,6 +286,10 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "rename-header",
     "move-section",
     "change-section-level",
+    "copy-file",
+    "rename-file",
+    "delete-file",
+    "move-file",
   ];
 
   if (!validOps.includes(p.op as string)) {

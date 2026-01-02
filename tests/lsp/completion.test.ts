@@ -592,7 +592,7 @@ patches:
       const labels = getLabels(completions);
 
       expect(labels).toContain('replace');
-      expect(labels.length).toBe(18); // All operations
+      expect(labels.length).toBe(22); // All operations (18 original + 4 file operations)
     });
 
     test('handles position at end of line with onNoMatch field', () => {
@@ -674,7 +674,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide completions for client filtering
-      expect(completions.length).toBe(18);
+      expect(completions.length).toBe(22);
     });
 
     test('returns empty array for unknown context', () => {
@@ -714,7 +714,7 @@ resources:
 
       const completions = provider.provideCompletions(doc, position);
 
-      expect(completions.length).toBe(18);
+      expect(completions.length).toBe(22);
     });
 
     test('triggers completions mid-line with indentation', () => {
@@ -740,8 +740,8 @@ resources:
         const position = createPosition(1, char);
         const completions = provider.provideCompletions(doc, position);
 
-        // Should get operation completions
-        expect(completions.length).toBe(18);
+        // Should get operation completions (22 total: 18 original + 4 file operations)
+        expect(completions.length).toBe(22);
       }
     });
   });
@@ -1011,7 +1011,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide operation completions
-      expect(completions.length).toBe(18);
+      expect(completions.length).toBe(22);
     });
 
     test('handles cursor at document end', () => {

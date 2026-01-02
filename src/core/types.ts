@@ -321,6 +321,54 @@ export interface ChangeSectionLevelPatch extends PatchCommonFields {
 }
 
 /**
+ * Copy file operation - copies a file to a new location
+ */
+export interface CopyFilePatch extends PatchCommonFields {
+  op: "copy-file";
+  /** Source file path (relative to project root) */
+  source: string;
+  /** Destination file path (relative to project root) */
+  destination: string;
+  /** Whether to overwrite if destination exists (default: false) */
+  overwrite?: boolean;
+}
+
+/**
+ * Rename file operation - renames a file
+ */
+export interface RenameFilePatch extends PatchCommonFields {
+  op: "rename-file";
+  /** Source file path (relative to project root) */
+  source: string;
+  /** Destination file path (relative to project root) */
+  destination: string;
+  /** Whether to overwrite if destination exists (default: false) */
+  overwrite?: boolean;
+}
+
+/**
+ * Delete file operation - deletes a file
+ */
+export interface DeleteFilePatch extends PatchCommonFields {
+  op: "delete-file";
+  /** File path to delete (relative to project root) */
+  path: string;
+}
+
+/**
+ * Move file operation - moves a file to a new location
+ */
+export interface MoveFilePatch extends PatchCommonFields {
+  op: "move-file";
+  /** Source file path (relative to project root) */
+  source: string;
+  /** Destination file path (relative to project root) */
+  destination: string;
+  /** Whether to overwrite if destination exists (default: false) */
+  overwrite?: boolean;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -341,7 +389,11 @@ export type PatchOperation =
   | InsertBeforeLinePatch
   | MoveSectionPatch
   | RenameHeaderPatch
-  | ChangeSectionLevelPatch;
+  | ChangeSectionLevelPatch
+  | CopyFilePatch
+  | RenameFilePatch
+  | DeleteFilePatch
+  | MoveFilePatch;
 
 /**
  * Global validator configuration
