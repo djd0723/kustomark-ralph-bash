@@ -78,11 +78,11 @@ export {
   stringifyFrontmatter,
   extractFrontmatter,
   insertFrontmatter,
-  getNestedValue,
-  setNestedValue,
-  deleteNestedValue,
   type FrontmatterResult,
 } from "./frontmatter-parser.js";
+
+// Export nested value utilities
+export { getNestedValue, setNestedValue, deleteNestedValue } from "./nested-values.js";
 
 // Export validator functions
 export {

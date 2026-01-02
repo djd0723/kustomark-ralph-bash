@@ -11,6 +11,7 @@
 
 import * as yaml from "js-yaml";
 import { evaluateCondition } from "./condition-evaluator.js";
+import { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
 import { resolveInheritance } from "./patch-inheritance.js";
 import { generatePatchSuggestions } from "./suggestion-engine.js";
 import type {
@@ -395,89 +396,7 @@ export function serializeFrontmatter(data: Record<string, unknown>, body: string
   return `---\n${frontmatterYaml}---\n${body}`;
 }
 
-/**
- * Get a nested value from an object using dot notation
- *
- * @param obj - Object to get value from
- * @param path - Dot-separated path (e.g., "metadata.author")
- * @returns The value at the path, or undefined if not found
- */
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const keys = path.split(".");
-  let current: unknown = obj;
-
-  for (const key of keys) {
-    if (current === null || current === undefined || typeof current !== "object") {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-
-  return current;
-}
-
-/**
- * Set a nested value in an object using dot notation
- *
- * @param obj - Object to set value in
- * @param path - Dot-separated path (e.g., "metadata.author")
- * @param value - Value to set
- */
-function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const keys = path.split(".");
-  let current: unknown = obj;
-
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-    if (!key) continue;
-
-    const currentObj = current as Record<string, unknown>;
-    if (!currentObj[key] || typeof currentObj[key] !== "object" || Array.isArray(currentObj[key])) {
-      currentObj[key] = {};
-    }
-    current = currentObj[key];
-  }
-
-  const lastKey = keys[keys.length - 1];
-  if (lastKey) {
-    (current as Record<string, unknown>)[lastKey] = value;
-  }
-}
-
-/**
- * Delete a nested value from an object using dot notation
- *
- * @param obj - Object to delete value from
- * @param path - Dot-separated path (e.g., "metadata.author")
- * @returns true if the key existed and was deleted, false otherwise
- */
-function deleteNestedValue(obj: Record<string, unknown>, path: string): boolean {
-  const keys = path.split(".");
-  let current: unknown = obj;
-
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-    if (!key) continue;
-
-    if (!current || typeof current !== "object" || !(key in (current as Record<string, unknown>))) {
-      return false;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-
-  const lastKey = keys[keys.length - 1];
-  if (
-    lastKey &&
-    current &&
-    typeof current === "object" &&
-    lastKey in (current as Record<string, unknown>)
-  ) {
-    delete (current as Record<string, unknown>)[lastKey];
-    return true;
-  }
-
-  return false;
-}
+// Nested value operations are now imported from nested-values.ts
 
 /**
  * Apply a set-frontmatter patch operation

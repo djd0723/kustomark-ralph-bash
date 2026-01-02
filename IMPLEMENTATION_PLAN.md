@@ -2372,3 +2372,142 @@ This document tracks the implementation of kustomark based on the spec milestone
   - Debugging build issues
   
   **Status:** COMPLETE! ✅ High-priority feature implemented with full test coverage and documentation.
+
+**2026-01-02 (Issue #1 Resolution - Directory Structure Preservation - VERIFIED!):**
+- ✅ Verified and documented fix for Issue #1 - CLI directory structure flattening bug:
+  - Issue reported: Build was flattening directory structures, causing file overwrites
+  - Root cause: `resolveResources` function was extracting just filename instead of relative paths
+  - Fix already implemented in `src/cli/index.ts` (lines 555-564):
+    - Uses `resource.baseDir` field from resolved resources
+    - Computes relative paths from appropriate base directory
+    - Preserves complete directory structure in output
+  - Core implementation in `src/core/resource-resolver.ts`:
+    - `ResolvedResource` interface includes `baseDir` field
+    - Resource resolver sets `baseDir` for all resource types:
+      - Glob patterns: uses search directory (line 203)
+      - Git URLs: uses normalized base directory (line 271)
+      - HTTP archives: uses normalized base directory (line 365)
+
+  **Verification Testing:**
+  - Created comprehensive test case with nested directory structure:
+    ```
+    skills/
+      create-research/
+        SKILL.md
+        references/
+          research_template.md
+          research_final_answer.md
+      iterate-research/
+        SKILL.md
+        references/
+          research_final_answer.md
+    ```
+  - Build output correctly preserves all directories:
+    ```
+    output/
+      skills/create-research/SKILL.md
+      skills/create-research/references/research_template.md
+      skills/create-research/references/research_final_answer.md
+      skills/iterate-research/SKILL.md
+      skills/iterate-research/references/research_final_answer.md
+    ```
+  - All files preserved with correct content
+  - No file overwrites occur
+  - All 1,565 tests passing ✓
+
+  **Documentation:**
+  - Updated `/home/dex/kustomark-ralph-bash/known-issues/issue-1-cli-flattens-directory-structure.md`:
+    - Marked issue as RESOLVED
+    - Added detailed fix explanation
+    - Included verification test results
+    - Documented implementation details
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/known-issues/issue-1-cli-flattens-directory-structure.md` - Marked as resolved
+  - `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md` - This entry
+
+  **Status:** VERIFIED AND DOCUMENTED! ✅ Fix working correctly, issue can be closed on GitHub.
+
+**2026-01-02 (Code Quality Improvement - Nested Value Operations Refactoring - COMPLETE!):**
+- ✅ Eliminated code duplication in nested value operations (200+ lines removed):
+  - Created centralized `/home/dex/kustomark-ralph-bash/src/core/nested-values.ts` module
+  - Unified implementations of `getNestedValue`, `setNestedValue`, and `deleteNestedValue`
+  - Removed duplicate implementations from three files:
+    - `src/core/patch-engine.ts` (83 lines removed)
+    - `src/core/frontmatter-parser.ts` (113 lines removed, now imports and re-exports)
+    - `src/core/validators.ts` (13 lines removed)
+
+  **Implementation:**
+  - Created comprehensive `nested-values.ts` module with:
+    - `getNestedValue(obj, path)` - Traverse object using dot notation
+    - `setNestedValue(obj, path, value)` - Set nested values, creating intermediate objects
+    - `deleteNestedValue(obj, path)` - Delete nested values, return boolean
+    - Full JSDoc documentation with examples
+    - Robust error handling (empty path validation)
+    - Type-safe implementation with proper null/undefined checks
+
+  **Refactoring:**
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/index.ts`:
+    - Split frontmatter exports from nested value exports
+    - Now exports nested-values functions directly
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/frontmatter-parser.ts`:
+    - Imports from nested-values.ts
+    - Re-exports for backward compatibility
+    - Maintains all existing API contracts
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/patch-engine.ts`:
+    - Imports from nested-values.ts
+    - Removed local implementations
+    - All frontmatter operations now use centralized functions
+  - Updated `/home/dex/kustomark-ralph-bash/src/core/validators.ts`:
+    - Imports from nested-values.ts
+    - Removed local implementation
+    - Frontmatter validation uses centralized function
+
+  **Testing:**
+  - Created `/home/dex/kustomark-ralph-bash/tests/core/nested-values.test.ts`:
+    - 42 comprehensive unit tests
+    - Tests for `getNestedValue` (12 tests):
+      - Top-level and nested value retrieval
+      - Deep nesting support
+      - Edge cases: null, undefined, primitives, arrays
+      - Empty objects and nonexistent paths
+    - Tests for `setNestedValue` (16 tests):
+      - Creating nested structures
+      - Intermediate object creation
+      - Overwriting existing values
+      - Replacing non-objects (strings, arrays, null)
+      - Setting various value types (null, undefined, objects, arrays)
+      - Error handling for empty paths
+    - Tests for `deleteNestedValue` (11 tests):
+      - Deleting at various nesting levels
+      - Return value verification (true/false)
+      - Edge cases: nonexistent paths, null/undefined traversal
+      - Empty path error handling
+    - Integration tests (3 tests):
+      - Set-get-delete workflows
+      - Complex multi-operation scenarios
+  - All 1,607 tests passing (42 new nested-values tests) ✓
+  - 6,322 expect() calls successful
+  - All linting checks passing (bun check) ✓
+  - Zero TypeScript compilation errors
+
+  **Impact:**
+  - **Code Reduction:** 200+ lines of duplicated code eliminated
+  - **Maintainability:** Single source of truth for nested value operations
+  - **Test Coverage:** Comprehensive test suite for previously untested helper functions
+  - **Type Safety:** Consistent error handling and type checking across all modules
+  - **Documentation:** Full JSDoc with examples for all exported functions
+  - **No Breaking Changes:** All existing APIs preserved through re-exports
+
+  **Files Created:**
+  - `/home/dex/kustomark-ralph-bash/src/core/nested-values.ts` - 163 lines
+  - `/home/dex/kustomark-ralph-bash/tests/core/nested-values.test.ts` - 42 tests
+
+  **Files Modified:**
+  - `/home/dex/kustomark-ralph-bash/src/core/index.ts` - Split exports, added nested-values
+  - `/home/dex/kustomark-ralph-bash/src/core/frontmatter-parser.ts` - Removed 113 lines, added imports
+  - `/home/dex/kustomark-ralph-bash/src/core/patch-engine.ts` - Removed 83 lines, added imports
+  - `/home/dex/kustomark-ralph-bash/src/core/validators.ts` - Removed 13 lines, added import
+  - `/home/dex/kustomark-ralph-bash/IMPLEMENTATION_PLAN.md` - This entry
+
+  **Status:** COMPLETE! ✅ High-priority code quality improvement successfully implemented.

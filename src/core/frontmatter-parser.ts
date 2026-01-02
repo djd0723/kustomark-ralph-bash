@@ -10,6 +10,7 @@
  */
 
 import yaml from "js-yaml";
+import { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
 
 /**
  * Frontmatter extraction result
@@ -155,124 +156,6 @@ export function insertFrontmatter(content: string, frontmatter: Record<string, u
   return `${frontmatterStr}${body}`;
 }
 
-/**
- * Get a nested value from an object using dot notation
- *
- * Examples:
- * - getNestedValue({ a: { b: 'c' } }, 'a.b') => 'c'
- * - getNestedValue({ a: { b: 'c' } }, 'a') => { b: 'c' }
- * - getNestedValue({ a: { b: 'c' } }, 'x.y') => undefined
- *
- * @param obj - The object to query
- * @param path - Dot-separated path (e.g., "metadata.author")
- * @returns The value at the path, or undefined if not found
- */
-export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const keys = path.split(".");
-  let current: unknown = obj;
-
-  for (const key of keys) {
-    if (current === null || current === undefined) {
-      return undefined;
-    }
-    if (typeof current !== "object" || Array.isArray(current)) {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-
-  return current;
-}
-
-/**
- * Set a nested value in an object using dot notation
- *
- * Creates intermediate objects as needed.
- * Mutates the original object.
- *
- * Examples:
- * - setNestedValue({}, 'a.b', 'c') => { a: { b: 'c' } }
- * - setNestedValue({ a: { x: 1 } }, 'a.b', 'c') => { a: { x: 1, b: 'c' } }
- *
- * @param obj - The object to modify
- * @param path - Dot-separated path (e.g., "metadata.author")
- * @param value - The value to set
- */
-export function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const keys = path.split(".");
-  const lastKey = keys.pop();
-
-  if (!lastKey) {
-    throw new Error("Path cannot be empty");
-  }
-
-  let current: Record<string, unknown> = obj;
-
-  for (const key of keys) {
-    if (!(key in current)) {
-      current[key] = {};
-    }
-
-    const next = current[key];
-    if (typeof next !== "object" || next === null || Array.isArray(next)) {
-      // Overwrite non-object values with an object
-      current[key] = {};
-    }
-
-    current = current[key] as Record<string, unknown>;
-  }
-
-  current[lastKey] = value;
-}
-
-/**
- * Delete a nested value from an object using dot notation
- *
- * Mutates the original object.
- * Does nothing if the path doesn't exist.
- *
- * Examples:
- * - deleteNestedValue({ a: { b: 'c', x: 1 } }, 'a.b') => { a: { x: 1 } }
- * - deleteNestedValue({ a: { b: 'c' } }, 'x.y') => { a: { b: 'c' } } (no change)
- *
- * @param obj - The object to modify
- * @param path - Dot-separated path (e.g., "metadata.author")
- * @returns true if the value was deleted, false if path didn't exist
- */
-export function deleteNestedValue(obj: Record<string, unknown>, path: string): boolean {
-  const keys = path.split(".");
-  const lastKey = keys.pop();
-
-  if (!lastKey) {
-    throw new Error("Path cannot be empty");
-  }
-
-  let current: unknown = obj;
-
-  for (const key of keys) {
-    if (current === null || current === undefined) {
-      return false;
-    }
-    if (typeof current !== "object" || Array.isArray(current)) {
-      return false;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-
-  if (
-    current === null ||
-    current === undefined ||
-    typeof current !== "object" ||
-    Array.isArray(current)
-  ) {
-    return false;
-  }
-
-  const currentObj = current as Record<string, unknown>;
-  if (!(lastKey in currentObj)) {
-    return false;
-  }
-
-  delete currentObj[lastKey];
-  return true;
-}
+// Re-export nested value utilities for backward compatibility
+// These are now imported from nested-values.ts
+export { deleteNestedValue, getNestedValue, setNestedValue };

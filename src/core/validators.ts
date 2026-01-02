@@ -5,6 +5,7 @@
  * Validation happens AFTER patches are applied to check the resulting content.
  */
 
+import { getNestedValue } from "./nested-values.js";
 import { parseFrontmatter } from "./patch-engine.js";
 import type { ValidationError, Validator } from "./types.js";
 
@@ -49,26 +50,7 @@ export function validateFrontmatterRequired(
   return { valid: missing.length === 0, missing };
 }
 
-/**
- * Get a nested value from an object using dot notation
- *
- * @param obj - Object to get value from
- * @param path - Dot-separated path (e.g., "metadata.author")
- * @returns The value at the path, or undefined if not found
- */
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const keys = path.split(".");
-  let current: unknown = obj;
-
-  for (const key of keys) {
-    if (current === null || current === undefined || typeof current !== "object") {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-
-  return current;
-}
+// getNestedValue is now imported from nested-values.ts
 
 /**
  * Run a single validator on content
