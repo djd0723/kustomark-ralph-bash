@@ -123,6 +123,9 @@ export async function executePlugin(
   const { plugin, config } = loadedPlugin;
   const timeout = config.timeout ?? options.timeout ?? DEFAULT_TIMEOUT;
 
+  // Track timeout ID for cleanup
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
   try {
     // Run parameter validation if plugin provides a validate function
     if (plugin.validate) {
@@ -133,9 +136,9 @@ export async function executePlugin(
       }
     }
 
-    // Create a promise for timeout
+    // Create a promise for timeout with cleanup
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(new PluginTimeoutError(plugin.name, context.file, timeout));
       }, timeout);
     });
@@ -146,6 +149,12 @@ export async function executePlugin(
 
     // Race between execution and timeout
     const result = await Promise.race([executionPromise, timeoutPromise]);
+
+    // Clear timeout if execution completed first
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
 
     // Validate result is a string
     if (typeof result !== "string") {
@@ -158,6 +167,12 @@ export async function executePlugin(
 
     return result;
   } catch (error) {
+    // Always clear timeout on any error
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+
     // Re-throw our custom errors
     if (error instanceof PluginTimeoutError || error instanceof PluginParamValidationError) {
       throw error;

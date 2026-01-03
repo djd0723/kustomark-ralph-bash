@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-01-03T03:02:50.149Z",
+  "config": {
+    "configPath": "/home/dex/kustomark-ralph-bash/tests/fixtures/incremental/1767409369940-gvzae/kustomark.yaml",
+    "basePath": "/home/dex/kustomark-ralph-bash/tests/fixtures/incremental/1767409369940-gvzae",
+    "resourceCount": 1,
+    "patchCount": 0,
+    "outputDir": "output"
+  },
+  "results": {
+    "filesWritten": 2,
+    "totalBytes": 0,
+    "patchesApplied": 0,
+    "patchesSkipped": 0
+  },
+  "warnings": [],
+  "validationErrors": [],
+  "operationCounts": {},
+  "success": true
+}

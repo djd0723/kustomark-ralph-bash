@@ -1,0 +1,225 @@
+name: Performance Regression Testing
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  performance:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build CLI
+        run: bun run build
+
+      - name: Determine benchmark suite
+        id: suite
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "suite=quick" >> $GITHUB_OUTPUT
+            echo "runs=10" >> $GITHUB_OUTPUT
+            echo "warmup=3" >> $GITHUB_OUTPUT
+          else
+            echo "suite=full" >> $GITHUB_OUTPUT
+            echo "runs=20" >> $GITHUB_OUTPUT
+            echo "warmup=5" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run benchmark suite
+        id: benchmark
+        run: |
+          # Run benchmarks with appropriate suite
+          bun run scripts/run-benchmarks.ts \
+            --suite ${{ steps.suite.outputs.suite }} \
+            --runs ${{ steps.suite.outputs.runs }} \
+            --warmup ${{ steps.suite.outputs.warmup }} \
+            --output benchmark-results.json
+
+      - name: Load baseline
+        id: baseline
+        run: |
+          if [ -f "benchmarks/baselines/main.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Baseline found at benchmarks/baselines/main.json"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No baseline found - will create one after merge"
+          fi
+
+      - name: Compare with baseline
+        if: steps.baseline.outputs.exists == 'true'
+        id: compare
+        run: |
+          bun run scripts/compare-benchmarks.ts \
+            --baseline benchmarks/baselines/main.json \
+            --current benchmark-results.json \
+            --threshold 10 \
+            --output comparison.json \
+            --markdown comparison.md
+
+      - name: Check for regressions
+        if: steps.baseline.outputs.exists == 'true'
+        id: regression
+        run: |
+          # Read comparison results and check for regressions
+          if [ -f "comparison.json" ]; then
+            REGRESSION_COUNT=$(cat comparison.json | jq '.regressions | length')
+            CRITICAL_COUNT=$(cat comparison.json | jq '.critical | length')
+
+            echo "regression_count=$REGRESSION_COUNT" >> $GITHUB_OUTPUT
+            echo "critical_count=$CRITICAL_COUNT" >> $GITHUB_OUTPUT
+
+            if [ "$CRITICAL_COUNT" -gt 0 ]; then
+              echo "has_regressions=true" >> $GITHUB_OUTPUT
+              echo "severity=critical" >> $GITHUB_OUTPUT
+            elif [ "$REGRESSION_COUNT" -gt 0 ]; then
+              echo "has_regressions=true" >> $GITHUB_OUTPUT
+              echo "severity=warning" >> $GITHUB_OUTPUT
+            else
+              echo "has_regressions=false" >> $GITHUB_OUTPUT
+              echo "severity=none" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "has_regressions=false" >> $GITHUB_OUTPUT
+            echo "severity=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request' && steps.baseline.outputs.exists == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read comparison markdown
+            let body = '';
+            if (fs.existsSync('comparison.md')) {
+              body = fs.readFileSync('comparison.md', 'utf8');
+            } else {
+              body = '## Performance Benchmark Results\n\nNo baseline found for comparison.';
+            }
+
+            // Add header based on regression status
+            const hasRegressions = '${{ steps.regression.outputs.has_regressions }}' === 'true';
+            const severity = '${{ steps.regression.outputs.severity }}';
+            const regressionCount = '${{ steps.regression.outputs.regression_count }}';
+            const criticalCount = '${{ steps.regression.outputs.critical_count }}';
+
+            let header = '';
+            if (severity === 'critical') {
+              header = `## ⚠️ Performance Regression Detected\n\n**Critical:** ${criticalCount} operation(s) show significant performance degradation (>10%).\n\n`;
+            } else if (severity === 'warning') {
+              header = `## ⚡ Performance Changes Detected\n\n**Warning:** ${regressionCount} operation(s) show performance regressions.\n\n`;
+            } else {
+              header = `## ✅ Performance Check Passed\n\nNo significant performance regressions detected.\n\n`;
+            }
+
+            body = header + body;
+
+            // Add footer
+            body += '\n\n---\n*Performance benchmarks run on ' + new Date().toISOString() + '*';
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Performance Benchmark Results')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark-results.json
+            comparison.json
+            comparison.md
+          retention-days: 30
+
+      - name: Update baseline on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # Ensure benchmarks/baselines directory exists
+          mkdir -p benchmarks/baselines
+
+          # Copy current results as new baseline
+          cp benchmark-results.json benchmarks/baselines/main.json
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Commit and push baseline update
+          git add benchmarks/baselines/main.json
+          if git diff --staged --quiet; then
+            echo "No changes to baseline"
+          else
+            git commit -m "chore: update performance baseline [skip ci]"
+            git push
+          fi
+
+      - name: Fail on critical regressions
+        if: steps.regression.outputs.severity == 'critical'
+        run: |
+          echo "::error::Critical performance regressions detected!"
+          echo "::error::${{ steps.regression.outputs.critical_count }} operation(s) show >10% performance degradation"
+          exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Performance Benchmark Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "comparison.md" ]; then
+            cat comparison.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No baseline comparison available." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Baseline will be created after merge to main." >> $GITHUB_STEP_SUMMARY
+          fi

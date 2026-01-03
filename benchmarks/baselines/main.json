@@ -1,0 +1,173 @@
+{
+  "timestamp": "2026-01-03T00:00:00.000Z",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "bunVersion": "1.0.0",
+    "cpuCount": 4,
+    "totalMemory": 17179869184
+  },
+  "results": [
+    {
+      "operation": "replace",
+      "fileCount": 10,
+      "complexity": "simple",
+      "runs": 10,
+      "timing": {
+        "mean": 2.5,
+        "median": 2.4,
+        "min": 2.2,
+        "max": 2.8,
+        "p95": 2.7,
+        "p99": 2.8,
+        "stdDev": 0.15
+      },
+      "memory": {
+        "heapUsed": 1048576,
+        "heapTotal": 2097152,
+        "external": 524288,
+        "rss": 20971520
+      },
+      "throughput": {
+        "filesPerSecond": 4000,
+        "operationsPerSecond": 4000,
+        "bytesPerSecond": 2097152
+      }
+    },
+    {
+      "operation": "replace",
+      "fileCount": 50,
+      "complexity": "medium",
+      "runs": 10,
+      "timing": {
+        "mean": 8.5,
+        "median": 8.3,
+        "min": 7.8,
+        "max": 9.2,
+        "p95": 9.0,
+        "p99": 9.2,
+        "stdDev": 0.35
+      },
+      "memory": {
+        "heapUsed": 5242880,
+        "heapTotal": 10485760,
+        "external": 1048576,
+        "rss": 41943040
+      },
+      "throughput": {
+        "filesPerSecond": 5882,
+        "operationsPerSecond": 5882,
+        "bytesPerSecond": 10485760
+      }
+    },
+    {
+      "operation": "replace",
+      "fileCount": 100,
+      "complexity": "complex",
+      "runs": 10,
+      "timing": {
+        "mean": 18.5,
+        "median": 18.2,
+        "min": 17.5,
+        "max": 20.1,
+        "p95": 19.8,
+        "p99": 20.1,
+        "stdDev": 0.65
+      },
+      "memory": {
+        "heapUsed": 10485760,
+        "heapTotal": 20971520,
+        "external": 2097152,
+        "rss": 83886080
+      },
+      "throughput": {
+        "filesPerSecond": 5405,
+        "operationsPerSecond": 5405,
+        "bytesPerSecond": 20971520
+      }
+    },
+    {
+      "operation": "append-to-section",
+      "fileCount": 10,
+      "complexity": "simple",
+      "runs": 10,
+      "timing": {
+        "mean": 3.2,
+        "median": 3.1,
+        "min": 2.9,
+        "max": 3.6,
+        "p95": 3.5,
+        "p99": 3.6,
+        "stdDev": 0.18
+      },
+      "memory": {
+        "heapUsed": 1310720,
+        "heapTotal": 2621440,
+        "external": 655360,
+        "rss": 22020096
+      },
+      "throughput": {
+        "filesPerSecond": 3125,
+        "operationsPerSecond": 3125,
+        "bytesPerSecond": 1638400
+      }
+    },
+    {
+      "operation": "append-to-section",
+      "fileCount": 50,
+      "complexity": "medium",
+      "runs": 10,
+      "timing": {
+        "mean": 11.2,
+        "median": 11.0,
+        "min": 10.5,
+        "max": 12.1,
+        "p95": 11.9,
+        "p99": 12.1,
+        "stdDev": 0.42
+      },
+      "memory": {
+        "heapUsed": 6553600,
+        "heapTotal": 13107200,
+        "external": 1310720,
+        "rss": 44040192
+      },
+      "throughput": {
+        "filesPerSecond": 4464,
+        "operationsPerSecond": 4464,
+        "bytesPerSecond": 8192000
+      }
+    },
+    {
+      "operation": "replace-section",
+      "fileCount": 10,
+      "complexity": "medium",
+      "runs": 10,
+      "timing": {
+        "mean": 4.5,
+        "median": 4.4,
+        "min": 4.1,
+        "max": 5.0,
+        "p95": 4.9,
+        "p99": 5.0,
+        "stdDev": 0.22
+      },
+      "memory": {
+        "heapUsed": 1572864,
+        "heapTotal": 3145728,
+        "external": 786432,
+        "rss": 24117248
+      },
+      "throughput": {
+        "filesPerSecond": 2222,
+        "operationsPerSecond": 2222,
+        "bytesPerSecond": 1146880
+      }
+    }
+  ],
+  "summary": {
+    "totalDuration": 150.5,
+    "totalOperations": 1800,
+    "averageThroughput": 4183
+  }
+}

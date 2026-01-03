@@ -83,6 +83,7 @@ ${formatSection("ADVANCED COMMANDS")}
   ${formatCommand("schema")}       Export JSON Schema for editor integration
   ${formatCommand("snapshot")}     Create, verify, or update build output snapshots
   ${formatCommand("suggest")}      Generate patches from file differences
+  ${formatCommand("profile")}      Memory profiling and performance analysis
 
 ${formatSection("GETTING HELP")}
   ${formatCommand("kustomark help")}                Show this help message
@@ -152,6 +153,7 @@ export function getCommandHelp(command: string): string {
     snapshot: getSnapshotHelp,
     template: getTemplateHelp,
     suggest: getSuggestHelp,
+    profile: getProfileHelp,
   };
 
   const helpFunc = helpFunctions[command];
@@ -2415,6 +2417,158 @@ ${formatSection("SEE ALSO")}
 }
 
 // ============================================================================
+// Profile Command Help
+// ============================================================================
+
+function getProfileHelp(): string {
+  return `
+${formatTitle("kustomark profile - Memory profiling for kustomark operations")}
+
+${formatSection("SYNOPSIS")}
+  ${formatCommand("kustomark profile memory")} [options]
+
+${formatSection("DESCRIPTION")}
+  Profile provides memory usage analysis and leak detection for kustomark
+  operations. It runs predefined or custom scenarios to measure memory
+  consumption, track garbage collection activity, and identify potential
+  memory leaks.
+
+  The profiler tracks:
+    - Memory allocations over time
+    - Garbage collection events and effectiveness
+    - Heap snapshots at intervals
+    - Peak and average memory usage
+    - Potential memory leak patterns
+
+${formatSection("SUBCOMMANDS")}
+  ${formatCommand("memory")}    Run memory profiling (required)
+
+${formatSection("OPTIONS")}
+  ${formatFlag("--scenario")} <name>           Scenario to profile (small, medium, large, custom)
+  ${formatFlag("--config")} <path>            Path to profiler config JSON file
+  ${formatFlag("--snapshot")}                Enable heap snapshots during profiling
+  ${formatFlag("--format")} <text|json>       Output format (default: text)
+  ${formatFlag("--output")} <path>            Save report to file
+  ${formatFlag("--files")} <count>            Number of files for custom scenario
+  ${formatFlag("--operations")} <ops>         Operations to test (custom scenario)
+  ${formatFlag("--sampling-interval")} <ms>   Sampling interval in milliseconds
+
+${formatSection("SCENARIOS")}
+  ${formatHighlight("small")}     10 files, simple operations (quick test)
+  ${formatHighlight("medium")}    50 files, mixed operations (default)
+  ${formatHighlight("large")}     200 files, complex operations (stress test)
+  ${formatHighlight("custom")}    User-defined via --files and --operations
+
+${formatSection("AVAILABLE OPERATIONS")} (for custom scenario)
+  ${formatFlag("append")}           append-to-section operation
+  ${formatFlag("prepend")}          prepend-to-section operation
+  ${formatFlag("replace")}          string replacement
+  ${formatFlag("regex")}            regex-based replacement
+  ${formatFlag("replace-section")}  full section replacement
+
+${formatSection("PROFILER CONFIG FILE")}
+  You can provide a JSON config file with:
+  {
+    "trackAllocations": true,      // Track memory allocations
+    "trackGC": true,                // Monitor garbage collection
+    "heapSnapshots": true,          // Capture heap snapshots
+    "samplingInterval": 100         // Sample interval in ms
+  }
+
+${formatSection("OUTPUT")}
+  The profiler generates a report containing:
+    - Peak and average memory usage
+    - Garbage collection statistics
+    - Memory allocation timeline
+    - Heap snapshots (if enabled)
+    - Potential memory leak warnings
+
+  Profiles are automatically archived to .kustomark/profiles/ for later analysis.
+
+${formatSection("EXAMPLES")}
+  ${formatExample("# Run default profiling scenario")}
+  ${formatCommand("kustomark profile memory")}
+
+  ${formatExample("# Profile with large workload and snapshots")}
+  ${formatCommand("kustomark profile memory --scenario large --snapshot")}
+
+  ${formatExample("# Custom scenario with specific operations")}
+  ${formatCommand("kustomark profile memory --scenario custom --files 100 --operations append,replace,regex")}
+
+  ${formatExample("# Save detailed JSON report")}
+  ${formatCommand("kustomark profile memory --format json --output profile-report.json")}
+
+  ${formatExample("# Use custom profiler config")}
+  ${formatCommand("kustomark profile memory --config profiler-config.json")}
+
+  ${formatExample("# Quick test with frequent sampling")}
+  ${formatCommand("kustomark profile memory --scenario small --sampling-interval 50")}
+
+${formatSection("INTERPRETING RESULTS")}
+  ${formatHighlight("Peak Memory:")}
+    Maximum heap usage during profiling
+    Higher values indicate more memory-intensive operations
+
+  ${formatHighlight("Average Memory:")}
+    Mean heap usage across all samples
+    Consistent growth may indicate a leak
+
+  ${formatHighlight("GC Events:")}
+    Number of garbage collection cycles
+    Frequent GCs may indicate memory pressure
+
+  ${formatHighlight("Leak Detection:")}
+    Automatic analysis identifies patterns:
+      - growing-memory: Memory consistently increasing
+      - gc-ineffective: GC not freeing much memory
+      - growing-allocations: Recent samples show growth
+
+  ${formatHighlight("Severity Levels:")}
+    HIGH:   Immediate attention recommended
+    MEDIUM: Worth investigating
+    LOW:    Minor or expected behavior
+
+${formatSection("USE CASES")}
+  ${formatHighlight("Performance Optimization:")}
+    Identify memory-intensive operations
+    Compare different patch strategies
+    Optimize for large-scale builds
+
+  ${formatHighlight("Regression Testing:")}
+    Establish baseline memory profiles
+    Compare new code against baselines
+    Detect memory regressions early
+
+  ${formatHighlight("Capacity Planning:")}
+    Estimate memory requirements
+    Plan for production deployments
+    Scale infrastructure appropriately
+
+${formatSection("TIPS")}
+  ${formatHighlight("Run with GC enabled:")}
+    Use --expose-gc flag when running with Bun
+    Enables more accurate GC tracking
+
+  ${formatHighlight("Test realistic scenarios:")}
+    Match profiling scenarios to actual workloads
+    Use representative file counts and operations
+
+  ${formatHighlight("Monitor trends:")}
+    Run profiles regularly during development
+    Archive results for comparison over time
+
+${formatSection("EXIT CODES")}
+  ${formatHighlight("0")}    Profiling completed successfully
+  ${formatHighlight("1")}    Error (invalid scenario, config error, etc.)
+
+${formatSection("SEE ALSO")}
+  ${formatCommand("kustomark benchmark")}    Performance benchmarking
+  ${formatCommand("kustomark analyze")}      Static analysis of patches
+  ${formatCommand("kustomark build")}        Standard build command
+`;
+}
+
+// ============================================================================
 // Format Helper
 // ============================================================================
 
@@ -2450,6 +2604,7 @@ export const helpCommands = [
   "snapshot",
   "template",
   "suggest",
+  "profile",
 ] as const;
 
 export type HelpCommand = (typeof helpCommands)[number];

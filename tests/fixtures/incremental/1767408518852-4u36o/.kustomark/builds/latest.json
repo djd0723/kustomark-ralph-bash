@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-01-03T02:48:39.048Z",
+  "config": {
+    "configPath": "/home/dex/kustomark-ralph-bash/tests/fixtures/incremental/1767408518852-4u36o/kustomark.yaml",
+    "basePath": "/home/dex/kustomark-ralph-bash/tests/fixtures/incremental/1767408518852-4u36o",
+    "resourceCount": 1,
+    "patchCount": 1,
+    "outputDir": "output"
+  },
+  "results": {
+    "filesWritten": 2,
+    "totalBytes": 0,
+    "patchesApplied": 1,
+    "patchesSkipped": 1
+  },
+  "warnings": [
+    {
+      "message": "Patch 'replace 'Content' with 'Updated content'' matched 0 times",
+      "suggestions": [
+        "The string exists with different casing. Consider using case-insensitive matching."
+      ]
+    }
+  ],
+  "validationErrors": [],
+  "operationCounts": {
+    "replace": 2
+  },
+  "success": true
+}

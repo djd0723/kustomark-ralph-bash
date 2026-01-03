@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "configHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "entries": [
+    {
+      "file": "file1.md",
+      "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "patchHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "outputHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "built": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "file": "file2.md",
+      "sourceHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "patchHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "outputHash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "built": "2024-01-02T00:00:00.000Z"
+    }
+  ]
+}

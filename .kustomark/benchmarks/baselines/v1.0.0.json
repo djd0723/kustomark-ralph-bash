@@ -1,0 +1,80 @@
+{
+  "metadata": {
+    "version": "v1.0.0",
+    "timestamp": "2026-01-03T03:21:14.869Z",
+    "bunVersion": "1.3.5",
+    "platform": "linux",
+    "arch": "x64",
+    "cpuCount": 4,
+    "totalMemory": 16767229952
+  },
+  "results": {
+    "timestamp": "2026-01-03T03:21:14.868Z",
+    "environment": {
+      "platform": "linux",
+      "arch": "x64",
+      "bunVersion": "1.3.5",
+      "cpuCount": 8,
+      "totalMemory": 16000000000
+    },
+    "results": [
+      {
+        "operation": "replace",
+        "fileCount": 10,
+        "complexity": "simple",
+        "runs": 100,
+        "timing": {
+          "mean": 1000000,
+          "median": 950000,
+          "min": 800000,
+          "max": 1500000,
+          "p95": 1200000,
+          "p99": 1400000,
+          "stdDev": 150000
+        },
+        "memory": {
+          "heapUsed": 10000000,
+          "heapTotal": 20000000,
+          "external": 1000000,
+          "rss": 50000000
+        },
+        "throughput": {
+          "filesPerSecond": 1000,
+          "operationsPerSecond": 10000,
+          "bytesPerSecond": 1000000
+        }
+      },
+      {
+        "operation": "replace-regex",
+        "fileCount": 10,
+        "complexity": "medium",
+        "runs": 100,
+        "timing": {
+          "mean": 2000000,
+          "median": 1900000,
+          "min": 1600000,
+          "max": 2500000,
+          "p95": 2200000,
+          "p99": 2400000,
+          "stdDev": 200000
+        },
+        "memory": {
+          "heapUsed": 15000000,
+          "heapTotal": 25000000,
+          "external": 1500000,
+          "rss": 55000000
+        },
+        "throughput": {
+          "filesPerSecond": 500,
+          "operationsPerSecond": 5000,
+          "bytesPerSecond": 500000
+        }
+      }
+    ],
+    "summary": {
+      "totalDuration": 1000000,
+      "totalOperations": 200,
+      "averageThroughput": 7500
+    }
+  }
+}

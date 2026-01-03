@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "configHash": "fde5c6347d29ef87d9928fd35e9e08ef566173a5b114b94c63afb8a91af00919",
+  "entries": [
+    {
+      "file": "file1.md",
+      "sourceHash": "967ea47d780e8479a5c994b2bcf1762186782ae970d2bcc7143554fba3f3aa5a",
+      "patchHash": "e10808d43975dc400731053386849f864f297e6c4f7519c380f3dbaf7067a840",
+      "outputHash": "6ceb890e22aa4227322bd1dd7d0d8a29d2599ff8418972e926c274a658f9c8f6",
+      "built": "2026-01-03T02:48:39.038Z"
+    },
+    {
+      "file": "file2.md",
+      "sourceHash": "e0d1015781bec0908011a21d80b1dc7b31d13016113cd3832b2308f85bc9e1fe",
+      "patchHash": "e10808d43975dc400731053386849f864f297e6c4f7519c380f3dbaf7067a840",
+      "outputHash": "e0d1015781bec0908011a21d80b1dc7b31d13016113cd3832b2308f85bc9e1fe",
+      "built": "2026-01-03T02:48:39.038Z"
+    }
+  ]
+}

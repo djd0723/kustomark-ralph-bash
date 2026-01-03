@@ -7,6 +7,16 @@
  * - Config parsing (from other modules)
  */
 
+// Export baseline manager functions and types
+export {
+  type BaselineComparisonResult,
+  type BaselineHistoryEntry,
+  BaselineManager,
+  type BaselineManagerOptions,
+  type BaselineMetadata,
+  type BaselineRecord,
+} from "./baseline-manager.js";
+
 // Export benchmark storage functions
 export {
   compareResults,

@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-01-03T03:20:33.177Z",
+  "config": {
+    "configPath": "/home/dex/kustomark-ralph-bash/tests/fixtures/integration/basic/overlay/kustomark.yaml",
+    "basePath": "/home/dex/kustomark-ralph-bash/tests/fixtures/integration/basic/overlay",
+    "resourceCount": 1,
+    "patchCount": 3,
+    "outputDir": "./output"
+  },
+  "results": {
+    "filesWritten": 2,
+    "totalBytes": 0,
+    "patchesApplied": 3,
+    "patchesSkipped": 1
+  },
+  "warnings": [
+    {
+      "message": "Patch 'replace 'myproject' with 'awesome-project'' matched 0 times",
+      "suggestions": [
+        "The string 'myproject' was not found in the content."
+      ]
+    }
+  ],
+  "validationErrors": [],
+  "operationCounts": {
+    "replace": 2,
+    "remove-section": 1,
+    "append-to-section": 1
+  },
+  "success": true
+}

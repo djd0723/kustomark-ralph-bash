@@ -92,6 +92,12 @@ import { runValidators } from "../core/validators.js";
 import { analyzeCommand } from "./analyze-command.js";
 import { handleBenchmarkCommand } from "./benchmark-command.js";
 import { recordBuild } from "./build-history.js";
+import {
+  cacheAnalyzeCommand,
+  cacheRepairCommand,
+  cacheStatsCommand,
+  cacheValidateCommand,
+} from "./cache-command.js";
 import { debugCommand } from "./debug-command.js";
 import { presentRecoveryOptions, type RecoveryResult } from "./error-recovery-ui.js";
 import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
@@ -1215,8 +1221,10 @@ async function applyPatches(
                 recoveryStats.skipped++;
               } else {
                 recoveryStats.failed++;
-                // In non-interactive mode (JSON), fail the build if no recovery available
-                if (options.format === "json") {
+                // In non-interactive mode (JSON), we need to decide whether to fail the build
+                // For empty files, patches that can't match are benign no-ops, so we skip them
+                // For non-empty files with no recovery, this likely indicates a real error
+                if (options.format === "json" && currentContent.trim().length > 0) {
                   throw error;
                 }
               }
@@ -4508,7 +4516,7 @@ interface CacheClearResult {
 }
 
 /**
- * Cache command - list or clear cached resources
+ * Cache command - list or clear cached resources, and manage build cache
  */
 async function cacheCommand(args: string[], options: CLIOptions): Promise<number> {
   const subcommand = args[0];
@@ -4609,12 +4617,32 @@ async function cacheCommand(args: string[], options: CLIOptions): Promise<number
       }
       return 1;
     }
+  } else if (subcommand === "stats") {
+    // Show build cache statistics
+    const path = args[1] || ".";
+    return await cacheStatsCommand(path, options);
+  } else if (subcommand === "analyze") {
+    // Analyze cache and suggest optimizations
+    const path = args[1] || ".";
+    return await cacheAnalyzeCommand(path, options);
+  } else if (subcommand === "validate") {
+    // Validate cache integrity
+    const path = args[1] || ".";
+    return await cacheValidateCommand(path, options);
+  } else if (subcommand === "repair") {
+    // Repair corrupted cache
+    const path = args[1] || ".";
+    return await cacheRepairCommand(path, options);
   } else {
     console.error(`Unknown cache subcommand: ${subcommand}`);
     console.error("Usage:");
     console.error("  kustomark cache list              List all cached resources");
     console.error("  kustomark cache clear             Clear all caches");
     console.error("  kustomark cache clear <pattern>   Clear specific resources matching pattern");
+    console.error("  kustomark cache stats [path]      Show build cache statistics");
+    console.error("  kustomark cache analyze [path]    Analyze cache and suggest optimizations");
+    console.error("  kustomark cache validate [path]   Validate cache integrity");
+    console.error("  kustomark cache repair [path]     Repair corrupted cache");
     console.error("");
     console.error("All commands support --format=json");
     return 1;
@@ -4720,6 +4748,11 @@ async function main(): Promise<number> {
       return await suggestCommand(options);
     case "benchmark":
       return await handleBenchmarkCommand(args.slice(1));
+    case "profile": {
+      const { handleProfileCommand } = await import("./profile-command.js");
+      const subcommand = args[1] || "";
+      return await handleProfileCommand(subcommand, args.slice(2));
+    }
     case "template": {
       // Handle template subcommands
       // Extract positional args (non-flags) from args

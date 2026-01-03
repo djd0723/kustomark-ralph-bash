@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-01-03T02:59:16.335Z",
+  "config": {
+    "configPath": "/home/dex/kustomark-ralph-bash/tests/fixtures/incremental/1767409156141-koxpa/kustomark.yaml",
+    "basePath": "/home/dex/kustomark-ralph-bash/tests/fixtures/incremental/1767409156141-koxpa",
+    "resourceCount": 1,
+    "patchCount": 0,
+    "outputDir": "output"
+  },
+  "results": {
+    "filesWritten": 2,
+    "totalBytes": 0,
+    "patchesApplied": 0,
+    "patchesSkipped": 0
+  },
+  "warnings": [],
+  "validationErrors": [],
+  "operationCounts": {},
+  "success": true
+}

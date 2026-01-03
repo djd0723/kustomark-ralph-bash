@@ -1142,7 +1142,114 @@ export interface BenchmarkComparison {
   };
 }
 
+// ============================================================================
+// Memory Profiling Types
+// ============================================================================
+
+export interface MemoryProfileConfig {
+  /** Track allocation patterns over time */
+  trackAllocations: boolean;
+  /** Monitor garbage collection activity */
+  trackGC: boolean;
+  /** Capture heap snapshots at intervals */
+  heapSnapshots: boolean;
+  /** Sampling interval in milliseconds */
+  samplingInterval: number;
+}
+
+export interface AllocationProfile {
+  /** Timestamp of the allocation sample */
+  timestamp: number;
+  /** Heap used in bytes */
+  heapUsed: number;
+  /** Heap total in bytes */
+  heapTotal: number;
+  /** External memory in bytes */
+  external: number;
+  /** Resident set size in bytes */
+  rss: number;
+  /** Array buffers in bytes */
+  arrayBuffers: number;
+}
+
+export interface GCProfile {
+  /** Timestamp of GC event */
+  timestamp: number;
+  /** Type of GC (scavenge, mark-sweep-compact) */
+  type: string;
+  /** Duration of GC in milliseconds */
+  duration: number;
+  /** Heap size before GC */
+  heapBefore: number;
+  /** Heap size after GC */
+  heapAfter: number;
+  /** Memory freed in bytes */
+  freed: number;
+}
+
+export interface HeapSnapshot {
+  /** Timestamp of snapshot */
+  timestamp: number;
+  /** Heap used in bytes */
+  heapUsed: number;
+  /** Heap total in bytes */
+  heapTotal: number;
+  /** External memory in bytes */
+  external: number;
+  /** Array buffers in bytes */
+  arrayBuffers: number;
+  /** Number of native contexts */
+  contexts?: number;
+  /** Number of detached contexts */
+  detachedContexts?: number;
+}
+
+export interface LeakCandidate {
+  /** Type of potential leak */
+  type: "growing-memory" | "growing-allocations" | "gc-ineffective" | "detached-contexts";
+  /** Severity level */
+  severity: "low" | "medium" | "high";
+  /** Description of the potential leak */
+  description: string;
+  /** Supporting data */
+  data: {
+    /** Growth rate in bytes/second (if applicable) */
+    growthRate?: number;
+    /** Percentage increase (if applicable) */
+    percentIncrease?: number;
+    /** Current value */
+    currentValue?: number;
+    /** Initial value */
+    initialValue?: number;
+  };
+}
+
+export interface MemoryProfile {
+  /** Peak memory usage in bytes */
+  peakMemory: number;
+  /** Average memory usage in bytes */
+  avgMemory: number;
+  /** Number of GC events */
+  gcCount: number;
+  /** Total time spent in GC in milliseconds */
+  gcTime: number;
+  /** Allocation samples collected */
+  allocations: AllocationProfile[];
+  /** GC events recorded */
+  gcEvents: GCProfile[];
+  /** Heap snapshots captured */
+  snapshots: HeapSnapshot[];
+  /** Potential memory leaks detected */
+  leakDetection: LeakCandidate[];
+  /** Total profiling duration in milliseconds */
+  duration: number;
+  /** Configuration used for profiling */
+  config: MemoryProfileConfig;
+}
+
+// ============================================================================
 // Snapshot Testing Types
+// ============================================================================
 
 /**
  * Snapshot manifest containing metadata about a saved snapshot

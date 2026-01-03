@@ -18,6 +18,54 @@ import type {
 } from "./types.js";
 
 /**
+ * Cache analytics data structure
+ */
+export interface CacheAnalytics {
+  /** Cache hit rate as a percentage (0-100) */
+  hitRate: number;
+  /** Cache miss rate as a percentage (0-100) */
+  missRate: number;
+  /** Map of invalidation reasons to their occurrence counts */
+  invalidationReasons: Map<string, number>;
+  /** Average rebuild time in milliseconds */
+  avgRebuildTime: number;
+  /** Average cached time in milliseconds */
+  avgCachedTime: number;
+  /** Total time saved by using cache in milliseconds */
+  timeSaved: number;
+}
+
+/**
+ * Cache optimization suggestion
+ */
+export interface CacheOptimizationSuggestion {
+  /** Suggestion type */
+  type: "info" | "warning" | "success";
+  /** Suggestion message */
+  message: string;
+  /** Impact level of implementing this suggestion */
+  impact: "low" | "medium" | "high";
+}
+
+/**
+ * Cache statistics tracking data
+ */
+export interface CacheStats {
+  /** Total number of cache lookups */
+  totalLookups: number;
+  /** Number of cache hits */
+  hits: number;
+  /** Number of cache misses */
+  misses: number;
+  /** Map of invalidation reasons to counts */
+  invalidationReasons: Map<string, number>;
+  /** Array of rebuild times in milliseconds */
+  rebuildTimes: number[];
+  /** Array of cached retrieval times in milliseconds */
+  cachedTimes: number[];
+}
+
+/**
  * Calculates SHA256 hash of content
  *
  * @param content - Content to hash (string or bytes)
@@ -912,4 +960,358 @@ export function determineFilesToRebuild(
   }
 
   return { rebuild, unchanged, reasons };
+}
+
+/**
+ * Analyzes cache performance and calculates statistics
+ *
+ * @param stats - Cache statistics collected during build
+ * @returns Cache analytics with hit/miss rates and time savings
+ */
+export function analyzeCachePerformance(stats: CacheStats): CacheAnalytics {
+  const hitRate = stats.totalLookups > 0 ? (stats.hits / stats.totalLookups) * 100 : 0;
+  const missRate = stats.totalLookups > 0 ? (stats.misses / stats.totalLookups) * 100 : 0;
+
+  // Calculate average rebuild time
+  const avgRebuildTime =
+    stats.rebuildTimes.length > 0
+      ? stats.rebuildTimes.reduce((sum, time) => sum + time, 0) / stats.rebuildTimes.length
+      : 0;
+
+  // Calculate average cached time (typically much faster)
+  const avgCachedTime =
+    stats.cachedTimes.length > 0
+      ? stats.cachedTimes.reduce((sum, time) => sum + time, 0) / stats.cachedTimes.length
+      : 0;
+
+  // Calculate time saved: (number of hits * average rebuild time) - (number of hits * average cached time)
+  const timeSaved = stats.hits * avgRebuildTime - stats.hits * avgCachedTime;
+
+  return {
+    hitRate,
+    missRate,
+    invalidationReasons: stats.invalidationReasons,
+    avgRebuildTime,
+    avgCachedTime,
+    timeSaved: Math.max(0, timeSaved), // Ensure non-negative
+  };
+}
+
+/**
+ * Calculates cache efficiency as a percentage
+ *
+ * @param analytics - Cache analytics data
+ * @returns Efficiency percentage (0-100)
+ */
+export function getCacheEfficiency(analytics: CacheAnalytics): number {
+  // Efficiency is based on hit rate and time savings
+  // Hit rate is the primary factor, but we boost it if time savings are significant
+  let efficiency = analytics.hitRate;
+
+  // If average rebuild time is significant and we're saving time, boost efficiency
+  if (analytics.avgRebuildTime > 100 && analytics.timeSaved > 1000) {
+    // Add up to 10 points bonus for significant time savings (capped at 100%)
+    const timeSavingsBonus = Math.min(10, analytics.timeSaved / 10000);
+    efficiency = Math.min(100, efficiency + timeSavingsBonus);
+  }
+
+  return efficiency;
+}
+
+/**
+ * Suggests cache optimizations based on analytics
+ *
+ * @param cache - Build cache to analyze
+ * @param analytics - Cache analytics data
+ * @returns Array of optimization suggestions
+ */
+export function suggestCacheOptimizations(
+  cache: BuildCache,
+  analytics: CacheAnalytics,
+): CacheOptimizationSuggestion[] {
+  const suggestions: CacheOptimizationSuggestion[] = [];
+
+  // Check hit rate
+  if (analytics.hitRate >= 80) {
+    suggestions.push({
+      type: "success",
+      message: `Excellent cache hit rate (${analytics.hitRate.toFixed(1)}%). Your cache is performing well.`,
+      impact: "low",
+    });
+  } else if (analytics.hitRate >= 50) {
+    suggestions.push({
+      type: "info",
+      message: `Moderate cache hit rate (${analytics.hitRate.toFixed(1)}%). Consider reviewing why ${analytics.missRate.toFixed(1)}% of files are being rebuilt.`,
+      impact: "medium",
+    });
+  } else if (analytics.hitRate > 0) {
+    suggestions.push({
+      type: "warning",
+      message: `Low cache hit rate (${analytics.hitRate.toFixed(1)}%). Your cache may not be effective. Review invalidation reasons below.`,
+      impact: "high",
+    });
+  }
+
+  // Check cache size
+  const cacheSize = cache.entries.size;
+  if (cacheSize === 0) {
+    suggestions.push({
+      type: "warning",
+      message: "Cache is empty. No previous builds found. First build will create cache entries.",
+      impact: "medium",
+    });
+  } else if (cacheSize > 1000) {
+    suggestions.push({
+      type: "info",
+      message: `Large cache (${cacheSize} entries). Consider pruning old entries if disk space is a concern.`,
+      impact: "low",
+    });
+  }
+
+  // Check invalidation reasons
+  const reasons = Array.from(analytics.invalidationReasons.entries()).sort((a, b) => b[1] - a[1]);
+
+  if (reasons.length > 0) {
+    const topReason = reasons[0];
+    if (topReason) {
+      const [reason, count] = topReason;
+      const percentage = (count / (analytics.hitRate + analytics.missRate)) * 100;
+
+      if (reason === "Configuration file changed" && percentage > 50) {
+        suggestions.push({
+          type: "warning",
+          message:
+            "Configuration changes are the main cause of cache invalidation. Frequent config changes will reduce cache effectiveness.",
+          impact: "high",
+        });
+      } else if (reason === "Source file content changed" && percentage > 60) {
+        suggestions.push({
+          type: "info",
+          message:
+            "Most invalidations are due to source file changes, which is normal during active development.",
+          impact: "low",
+        });
+      } else if (reason === "Applicable patches changed" && percentage > 40) {
+        suggestions.push({
+          type: "warning",
+          message:
+            "Patch changes are frequently invalidating cache. Consider stabilizing your patch configuration.",
+          impact: "medium",
+        });
+      } else if (reason === "Group filters changed" && percentage > 30) {
+        suggestions.push({
+          type: "info",
+          message:
+            "Group filter changes are causing cache invalidation. Use consistent group filters for better caching.",
+          impact: "medium",
+        });
+      } else if (reason === "No cache exists") {
+        suggestions.push({
+          type: "info",
+          message:
+            "Initial build or cache was cleared. Subsequent builds will benefit from caching.",
+          impact: "low",
+        });
+      }
+    }
+  }
+
+  // Check time savings
+  if (analytics.timeSaved > 5000) {
+    // More than 5 seconds saved
+    suggestions.push({
+      type: "success",
+      message: `Cache saved approximately ${(analytics.timeSaved / 1000).toFixed(2)} seconds on this build. Keep using cache for faster builds!`,
+      impact: "high",
+    });
+  } else if (analytics.timeSaved > 1000) {
+    suggestions.push({
+      type: "info",
+      message: `Cache saved approximately ${(analytics.timeSaved / 1000).toFixed(2)} seconds on this build.`,
+      impact: "medium",
+    });
+  }
+
+  // If no suggestions yet, add a default one
+  if (suggestions.length === 0) {
+    suggestions.push({
+      type: "info",
+      message: "No specific optimization suggestions at this time. Cache is functioning normally.",
+      impact: "low",
+    });
+  }
+
+  return suggestions;
+}
+
+/**
+ * Validates cache integrity by checking for corrupted or invalid entries
+ *
+ * @param cache - Build cache to validate
+ * @returns Object with validation results
+ */
+export async function validateCacheIntegrity(cache: BuildCache): Promise<{
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Check cache version
+  if (cache.version !== 1) {
+    errors.push(`Invalid cache version: expected 1, got ${cache.version}`);
+  }
+
+  // Check config hash format
+  if (!cache.configHash || typeof cache.configHash !== "string") {
+    errors.push("Missing or invalid config hash");
+  } else if (!/^[a-f0-9]{64}$/i.test(cache.configHash)) {
+    errors.push(`Invalid config hash format: ${cache.configHash}`);
+  }
+
+  // Check entries
+  let entryIndex = 0;
+  for (const [filePath, entry] of cache.entries) {
+    // Validate file path
+    if (!filePath || typeof filePath !== "string") {
+      errors.push(`Entry ${entryIndex}: Invalid file path`);
+    }
+
+    // Validate hashes
+    if (!entry.sourceHash || !/^[a-f0-9]{64}$/i.test(entry.sourceHash)) {
+      errors.push(`Entry ${entryIndex} (${filePath}): Invalid source hash`);
+    }
+    if (!entry.patchHash || !/^[a-f0-9]{64}$/i.test(entry.patchHash)) {
+      errors.push(`Entry ${entryIndex} (${filePath}): Invalid patch hash`);
+    }
+    if (!entry.outputHash || !/^[a-f0-9]{64}$/i.test(entry.outputHash)) {
+      errors.push(`Entry ${entryIndex} (${filePath}): Invalid output hash`);
+    }
+
+    // Validate timestamp
+    if (!entry.built) {
+      errors.push(`Entry ${entryIndex} (${filePath}): Missing build timestamp`);
+    } else {
+      const date = new Date(entry.built);
+      if (Number.isNaN(date.getTime())) {
+        errors.push(`Entry ${entryIndex} (${filePath}): Invalid build timestamp: ${entry.built}`);
+      }
+    }
+
+    // Check for very old entries (more than 1 year old)
+    if (entry.built) {
+      const builtDate = new Date(entry.built);
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      if (builtDate < oneYearAgo) {
+        warnings.push(
+          `Entry ${entryIndex} (${filePath}): Very old cache entry (built ${entry.built}). Consider clearing old entries.`,
+        );
+      }
+    }
+
+    entryIndex++;
+  }
+
+  // Check for duplicate file paths (shouldn't happen with Map, but good to verify)
+  const paths = Array.from(cache.entries.keys());
+  const uniquePaths = new Set(paths);
+  if (paths.length !== uniquePaths.size) {
+    errors.push("Duplicate file paths detected in cache entries");
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Repairs corrupted cache by removing invalid entries
+ *
+ * @param cache - Build cache to repair
+ * @returns Repaired cache and repair report
+ */
+export async function repairCache(cache: BuildCache): Promise<{
+  repairedCache: BuildCache;
+  entriesRemoved: number;
+  issues: string[];
+}> {
+  const issues: string[] = [];
+  const validEntries = new Map<string, BuildCacheEntry>();
+  let entriesRemoved = 0;
+
+  // Validate and repair each entry
+  for (const [filePath, entry] of cache.entries) {
+    let isValid = true;
+
+    // Check file path
+    if (!filePath || typeof filePath !== "string") {
+      issues.push(`Removed entry with invalid file path`);
+      isValid = false;
+      entriesRemoved++;
+      continue;
+    }
+
+    // Check hashes
+    if (!entry.sourceHash || !/^[a-f0-9]{64}$/i.test(entry.sourceHash)) {
+      issues.push(`Removed entry for ${filePath}: invalid source hash`);
+      isValid = false;
+    }
+    if (!entry.patchHash || !/^[a-f0-9]{64}$/i.test(entry.patchHash)) {
+      issues.push(`Removed entry for ${filePath}: invalid patch hash`);
+      isValid = false;
+    }
+    if (!entry.outputHash || !/^[a-f0-9]{64}$/i.test(entry.outputHash)) {
+      issues.push(`Removed entry for ${filePath}: invalid output hash`);
+      isValid = false;
+    }
+
+    // Check timestamp
+    if (!entry.built) {
+      issues.push(`Removed entry for ${filePath}: missing timestamp`);
+      isValid = false;
+    } else {
+      const date = new Date(entry.built);
+      if (Number.isNaN(date.getTime())) {
+        issues.push(`Removed entry for ${filePath}: invalid timestamp`);
+        isValid = false;
+      }
+    }
+
+    if (!isValid) {
+      entriesRemoved++;
+    } else {
+      validEntries.set(filePath, entry);
+    }
+  }
+
+  // Repair cache version if needed
+  let configHash = cache.configHash;
+  if (!configHash || typeof configHash !== "string" || !/^[a-f0-9]{64}$/i.test(configHash)) {
+    // Generate a placeholder hash
+    configHash = "0".repeat(64);
+    issues.push("Repaired invalid config hash with placeholder");
+  }
+
+  const repairedCache: BuildCache = {
+    version: 1,
+    configHash,
+    entries: validEntries,
+  };
+
+  if (cache.configHashes) {
+    repairedCache.configHashes = cache.configHashes;
+  }
+  if (cache.groupFilters) {
+    repairedCache.groupFilters = cache.groupFilters;
+  }
+
+  return {
+    repairedCache,
+    entriesRemoved,
+    issues,
+  };
 }
