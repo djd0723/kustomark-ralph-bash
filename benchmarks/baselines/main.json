@@ -1,173 +1,719 @@
 {
-  "timestamp": "2026-01-03T00:00:00.000Z",
+  "timestamp": "2026-01-03T03:45:33.139Z",
   "environment": {
     "platform": "linux",
     "arch": "x64",
-    "bunVersion": "1.0.0",
+    "bunVersion": "1.3.5",
     "cpuCount": 4,
-    "totalMemory": 17179869184
+    "totalMemory": 16772579328
   },
   "results": [
     {
       "operation": "replace",
       "fileCount": 10,
       "complexity": "simple",
-      "runs": 10,
+      "runs": 20,
       "timing": {
-        "mean": 2.5,
-        "median": 2.4,
-        "min": 2.2,
-        "max": 2.8,
-        "p95": 2.7,
-        "p99": 2.8,
-        "stdDev": 0.15
+        "mean": 0.09848,
+        "median": 0.093445,
+        "min": 0.073687,
+        "max": 0.147526,
+        "p95": 0.145021,
+        "p99": 0.147526,
+        "stdDev": 0.021880008059870545
       },
       "memory": {
-        "heapUsed": 1048576,
-        "heapTotal": 2097152,
-        "external": 524288,
-        "rss": 20971520
+        "heapUsed": 0,
+        "heapTotal": 2666496,
+        "external": 347120,
+        "rss": 1038880
       },
       "throughput": {
-        "filesPerSecond": 4000,
-        "operationsPerSecond": 4000,
-        "bytesPerSecond": 2097152
+        "filesPerSecond": 10154.346060113729,
+        "operationsPerSecond": 10154.346060113729,
+        "bytesPerSecond": 42952883.83428107
+      }
+    },
+    {
+      "operation": "replace",
+      "fileCount": 10,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 0.07302785,
+        "median": 0.0731515,
+        "min": 0.035517,
+        "max": 0.115676,
+        "p95": 0.103664,
+        "p99": 0.115676,
+        "stdDev": 0.021558542219442853
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 3223552,
+        "external": 347120,
+        "rss": 1038880
+      },
+      "throughput": {
+        "filesPerSecond": 13693.40600880349,
+        "operationsPerSecond": 13693.40600880349,
+        "bytesPerSecond": 101605072.58532189
+      }
+    },
+    {
+      "operation": "replace",
+      "fileCount": 10,
+      "complexity": "complex",
+      "runs": 20,
+      "timing": {
+        "mean": 0.08827305,
+        "median": 0.0918465,
+        "min": 0.054442,
+        "max": 0.119594,
+        "p95": 0.112621,
+        "p99": 0.119594,
+        "stdDev": 0.017673534033902216
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 3716096,
+        "external": 347120,
+        "rss": 1038880
+      },
+      "throughput": {
+        "filesPerSecond": 11328.48587422775,
+        "operationsPerSecond": 11328.48587422775,
+        "bytesPerSecond": 418576224.5668412
+      }
+    },
+    {
+      "operation": "replace",
+      "fileCount": 50,
+      "complexity": "simple",
+      "runs": 20,
+      "timing": {
+        "mean": 0.1907534,
+        "median": 0.168139,
+        "min": 0.124783,
+        "max": 0.325759,
+        "p95": 0.317012,
+        "p99": 0.325759,
+        "stdDev": 0.056344956614944694
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 6256640,
+        "external": 347120,
+        "rss": 1038880
+      },
+      "throughput": {
+        "filesPerSecond": 5242.370516069438,
+        "operationsPerSecond": 5242.370516069438,
+        "bytesPerSecond": 111085831.2355114
       }
     },
     {
       "operation": "replace",
       "fileCount": 50,
       "complexity": "medium",
-      "runs": 10,
+      "runs": 20,
       "timing": {
-        "mean": 8.5,
-        "median": 8.3,
-        "min": 7.8,
-        "max": 9.2,
-        "p95": 9.0,
-        "p99": 9.2,
-        "stdDev": 0.35
+        "mean": 0.1651519,
+        "median": 0.1477355,
+        "min": 0.122459,
+        "max": 0.381713,
+        "p95": 0.263542,
+        "p99": 0.381713,
+        "stdDev": 0.05808950768761945
       },
       "memory": {
-        "heapUsed": 5242880,
-        "heapTotal": 10485760,
-        "external": 1048576,
-        "rss": 41943040
+        "heapUsed": 0,
+        "heapTotal": 8863744,
+        "external": 347120,
+        "rss": 1038880
       },
       "throughput": {
-        "filesPerSecond": 5882,
-        "operationsPerSecond": 5882,
-        "bytesPerSecond": 10485760
+        "filesPerSecond": 6055.031761669105,
+        "operationsPerSecond": 6055.031761669105,
+        "bytesPerSecond": 224883879.62839058
+      }
+    },
+    {
+      "operation": "replace",
+      "fileCount": 50,
+      "complexity": "complex",
+      "runs": 20,
+      "timing": {
+        "mean": 0.26558555,
+        "median": 0.2645845,
+        "min": 0.254065,
+        "max": 0.288859,
+        "p95": 0.276767,
+        "p99": 0.288859,
+        "stdDev": 0.007806963349952399
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 11388928,
+        "external": 347120,
+        "rss": 1038880
+      },
+      "throughput": {
+        "filesPerSecond": 3765.265090664759,
+        "operationsPerSecond": 3765.265090664759,
+        "bytesPerSecond": 697665968.6492733
+      }
+    },
+    {
+      "operation": "replace",
+      "fileCount": 100,
+      "complexity": "simple",
+      "runs": 20,
+      "timing": {
+        "mean": 0.44393485,
+        "median": 0.4276385,
+        "min": 0.382694,
+        "max": 0.587748,
+        "p95": 0.565346,
+        "p99": 0.587748,
+        "stdDev": 0.04988717035198027
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 16584704,
+        "external": 347120,
+        "rss": 1038880
+      },
+      "throughput": {
+        "filesPerSecond": 2252.5827832620034,
+        "operationsPerSecond": 2252.5827832620034,
+        "bytesPerSecond": 95486984.18247633
+      }
+    },
+    {
+      "operation": "replace",
+      "fileCount": 100,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 0.32258085,
+        "median": 0.2935785,
+        "min": 0.245388,
+        "max": 0.540249,
+        "p95": 0.4923,
+        "p99": 0.540249,
+        "stdDev": 0.08425303255211351
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 21814272,
+        "external": 347120,
+        "rss": 1038880
+      },
+      "throughput": {
+        "filesPerSecond": 3099.9980315012504,
+        "operationsPerSecond": 3099.9980315012504,
+        "bytesPerSecond": 230298853.7602279
       }
     },
     {
       "operation": "replace",
       "fileCount": 100,
       "complexity": "complex",
-      "runs": 10,
+      "runs": 20,
       "timing": {
-        "mean": 18.5,
-        "median": 18.2,
-        "min": 17.5,
-        "max": 20.1,
-        "p95": 19.8,
-        "p99": 20.1,
-        "stdDev": 0.65
+        "mean": 0.77416575,
+        "median": 0.7905125,
+        "min": 0.509281,
+        "max": 1.052676,
+        "p95": 0.835261,
+        "p99": 1.052676,
+        "stdDev": 0.10767074939735258
       },
       "memory": {
-        "heapUsed": 10485760,
-        "heapTotal": 20971520,
-        "external": 2097152,
-        "rss": 83886080
+        "heapUsed": 0,
+        "heapTotal": 22433792,
+        "external": 2246089,
+        "rss": 3440953
       },
       "throughput": {
-        "filesPerSecond": 5405,
-        "operationsPerSecond": 5405,
-        "bytesPerSecond": 20971520
+        "filesPerSecond": 1291.7130472382692,
+        "operationsPerSecond": 1291.7130472382692,
+        "bytesPerSecond": 479153204.5947525
       }
     },
     {
       "operation": "append-to-section",
       "fileCount": 10,
       "complexity": "simple",
-      "runs": 10,
+      "runs": 20,
       "timing": {
-        "mean": 3.2,
-        "median": 3.1,
-        "min": 2.9,
-        "max": 3.6,
-        "p95": 3.5,
-        "p99": 3.6,
-        "stdDev": 0.18
+        "mean": 0.1210706,
+        "median": 0.1286455,
+        "min": 0.061645,
+        "max": 0.247793,
+        "p95": 0.196396,
+        "p99": 0.247793,
+        "stdDev": 0.04640747731928551
       },
       "memory": {
-        "heapUsed": 1310720,
-        "heapTotal": 2621440,
-        "external": 655360,
-        "rss": 22020096
+        "heapUsed": 0,
+        "heapTotal": 22434816,
+        "external": 2246089,
+        "rss": 3440953
       },
       "throughput": {
-        "filesPerSecond": 3125,
-        "operationsPerSecond": 3125,
-        "bytesPerSecond": 1638400
+        "filesPerSecond": 8259.643546823092,
+        "operationsPerSecond": 8259.643546823092,
+        "bytesPerSecond": 34938292.203061685
+      }
+    },
+    {
+      "operation": "append-to-section",
+      "fileCount": 10,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 0.63785445,
+        "median": 0.6831305,
+        "min": 0.335176,
+        "max": 0.907265,
+        "p95": 0.78673,
+        "p99": 0.907265,
+        "stdDev": 0.14906189352731133
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 24500224,
+        "external": 2246089,
+        "rss": 3440953
+      },
+      "throughput": {
+        "filesPerSecond": 1567.7557787673977,
+        "operationsPerSecond": 1567.7557787673977,
+        "bytesPerSecond": 11632747.878454091
+      }
+    },
+    {
+      "operation": "append-to-section",
+      "fileCount": 10,
+      "complexity": "complex",
+      "runs": 20,
+      "timing": {
+        "mean": 1.36680545,
+        "median": 1.2379375,
+        "min": 0.681073,
+        "max": 2.727956,
+        "p95": 2.05535,
+        "p99": 2.727956,
+        "stdDev": 0.5917977371462715
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 30660608,
+        "external": 2409054,
+        "rss": 3707358
+      },
+      "throughput": {
+        "filesPerSecond": 731.633020632161,
+        "operationsPerSecond": 731.633020632161,
+        "bytesPerSecond": 27033108.479337715
+      }
+    },
+    {
+      "operation": "append-to-section",
+      "fileCount": 50,
+      "complexity": "simple",
+      "runs": 20,
+      "timing": {
+        "mean": 0.2614675,
+        "median": 0.2614085,
+        "min": 0.247022,
+        "max": 0.28371,
+        "p95": 0.276968,
+        "p99": 0.28371,
+        "stdDev": 0.009536480018853917
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 30661632,
+        "external": 2409054,
+        "rss": 3707358
+      },
+      "throughput": {
+        "filesPerSecond": 3824.567106810598,
+        "operationsPerSecond": 3824.567106810598,
+        "bytesPerSecond": 81042576.99331658
       }
     },
     {
       "operation": "append-to-section",
       "fileCount": 50,
       "complexity": "medium",
-      "runs": 10,
+      "runs": 20,
       "timing": {
-        "mean": 11.2,
-        "median": 11.0,
-        "min": 10.5,
-        "max": 12.1,
-        "p95": 11.9,
-        "p99": 12.1,
-        "stdDev": 0.42
+        "mean": 1.3597324,
+        "median": 1.0898255,
+        "min": 1.073064,
+        "max": 2.345652,
+        "p95": 2.064577,
+        "p99": 2.345652,
+        "stdDev": 0.3959124473893692
       },
       "memory": {
-        "heapUsed": 6553600,
-        "heapTotal": 13107200,
-        "external": 1310720,
-        "rss": 44040192
+        "heapUsed": 0,
+        "heapTotal": 41705472,
+        "external": 2516600,
+        "rss": 4119192
       },
       "throughput": {
-        "filesPerSecond": 4464,
-        "operationsPerSecond": 4464,
-        "bytesPerSecond": 8192000
+        "filesPerSecond": 735.4388260513613,
+        "operationsPerSecond": 735.4388260513613,
+        "bytesPerSecond": 27314197.99954756
+      }
+    },
+    {
+      "operation": "append-to-section",
+      "fileCount": 50,
+      "complexity": "complex",
+      "runs": 20,
+      "timing": {
+        "mean": 3.8718582,
+        "median": 3.3323005,
+        "min": 3.197333,
+        "max": 6.277006,
+        "p95": 5.978203,
+        "p99": 6.277006,
+        "stdDev": 0.9600263917183528
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 45506560,
+        "external": 2703463,
+        "rss": 5279447
+      },
+      "throughput": {
+        "filesPerSecond": 258.2739212918489,
+        "operationsPerSecond": 258.2739212918489,
+        "bytesPerSecond": 47855574.876166694
+      }
+    },
+    {
+      "operation": "append-to-section",
+      "fileCount": 100,
+      "complexity": "simple",
+      "runs": 20,
+      "timing": {
+        "mean": 0.5406842,
+        "median": 0.5332565,
+        "min": 0.513941,
+        "max": 0.638723,
+        "p95": 0.555918,
+        "p99": 0.638723,
+        "stdDev": 0.025343226127705204
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 45507584,
+        "external": 2703463,
+        "rss": 5279447
+      },
+      "throughput": {
+        "filesPerSecond": 1849.5084561376123,
+        "operationsPerSecond": 1849.5084561376123,
+        "bytesPerSecond": 78400663.45567338
+      }
+    },
+    {
+      "operation": "append-to-section",
+      "fileCount": 100,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 2.3960374,
+        "median": 2.1907625,
+        "min": 2.121473,
+        "max": 3.929821,
+        "p95": 3.430819,
+        "p99": 3.929821,
+        "stdDev": 0.5117884171879431
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 48145408,
+        "external": 2848467,
+        "rss": 6380387
+      },
+      "throughput": {
+        "filesPerSecond": 417.3557557991374,
+        "operationsPerSecond": 417.3557557991374,
+        "bytesPerSecond": 31005359.098317917
+      }
+    },
+    {
+      "operation": "append-to-section",
+      "fileCount": 100,
+      "complexity": "complex",
+      "runs": 20,
+      "timing": {
+        "mean": 6.82554535,
+        "median": 6.6628975,
+        "min": 6.412369,
+        "max": 8.284917,
+        "p95": 7.391716,
+        "p99": 8.284917,
+        "stdDev": 0.4471235122761131
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 48506880,
+        "external": 3359000,
+        "rss": 9044552
+      },
+      "throughput": {
+        "filesPerSecond": 146.5084397981474,
+        "operationsPerSecond": 146.5084397981474,
+        "bytesPerSecond": 54346426.69248399
       }
     },
     {
       "operation": "replace-section",
       "fileCount": 10,
       "complexity": "medium",
-      "runs": 10,
+      "runs": 20,
       "timing": {
-        "mean": 4.5,
-        "median": 4.4,
-        "min": 4.1,
-        "max": 5.0,
-        "p95": 4.9,
-        "p99": 5.0,
-        "stdDev": 0.22
+        "mean": 0.2223684,
+        "median": 0.21951,
+        "min": 0.210172,
+        "max": 0.246851,
+        "p95": 0.2463,
+        "p99": 0.246851,
+        "stdDev": 0.011355460362310285
       },
       "memory": {
-        "heapUsed": 1572864,
-        "heapTotal": 3145728,
-        "external": 786432,
-        "rss": 24117248
+        "heapUsed": 0,
+        "heapTotal": 48506880,
+        "external": 3359000,
+        "rss": 9044552
       },
       "throughput": {
-        "filesPerSecond": 2222,
-        "operationsPerSecond": 2222,
-        "bytesPerSecond": 1146880
+        "filesPerSecond": 4497.041845873784,
+        "operationsPerSecond": 4497.041845873784,
+        "bytesPerSecond": 33368050.49638348
+      }
+    },
+    {
+      "operation": "replace-section",
+      "fileCount": 10,
+      "complexity": "complex",
+      "runs": 20,
+      "timing": {
+        "mean": 0.66880345,
+        "median": 0.6725315,
+        "min": 0.64229,
+        "max": 0.686613,
+        "p95": 0.681764,
+        "p99": 0.686613,
+        "stdDev": 0.011994600570569242
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 48506880,
+        "external": 3369587,
+        "rss": 9205091
+      },
+      "throughput": {
+        "filesPerSecond": 1495.2075979871217,
+        "operationsPerSecond": 1495.2075979871217,
+        "bytesPerSecond": 55246425.53802616
+      }
+    },
+    {
+      "operation": "replace-section",
+      "fileCount": 50,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 1.2580195,
+        "median": 1.128227,
+        "min": 1.094775,
+        "max": 2.090195,
+        "p95": 1.850708,
+        "p99": 2.090195,
+        "stdDev": 0.2822847604203068
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 49014784,
+        "external": 3431408,
+        "rss": 9573120
+      },
+      "throughput": {
+        "filesPerSecond": 794.9002380328764,
+        "operationsPerSecond": 794.9002380328764,
+        "bytesPerSecond": 29522594.840541027
+      }
+    },
+    {
+      "operation": "replace-section",
+      "fileCount": 50,
+      "complexity": "complex",
+      "runs": 20,
+      "timing": {
+        "mean": 3.42760865,
+        "median": 3.3420335,
+        "min": 3.276592,
+        "max": 4.039537,
+        "p95": 3.995905,
+        "p99": 4.039537,
+        "stdDev": 0.22849596490950885
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 49358848,
+        "external": 3622984,
+        "rss": 10730808
+      },
+      "throughput": {
+        "filesPerSecond": 291.74859271054765,
+        "operationsPerSecond": 291.74859271054765,
+        "bytesPerSecond": 54058096.74333737
+      }
+    },
+    {
+      "operation": "replace-regex",
+      "fileCount": 10,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 0.02072975,
+        "median": 0.017938,
+        "min": 0.014798,
+        "max": 0.042249,
+        "p95": 0.041227,
+        "p99": 0.042249,
+        "stdDev": 0.0075472072309894864
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 49358848,
+        "external": 3622984,
+        "rss": 10730808
+      },
+      "throughput": {
+        "filesPerSecond": 48239.84852687563,
+        "operationsPerSecond": 48239.84852687563,
+        "bytesPerSecond": 357939676.0694172
+      }
+    },
+    {
+      "operation": "replace-regex",
+      "fileCount": 50,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 0.07710195,
+        "median": 0.0703215,
+        "min": 0.061515,
+        "max": 0.109624,
+        "p95": 0.096741,
+        "p99": 0.109624,
+        "stdDev": 0.013408056139780291
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 49358848,
+        "external": 3622984,
+        "rss": 10730808
+      },
+      "throughput": {
+        "filesPerSecond": 12969.840581204498,
+        "operationsPerSecond": 12969.840581204498,
+        "bytesPerSecond": 481699879.185935
+      }
+    },
+    {
+      "operation": "replace-regex",
+      "fileCount": 100,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 0.13890260000000001,
+        "median": 0.136715,
+        "min": 0.124813,
+        "max": 0.182621,
+        "p95": 0.15494,
+        "p99": 0.182621,
+        "stdDev": 0.0128182982544486
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 49358848,
+        "external": 3622984,
+        "rss": 10730808
+      },
+      "throughput": {
+        "filesPerSecond": 7199.28928616167,
+        "operationsPerSecond": 7199.28928616167,
+        "bytesPerSecond": 534835201.0689505
+      }
+    },
+    {
+      "operation": "set-frontmatter",
+      "fileCount": 10,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 0.194643,
+        "median": 0.1982855,
+        "min": 0.153166,
+        "max": 0.2843,
+        "p95": 0.223918,
+        "p99": 0.2843,
+        "stdDev": 0.02983970923785954
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 49490944,
+        "external": 3622984,
+        "rss": 10730808
+      },
+      "throughput": {
+        "filesPerSecond": 5137.61090817548,
+        "operationsPerSecond": 5137.61090817548,
+        "bytesPerSecond": 38121072.93866206
+      }
+    },
+    {
+      "operation": "set-frontmatter",
+      "fileCount": 50,
+      "complexity": "medium",
+      "runs": 20,
+      "timing": {
+        "mean": 0.51629445,
+        "median": 0.4948345,
+        "min": 0.42811,
+        "max": 0.644815,
+        "p95": 0.640217,
+        "p99": 0.644815,
+        "stdDev": 0.0668167612081542
+      },
+      "memory": {
+        "heapUsed": 0,
+        "heapTotal": 50834432,
+        "external": 3622984,
+        "rss": 10730808
+      },
+      "throughput": {
+        "filesPerSecond": 1936.879236257527,
+        "operationsPerSecond": 1936.879236257527,
+        "bytesPerSecond": 71935694.83460456
       }
     }
   ],
   "summary": {
-    "totalDuration": 150.5,
-    "totalOperations": 1800,
-    "averageThroughput": 4183
+    "totalDuration": 725.1673109999999,
+    "totalOperations": 26000,
+    "averageThroughput": 5823.564845886676
   }
 }
