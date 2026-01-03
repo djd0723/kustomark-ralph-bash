@@ -121,7 +121,6 @@ export {
   getDefaultCacheDir,
   listGitCache,
 } from "./git-fetcher.js";
-
 // Export git URL parser functions
 export { isGitUrl, parseGitUrl } from "./git-url-parser.js";
 // Export HTTP archive fetcher functions and types
@@ -156,6 +155,7 @@ export {
   applyAppendToSection,
   applyMergeFrontmatter,
   applyPatches,
+  applyPatchesWithPlugins,
   applyPrependToSection,
   applyRemoveFrontmatter,
   applyRemoveSection,
@@ -171,6 +171,27 @@ export {
 } from "./patch-engine.js";
 // Export patch inheritance functions
 export { resolveInheritance } from "./patch-inheritance.js";
+// Export plugin error classes
+export {
+  createPluginLoadErrorMessage,
+  PluginChecksumError,
+  PluginExecutionError,
+  PluginLoadError,
+  PluginNotFoundError,
+  PluginParamValidationError,
+  PluginTimeoutError,
+  PluginValidationError,
+  validatePluginInterface,
+} from "./plugin-errors.js";
+// Export plugin executor functions
+export { createPluginContext, executePlugin } from "./plugin-executor.js";
+// Export plugin loader functions
+export {
+  calculatePluginHash,
+  createPluginRegistry,
+  loadPlugin,
+  resolvePluginSource,
+} from "./plugin-loader.js";
 // Export preview generator functions and types
 export {
   type CharDiff,

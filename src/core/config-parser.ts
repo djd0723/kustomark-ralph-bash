@@ -394,6 +394,164 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
     }
   }
 
+  // Validate plugins configuration
+  if (config.plugins !== undefined) {
+    if (!Array.isArray(config.plugins)) {
+      errors.push({
+        field: "plugins",
+        message: "plugins must be an array",
+      });
+    } else {
+      // Track plugin names to detect duplicates
+      const pluginNames = new Set<string>();
+
+      config.plugins.forEach((plugin: unknown, index: number) => {
+        const prefix = `plugins[${index}]`;
+
+        if (!plugin || typeof plugin !== "object") {
+          errors.push({
+            field: prefix,
+            message: "plugin must be an object",
+          });
+          return;
+        }
+
+        const p = plugin as Record<string, unknown>;
+
+        // Validate name field
+        if (!p.name) {
+          errors.push({
+            field: `${prefix}.name`,
+            message: "plugin name is required",
+          });
+        } else if (typeof p.name !== "string") {
+          errors.push({
+            field: `${prefix}.name`,
+            message: "plugin name must be a string",
+          });
+        } else {
+          // Check for duplicate names
+          if (pluginNames.has(p.name)) {
+            errors.push({
+              field: `${prefix}.name`,
+              message: `duplicate plugin name "${p.name}"`,
+            });
+          } else {
+            pluginNames.add(p.name);
+          }
+
+          // Validate name format (alphanumeric, dashes, underscores)
+          if (!/^[a-zA-Z0-9_-]+$/.test(p.name)) {
+            errors.push({
+              field: `${prefix}.name`,
+              message:
+                "plugin name must contain only alphanumeric characters, dashes, and underscores",
+            });
+          }
+        }
+
+        // Validate source field
+        if (!p.source) {
+          errors.push({
+            field: `${prefix}.source`,
+            message: "plugin source is required",
+          });
+        } else if (typeof p.source !== "string") {
+          errors.push({
+            field: `${prefix}.source`,
+            message: "plugin source must be a string",
+          });
+        } else if (p.source.trim() === "") {
+          errors.push({
+            field: `${prefix}.source`,
+            message: "plugin source cannot be empty",
+          });
+        }
+
+        // Validate version field (if present)
+        if (p.version !== undefined) {
+          if (typeof p.version !== "string") {
+            errors.push({
+              field: `${prefix}.version`,
+              message: "plugin version must be a string",
+            });
+          } else {
+            // Validate semver format (basic check)
+            const semverRegex = /^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$/;
+            if (!semverRegex.test(p.version)) {
+              warnings.push({
+                field: `${prefix}.version`,
+                message: `plugin version "${p.version}" does not follow semver format (e.g., 1.0.0)`,
+              });
+            }
+          }
+        }
+
+        // Validate checksum field (if present)
+        if (p.checksum !== undefined) {
+          if (typeof p.checksum !== "string") {
+            errors.push({
+              field: `${prefix}.checksum`,
+              message: "plugin checksum must be a string",
+            });
+          } else if (p.checksum.trim() === "") {
+            errors.push({
+              field: `${prefix}.checksum`,
+              message: "plugin checksum cannot be empty",
+            });
+          } else {
+            // Validate checksum format (sha256:hash or just hash)
+            const checksumPattern = /^(sha256:)?[a-fA-F0-9]{64}$/;
+            if (!checksumPattern.test(p.checksum)) {
+              errors.push({
+                field: `${prefix}.checksum`,
+                message:
+                  "plugin checksum must be a SHA256 hash (64 hex characters), optionally prefixed with 'sha256:'",
+              });
+            }
+          }
+        }
+
+        // Validate timeout field (if present)
+        if (p.timeout !== undefined) {
+          if (typeof p.timeout !== "number") {
+            errors.push({
+              field: `${prefix}.timeout`,
+              message: "plugin timeout must be a number",
+            });
+          } else if (p.timeout <= 0) {
+            errors.push({
+              field: `${prefix}.timeout`,
+              message: "plugin timeout must be greater than 0",
+            });
+          } else if (p.timeout > 300000) {
+            warnings.push({
+              field: `${prefix}.timeout`,
+              message: `plugin timeout of ${p.timeout}ms is very long (>5 minutes)`,
+            });
+          }
+        }
+      });
+
+      // Validate that plugin patches reference valid plugins
+      if (config.patches && pluginNames.size > 0) {
+        config.patches.forEach((patch: unknown, patchIndex: number) => {
+          if (patch && typeof patch === "object") {
+            const p = patch as Record<string, unknown>;
+            if (p.op === "plugin" && p.plugin) {
+              if (typeof p.plugin === "string" && !pluginNames.has(p.plugin)) {
+                errors.push({
+                  field: `patches[${patchIndex}].plugin`,
+                  message: `plugin "${p.plugin}" is not defined in plugins array`,
+                });
+              }
+            }
+          }
+        });
+      }
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -460,6 +618,8 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "remove-table-row",
     "add-table-column",
     "remove-table-column",
+    "exec",
+    "plugin",
   ];
 
   if (!validOps.includes(p.op as string)) {

@@ -2596,6 +2596,89 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            {
+              type: "object",
+              required: ["op", "plugin"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "plugin",
+                  description: "Execute a custom plugin to transform content",
+                },
+                plugin: {
+                  type: "string",
+                  description:
+                    "Name of the plugin to execute (must be defined in the plugins array)",
+                },
+                params: {
+                  type: "object",
+                  description: "Parameters to pass to the plugin",
+                  additionalProperties: true,
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this specific patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
           ],
         },
       },
@@ -2685,6 +2768,42 @@ export function generateSchema(): object {
           },
         },
         additionalProperties: false,
+      },
+      plugins: {
+        type: "array",
+        description: "Plugin configurations for custom content transformations",
+        items: {
+          type: "object",
+          required: ["name", "source"],
+          properties: {
+            name: {
+              type: "string",
+              description: "Unique name for the plugin (alphanumeric, dashes, underscores)",
+              pattern: "^[a-zA-Z0-9_-]+$",
+            },
+            source: {
+              type: "string",
+              description: "Plugin source path (local file or npm package name)",
+            },
+            version: {
+              type: "string",
+              description: "Plugin version (semver format)",
+              pattern: "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?(\\+[a-zA-Z0-9.-]+)?$",
+            },
+            checksum: {
+              type: "string",
+              description:
+                "SHA256 checksum of plugin source for verification (optional 'sha256:' prefix)",
+              pattern: "^(sha256:)?[a-fA-F0-9]{64}$",
+            },
+            timeout: {
+              type: "number",
+              description: "Plugin execution timeout in milliseconds (default: 30000)",
+              minimum: 1,
+            },
+          },
+          additionalProperties: false,
+        },
       },
     },
     additionalProperties: false,

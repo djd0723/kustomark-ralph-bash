@@ -15,9 +15,13 @@ import { evaluateCondition } from "./condition-evaluator.js";
 import { extractSnippet, findFailurePosition, findSimilarContent, PatchError } from "./errors.js";
 import { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
 import { resolveInheritance } from "./patch-inheritance.js";
+import { PluginNotFoundError } from "./plugin-errors.js";
+import { createPluginContext, executePlugin } from "./plugin-executor.js";
+import type { PluginRegistry } from "./plugin-types.js";
 import { generatePatchSuggestions } from "./suggestion-engine.js";
 import { findRowIndex, findTable, getColumnIndex, serializeTable } from "./table-parser.js";
 import type {
+  KustomarkConfig,
   MarkdownSection,
   OnNoMatchStrategy,
   PatchOperation,
@@ -1991,6 +1995,13 @@ export async function applySinglePatch(
       result = await applyExec(content, patch.command, patch.timeout);
       break;
 
+    case "plugin":
+      // Plugin operation requires a registry to be passed
+      // This will be handled by applyPatchesWithPlugins
+      throw new Error(
+        `Plugin operation requires a plugin registry. Use applyPatchesWithPlugins() instead of applySinglePatch().`,
+      );
+
     case "copy-file":
     case "rename-file":
     case "delete-file":
@@ -2109,6 +2120,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `remove-table-column '${patch.column}' from table '${patch.table}'`;
     case "exec":
       return `exec '${patch.command}'`;
+    case "plugin":
+      return `plugin '${patch.plugin}'`;
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":
@@ -2120,6 +2133,48 @@ function getPatchDescription(patch: PatchOperation): string {
     default:
       return "unknown patch";
   }
+}
+
+/**
+ * Apply a plugin patch operation
+ *
+ * @param content - The content to patch
+ * @param pluginName - Name of the plugin to execute
+ * @param params - Parameters to pass to the plugin
+ * @param file - Absolute path to the file being processed
+ * @param config - Kustomark configuration
+ * @param relativePath - Relative path from output directory
+ * @param registry - Plugin registry
+ * @returns Promise resolving to object with patched content and count
+ *
+ * @throws {PluginNotFoundError} If plugin is not found in registry
+ * @throws {PluginExecutionError} If plugin execution fails
+ * @throws {PluginTimeoutError} If plugin exceeds timeout
+ */
+async function applyPluginPatch(
+  content: string,
+  pluginName: string,
+  params: Record<string, unknown>,
+  file: string,
+  config: Readonly<KustomarkConfig>,
+  relativePath: string,
+  registry: PluginRegistry,
+): Promise<{ content: string; count: number }> {
+  // Look up plugin in registry
+  const loadedPlugin = registry.get(pluginName);
+
+  if (!loadedPlugin) {
+    const availablePlugins = Array.from(registry.keys());
+    throw new PluginNotFoundError(pluginName, availablePlugins);
+  }
+
+  // Create plugin context
+  const context = createPluginContext(file, config, relativePath);
+
+  // Execute plugin
+  const result = await executePlugin(loadedPlugin, content, params ?? {}, context);
+
+  return { content: result, count: 1 };
 }
 
 /**
@@ -2224,6 +2279,142 @@ export async function applyPatches(
     // Collect validation errors from per-patch validation
     if (result.validationErrors.length > 0) {
       validationErrors.push(...result.validationErrors);
+    }
+  }
+
+  return {
+    content: currentContent,
+    applied: appliedCount,
+    warnings,
+    validationErrors,
+    conditionSkipped: conditionSkippedCount,
+  };
+}
+
+/**
+ * Apply multiple patches to content with plugin support.
+ *
+ * This is an enhanced version of applyPatches() that supports plugin patch operations.
+ * It requires a plugin registry and file context information for plugin execution.
+ *
+ * @param content - The initial content to patch
+ * @param patches - Array of patch operations to apply in order
+ * @param file - Absolute path to the file being processed
+ * @param config - Kustomark configuration
+ * @param relativePath - Relative path from output directory to file
+ * @param registry - Plugin registry (can be empty Map if no plugins are used)
+ * @param defaultOnNoMatch - Default behavior when patches don't match: 'warn' (default), 'error', or 'skip'
+ * @param verbose - Whether to log verbose messages to console (for condition skipping)
+ * @returns Promise resolving to PatchResult object
+ *
+ * @example
+ * ```typescript
+ * const registry = await createPluginRegistry(config.plugins || [], configDir);
+ * const result = await applyPatchesWithPlugins(
+ *   content,
+ *   patches,
+ *   '/project/docs/api.md',
+ *   config,
+ *   'api.md',
+ *   registry
+ * );
+ * ```
+ */
+export async function applyPatchesWithPlugins(
+  content: string,
+  patches: PatchOperation[],
+  file: string,
+  config: Readonly<KustomarkConfig>,
+  relativePath: string,
+  registry: PluginRegistry,
+  defaultOnNoMatch: OnNoMatchStrategy = "warn",
+  verbose = false,
+): Promise<PatchResult> {
+  // Resolve inheritance before applying patches
+  const resolvedPatches = resolveInheritance(patches);
+
+  let currentContent = content;
+  let appliedCount = 0;
+  let conditionSkippedCount = 0;
+  const warnings: ValidationWarning[] = [];
+  const validationErrors: ValidationError[] = [];
+
+  for (const patch of resolvedPatches) {
+    // Handle plugin patches specially
+    if (patch.op === "plugin") {
+      // Check condition if present
+      if (patch.when) {
+        const conditionMet = evaluateCondition(currentContent, patch.when);
+        if (!conditionMet) {
+          if (verbose) {
+            const patchDesc = getPatchDescription(patch);
+            console.log(`Skipping patch '${patchDesc}' due to condition not being met`);
+          }
+          conditionSkippedCount++;
+          continue;
+        }
+      }
+
+      try {
+        const result = await applyPluginPatch(
+          currentContent,
+          patch.plugin,
+          patch.params ?? {},
+          file,
+          config,
+          relativePath,
+          registry,
+        );
+        currentContent = result.content;
+        appliedCount++;
+
+        // Run per-patch validation if specified
+        if (patch.validate && result.count > 0) {
+          const patchDesc = getPatchDescription(patch);
+
+          if (patch.validate.notContains !== undefined) {
+            const isValid = validateNotContains(result.content, patch.validate.notContains);
+            if (!isValid) {
+              validationErrors.push({
+                message: `Patch '${patchDesc}' validation failed: content contains forbidden pattern '${patch.validate.notContains}'`,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        // Handle plugin errors
+        const onNoMatch = patch.onNoMatch ?? defaultOnNoMatch;
+        const patchDesc = getPatchDescription(patch);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+
+        if (onNoMatch === "error") {
+          throw error;
+        }
+        if (onNoMatch === "warn") {
+          warnings.push({
+            message: `${patchDesc}: ${errorMsg}`,
+          });
+        }
+        // 'skip' - no warning or error
+      }
+    } else {
+      // Use regular applySinglePatch for non-plugin patches
+      const result = await applySinglePatch(currentContent, patch, defaultOnNoMatch, verbose);
+      currentContent = result.content;
+
+      if (result.conditionSkipped) {
+        conditionSkippedCount++;
+      } else if (result.count > 0) {
+        appliedCount++;
+      }
+
+      if (result.warning) {
+        warnings.push(result.warning);
+      }
+
+      if (result.validationErrors.length > 0) {
+        validationErrors.push(...result.validationErrors);
+      }
     }
   }
 

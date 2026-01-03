@@ -6,6 +6,188 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 ## Recent Enhancements
 
+**2026-01-02 (Plugin System - User-Defined Patch Operations - COMPLETE!):**
+- ✅ **NEW FEATURE**: Complete plugin system allowing user-defined patch operations
+- ✅ **COMPREHENSIVE TESTING**: 77 new tests with 149 assertions (100% pass rate)
+- ✅ **DOCUMENTATION**: Complete plugin authoring guide and 5 production-ready examples
+- ✅ **Implementation**: Full plugin infrastructure in `/home/dex/kustomark-ralph-bash/src/core/plugin-*.ts`
+
+**Plugin System Features:**
+
+1. **Core Plugin Infrastructure**
+   - **Type Definitions** (`plugin-types.ts`): Complete TypeScript interfaces for plugins
+     - `Plugin` interface: name, version, apply(), validate(), description, params
+     - `PluginContext`: file, config, env, relativePath
+     - `PluginFunction`: sync/async transformation function
+     - `PluginConfig`: plugin configuration in kustomark.yaml
+     - `PluginRegistry`: Map for O(1) plugin lookup
+   - **Error Handling** (`plugin-errors.ts`): 7 custom error classes
+     - PluginLoadError, PluginValidationError, PluginExecutionError
+     - PluginTimeoutError, PluginNotFoundError, PluginParamValidationError, PluginChecksumError
+     - Detailed error messages with suggestions and context
+   - **Plugin Loader** (`plugin-loader.ts`): Discovery and loading
+     - Resolves local paths (./plugins/my-plugin.js) and npm packages (kustomark-plugin-*)
+     - SHA256 hash calculation for cache invalidation
+     - Checksum verification for security
+     - Dynamic import() supports both ESM and CommonJS
+   - **Plugin Executor** (`plugin-executor.ts`): Execution with timeout
+     - Default 30s timeout with configurable override
+     - Promise.race() for timeout enforcement
+     - Immutable context creation with filtered environment variables
+     - Handles both synchronous and asynchronous plugins
+
+2. **Integration with Existing Systems**
+   - **Patch Engine** (`patch-engine.ts`): New `plugin` patch operation
+     - `applyPluginPatch()` function for plugin execution
+     - `applyPatchesWithPlugins()` for plugin-aware patch application
+     - Plugin validation before execution
+     - Error propagation with file context
+   - **Config Parser** (`config-parser.ts`): Plugin validation
+     - Validates `plugins` array in kustomark.yaml
+     - Checks for duplicate plugin names
+     - Validates semver version format
+     - Validates SHA256 checksum format
+     - Ensures plugin patches reference valid plugins
+   - **Schema** (`schema.ts`): JSON schemas for plugins
+     - Schema for `plugins` field with all validation rules
+     - Schema for `plugin` patch operation
+   - **CLI** (`cli/index.ts`): Plugin registry creation and passing
+     - Loads plugins after config validation
+     - Creates registry and passes to patch engine
+     - Graceful error handling for plugin failures
+
+3. **Testing Infrastructure** (77 tests, 149 assertions)
+   - **Plugin Loader Tests** (`tests/core/plugin-loader.test.ts` - 27 tests)
+     - Plugin source resolution (relative, absolute, npm)
+     - SHA256 hash calculation and verification
+     - Plugin loading and interface validation
+     - Checksum verification
+     - Registry creation and duplicate detection
+   - **Plugin Executor Tests** (`tests/core/plugin-executor.test.ts` - 27 tests)
+     - Context creation with environment filtering
+     - Synchronous and asynchronous execution
+     - Parameter validation
+     - Timeout enforcement
+     - Error handling
+   - **Plugin Integration Tests** (`tests/core/plugin-integration.test.ts` - 23 tests)
+     - End-to-end config parsing with plugins
+     - Plugin patch operation integration
+     - Error propagation with context
+     - Complex workflows and edge cases
+
+4. **Test Fixtures** (8 plugins)
+   - **simple-plugin.js**: Basic synchronous plugin
+   - **async-plugin.js**: Async plugin with delay
+   - **word-counter.js**: Word/character counting
+   - **toc-generator.js**: Table of contents generation
+   - **error-plugin.js**: Error throwing for testing
+   - **invalid-interface.js**: Missing exports for validation
+   - **validator-plugin.js**: Parameter validation
+   - **timeout-plugin.js**: Timeout enforcement
+
+5. **Production Examples** (5 plugins, 1,104 lines)
+   - **toc-generator.js** (210 lines): Generates TOC from headers
+     - Configurable depth, title, position
+     - Smart anchor generation
+   - **word-counter.js** (250 lines): Word/char count statistics
+     - Reading time calculation
+     - Multiple output formats (markdown, HTML, badges)
+   - **link-validator.js** (231 lines): Validates internal links
+     - Checks for broken references
+     - Optional build failure on errors
+   - **code-formatter.js** (181 lines): Formats code blocks
+     - Line numbers, language labels
+     - Copy button hints
+   - **frontmatter-enhancer.js** (232 lines): Auto-populates frontmatter
+     - Word count, reading time, dates
+     - File information metadata
+
+6. **Documentation** (2 files, 1,073 lines)
+   - **docs/plugins.md** (830 lines): Complete plugin guide
+     - Security model and best practices
+     - API reference with TypeScript types
+     - 5 working examples
+     - Troubleshooting guide
+   - **examples/plugins/README.md** (243 lines): Plugin descriptions
+     - Usage patterns and examples
+     - Customization guide
+     - Testing guidelines
+
+**Files Created:**
+- `/home/dex/kustomark-ralph-bash/src/core/plugin-types.ts` (311 lines)
+- `/home/dex/kustomark-ralph-bash/src/core/plugin-errors.ts` (282 lines)
+- `/home/dex/kustomark-ralph-bash/src/core/plugin-loader.ts` (241 lines)
+- `/home/dex/kustomark-ralph-bash/src/core/plugin-executor.ts` (150 lines)
+- `/home/dex/kustomark-ralph-bash/tests/core/plugin-loader.test.ts` (352 lines)
+- `/home/dex/kustomark-ralph-bash/tests/core/plugin-executor.test.ts` (597 lines)
+- `/home/dex/kustomark-ralph-bash/tests/core/plugin-integration.test.ts` (607 lines)
+- `/home/dex/kustomark-ralph-bash/tests/fixtures/plugins/*.js` (8 files, 383 lines)
+- `/home/dex/kustomark-ralph-bash/examples/plugins/*.js` (5 files, 1,104 lines)
+- `/home/dex/kustomark-ralph-bash/docs/plugins.md` (830 lines)
+- `/home/dex/kustomark-ralph-bash/examples/plugins/README.md` (243 lines)
+
+**Files Modified:**
+- `/home/dex/kustomark-ralph-bash/src/core/types.ts` - Added PluginPatch and PluginConfig
+- `/home/dex/kustomark-ralph-bash/src/core/patch-engine.ts` - Integrated plugin patches
+- `/home/dex/kustomark-ralph-bash/src/core/config-parser.ts` - Added plugin validation
+- `/home/dex/kustomark-ralph-bash/src/core/schema.ts` - Added plugin schemas
+- `/home/dex/kustomark-ralph-bash/src/cli/index.ts` - Added plugin loading
+- `/home/dex/kustomark-ralph-bash/src/core/index.ts` - Exported plugin APIs
+
+**Testing Results:**
+- ✅ All 3,368 tests passing (77 new plugin tests) ✓
+- ✅ All linting checks passing (`bun check`) ✓
+- ✅ TypeScript compilation clean ✓
+- ✅ 11,025 expect() calls successful (149 new assertions)
+- ✅ Zero breaking changes - full backward compatibility maintained
+
+**Configuration Example:**
+```yaml
+apiVersion: kustomark/v1
+kind: Kustomization
+
+plugins:
+  - name: toc-generator
+    source: ./plugins/toc.js
+  - name: link-checker
+    source: kustomark-plugin-link-checker
+    version: ^1.0.0
+
+resources:
+  - docs/**/*.md
+
+patches:
+  - op: plugin
+    plugin: toc-generator
+    params:
+      maxDepth: 3
+      title: "Table of Contents"
+    include: "**/*.md"
+```
+
+**Security Model:**
+- **Trust-based**: Plugins have full system access (like `exec` operation)
+- **Timeout Enforcement**: Default 30s, configurable per-plugin
+- **Checksum Verification**: Optional SHA256 checksums for plugin files
+- **Interface Validation**: Ensures plugins export required fields
+- **Parameter Validation**: Optional plugin-provided validation functions
+- **Error Isolation**: Plugin errors don't crash the build
+
+**Benefits:**
+1. **Extensibility**: Users can create custom transformations without modifying core
+2. **Reusability**: Plugins can be shared via npm packages
+3. **Type Safety**: Full TypeScript support for plugin authoring
+4. **Performance**: Plugin loading is cached for fast builds
+5. **Developer Experience**: Comprehensive documentation and examples
+6. **Maintainability**: Plugins isolate complex logic from core codebase
+7. **Ecosystem**: Opens door for community-contributed plugins
+
+**Status:** Plugin System COMPLETE! ✅
+
+The plugin system is now production-ready with comprehensive test coverage, documentation, and examples. Users can create custom patch operations as local files or publishable npm packages, extending kustomark's functionality without modifying the core codebase.
+
+---
+
 **2026-01-02 (Template System Expansion - 4 New Built-in Templates - COMPLETE!):**
 - ✅ **NEW TEMPLATES**: Implemented 4 high-value production-ready templates
 - ✅ **COMPREHENSIVE TESTING**: 36 new tests with 225 assertions (100% pass rate)

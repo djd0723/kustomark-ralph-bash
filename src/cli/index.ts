@@ -54,7 +54,12 @@ import {
   listHttpCache,
 } from "../core/http-fetcher.js";
 import { findLockEntry, loadLockFile, saveLockFile } from "../core/lock-file.js";
-import { applyPatches as coreApplyPatches } from "../core/patch-engine.js";
+import {
+  applyPatches as coreApplyPatches,
+  applyPatchesWithPlugins as coreApplyPatchesWithPlugins,
+} from "../core/patch-engine.js";
+import { createPluginRegistry } from "../core/plugin-loader.js";
+import type { PluginRegistry } from "../core/plugin-types.js";
 import { resolveResources as coreResolveResources } from "../core/resource-resolver.js";
 import { generateSchema } from "../core/schema.js";
 import { runTestSuite } from "../core/test-runner.js";
@@ -1013,6 +1018,9 @@ async function applyPatches(
   patches: PatchOperation[],
   onNoMatch: OnNoMatchStrategy,
   options: CLIOptions,
+  config: KustomarkConfig,
+  outputDir: string,
+  pluginRegistry: PluginRegistry,
   progressReporter?: ReturnType<typeof createProgressReporter>,
 ): Promise<{
   resources: Map<string, string>;
@@ -1061,7 +1069,29 @@ async function applyPatches(
 
     // Apply all applicable patches using the core patch engine
     const verbose = options.verbosity >= 2;
-    const result = await coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
+
+    // Check if any patch uses plugins
+    const hasPluginPatches = applicablePatches.some((patch) => patch.op === "plugin");
+
+    // Calculate relative path from output directory
+    const absoluteFilePath = isAbsolute(filePath) ? filePath : resolve(filePath);
+    const absoluteOutputDir = isAbsolute(outputDir) ? outputDir : resolve(outputDir);
+    const relativePath = relative(absoluteOutputDir, absoluteFilePath);
+
+    // Use appropriate apply function
+    const result = hasPluginPatches
+      ? await coreApplyPatchesWithPlugins(
+          content,
+          applicablePatches,
+          absoluteFilePath,
+          config,
+          relativePath,
+          pluginRegistry,
+          onNoMatch,
+          verbose,
+        )
+      : await coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
+
     patchedResources.set(filePath, result.content);
     totalPatchesApplied += result.applied;
 
@@ -1143,6 +1173,9 @@ async function applyPatchesParallel(
   patches: PatchOperation[],
   onNoMatch: OnNoMatchStrategy,
   options: CLIOptions,
+  config: KustomarkConfig,
+  outputDir: string,
+  pluginRegistry: PluginRegistry,
   progressReporter?: ReturnType<typeof createProgressReporter>,
 ): Promise<{
   resources: Map<string, string>;
@@ -1200,7 +1233,28 @@ async function applyPatchesParallel(
 
         // Apply all applicable patches sequentially for this file
         const verbose = options.verbosity >= 2;
-        const result = await coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
+
+        // Check if any patch uses plugins
+        const hasPluginPatches = applicablePatches.some((patch) => patch.op === "plugin");
+
+        // Calculate relative path from output directory
+        const absoluteFilePath = isAbsolute(filePath) ? filePath : resolve(filePath);
+        const absoluteOutputDir = isAbsolute(outputDir) ? outputDir : resolve(outputDir);
+        const relativePath = relative(absoluteOutputDir, absoluteFilePath);
+
+        // Use appropriate apply function
+        const result = hasPluginPatches
+          ? await coreApplyPatchesWithPlugins(
+              content,
+              applicablePatches,
+              absoluteFilePath,
+              config,
+              relativePath,
+              pluginRegistry,
+              onNoMatch,
+              verbose,
+            )
+          : await coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
 
         // Calculate skipped patches (patches that didn't match + condition-skipped patches)
         const skipped = applicablePatches.length - result.applied - result.conditionSkipped;
@@ -1926,6 +1980,37 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       return 1;
     }
 
+    // Load plugins if configured
+    let pluginRegistry: PluginRegistry = new Map();
+    if (config.plugins && config.plugins.length > 0) {
+      try {
+        log(`Loading ${config.plugins.length} plugin(s)...`, 2, options);
+        pluginRegistry = await createPluginRegistry(config.plugins, basePath);
+        log(`Successfully loaded ${pluginRegistry.size} plugin(s)`, 2, options);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        if (options.format === "json") {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                filesWritten: 0,
+                patchesApplied: 0,
+                warnings: [],
+                validationErrors: [],
+                errors: [{ field: "plugins", message: `Failed to load plugins: ${errorMsg}` }],
+              },
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.error(`Error: Failed to load plugins: ${errorMsg}`);
+        }
+        return 1;
+      }
+    }
+
     // Load lock file
     let lockFile: LockFile | null = null;
     const lockEntries: LockFileEntry[] = [];
@@ -2140,6 +2225,9 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         )
       : processedResources;
 
+    // Calculate output directory for plugin context
+    const outputDir = resolve(basePath, config.output ?? ".");
+
     log(
       `Applying content patches${options.incremental ? ` to ${resourcesToProcess.size} file(s)` : ""}...`,
       2,
@@ -2158,6 +2246,9 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           contentOps,
           config.onNoMatch || "warn",
           options,
+          config,
+          outputDir,
+          pluginRegistry,
           progress,
         )
       : await applyPatches(
@@ -2165,6 +2256,9 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
           contentOps,
           config.onNoMatch || "warn",
           options,
+          config,
+          outputDir,
+          pluginRegistry,
           progress,
         );
 
@@ -2199,7 +2293,6 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
     }
 
     // Write output files
-    const outputDir = resolve(basePath, config.output ?? ".");
     if (!options.dryRun) {
       mkdirSync(outputDir, { recursive: true });
     }
@@ -2691,6 +2784,20 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
       return 1;
     }
 
+    // Load plugins if configured
+    let pluginRegistry: PluginRegistry = new Map();
+    if (config.plugins && config.plugins.length > 0) {
+      try {
+        log(`Loading ${config.plugins.length} plugin(s)...`, 2, options);
+        pluginRegistry = await createPluginRegistry(config.plugins, basePath);
+        log(`Successfully loaded ${pluginRegistry.size} plugin(s)`, 2, options);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error(`Error: Failed to load plugins: ${errorMsg}`);
+        return 1;
+      }
+    }
+
     // Load lock file
     let lockFile: LockFile | null = null;
     const lockEntries: LockFileEntry[] = [];
@@ -2712,12 +2819,16 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
 
     // Apply patches
     log("Applying patches...", 2, options);
+    const outputDir = config.output ? resolve(basePath, config.output) : basePath;
     const { resources: patchedResources, validationErrors: patchValidationErrors } =
       await applyPatches(
         originalResources,
         config.patches || [],
         config.onNoMatch || "warn",
         options,
+        config,
+        outputDir,
+        pluginRegistry,
       );
 
     // Collect all validation errors (from patches and global validators)
@@ -2737,7 +2848,6 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
     }
 
     // Generate diff
-    const outputDir = config.output ? resolve(basePath, config.output) : basePath;
     const diffResult = generateDiff(originalResources, patchedResources, outputDir, basePath);
 
     // Add validation errors to diff result
@@ -3837,6 +3947,14 @@ async function performWatchBuild(
       );
     }
 
+    // Load plugins if configured
+    let pluginRegistry: PluginRegistry = new Map();
+    if (config.plugins && config.plugins.length > 0) {
+      log(`Loading ${config.plugins.length} plugin(s)...`, 3, options);
+      pluginRegistry = await createPluginRegistry(config.plugins, basePath);
+      log(`Successfully loaded ${pluginRegistry.size} plugin(s)`, 3, options);
+    }
+
     // Load lock file
     let lockFile: LockFile | null = null;
     const lockEntries: LockFileEntry[] = [];
@@ -3858,12 +3976,21 @@ async function performWatchBuild(
 
     // Apply patches
     log("Applying patches...", 3, options);
+    const outputDir = resolve(basePath, config.output ?? ".");
     const {
       resources: patchedResources,
       patchesApplied,
       warnings,
       validationErrors: patchValidationErrors,
-    } = await applyPatches(resources, config.patches || [], config.onNoMatch || "warn", options);
+    } = await applyPatches(
+      resources,
+      config.patches || [],
+      config.onNoMatch || "warn",
+      options,
+      config,
+      outputDir,
+      pluginRegistry,
+    );
 
     // Collect all validation errors (from patches and global validators)
     const allValidationErrors: ValidationError[] = [...patchValidationErrors];
@@ -3890,7 +4017,6 @@ async function performWatchBuild(
     }
 
     // Write output files
-    const outputDir = resolve(basePath, config.output ?? ".");
     mkdirSync(outputDir, { recursive: true });
 
     const sourceFiles = new Set<string>();

@@ -2,6 +2,23 @@
  * Core type definitions for Kustomark
  */
 
+// Re-export plugin types
+export type {
+  LoadedPlugin,
+  Plugin,
+  PluginConfig,
+  PluginContext,
+  PluginExecutionOptions,
+  PluginFunction,
+  PluginParamError,
+  PluginParamSchema,
+  PluginRegistry,
+  PluginValidateFunction,
+} from "./plugin-types.js";
+
+// Import PluginConfig for use in this file
+import type { PluginConfig } from "./plugin-types.js";
+
 /**
  * Strategy for handling patches that don't match
  */
@@ -439,6 +456,17 @@ export interface ExecPatch extends PatchCommonFields {
 }
 
 /**
+ * Plugin operation - runs a custom plugin to transform content
+ */
+export interface PluginPatch extends PatchCommonFields {
+  op: "plugin";
+  /** Name of the plugin to execute (must be defined in plugins array) */
+  plugin: string;
+  /** Parameters to pass to the plugin */
+  params?: Record<string, unknown>;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -469,7 +497,8 @@ export type PatchOperation =
   | RemoveTableRowPatch
   | AddTableColumnPatch
   | RemoveTableColumnPatch
-  | ExecPatch;
+  | ExecPatch
+  | PluginPatch;
 
 /**
  * Global validator configuration
@@ -572,6 +601,8 @@ export interface KustomarkConfig {
   watch?: WatchHooks;
   /** Security configuration for remote resource validation */
   security?: SecurityConfig;
+  /** Plugin configurations */
+  plugins?: PluginConfig[];
 }
 
 /**
