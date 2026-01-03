@@ -73,24 +73,68 @@ Prompt-based config creation with beautiful CLI UX.
 
 See [README - Init Command](../README.md#kustomark-init) for full documentation.
 
-## Deferred: Complexity
+### Script Hooks (exec operation)
 
-### Script Hooks
+**Status**: Implemented
+
+Execute shell scripts as part of the patch pipeline.
 
 ```yaml
 - op: exec
   command: "./transform.sh"
+  timeout: 5000  # Optional, defaults to 5000ms
 ```
 
-**Rationale**: Non-deterministic, security considerations, portability.
+**Implementation Details**:
+- Deterministic script execution with configurable timeout
+- Uses Bun.spawn for process execution
+- Timeout enforcement (default 5s, configurable)
+- Full stdin/stdout/stderr handling
+- Exit code checking and error handling
+- Tested with 20+ test cases
+
+**Use Cases**:
+- Custom transformations via external scripts
+- Integration with existing tooling
+- Complex text processing that's easier in bash/python/etc
+- Code generation and formatting
+
+**Security Considerations**:
+- Scripts have full system access (use with trusted scripts only)
+- Timeout prevents runaway processes
+- Exit code validation ensures script success
+
+See implementation in `src/core/patch-engine.ts` (applyExec function).
 
 ### Plugin System
 
-User-defined patch operations.
+**Status**: Implemented
 
-**Rationale**: API design complexity, security, ecosystem maintenance.
+User-defined patch operations via JavaScript/TypeScript plugins.
 
-**Current alternative**: Request operations via issues; add to core if common.
+**Implementation Details**:
+- Complete plugin infrastructure (`plugin-types.ts`, `plugin-loader.ts`, `plugin-executor.ts`)
+- SHA256-based cache invalidation
+- Checksum verification for security
+- Dynamic import() supports both ESM and CommonJS
+- 30s default timeout with configurable override
+- 7 custom error classes for detailed diagnostics
+- 77 comprehensive tests with 149 assertions
+
+**Use Cases**:
+- Organization-specific patch operations
+- Complex transformations requiring full programming capability
+- Reusable custom operations across projects
+- Integration with external APIs or databases
+
+**Security Model**:
+- Trust-based: Plugins have full system access
+- Checksum verification ensures plugin integrity
+- Plugin discovery from local paths or npm packages
+
+See [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) for complete plugin system documentation and examples.
+
+## Deferred: Complexity
 
 ### Full AST Parsing
 

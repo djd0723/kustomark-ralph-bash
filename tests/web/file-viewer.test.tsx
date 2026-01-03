@@ -530,10 +530,33 @@ describe("FileViewer Component", () => {
       });
     });
 
-    it.skip("should revert to 'Copy' text after timeout", async () => {
-      // TODO: This test requires timer mocking which needs to be implemented differently in Bun
-      // The component has a 2 second timeout that reverts the "Copied!" text back to "Copy"
-      // This functionality works in the actual component but testing it requires fake timers
+    it("should revert to 'Copy' text after timeout", async () => {
+      const user = userEvent.setup();
+
+      mockApiGet.mockResolvedValue({
+        content: "Test content",
+        path: "test.txt",
+      });
+
+      render(<FileViewer filePath="test.txt" />);
+
+      await waitFor(() => {
+        const codeElement = screen.getByRole("code", { hidden: true });
+        expect(codeElement).toHaveTextContent("Test content");
+      });
+
+      const copyButton = screen.getByRole("button", { name: /copy/i });
+      await user.click(copyButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Copied!")).toBeInTheDocument();
+      });
+
+      // Wait for the timeout to complete (2000ms + buffer)
+      await new Promise(resolve => setTimeout(resolve, 2100));
+
+      expect(screen.getByText("Copy")).toBeInTheDocument();
+      expect(screen.queryByText("Copied!")).not.toBeInTheDocument();
     });
 
     it("should handle clipboard API errors gracefully", async () => {
