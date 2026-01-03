@@ -185,6 +185,7 @@ ${formatSection("OPTIONS")}
   ${formatFlag("--format")} <text|json>    Output format (default: text)
   ${formatFlag("--clean")}                Remove output files not in source
   ${formatFlag("--dry-run")}              Preview changes without writing files
+  ${formatFlag("--auto-fix")}             Enable interactive error recovery for failed patches
   ${formatFlag("--stats")}                Show detailed build statistics
   ${formatFlag("--progress")}             Show progress feedback during build
   ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
@@ -230,6 +231,9 @@ ${formatSection("EXAMPLES")}
 
   ${formatExample("# Build excluding certain patch groups")}
   ${formatCommand("kustomark build ./team/ --disable-groups=experimental")}
+
+  ${formatExample("# Build with interactive error recovery")}
+  ${formatCommand("kustomark build ./team/ --auto-fix --stats")}
 
 ${formatSection("WORKFLOWS")}
   ${formatHighlight("Development workflow:")}

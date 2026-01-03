@@ -37,6 +37,8 @@ import {
 } from "../core/config-parser.js";
 import { generateFileDiff } from "../core/diff-generator.js";
 import { analyzeBuild } from "../core/dry-run-analyzer.js";
+import { ErrorRecoveryEngine } from "../core/error-recovery.js";
+import { PatchError } from "../core/errors.js";
 import {
   applyCopyFile,
   applyDeleteFile,
@@ -55,6 +57,7 @@ import {
 } from "../core/http-fetcher.js";
 import { findLockEntry, loadLockFile, saveLockFile } from "../core/lock-file.js";
 import {
+  applySinglePatch,
   applyPatches as coreApplyPatches,
   applyPatchesWithPlugins as coreApplyPatchesWithPlugins,
 } from "../core/patch-engine.js";
@@ -90,6 +93,7 @@ import { analyzeCommand } from "./analyze-command.js";
 import { handleBenchmarkCommand } from "./benchmark-command.js";
 import { recordBuild } from "./build-history.js";
 import { debugCommand } from "./debug-command.js";
+import { presentRecoveryOptions } from "./error-recovery-ui.js";
 import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
 import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
@@ -145,6 +149,7 @@ export interface CLIOptions {
   offline?: boolean; // For build --offline option (fail if remote fetch needed)
   dryRun?: boolean; // For build --dry-run option (preview changes without writing files)
   analyze?: boolean; // For build --analyze option (run analysis without dry-run)
+  autoFix?: boolean; // For build --auto-fix option (enable error recovery system)
   suite?: string; // For test --suite option (test suite file path)
   patch?: string; // For test --patch option (inline YAML patch)
   patchFile?: string; // For test --patch-file option (patch file path)
@@ -175,6 +180,14 @@ export interface CLIOptions {
   noHistory?: boolean; // For --no-history flag (disable build history recording)
 }
 
+interface RecoveryStats {
+  totalErrors: number; // Total number of patch errors encountered
+  recovered: number; // Number of errors successfully auto-fixed
+  skipped: number; // Number of errors skipped by user
+  failed: number; // Number of errors that couldn't be recovered
+  strategies: Record<string, number>; // Count by recovery strategy used
+}
+
 interface BuildStats {
   duration: number; // Duration in milliseconds
   files: {
@@ -198,6 +211,7 @@ interface BuildStats {
     speedup?: number; // Estimated speedup from caching
     invalidationReasons: Record<string, number>;
   };
+  recovery?: RecoveryStats; // Error recovery statistics (only present when --auto-fix is used)
 }
 
 interface BuildResult {
@@ -366,6 +380,8 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
       options.offline = true;
     } else if (arg === "--dry-run") {
       options.dryRun = true;
+    } else if (arg === "--auto-fix") {
+      options.autoFix = true;
     } else if (arg === "--analyze") {
       options.analyze = true;
     } else if (arg === "--verify") {
@@ -1029,6 +1045,7 @@ async function applyPatches(
   warnings: ValidationWarning[];
   validationErrors: ValidationError[];
   operationCounts: Record<string, number>;
+  recoveryStats?: RecoveryStats;
 }> {
   const patchedResources = new Map<string, string>();
   let totalPatchesApplied = 0;
@@ -1036,6 +1053,12 @@ async function applyPatches(
   const allWarnings: ValidationWarning[] = [];
   const allValidationErrors: ValidationError[] = [];
   const operationCounts: Record<string, number> = {};
+
+  // Initialize error recovery engine if --auto-fix is enabled
+  const recoveryEngine = options.autoFix ? new ErrorRecoveryEngine() : null;
+  const recoveryStats: RecoveryStats = options.autoFix
+    ? { totalErrors: 0, recovered: 0, skipped: 0, failed: 0, strategies: {} }
+    : { totalErrors: 0, recovered: 0, skipped: 0, failed: 0, strategies: {} };
 
   // Initialize progress if provided
   if (progressReporter) {
@@ -1070,49 +1093,169 @@ async function applyPatches(
     // Apply all applicable patches using the core patch engine
     const verbose = options.verbosity >= 2;
 
-    // Check if any patch uses plugins
-    const hasPluginPatches = applicablePatches.some((patch) => patch.op === "plugin");
+    // When --auto-fix is enabled, apply patches one at a time with error recovery
+    // Otherwise, use the batch approach for better performance
+    if (options.autoFix && recoveryEngine) {
+      let currentContent = content;
+      let patchesAppliedForFile = 0;
+      let patchesSkippedForFile = 0;
 
-    // Calculate relative path from output directory
-    const absoluteFilePath = isAbsolute(filePath) ? filePath : resolve(filePath);
-    const absoluteOutputDir = isAbsolute(outputDir) ? outputDir : resolve(outputDir);
-    const relativePath = relative(absoluteOutputDir, absoluteFilePath);
+      for (let patchIndex = 0; patchIndex < applicablePatches.length; patchIndex++) {
+        const patch = applicablePatches[patchIndex];
+        if (!patch) continue;
+        const opType = patch.op;
+        operationCounts[opType] = (operationCounts[opType] || 0) + 1;
 
-    // Use appropriate apply function
-    const result = hasPluginPatches
-      ? await coreApplyPatchesWithPlugins(
-          content,
-          applicablePatches,
-          absoluteFilePath,
-          config,
-          relativePath,
-          pluginRegistry,
-          onNoMatch,
-          verbose,
-        )
-      : await coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
+        try {
+          // Try to apply the patch
+          const result = await applySinglePatch(currentContent, patch, onNoMatch, verbose);
+          currentContent = result.content;
 
-    patchedResources.set(filePath, result.content);
-    totalPatchesApplied += result.applied;
+          if (result.count > 0) {
+            patchesAppliedForFile++;
+          } else if (result.conditionSkipped) {
+            // Condition was false, don't count as skipped
+          } else {
+            patchesSkippedForFile++;
+          }
 
-    // Track skipped patches (patches that didn't match + condition-skipped patches)
-    const skipped = applicablePatches.length - result.applied - result.conditionSkipped;
-    totalPatchesSkipped += skipped;
+          // Collect warnings and validation errors
+          if (result.warning) {
+            allWarnings.push(result.warning);
+          }
+          for (const error of result.validationErrors) {
+            allValidationErrors.push({
+              ...error,
+              file: filePath,
+            });
+          }
+        } catch (error) {
+          // Check if this is a PatchError
+          if (error instanceof PatchError) {
+            recoveryStats.totalErrors++;
 
-    // Count patches by operation type
-    for (const patch of applicablePatches) {
-      const opType = patch.op;
-      operationCounts[opType] = (operationCounts[opType] || 0) + 1;
-    }
+            // Try to find recovery options
+            const recoveries = await recoveryEngine.findRecoveries(error, currentContent, patch);
 
-    allWarnings.push(...result.warnings);
+            // Convert to UI format
+            const uiRecoveries = recoveries.map((r) => ({
+              type: r.confidence >= 0.8 ? ("auto-fix" as const) : ("suggestion" as const),
+              confidence: r.confidence,
+              description: r.message,
+              fixedPatch: r.fixedPatch,
+              fixedContent: undefined, // Will be computed after applying
+              explanation: r.message,
+            }));
 
-    // Collect validation errors from per-patch validation
-    for (const error of result.validationErrors) {
-      allValidationErrors.push({
-        ...error,
-        file: filePath,
-      });
+            // Present recovery options to user (if interactive)
+            const selectedRecovery =
+              options.format !== "json"
+                ? await presentRecoveryOptions(error.message, currentContent, patch, uiRecoveries)
+                : uiRecoveries.length > 0 &&
+                    uiRecoveries[0]?.confidence &&
+                    uiRecoveries[0].confidence >= 0.8
+                  ? uiRecoveries[0]
+                  : null;
+
+            if (selectedRecovery?.fixedPatch) {
+              // Apply the fixed patch
+              try {
+                const fixedResult = await applySinglePatch(
+                  currentContent,
+                  selectedRecovery.fixedPatch,
+                  onNoMatch,
+                  verbose,
+                );
+                currentContent = fixedResult.content;
+                patchesAppliedForFile++;
+                recoveryStats.recovered++;
+
+                // Track which strategy was used (extract from description)
+                const strategyMatch = selectedRecovery.description.match(/Fixed (\w+)/);
+                const strategyName = strategyMatch?.[1] ?? "unknown";
+                recoveryStats.strategies[strategyName] =
+                  (recoveryStats.strategies[strategyName] || 0) + 1;
+
+                // Collect warnings and validation errors from fixed patch
+                if (fixedResult.warning) {
+                  allWarnings.push(fixedResult.warning);
+                }
+                for (const validationError of fixedResult.validationErrors) {
+                  allValidationErrors.push({
+                    ...validationError,
+                    file: filePath,
+                  });
+                }
+              } catch (_fixError) {
+                // Recovery patch also failed
+                recoveryStats.failed++;
+                patchesSkippedForFile++;
+              }
+            } else {
+              // User skipped or no recovery available
+              if (uiRecoveries.length > 0) {
+                recoveryStats.skipped++;
+              } else {
+                recoveryStats.failed++;
+              }
+              patchesSkippedForFile++;
+            }
+          } else {
+            // Not a PatchError, re-throw
+            throw error;
+          }
+        }
+      }
+
+      patchedResources.set(filePath, currentContent);
+      totalPatchesApplied += patchesAppliedForFile;
+      totalPatchesSkipped += patchesSkippedForFile;
+    } else {
+      // No --auto-fix, use batch processing for better performance
+      // Check if any patch uses plugins
+      const hasPluginPatches = applicablePatches.some((patch) => patch.op === "plugin");
+
+      // Calculate relative path from output directory
+      const absoluteFilePath = isAbsolute(filePath) ? filePath : resolve(filePath);
+      const absoluteOutputDir = isAbsolute(outputDir) ? outputDir : resolve(outputDir);
+      const relativePath = relative(absoluteOutputDir, absoluteFilePath);
+
+      // Use appropriate apply function
+      const result = hasPluginPatches
+        ? await coreApplyPatchesWithPlugins(
+            content,
+            applicablePatches,
+            absoluteFilePath,
+            config,
+            relativePath,
+            pluginRegistry,
+            onNoMatch,
+            verbose,
+          )
+        : await coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
+
+      patchedResources.set(filePath, result.content);
+      totalPatchesApplied += result.applied;
+
+      // Track skipped patches (patches that didn't match + condition-skipped patches)
+      const skipped = applicablePatches.length - result.applied - result.conditionSkipped;
+      totalPatchesSkipped += skipped;
+
+      // Count patches by operation type
+      for (const patch of applicablePatches) {
+        const opType = patch.op;
+        operationCounts[opType] = (operationCounts[opType] || 0) + 1;
+      }
+
+      allWarnings.push(...result.warnings);
+
+      // Collect validation errors from per-patch validation
+      for (const error of result.validationErrors) {
+        allValidationErrors.push({
+          ...error,
+          file: filePath,
+        });
+      }
     }
   }
 
@@ -1128,6 +1271,7 @@ async function applyPatches(
     warnings: allWarnings,
     validationErrors: allValidationErrors,
     operationCounts,
+    recoveryStats: options.autoFix ? recoveryStats : undefined,
   };
 }
 
@@ -1184,7 +1328,28 @@ async function applyPatchesParallel(
   warnings: ValidationWarning[];
   validationErrors: ValidationError[];
   operationCounts: Record<string, number>;
+  recoveryStats?: RecoveryStats;
 }> {
+  // When --auto-fix is enabled, fall back to sequential processing
+  // because error recovery requires interactive user input
+  if (options.autoFix) {
+    log(
+      `Auto-fix mode enabled, falling back to sequential processing for interactive error recovery`,
+      2,
+      options,
+    );
+    return await applyPatches(
+      resources,
+      patches,
+      onNoMatch,
+      options,
+      config,
+      outputDir,
+      pluginRegistry,
+      progressReporter,
+    );
+  }
+
   // Determine concurrency level
   const jobCount = options.jobs || cpus().length;
   const limit = createConcurrencyLimiter(jobCount);
@@ -2240,6 +2405,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       warnings,
       validationErrors: patchValidationErrors,
       operationCounts: contentOpCounts,
+      recoveryStats,
     } = options.parallel
       ? await applyPatchesParallel(
           resourcesToProcess,
@@ -2518,6 +2684,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
         },
         bytes: totalBytes,
         byOperation: operationCounts,
+        ...(recoveryStats && { recovery: recoveryStats }),
       };
 
       // Add cache statistics for incremental builds
@@ -2678,6 +2845,33 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
             console.log("  Invalidation reasons:");
             for (const [reason, count] of reasons) {
               console.log(`    ${reason}: ${count}`);
+            }
+          }
+        }
+
+        // Show error recovery statistics if --auto-fix was used
+        if (stats.recovery && stats.recovery.totalErrors > 0) {
+          console.log("\nError Recovery Statistics:");
+          console.log(`  Total errors encountered: ${stats.recovery.totalErrors}`);
+          console.log(`  Successfully recovered: ${stats.recovery.recovered}`);
+          console.log(`  Skipped by user: ${stats.recovery.skipped}`);
+          console.log(`  Failed to recover: ${stats.recovery.failed}`);
+
+          if (stats.recovery.totalErrors > 0) {
+            const recoveryRate = (
+              (stats.recovery.recovered / stats.recovery.totalErrors) *
+              100
+            ).toFixed(1);
+            console.log(`  Recovery rate: ${recoveryRate}%`);
+          }
+
+          if (Object.keys(stats.recovery.strategies).length > 0) {
+            console.log("  Strategies used:");
+            const sortedStrategies = Object.entries(stats.recovery.strategies).sort(
+              ([, a], [, b]) => b - a,
+            );
+            for (const [strategy, count] of sortedStrategies) {
+              console.log(`    ${strategy}: ${count}`);
             }
           }
         }

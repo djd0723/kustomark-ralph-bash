@@ -24,6 +24,13 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
   - [kustomark analyze](#kustomark-analyze-path)
   - [kustomark template](#kustomark-template)
     - [Built-in Templates](#built-in-templates)
+- [Error Recovery with --auto-fix](#error-recovery-with---auto-fix)
+  - [Built-in Recovery Strategies](#built-in-recovery-strategies)
+  - [Confidence Scoring](#confidence-scoring)
+  - [Usage Examples](#usage-examples)
+  - [Recovery Statistics](#recovery-statistics)
+  - [Interactive vs Non-Interactive Behavior](#interactive-vs-non-interactive-behavior)
+  - [Best Practices](#best-practices)
 - [Configuration](#configuration)
 - [Security & Validation](#security--validation)
 - [Patch Operations](#patch-operations)
@@ -1782,6 +1789,260 @@ kustomark web . --dev --port=5173 --verbose
 - Team collaboration through web interface
 - Easier onboarding for non-CLI users
 - Development and testing of web UI features
+
+---
+
+## Error Recovery with --auto-fix
+
+Kustomark includes an intelligent error recovery system that can automatically detect and fix common patch errors. When patches fail to apply (e.g., due to typos, case mismatches, or whitespace differences), the recovery engine analyzes the error and suggests or applies fixes automatically.
+
+### Overview
+
+The error recovery system helps you avoid manual debugging by:
+- Automatically detecting common patch failure patterns
+- Providing high-confidence fixes that can be auto-applied
+- Offering alternative suggestions when multiple fixes are possible
+- Tracking recovery statistics to measure success rates
+
+Enable error recovery by adding the `--auto-fix` flag to your build command:
+
+```bash
+kustomark build ./team/ --auto-fix
+```
+
+### Built-in Recovery Strategies
+
+Kustomark includes 6 intelligent recovery strategies that handle the most common patching errors:
+
+#### 1. **Case Mismatch Recovery** (confidence: 0.9)
+Detects when text exists but with different casing.
+
+```yaml
+# Your patch
+patches:
+  - op: replace
+    old: "hello world"  # lowercase
+    new: "hi there"
+
+# Content has: "Hello World"
+# Auto-fix: Updates patch to use "Hello World"
+```
+
+#### 2. **Whitespace Normalization** (confidence: 0.88)
+Handles extra spaces, tabs, or inconsistent whitespace.
+
+```yaml
+# Your patch
+patches:
+  - op: replace
+    old: "Hello World"  # single space
+    new: "Hi"
+
+# Content has: "Hello  World"  # double space
+# Auto-fix: Updates patch to match actual whitespace
+```
+
+#### 3. **Section ID Typo Recovery** (confidence: 0.85)
+Uses fuzzy matching to find similar section IDs.
+
+```yaml
+# Your patch
+patches:
+  - op: remove-section
+    id: "instalation"  # typo
+
+# Content has: "## Installation"
+# Auto-fix: Corrects to "installation" (Levenshtein distance: 1)
+```
+
+#### 4. **Frontmatter Key Typo Recovery** (confidence: 0.85)
+Finds similar frontmatter keys when exact match fails.
+
+```yaml
+# Your patch
+patches:
+  - op: remove-frontmatter
+    key: "auther"  # typo
+
+# Content has frontmatter key: "author"
+# Auto-fix: Corrects to "author"
+```
+
+#### 5. **Line Fuzzy Match Recovery** (confidence: 0.75)
+Finds similar lines with slight differences.
+
+```yaml
+# Your patch
+patches:
+  - op: replace-line
+    match: "Install the package:"  # missing period
+
+# Content has: "Install the package."
+# Auto-fix: Updates to match actual line
+```
+
+#### 6. **Marker Order Recovery** (confidence: 0.95)
+Detects when start/end markers are reversed.
+
+```yaml
+# Your patch
+patches:
+  - op: delete-between
+    start: "<!-- END -->"
+    end: "<!-- START -->"
+
+# Markers exist but in wrong order
+# Auto-fix: Swaps start and end markers
+```
+
+### Confidence Scoring
+
+Each recovery strategy provides a confidence score (0-1) indicating how certain the fix is correct:
+
+- **High confidence (0.8-1.0)**: Auto-applied in `--auto-fix` mode without prompting
+  - Marker order fixes (0.95)
+  - Case mismatches (0.9)
+  - Whitespace normalization (0.88)
+  - Section/key typos with low edit distance (0.85+)
+
+- **Medium confidence (0.5-0.79)**: Presented as suggestions requiring user confirmation
+  - Section/key typos with higher edit distance (0.5-0.79)
+  - Line fuzzy matches with significant differences (0.5-0.74)
+
+- **Low confidence (<0.5)**: Not presented to avoid false positives
+
+The auto-application threshold is **0.8** - only fixes meeting or exceeding this confidence are automatically applied.
+
+### Usage Examples
+
+#### Basic Error Recovery
+
+```bash
+# Enable automatic error recovery
+kustomark build ./team/ --auto-fix
+
+# Combine with dry-run to preview fixes
+kustomark build ./team/ --auto-fix --dry-run
+
+# Show recovery statistics
+kustomark build ./team/ --auto-fix --stats
+```
+
+#### Interactive Mode (Text Output)
+
+In text mode, `--auto-fix` provides interactive prompts for medium-confidence fixes:
+
+```bash
+$ kustomark build ./team/ --auto-fix
+
+Patch failed: Section 'instalation' matched 0 times
+
+Auto-fix available (confidence: 0.85):
+  Fixed section ID typo: 'instalation' → 'installation' (distance: 1)
+
+Apply this fix? [Y/n/s/a/q]
+  Y = Yes, apply this fix
+  n = No, skip this fix
+  s = Skip all remaining fixes
+  a = Apply all remaining high-confidence fixes
+  q = Quit and abort build
+```
+
+#### Non-Interactive Mode (JSON Output)
+
+In JSON mode, high-confidence fixes are auto-applied without prompting:
+
+```bash
+$ kustomark build ./team/ --auto-fix --format=json
+
+{
+  "success": true,
+  "filesProcessed": 5,
+  "patchesApplied": 12,
+  "recovery": {
+    "totalErrors": 3,
+    "recovered": 3,
+    "skipped": 0,
+    "failed": 0,
+    "strategies": {
+      "case-mismatch": 2,
+      "section-id-typo": 1
+    }
+  }
+}
+```
+
+This non-interactive behavior makes `--auto-fix` safe for CI/CD pipelines.
+
+### Recovery Statistics
+
+When using `--auto-fix` with `--stats`, detailed recovery metrics are included:
+
+```bash
+$ kustomark build ./team/ --auto-fix --stats
+
+Build Statistics:
+  Files processed: 5
+  Patches applied: 12
+  Build time: 45ms
+
+Error Recovery Statistics:
+  Total errors encountered: 4
+  Successfully recovered: 3
+  Skipped by user: 1
+  Failed to recover: 0
+  Recovery rate: 75.0%
+
+  Strategies used:
+    case-mismatch: 2
+    section-id-typo: 1
+```
+
+**Recovery metrics explained:**
+- **Total errors**: Number of patch failures encountered
+- **Successfully recovered**: Errors fixed and patches applied successfully
+- **Skipped**: Errors skipped by user or below confidence threshold
+- **Failed**: Errors where no recovery strategy could help
+- **Recovery rate**: Percentage of errors successfully fixed
+- **Strategies used**: Which recovery strategies were applied and how often
+
+### Interactive vs Non-Interactive Behavior
+
+The error recovery system adapts to your workflow:
+
+| Mode | Trigger | Behavior |
+|------|---------|----------|
+| **Interactive Text** | `--auto-fix` (no `--format=json`) | Prompts for medium-confidence fixes; auto-applies high-confidence (≥0.8) |
+| **Non-Interactive JSON** | `--auto-fix --format=json` | Auto-applies high-confidence fixes only; skips medium-confidence without prompting |
+| **CI/CD Safe** | `--auto-fix --format=json -q` | Fully automated; suitable for continuous integration |
+
+### Best Practices
+
+1. **Start with dry-run**: Preview what would be fixed before applying
+   ```bash
+   kustomark build ./team/ --auto-fix --dry-run
+   ```
+
+2. **Review changes**: Use git diff to verify auto-applied fixes
+   ```bash
+   kustomark build ./team/ --auto-fix
+   git diff
+   ```
+
+3. **Use in CI/CD**: JSON mode ensures predictable, non-interactive behavior
+   ```bash
+   kustomark build ./team/ --auto-fix --format=json
+   ```
+
+4. **Monitor recovery rates**: Track `--stats` to identify patterns in patch errors
+   ```bash
+   kustomark build ./team/ --auto-fix --stats
+   ```
+
+5. **Combine with validation**: Validate configs before fixing
+   ```bash
+   kustomark validate ./team/ && kustomark build ./team/ --auto-fix
+   ```
 
 ---
 

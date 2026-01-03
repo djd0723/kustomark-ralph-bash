@@ -19,6 +19,22 @@ import {
 export { calculateLevenshteinDistance };
 
 /**
+ * Calculate confidence score from Levenshtein distance
+ *
+ * @param distance - The Levenshtein distance between strings
+ * @param target - The target string
+ * @param candidate - The candidate string
+ * @returns Confidence score between 0 and 1
+ */
+function calculateConfidence(distance: number, target: string, candidate: string): number {
+  const maxLength = Math.max(target.length, candidate.length);
+  if (maxLength === 0) {
+    return 1; // Both strings are empty
+  }
+  return 1 - distance / maxLength;
+}
+
+/**
  * Find similar strings from a list of candidates using fuzzy matching
  *
  * This function now delegates to the optimized string-similarity utility
@@ -27,13 +43,13 @@ export { calculateLevenshteinDistance };
  * @param target - The target string to match against
  * @param candidates - Array of candidate strings to search through
  * @param maxDistance - Maximum Levenshtein distance to consider (default: auto-calculated based on target length)
- * @returns Array of similar strings with their distances, sorted by distance (closest first)
+ * @returns Array of similar strings with their distances and confidence scores, sorted by distance (closest first)
  */
 export function findSimilarStrings(
   target: string,
   candidates: string[],
   maxDistance?: number,
-): Array<{ value: string; distance: number }> {
+): Array<{ value: string; distance: number; confidence: number }> {
   // Use the optimized utility with case-insensitive matching
   // The utility checks both case-sensitive and case-insensitive distances
   const caseSensitiveResults = findSimilarStringsUtil(target, candidates, {
@@ -64,10 +80,11 @@ export function findSimilarStrings(
     }
   }
 
-  // Convert back to array and sort
+  // Convert back to array with confidence scores and sort
   const results = Array.from(mergedMap.entries()).map(([value, distance]) => ({
     value,
     distance,
+    confidence: calculateConfidence(distance, target, value),
   }));
 
   results.sort((a, b) => {
@@ -79,6 +96,26 @@ export function findSimilarStrings(
 
   // Limit to top 5 suggestions
   return results.slice(0, 5);
+}
+
+/**
+ * Get suggestions with confidence scores
+ *
+ * Returns similar strings with both distance and confidence metrics.
+ * Confidence is calculated as: 1 - (distance / max(target.length, candidate.length))
+ *
+ * @param target - The target string to match against
+ * @param candidates - Array of candidate strings to search through
+ * @param maxDistance - Maximum Levenshtein distance to consider (default: auto-calculated based on target length)
+ * @returns Array of suggestions with value, distance, and confidence (0-1)
+ */
+export function getSuggestionWithConfidence(
+  target: string,
+  candidates: string[],
+  maxDistance?: number,
+): Array<{ value: string; distance: number; confidence: number }> {
+  // This function is now just an alias for findSimilarStrings since it returns confidence scores
+  return findSimilarStrings(target, candidates, maxDistance);
 }
 
 /**

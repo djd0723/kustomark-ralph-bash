@@ -232,6 +232,7 @@ export {
   generateFrontmatterKeySuggestions,
   generatePatchSuggestions,
   generateSectionSuggestions,
+  getSuggestionWithConfidence,
 } from "./suggestion-engine.js";
 // Export table parser functions and types
 export {
