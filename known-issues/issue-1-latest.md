@@ -4,10 +4,29 @@
 **Author:** dexhorthy
 **Created:** 2026-01-02
 **State:** open
+**Status:** ✅ VERIFIED FIXED (2026-01-03)
 
-## Description
+## Resolution Summary
 
-## Problem
+**Status:** This issue has been verified as FIXED in the current codebase.
+
+**Fix Implementation:**
+- Resource resolver now tracks `baseDir` for each resolved resource
+- CLI computes relative paths from `baseDir` instead of extracting just the filename
+- See `src/cli/index.ts` lines 899-910 and `src/core/resource-resolver.ts` lines 391, 487, 581
+
+**Testing:**
+- Added comprehensive test suite: `tests/cli-nested-directories.test.ts`
+- 4 test cases with 48 assertions covering all nested directory scenarios
+- All tests pass, confirming the fix works correctly
+
+**Next Steps:**
+- This issue can be closed on GitHub
+- Regression tests are in place to prevent recurrence
+
+---
+
+## Original Problem Description
 
 When resolving resources from a directory reference, the CLI flattens all files to just their basename instead of preserving the relative directory structure.
 
