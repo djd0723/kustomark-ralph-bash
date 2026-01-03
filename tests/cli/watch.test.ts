@@ -207,19 +207,60 @@ output: ./output
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    // Wait for initial build
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    let stdout = "";
+    let stderr = "";
+
+    watchProcess.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    watchProcess.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    // Wait for initial build to complete by checking for "Watching for changes" message
+    await new Promise<void>((resolve) => {
+      let checkInterval: Timer | null = null;
+      let fallbackTimeout: Timer | null = null;
+
+      checkInterval = setInterval(() => {
+        if (stdout.includes("Watching for changes") || stderr.includes("Watching for changes")) {
+          if (checkInterval) clearInterval(checkInterval);
+          if (fallbackTimeout) clearTimeout(fallbackTimeout);
+          resolve();
+        }
+      }, 100);
+
+      // Fallback timeout in case the message doesn't appear
+      fallbackTimeout = setTimeout(() => {
+        if (checkInterval) clearInterval(checkInterval);
+        resolve();
+      }, 5000);
+    });
 
     // Send SIGINT
     watchProcess.kill("SIGINT");
 
     // Wait for graceful shutdown
     const exitCode = await new Promise<number | null>((resolve) => {
-      watchProcess.on("exit", (code) => resolve(code));
-      setTimeout(() => resolve(null), 2000);
+      let exitTimeout: Timer | null = null;
+
+      const exitHandler = (code: number | null) => {
+        if (exitTimeout) clearTimeout(exitTimeout);
+        resolve(code);
+      };
+
+      watchProcess.once("exit", exitHandler);
+
+      exitTimeout = setTimeout(() => {
+        watchProcess.removeListener("exit", exitHandler);
+        // If we timeout, force kill the process
+        watchProcess.kill("SIGKILL");
+        resolve(null);
+      }, 3000);
     });
 
-    // Process should exit cleanly
-    expect(exitCode).not.toBeNull();
+    // Process should exit cleanly with code 0
+    expect(exitCode).toBe(0);
   });
 });

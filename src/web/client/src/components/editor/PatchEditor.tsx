@@ -19,24 +19,36 @@ export const PatchEditor: React.FC<PatchEditorProps> = ({ patches, onPatchesChan
       new: "",
     };
     const updatedPatches = [...patches, newPatch];
-    onPatchesChange(updatedPatches);
-    setSelectedIndex(updatedPatches.length - 1);
+    try {
+      onPatchesChange(updatedPatches);
+      setSelectedIndex(updatedPatches.length - 1);
+    } catch (error) {
+      console.error("Error in onPatchesChange callback:", error);
+    }
   };
 
   const handleUpdate = (patch: PatchOperation) => {
     if (selectedIndex === null) return;
     const updatedPatches = [...patches];
     updatedPatches[selectedIndex] = patch;
-    onPatchesChange(updatedPatches);
+    try {
+      onPatchesChange(updatedPatches);
+    } catch (error) {
+      console.error("Error in onPatchesChange callback:", error);
+    }
   };
 
   const handleDelete = (index: number) => {
     const updatedPatches = patches.filter((_, i) => i !== index);
-    onPatchesChange(updatedPatches);
-    if (selectedIndex === index) {
-      setSelectedIndex(null);
-    } else if (selectedIndex !== null && selectedIndex > index) {
-      setSelectedIndex(selectedIndex - 1);
+    try {
+      onPatchesChange(updatedPatches);
+      if (selectedIndex === index) {
+        setSelectedIndex(null);
+      } else if (selectedIndex !== null && selectedIndex > index) {
+        setSelectedIndex(selectedIndex - 1);
+      }
+    } catch (error) {
+      console.error("Error in onPatchesChange callback:", error);
     }
   };
 
@@ -47,11 +59,15 @@ export const PatchEditor: React.FC<PatchEditorProps> = ({ patches, onPatchesChan
       updatedPatches[index],
       updatedPatches[index - 1],
     ];
-    onPatchesChange(updatedPatches);
-    if (selectedIndex === index) {
-      setSelectedIndex(index - 1);
-    } else if (selectedIndex === index - 1) {
-      setSelectedIndex(index);
+    try {
+      onPatchesChange(updatedPatches);
+      if (selectedIndex === index) {
+        setSelectedIndex(index - 1);
+      } else if (selectedIndex === index - 1) {
+        setSelectedIndex(index);
+      }
+    } catch (error) {
+      console.error("Error in onPatchesChange callback:", error);
     }
   };
 
@@ -62,11 +78,15 @@ export const PatchEditor: React.FC<PatchEditorProps> = ({ patches, onPatchesChan
       updatedPatches[index + 1],
       updatedPatches[index],
     ];
-    onPatchesChange(updatedPatches);
-    if (selectedIndex === index) {
-      setSelectedIndex(index + 1);
-    } else if (selectedIndex === index + 1) {
-      setSelectedIndex(index);
+    try {
+      onPatchesChange(updatedPatches);
+      if (selectedIndex === index) {
+        setSelectedIndex(index + 1);
+      } else if (selectedIndex === index + 1) {
+        setSelectedIndex(index);
+      }
+    } catch (error) {
+      console.error("Error in onPatchesChange callback:", error);
     }
   };
 

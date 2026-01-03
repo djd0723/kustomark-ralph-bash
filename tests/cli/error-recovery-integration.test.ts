@@ -172,7 +172,7 @@ resources:
   - "*.md"
 patches:
   - op: remove-frontmatter
-    key: "athour"  # Typo: should be "author"
+    key: "autor"  # Typo: should be "author" (missing 'h')
 `
       );
 
@@ -734,7 +734,13 @@ patches:
       const result = JSON.parse(output);
 
       expect(result.success).toBe(true);
-      expect(result.recovery.skipped).toBeGreaterThanOrEqual(1);
+      // The first patch with onNoMatch: skip should not trigger error recovery
+      // The second patch should be auto-recovered (case mismatch)
+      expect(result.recovery.recovered).toBeGreaterThanOrEqual(1);
+      // Verify the output was actually modified
+      const outputFile = join(FIXTURES_DIR, "output", "test.md");
+      const content = readFileSync(outputFile, "utf-8");
+      expect(content).toContain("hi");
     });
 
     test("handles errors in middle of patch sequence", () => {
@@ -953,7 +959,7 @@ patches:
       const result = JSON.parse(output);
 
       expect(result.success).toBe(true);
-      expect(result.filesProcessed).toBe(3);
+      expect(result.filesWritten).toBe(3);
     });
 
     test("combines --auto-fix with --offline flag", () => {

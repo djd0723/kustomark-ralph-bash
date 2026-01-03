@@ -2025,7 +2025,10 @@ export async function applySinglePatch(
     const errorMsg = `Patch '${patchDesc}' matched 0 times`;
 
     if (onNoMatch === "error") {
-      throw new Error(errorMsg);
+      throw new PatchError(errorMsg, "PATCH_NO_MATCH", {
+        patchIndex,
+        operation: patch.op,
+      });
     }
     if (onNoMatch === "warn") {
       // Generate intelligent suggestions for the failed patch

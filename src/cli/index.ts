@@ -93,7 +93,7 @@ import { analyzeCommand } from "./analyze-command.js";
 import { handleBenchmarkCommand } from "./benchmark-command.js";
 import { recordBuild } from "./build-history.js";
 import { debugCommand } from "./debug-command.js";
-import { presentRecoveryOptions } from "./error-recovery-ui.js";
+import { presentRecoveryOptions, type RecoveryResult } from "./error-recovery-ui.js";
 import { getCommandHelp, getMainHelp, isValidHelpCommand } from "./help.js";
 import { initNonInteractive } from "./init-command.js";
 import { initInteractive } from "./init-interactive.js";
@@ -223,6 +223,7 @@ interface BuildResult {
   stats?: BuildStats; // Optional stats when --stats flag is used
   dryRun?: boolean; // True if --dry-run flag was used
   dryRunAnalysis?: DryRunAnalysis; // Analysis results when --dry-run or --analyze is used
+  recovery?: RecoveryStats; // Error recovery statistics (only present when --auto-fix is used)
 }
 
 interface DiffResult {
@@ -1147,15 +1148,32 @@ async function applyPatches(
               explanation: r.message,
             }));
 
-            // Present recovery options to user (if interactive)
-            const selectedRecovery =
-              options.format !== "json"
-                ? await presentRecoveryOptions(error.message, currentContent, patch, uiRecoveries)
-                : uiRecoveries.length > 0 &&
-                    uiRecoveries[0]?.confidence &&
-                    uiRecoveries[0].confidence >= 0.8
-                  ? uiRecoveries[0]
-                  : null;
+            // Handle recovery based on mode (interactive vs JSON)
+            let selectedRecovery: RecoveryResult | null = null;
+
+            if (options.format === "json") {
+              // JSON/non-interactive mode: auto-apply high-confidence recoveries
+              if (uiRecoveries.length > 0) {
+                // Sort by confidence (highest first)
+                const sortedRecoveries = [...uiRecoveries].sort(
+                  (a, b) => b.confidence - a.confidence,
+                );
+                const bestRecovery = sortedRecoveries[0];
+
+                // Auto-apply if confidence > 0.8
+                if (bestRecovery && bestRecovery.confidence > 0.8) {
+                  selectedRecovery = bestRecovery;
+                }
+              }
+            } else {
+              // Interactive mode: present recovery options to user
+              selectedRecovery = await presentRecoveryOptions(
+                error.message,
+                currentContent,
+                patch,
+                uiRecoveries,
+              );
+            }
 
             if (selectedRecovery?.fixedPatch) {
               // Apply the fixed patch
@@ -1197,6 +1215,10 @@ async function applyPatches(
                 recoveryStats.skipped++;
               } else {
                 recoveryStats.failed++;
+                // In non-interactive mode (JSON), fail the build if no recovery available
+                if (options.format === "json") {
+                  throw error;
+                }
               }
               patchesSkippedForFile++;
             }
@@ -2410,7 +2432,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       ? await applyPatchesParallel(
           resourcesToProcess,
           contentOps,
-          config.onNoMatch || "warn",
+          config.onNoMatch || (options.autoFix ? "error" : "warn"),
           options,
           config,
           outputDir,
@@ -2420,7 +2442,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       : await applyPatches(
           resourcesToProcess,
           contentOps,
-          config.onNoMatch || "warn",
+          config.onNoMatch || (options.autoFix ? "error" : "warn"),
           options,
           config,
           outputDir,
@@ -2770,6 +2792,7 @@ async function buildCommand(path: string, options: CLIOptions): Promise<number> 
       stats,
       ...(options.dryRun && { dryRun: true }),
       ...(dryRunAnalysis && { dryRunAnalysis }),
+      ...(options.autoFix && recoveryStats && { recovery: recoveryStats }),
     };
 
     if (options.format === "json") {
@@ -3018,7 +3041,7 @@ async function diffCommand(path: string, options: CLIOptions): Promise<number> {
       await applyPatches(
         originalResources,
         config.patches || [],
-        config.onNoMatch || "warn",
+        config.onNoMatch || (options.autoFix ? "error" : "warn"),
         options,
         config,
         outputDir,
@@ -4092,9 +4115,10 @@ async function watchCommand(path: string, options: CLIOptions): Promise<number> 
       process.exit(0);
     };
 
-    // Register signal handlers
-    process.on("SIGINT", cleanup);
-    process.on("SIGTERM", cleanup);
+    // Register signal handlers for graceful shutdown
+    // Use once() to ensure cleanup only runs once even if signal is sent multiple times
+    process.once("SIGINT", cleanup);
+    process.once("SIGTERM", cleanup);
 
     log("Watching for changes... (press Ctrl+C to stop)", 1, options);
 
@@ -4179,7 +4203,7 @@ async function performWatchBuild(
     } = await applyPatches(
       resources,
       config.patches || [],
-      config.onNoMatch || "warn",
+      config.onNoMatch || (options.autoFix ? "error" : "warn"),
       options,
       config,
       outputDir,

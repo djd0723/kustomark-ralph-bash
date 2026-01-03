@@ -127,7 +127,11 @@ class SectionIdTypoRecovery implements ErrorRecoveryStrategy {
     ];
 
     return (
-      sectionOps.includes(patch.op) && _error.message.includes("matched 0 times") && "id" in patch
+      sectionOps.includes(patch.op) &&
+      (_error.message.includes("matched 0 times") ||
+        _error.message.includes("not found") ||
+        _error.message.includes("failed")) &&
+      "id" in patch
     );
   }
 
@@ -165,10 +169,9 @@ class SectionIdTypoRecovery implements ErrorRecoveryStrategy {
       };
     }
 
-    // Calculate confidence based on distance
-    const maxDistance = Math.max(3, Math.floor(targetId.length * 0.3));
-    const normalizedDistance = Math.min(1, bestMatch.distance / maxDistance);
-    const confidence = this.confidence * (1 - normalizedDistance);
+    // Use the confidence from findSimilarStrings (which uses edit distance similarity)
+    // Scale it by our base confidence
+    const confidence = Math.min(this.confidence, bestMatch.confidence);
 
     // Create fixed patch
     const fixedPatch = { ...patch, id: bestMatch.value };
@@ -209,7 +212,11 @@ class CaseMismatchRecovery implements ErrorRecoveryStrategy {
     }
 
     // Check if error is about not matching
-    if (!_error.message.includes("matched 0 times")) {
+    if (
+      !_error.message.includes("matched 0 times") &&
+      !_error.message.includes("not found") &&
+      !_error.message.includes("failed")
+    ) {
       return false;
     }
 
@@ -318,7 +325,11 @@ class WhitespaceNormalizationRecovery implements ErrorRecoveryStrategy {
       return false;
     }
 
-    if (!_error.message.includes("matched 0 times")) {
+    if (
+      !_error.message.includes("matched 0 times") &&
+      !_error.message.includes("not found") &&
+      !_error.message.includes("failed")
+    ) {
       return false;
     }
 
@@ -431,7 +442,12 @@ class FrontmatterKeyTypoRecovery implements ErrorRecoveryStrategy {
 
   canRecover(_error: PatchError, _content: string, patch: PatchOperation): boolean {
     const frontmatterOps = ["remove-frontmatter", "rename-frontmatter"];
-    return frontmatterOps.includes(patch.op) && _error.message.includes("matched 0 times");
+    return (
+      frontmatterOps.includes(patch.op) &&
+      (_error.message.includes("matched 0 times") ||
+        _error.message.includes("not found") ||
+        _error.message.includes("failed"))
+    );
   }
 
   recover(_error: PatchError, content: string, patch: PatchOperation): RecoveryResult {
@@ -471,10 +487,9 @@ class FrontmatterKeyTypoRecovery implements ErrorRecoveryStrategy {
       };
     }
 
-    // Calculate confidence based on distance
-    const maxDistance = Math.max(3, Math.floor(targetKey.length * 0.3));
-    const normalizedDistance = Math.min(1, bestMatch.distance / maxDistance);
-    const confidence = this.confidence * (1 - normalizedDistance);
+    // Use the confidence from findSimilarStrings (which uses edit distance similarity)
+    // Scale it by our base confidence
+    const confidence = Math.min(this.confidence, bestMatch.confidence);
 
     // Create fixed patch
     let fixedPatch: PatchOperation;
@@ -518,7 +533,11 @@ class LineFuzzyMatchRecovery implements ErrorRecoveryStrategy {
   canRecover(_error: PatchError, _content: string, patch: PatchOperation): boolean {
     const lineOps = ["replace-line", "insert-after-line", "insert-before-line"];
     return (
-      lineOps.includes(patch.op) && _error.message.includes("matched 0 times") && "match" in patch
+      lineOps.includes(patch.op) &&
+      (_error.message.includes("matched 0 times") ||
+        _error.message.includes("not found") ||
+        _error.message.includes("failed")) &&
+      "match" in patch
     );
   }
 
@@ -594,7 +613,11 @@ class MarkerOrderRecovery implements ErrorRecoveryStrategy {
       return false;
     }
 
-    if (!_error.message.includes("matched 0 times")) {
+    if (
+      !_error.message.includes("matched 0 times") &&
+      !_error.message.includes("not found") &&
+      !_error.message.includes("failed")
+    ) {
       return false;
     }
 
