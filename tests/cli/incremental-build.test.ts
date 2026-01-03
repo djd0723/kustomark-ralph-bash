@@ -56,10 +56,15 @@ async function runCLI(args: string[]): Promise<{ stdout: string; stderr: string;
 }
 
 describe("Incremental Build Integration Tests", () => {
-  const fixtureRoot = resolve(__dirname, "../fixtures/incremental");
+  // Use a unique directory for each test run to avoid conflicts when tests run in parallel
+  let fixtureRoot: string;
 
   beforeEach(() => {
-    // Clean up if exists
+    // Create a unique directory for this test using timestamp and random value
+    const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    fixtureRoot = resolve(__dirname, "../fixtures/incremental", uniqueId);
+
+    // Clean up if exists (shouldn't happen with unique IDs)
     if (existsSync(fixtureRoot)) {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
