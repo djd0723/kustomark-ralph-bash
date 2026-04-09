@@ -1,0 +1,31 @@
+src/core/types.ts
+  7adcf94947785e7a 448-461,583
+src/core/patch-engine.ts
+  7adcf94947785e7a 1379-1434,2539-2542,2697-2698
+IMPLEMENTATION_PLAN.md
+  7adcf94947785e7a 3,9-65
+src/core/schema.ts
+  7adcf94947785e7a 2528-2578
+tests/core/table-operations-integration.test.ts
+  7adcf94947785e7a 4,1717-1898
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "bd3cfa597c0cac24bad3cf9ac7c92c68b1e4dead",
+  "prompts": {
+    "7adcf94947785e7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e5edef1-7185-4a0d-9b08-16a1224fa2ba",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 412,
+      "total_deletions": 2,
+      "accepted_lines": 412,
+      "overriden_lines": 0
+    }
+  }
+}
