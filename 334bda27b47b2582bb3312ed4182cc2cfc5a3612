@@ -1,0 +1,39 @@
+IMPLEMENTATION_PLAN.md
+  5b1829a8572437c5 3,9-61
+src/core/index.ts
+  5b1829a8572437c5 173,300
+src/core/config-parser.ts
+  5b1829a8572437c5 623,1055-1101
+src/core/types.ts
+  5b1829a8572437c5 476-491,628
+src/core/patch-engine.ts
+  5b1829a8572437c5 1476-1526,2692-2702,2865-2872
+README.md
+  5b1829a8572437c5 3736-3810
+.github/workflows/performance.yml
+  5b1829a8572437c5 111,175
+tests/core/table-operations-integration.test.ts
+  5b1829a8572437c5 2036-2261
+src/core/schema.ts
+  5b1829a8572437c5 2706-2737,2739-2741,2743-2765,2767-2772
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "334bda27b47b2582bb3312ed4182cc2cfc5a3612",
+  "prompts": {
+    "5b1829a8572437c5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "81bbbf01-efb9-4045-b38c-d3aec9e7ff89",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 592,
+      "total_deletions": 12,
+      "accepted_lines": 571,
+      "overriden_lines": 3
+    }
+  }
+}
