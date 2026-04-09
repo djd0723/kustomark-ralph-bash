@@ -33,6 +33,41 @@ import type {
 import { validateNotContains } from "./validators.js";
 
 /**
+ * Substitutes ${varName} placeholders in a string with values from the vars map.
+ * Unknown variables are left as-is.
+ */
+export function resolveVars(str: string, vars: Record<string, string>): string {
+  if (!str || Object.keys(vars).length === 0) return str;
+  return str.replace(/\$\{([^}]+)\}/g, (match, name: string) => {
+    return Object.hasOwn(vars, name) ? (vars[name] as string) : match;
+  });
+}
+
+/**
+ * Substitutes ${varName} placeholders in all string fields of a patch operation.
+ * Returns a new patch object with substitutions applied.
+ */
+export function resolveVarsInPatch<T extends Record<string, unknown>>(
+  patch: T,
+  vars: Record<string, string>,
+): T {
+  if (Object.keys(vars).length === 0) return patch;
+  const resolved: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (typeof value === "string") {
+      resolved[key] = resolveVars(value, vars);
+    } else if (Array.isArray(value)) {
+      resolved[key] = value.map((item) =>
+        typeof item === "string" ? resolveVars(item, vars) : item,
+      );
+    } else {
+      resolved[key] = value;
+    }
+  }
+  return resolved as T;
+}
+
+/**
  * Parse markdown content to find all sections with their boundaries.
  *
  * This function identifies all markdown headers (levels 1-6) and creates section

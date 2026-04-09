@@ -637,6 +637,8 @@ export interface KustomarkConfig {
   security?: SecurityConfig;
   /** Plugin configurations */
   plugins?: PluginConfig[];
+  /** Variable definitions for substitution in patch values. Reference as ${varName}. */
+  vars?: Record<string, string>;
 }
 
 /**

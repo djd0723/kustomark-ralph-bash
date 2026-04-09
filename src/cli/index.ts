@@ -60,6 +60,7 @@ import {
   applySinglePatch,
   applyPatches as coreApplyPatches,
   applyPatchesWithPlugins as coreApplyPatchesWithPlugins,
+  resolveVarsInPatch,
 } from "../core/patch-engine.js";
 import { createPluginRegistry } from "../core/plugin-loader.js";
 import type { PluginRegistry } from "../core/plugin-types.js";
@@ -1097,6 +1098,19 @@ async function applyPatches(
       continue;
     }
 
+    // Resolve variables in patch string fields
+    const vars = { ...(config.vars ?? {}), ...(options.var ?? {}) };
+    const resolvedPatches =
+      Object.keys(vars).length > 0
+        ? applicablePatches.map(
+            (p) =>
+              resolveVarsInPatch(
+                p as unknown as Record<string, unknown>,
+                vars,
+              ) as unknown as PatchOperation,
+          )
+        : applicablePatches;
+
     // Apply all applicable patches using the core patch engine
     const verbose = options.verbosity >= 2;
 
@@ -1107,8 +1121,8 @@ async function applyPatches(
       let patchesAppliedForFile = 0;
       let patchesSkippedForFile = 0;
 
-      for (let patchIndex = 0; patchIndex < applicablePatches.length; patchIndex++) {
-        const patch = applicablePatches[patchIndex];
+      for (let patchIndex = 0; patchIndex < resolvedPatches.length; patchIndex++) {
+        const patch = resolvedPatches[patchIndex];
         if (!patch) continue;
         const opType = patch.op;
         operationCounts[opType] = (operationCounts[opType] || 0) + 1;
@@ -1243,7 +1257,7 @@ async function applyPatches(
     } else {
       // No --auto-fix, use batch processing for better performance
       // Check if any patch uses plugins
-      const hasPluginPatches = applicablePatches.some((patch) => patch.op === "plugin");
+      const hasPluginPatches = resolvedPatches.some((patch) => patch.op === "plugin");
 
       // Calculate relative path from output directory
       const absoluteFilePath = isAbsolute(filePath) ? filePath : resolve(filePath);
@@ -1254,7 +1268,7 @@ async function applyPatches(
       const result = hasPluginPatches
         ? await coreApplyPatchesWithPlugins(
             content,
-            applicablePatches,
+            resolvedPatches,
             absoluteFilePath,
             config,
             relativePath,
@@ -1262,17 +1276,17 @@ async function applyPatches(
             onNoMatch,
             verbose,
           )
-        : await coreApplyPatches(content, applicablePatches, onNoMatch, verbose);
+        : await coreApplyPatches(content, resolvedPatches, onNoMatch, verbose);
 
       patchedResources.set(filePath, result.content);
       totalPatchesApplied += result.applied;
 
       // Track skipped patches (patches that didn't match + condition-skipped patches)
-      const skipped = applicablePatches.length - result.applied - result.conditionSkipped;
+      const skipped = resolvedPatches.length - result.applied - result.conditionSkipped;
       totalPatchesSkipped += skipped;
 
       // Count patches by operation type
-      for (const patch of applicablePatches) {
+      for (const patch of resolvedPatches) {
         const opType = patch.op;
         operationCounts[opType] = (operationCounts[opType] || 0) + 1;
       }

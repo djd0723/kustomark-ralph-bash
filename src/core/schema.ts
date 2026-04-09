@@ -225,6 +225,12 @@ export function generateSchema(): object {
           ],
         },
       },
+      vars: {
+        type: "object",
+        description:
+          "Variable definitions for substitution in patch values. Reference as $" + "{varName}.",
+        additionalProperties: { type: "string" },
+      },
       onNoMatch: {
         type: "string",
         enum: ["skip", "warn", "error"],

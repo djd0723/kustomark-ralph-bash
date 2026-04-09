@@ -178,6 +178,8 @@ export {
   findSection,
   generateSlug,
   parseSections,
+  resolveVars,
+  resolveVarsInPatch,
 } from "./patch-engine.js";
 // Export patch inheritance functions
 export { resolveInheritance } from "./patch-inheritance.js";

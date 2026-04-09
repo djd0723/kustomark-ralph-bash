@@ -200,6 +200,16 @@ ${formatSection("PERFORMANCE OPTIONS")}
   ${formatFlag("--clean-cache")}          Clear build cache before building
   ${formatFlag("--cache-dir")} <path>     Custom cache directory
 
+${formatSection("VARIABLE SUBSTITUTION")}
+  ${formatFlag("--var")} <NAME=VALUE>        Override a variable defined in the vars section of kustomark.yaml (can be repeated)
+
+  Variables defined under the ${formatHighlight("vars")} key in kustomark.yaml can be referenced
+  in any patch string value as ${formatHighlight("$" + "{varName}")}. CLI flags override config-defined vars.
+
+  Example:
+    kustomark.yaml: ${formatExample("vars:\n    environment: staging")}
+    Override:       ${formatFlag("--var environment=production")}
+
 ${formatSection("GROUP FILTERING")}
   ${formatFlag("--enable-groups")} <list>   Enable only specified groups (comma-separated)
   ${formatFlag("--disable-groups")} <list>  Disable specified groups (comma-separated)

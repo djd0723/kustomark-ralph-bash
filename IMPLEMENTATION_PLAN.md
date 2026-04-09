@@ -1,10 +1,53 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (Variable Substitution in Patches - COMPLETE!):**
+
+* ✅ **VARIABLE SUBSTITUTION**: `${varName}` placeholders in patch string values are replaced at build time
+* ✅ **CONFIG `vars` SECTION**: Declare variables with defaults in `kustomark.yaml` under `vars:`
+* ✅ **CLI `--var` OVERRIDE**: `--var NAME=VALUE` overrides config-level vars (previously only worked for templates)
+* ✅ **UNKNOWN VARS PRESERVED**: Unreferenced `${VAR}` placeholders are left as-is (no silent failures)
+* ✅ **15 NEW TESTS PASSING**: Unit tests in `tests/core/vars.test.ts`, integration tests in `tests/cli/vars-integration.test.ts`
+* ✅ **3,563 TESTS PASSING**: All tests pass with 0 failures
+
+**Variable Substitution Details:**
+
+1. **Usage**
+   ```yaml
+   apiVersion: kustomark/v1
+   kind: Kustomization
+   vars:
+     environment: production
+     version: "1.0.0"
+   patches:
+     - op: replace
+       old: "https://api.staging.example.com"
+       new: "https://api.${environment}.example.com"
+   ```
+   ```bash
+   kustomark build . --var environment=staging --var version=2.0.0
+   ```
+
+2. **Resolution order**: CLI `--var` overrides `vars:` config defaults
+
+3. **Implementation Files**
+   * `src/core/types.ts` — Added `vars?: Record<string, string>` to `KustomarkConfig`
+   * `src/core/patch-engine.ts` — Added `resolveVars()` and `resolveVarsInPatch()` functions
+   * `src/core/index.ts` — Re-exported new functions
+   * `src/cli/index.ts` — Applied var resolution in `applyPatches()` before patch engine; connected `options.var` + `config.vars`
+   * `src/core/schema.ts` — Added `vars` to JSON schema with additionalProperties string validation
+   * `src/cli/help.ts` — Added VARIABLE SUBSTITUTION section to build command help
+   * `tests/core/vars.test.ts` — 11 unit tests
+   * `tests/cli/vars-integration.test.ts` — 4 integration tests
+
+**Status:** Variable Substitution COMPLETE! ✅
+
+***
 
 **2026-04-09 (JSON/YAML Patch Operations + Bug Fixes - COMPLETE!):**
 - ✅ **JSON/YAML PATCH OPERATIONS**: Implemented `json-set`, `json-delete`, and `json-merge` patch operations for `.json`, `.yaml`, and `.yml` files
