@@ -1,0 +1,33 @@
+src/core/schema.ts
+  2f30e745e114476e 234-241
+IMPLEMENTATION_PLAN.md
+  2f30e745e114476e 3,9-57
+src/core/types.ts
+  2f30e745e114476e 642-643
+src/cli/index.ts
+  2f30e745e114476e 170,832-847,1118-1128
+tests/cli/vars-integration.test.ts
+  2f30e745e114476e 143-329
+src/cli/help.ts
+  2f30e745e114476e 204-205,208-209,211-214,217,219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "c2508f5415580af7e58a13c293b6d2a334180218",
+  "prompts": {
+    "2f30e745e114476e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "008347d8-53e1-42c0-be59-7b2feebc6c61",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 287,
+      "total_deletions": 6,
+      "accepted_lines": 287,
+      "overriden_lines": 0
+    }
+  }
+}
