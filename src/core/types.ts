@@ -467,6 +467,37 @@ export interface PluginPatch extends PatchCommonFields {
 }
 
 /**
+ * JSON/YAML set operation - sets a value at a dot-notation path
+ */
+export interface JsonSetPatch extends PatchCommonFields {
+  op: "json-set";
+  /** Dot-notation path to the value (e.g. "server.port" or "users[0].name") */
+  path: string;
+  /** Value to set at the path */
+  value: unknown;
+}
+
+/**
+ * JSON/YAML delete operation - deletes a key at a dot-notation path
+ */
+export interface JsonDeletePatch extends PatchCommonFields {
+  op: "json-delete";
+  /** Dot-notation path to the key to delete */
+  path: string;
+}
+
+/**
+ * JSON/YAML merge operation - deep merges an object into the file
+ */
+export interface JsonMergePatch extends PatchCommonFields {
+  op: "json-merge";
+  /** Object to deep merge (at root or at path) */
+  value: Record<string, unknown>;
+  /** Optional dot-notation path to merge into (defaults to root) */
+  path?: string;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -498,7 +529,10 @@ export type PatchOperation =
   | AddTableColumnPatch
   | RemoveTableColumnPatch
   | ExecPatch
-  | PluginPatch;
+  | PluginPatch
+  | JsonSetPatch
+  | JsonDeletePatch
+  | JsonMergePatch;
 
 /**
  * Global validator configuration

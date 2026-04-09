@@ -1,10 +1,70 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (JSON/YAML Patch Operations + Bug Fixes - COMPLETE!):**
+- ✅ **JSON/YAML PATCH OPERATIONS**: Implemented `json-set`, `json-delete`, and `json-merge` patch operations for `.json`, `.yaml`, and `.yml` files
+- ✅ **HTTP FETCHER BUG FIX**: Fixed macOS symlink bug (`/var` → `/private/var`) causing files to be skipped during tar.gz extraction
+- ✅ **BUILD HISTORY FIX**: Added counter suffix to `buildId` (`${timestamp}-${N}`) to prevent collisions when builds happen within the same millisecond
+- ✅ **TEST FIXES**: Fixed build-history test assertion, file-viewer clipboard test, file-browser mixed-case sort test, and template-manager symlink test
+- ✅ **MISSING PACKAGES**: Installed `react-markdown`, `clsx`, `react-diff-viewer-continued`, `remark-gfm` at root level for test runner access
+- ✅ **3,533 TESTS PASSING**: All tests pass with 0 failures
+
+**JSON/YAML Patch Operations Details:**
+
+1. **New Operations**
+   - `json-set`: Set a value at a dot-notation path (e.g. `server.port`, `users[0].name`)
+   - `json-delete`: Delete a key/value at a dot-notation path
+   - `json-merge`: Deep merge an object into the document (at root or at a path)
+
+2. **Format Support**
+   - Works on `.json`, `.yaml`, and `.yml` files
+   - Non-matching files are returned unchanged (count=0)
+   - YAML files parsed with the `yaml` package, preserving valid YAML output
+   - JSON files formatted with 2-space indentation
+
+3. **Implementation Files**
+   - `src/core/types.ts` — Added `JsonSetPatch`, `JsonDeletePatch`, `JsonMergePatch` interfaces
+   - `src/core/patch-engine.ts` — Added `applyJsonSet`, `applyJsonDelete`, `applyJsonMerge` functions and integrated into `applySinglePatch`
+   - `src/core/schema.ts` — Added JSON schema definitions for all three operations
+   - `tests/core/json-patch.test.ts` — 22 comprehensive tests (all passing)
+
+4. **Example Usage**
+   ```yaml
+   patches:
+     # Set a specific value
+     - op: json-set
+       path: "server.port"
+       value: 8080
+
+     # Delete a key
+     - op: json-delete
+       path: "debug.verbose"
+
+     # Deep merge configuration
+     - op: json-merge
+       value:
+         logging:
+           level: "info"
+           format: "json"
+   ```
+
+5. **Bug Fixes**
+   - `src/core/http-fetcher.ts`: Used `realpath()` for `baseDir` in `readFilesRecursively()` so macOS symlinks (`/var` → `/private/var`) don't cause path containment checks to fail
+   - `src/core/build-history.ts`: Added module-level counter to build IDs preventing timestamp collision
+   - `tests/core/build-history.test.ts`: Updated assertion to use `startsWith` for new ID format
+   - `tests/web/file-viewer.test.tsx`: Fixed clipboard mock and async assertion timing
+   - `tests/web/file-browser.test.ts`: Used unique filenames for mixed-case sort test
+   - `tests/core/template-manager.test.ts`: Used `realpathSync` for symlink-aware path comparison
+
+**Status:** JSON/YAML Patch Operations COMPLETE! ✅
+
+---
+
 
 **2026-01-03 (Test Suite Fixes & Code Quality - COMPLETE!):**
 - ✅ **100% TEST PASS RATE**: Fixed failing help.test.ts - updated for 20 commands (snapshot and profile added)

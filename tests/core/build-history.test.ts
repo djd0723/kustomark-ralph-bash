@@ -165,7 +165,7 @@ describe("Build History Module", () => {
       expect(record.files["file2.md"]).toBeDefined();
       expect(record.totalSize).toBeGreaterThan(0);
       expect(record.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-      expect(record.id).toBe(record.timestamp);
+      expect(record.id.startsWith(record.timestamp)).toBe(true);
     });
 
     test("should record a failed build with error message", async () => {

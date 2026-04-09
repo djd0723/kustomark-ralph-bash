@@ -179,9 +179,12 @@ Push changes back to upstream.
 
 ### Multi-Format Support
 
-Patch YAML, JSON, TOML.
+**Status**: Partially Implemented (JSON/YAML only)
 
-**Rationale**: Scope creep. Tools exist (yq, jq). Kustomark is markdown-specific.
+`json-set`, `json-delete`, and `json-merge` operations now work on `.json`, `.yaml`, and `.yml` files.
+TOML remains unimplemented (tools like `taplo` exist for TOML).
+
+See `src/core/patch-engine.ts` (`applyJsonSet`, `applyJsonDelete`, `applyJsonMerge`).
 
 ## Future Candidates
 

@@ -864,9 +864,9 @@ describe("File Browser Routes", () => {
     });
 
     test("should handle mixed case file names in sorting", async () => {
-      writeFileSync(join(fixtureRoot, "ABC.txt"), "A");
-      writeFileSync(join(fixtureRoot, "abc.txt"), "B");
-      writeFileSync(join(fixtureRoot, "Abc.txt"), "C");
+      writeFileSync(join(fixtureRoot, "apple.txt"), "A");
+      writeFileSync(join(fixtureRoot, "Banana.txt"), "B");
+      writeFileSync(join(fixtureRoot, "cherry.txt"), "C");
 
       const response = await request(app)
         .get("/api/files/list")

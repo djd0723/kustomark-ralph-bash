@@ -17,6 +17,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
+let _buildCounter = 0;
+
 /**
  * File record for a single built file
  */
@@ -538,7 +540,7 @@ export async function recordBuild(
   },
 ): Promise<BuildRecord> {
   const timestamp = new Date().toISOString();
-  const buildId = timestamp;
+  const buildId = `${timestamp}-${++_buildCounter}`;
 
   // Create file records
   const fileRecords: Record<string, BuildFileRecord> = {};

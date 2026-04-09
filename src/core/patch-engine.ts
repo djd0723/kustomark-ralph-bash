@@ -1422,6 +1422,190 @@ export async function applyExec(
 }
 
 /**
+ * Check whether a file path is a JSON or YAML file based on its extension.
+ *
+ * @param filePath - Absolute or relative file path to check
+ * @returns true if the extension is .json, .yaml, or .yml
+ */
+function isJsonOrYamlFile(filePath: string): boolean {
+  const lower = filePath.toLowerCase();
+  return lower.endsWith(".json") || lower.endsWith(".yaml") || lower.endsWith(".yml");
+}
+
+/**
+ * Deep merge source into target, mutating target.
+ *
+ * Arrays are replaced (not concatenated). All other values are recursively
+ * merged when both sides are plain objects; otherwise source wins.
+ *
+ * @param target - Object to merge into
+ * @param source - Object whose values take precedence
+ */
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const [key, srcVal] of Object.entries(source)) {
+    const tgtVal = target[key];
+    if (
+      srcVal !== null &&
+      typeof srcVal === "object" &&
+      !Array.isArray(srcVal) &&
+      tgtVal !== null &&
+      typeof tgtVal === "object" &&
+      !Array.isArray(tgtVal)
+    ) {
+      deepMerge(tgtVal as Record<string, unknown>, srcVal as Record<string, unknown>);
+    } else {
+      target[key] = srcVal;
+    }
+  }
+}
+
+/**
+ * Parse content as JSON or YAML depending on file extension.
+ *
+ * @param content - Raw file content
+ * @param filePath - File path (used to choose parser)
+ * @returns Parsed object
+ * @throws If content cannot be parsed
+ */
+function parseContent(content: string, filePath: string): Record<string, unknown> {
+  if (filePath.toLowerCase().endsWith(".json")) {
+    return JSON.parse(content) as Record<string, unknown>;
+  }
+  // .yaml / .yml
+  return yaml.load(content) as Record<string, unknown>;
+}
+
+/**
+ * Serialize an object back to JSON or YAML depending on file extension.
+ *
+ * JSON is indented with 2 spaces. YAML uses js-yaml defaults.
+ *
+ * @param obj - Object to serialize
+ * @param filePath - File path (used to choose serializer)
+ * @returns Serialized string
+ */
+function serializeContent(obj: Record<string, unknown>, filePath: string): string {
+  if (filePath.toLowerCase().endsWith(".json")) {
+    return JSON.stringify(obj, null, 2);
+  }
+  // .yaml / .yml
+  return yaml.dump(obj);
+}
+
+/**
+ * Apply a json-set patch operation.
+ *
+ * Parses the file content, sets the value at the given dot-notation path,
+ * then serializes back. Returns count=0 for non-JSON/YAML files.
+ *
+ * @param content - File content
+ * @param path - Dot-notation path (e.g. "server.port")
+ * @param value - Value to set
+ * @param filePath - File path (determines format)
+ * @returns Updated content and match count
+ */
+export function applyJsonSet(
+  content: string,
+  path: string,
+  value: unknown,
+  filePath: string,
+): { content: string; count: number } {
+  if (!isJsonOrYamlFile(filePath)) {
+    return { content, count: 0 };
+  }
+  try {
+    const obj = parseContent(content, filePath);
+    setNestedValue(obj, path, value);
+    return { content: serializeContent(obj, filePath), count: 1 };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`json-set patch failed: ${msg}`);
+    return { content, count: 0 };
+  }
+}
+
+/**
+ * Apply a json-delete patch operation.
+ *
+ * Parses the file content, deletes the key at the given dot-notation path,
+ * then serializes back. Returns count=0 when path not found or non-JSON/YAML.
+ *
+ * @param content - File content
+ * @param path - Dot-notation path to delete
+ * @param filePath - File path (determines format)
+ * @returns Updated content and match count
+ */
+export function applyJsonDelete(
+  content: string,
+  path: string,
+  filePath: string,
+): { content: string; count: number } {
+  if (!isJsonOrYamlFile(filePath)) {
+    return { content, count: 0 };
+  }
+  try {
+    const obj = parseContent(content, filePath);
+    const deleted = deleteNestedValue(obj, path);
+    if (!deleted) {
+      return { content, count: 0 };
+    }
+    return { content: serializeContent(obj, filePath), count: 1 };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`json-delete patch failed: ${msg}`);
+    return { content, count: 0 };
+  }
+}
+
+/**
+ * Apply a json-merge patch operation.
+ *
+ * Parses the file content, deep-merges the given object at the root or at
+ * the optional path, then serializes back. Returns count=0 for non-JSON/YAML.
+ *
+ * @param content - File content
+ * @param value - Object to deep merge
+ * @param filePath - File path (determines format)
+ * @param path - Optional dot-notation path to merge into (root if omitted)
+ * @returns Updated content and match count
+ */
+export function applyJsonMerge(
+  content: string,
+  value: Record<string, unknown>,
+  filePath: string,
+  path?: string,
+): { content: string; count: number } {
+  if (!isJsonOrYamlFile(filePath)) {
+    return { content, count: 0 };
+  }
+  try {
+    const obj = parseContent(content, filePath);
+    if (path) {
+      // Navigate to target, creating intermediate objects as needed
+      const existing = getNestedValue(obj, path);
+      if (
+        existing !== null &&
+        existing !== undefined &&
+        typeof existing === "object" &&
+        !Array.isArray(existing)
+      ) {
+        deepMerge(existing as Record<string, unknown>, value);
+      } else {
+        // Path doesn't exist or is not an object - set it directly
+        setNestedValue(obj, path, { ...value });
+      }
+    } else {
+      deepMerge(obj, value);
+    }
+    return { content: serializeContent(obj, filePath), count: 1 };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`json-merge patch failed: ${msg}`);
+    return { content, count: 0 };
+  }
+}
+
+/**
  * Enhanced wrapper functions that throw PatchError on failure
  * These maintain backward compatibility while providing better error messages
  */
@@ -1783,6 +1967,7 @@ export async function applySinglePatch(
   patch: PatchOperation,
   defaultOnNoMatch: OnNoMatchStrategy = "warn",
   verbose = false,
+  filePath = "",
 ): Promise<{
   content: string;
   count: number;
@@ -1995,6 +2180,18 @@ export async function applySinglePatch(
       result = await applyExec(content, patch.command, patch.timeout);
       break;
 
+    case "json-set":
+      result = applyJsonSet(content, patch.path, patch.value, filePath);
+      break;
+
+    case "json-delete":
+      result = applyJsonDelete(content, patch.path, filePath);
+      break;
+
+    case "json-merge":
+      result = applyJsonMerge(content, patch.value, filePath, patch.path);
+      break;
+
     case "plugin":
       // Plugin operation requires a registry to be passed
       // This will be handled by applyPatchesWithPlugins
@@ -2123,6 +2320,12 @@ function getPatchDescription(patch: PatchOperation): string {
       return `remove-table-column '${patch.column}' from table '${patch.table}'`;
     case "exec":
       return `exec '${patch.command}'`;
+    case "json-set":
+      return `json-set '${patch.path}'`;
+    case "json-delete":
+      return `json-delete '${patch.path}'`;
+    case "json-merge":
+      return patch.path ? `json-merge into '${patch.path}'` : "json-merge";
     case "plugin":
       return `plugin '${patch.plugin}'`;
     case "copy-file":
@@ -2402,7 +2605,7 @@ export async function applyPatchesWithPlugins(
       }
     } else {
       // Use regular applySinglePatch for non-plugin patches
-      const result = await applySinglePatch(currentContent, patch, defaultOnNoMatch, verbose);
+      const result = await applySinglePatch(currentContent, patch, defaultOnNoMatch, verbose, file);
       currentContent = result.content;
 
       if (result.conditionSkipped) {

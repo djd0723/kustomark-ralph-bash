@@ -241,8 +241,10 @@ async function readFilesRecursively(
   const files: ExtractedFile[] = [];
   const entries = await readdir(dir, { withFileTypes: true });
 
-  // Normalize base directory for security validation
-  const normalizedBaseDir = resolve(baseDir);
+  // Normalize base directory for security validation - use realpath to resolve symlinks
+  // (on macOS, /var is a symlink to /private/var, so realpath() returns /private/var/... but
+  //  resolve() returns /var/... causing the path containment check to fail)
+  const normalizedBaseDir = await realpath(resolve(baseDir));
 
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);

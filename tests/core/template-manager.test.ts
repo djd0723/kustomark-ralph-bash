@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync, existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -255,7 +255,7 @@ describe("Template Manager", () => {
 
       expect(source.id).toBe("source-test");
       expect(source.source).toBe("user");
-      expect(source.path).toBe(projectTemplateDir);
+      expect(source.path).toBe(realpathSync(projectTemplateDir));
     });
 
     test("hasTemplate returns true for existing templates", async () => {

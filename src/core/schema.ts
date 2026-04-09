@@ -2679,6 +2679,192 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            {
+              type: "object",
+              required: ["op", "path", "value"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "json-set",
+                  description: "Set a value at a dot-notation path in a JSON or YAML file",
+                },
+                path: {
+                  type: "string",
+                  description: 'Dot-notation path to set (e.g. "server.port" or "users[0].name")',
+                },
+                value: {
+                  description: "Value to set at the path",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["op", "path"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "json-delete",
+                  description: "Delete a key at a dot-notation path in a JSON or YAML file",
+                },
+                path: {
+                  type: "string",
+                  description: 'Dot-notation path to delete (e.g. "server.debug")',
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["op", "value"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "json-merge",
+                  description:
+                    "Deep merge an object into a JSON or YAML file at root or at a given path",
+                },
+                value: {
+                  type: "object",
+                  description: "Object to deep merge",
+                  additionalProperties: true,
+                },
+                path: {
+                  type: "string",
+                  description: "Optional dot-notation path to merge into (defaults to root)",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
           ],
         },
       },
