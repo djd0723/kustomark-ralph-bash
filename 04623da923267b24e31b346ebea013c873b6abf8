@@ -1,0 +1,27 @@
+IMPLEMENTATION_PLAN.md
+  e6b95b3464a78e90 9-15
+src/core/list-parser.test.ts
+  e6b95b3464a78e90 13
+README.md
+  e6b95b3464a78e90 38,3613-3821
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "04623da923267b24e31b346ebea013c873b6abf8",
+  "prompts": {
+    "e6b95b3464a78e90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d253bc2f-16c3-4746-a75e-93825307652f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 218,
+      "total_deletions": 1,
+      "accepted_lines": 218,
+      "overriden_lines": 0
+    }
+  }
+}
