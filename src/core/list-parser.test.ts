@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { findList, type MarkdownList, parseLists } from "./list-parser.js";
+import { findList, parseLists } from "./list-parser.js";
 import { applyAddListItem, applyRemoveListItem, applySetListItem } from "./patch-engine.js";
 
 // ─── parseLists ──────────────────────────────────────────────────────────────

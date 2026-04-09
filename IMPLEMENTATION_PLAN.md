@@ -6,6 +6,13 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 ## Recent Enhancements
 
+**2026-04-09 (README Documentation - List Operations):**
+
+* ✅ **README.md List Operations section**: Added full documentation for `add-list-item`, `remove-list-item`, `set-list-item`
+* ✅ **Table of Contents**: Added `List Operations` entry between Table Operations and File Operations
+* ✅ **Fixed unused import**: Removed unused `MarkdownList` type import from `src/core/list-parser.test.ts` (TypeScript lint error)
+* ✅ **3,640 tests passing**: All tests pass with 0 failures, `bun check` clean
+
 **2026-04-09 (List Item Operations - COMPLETE!):**
 
 * ✅ **`add-list-item`**: Add items to unordered or ordered markdown lists at beginning, end, or specific position

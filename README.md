@@ -35,6 +35,7 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
 - [Security & Validation](#security--validation)
 - [Patch Operations](#patch-operations)
 - [Table Operations](#table-operations)
+- [List Operations](#list-operations)
 - [File Operations](#file-operations)
 - [Conditional Patches](#conditional-patches)
   - [Condition Types](#condition-types)
@@ -3608,6 +3609,215 @@ Output:
 **Notes:**
 - Removing a column affects all rows in the table
 - The header row and alignment row are also updated
+
+## List Operations
+
+List operations allow you to manipulate unordered (`-`, `*`, `+`) and ordered (`1.`, `2.`, ...) markdown lists, including task lists (`[ ]`/`[x]`). Lists can be identified by their zero-based index in the document or by the section ID of the heading that contains them.
+
+Sub-items (indented lines) are treated as part of their parent item and preserved automatically.
+
+### `add-list-item` - Add Item to List
+
+Add a new item to a markdown list at a specified position.
+
+```yaml
+- op: add-list-item
+  list: 0              # zero-based list index or section ID
+  item: "New feature"
+  position: -1         # -1 or omit = end, 0 = beginning, N = after Nth item (0-based)
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `list` | number \| string | Yes | Zero-based list index or section ID containing the list |
+| `item` | string | Yes | Text of the item to add (without bullet prefix) |
+| `position` | number | No | Insertion position: `0` = beginning, `-1` or omit = end, `N` = after Nth item |
+
+**Example:**
+
+Input:
+
+```markdown
+## Features
+
+- Alpha
+- Beta
+- Gamma
+```
+
+Config:
+
+```yaml
+- op: add-list-item
+  list: "features"
+  item: "Delta"
+  position: 1          # insert after "Beta" (index 1)
+```
+
+Output:
+
+```markdown
+## Features
+
+- Alpha
+- Beta
+- Delta
+- Gamma
+```
+
+**Task list support:**
+
+```yaml
+- op: add-list-item
+  list: 0
+  item: "[ ] Write tests"
+  position: 0          # prepend
+```
+
+### `remove-list-item` - Remove Item from List
+
+Remove an item from a markdown list by index or text match.
+
+```yaml
+# Remove by zero-based index
+- op: remove-list-item
+  list: 0
+  item: 2              # remove the third item
+
+# Remove by text match
+- op: remove-list-item
+  list: "my-section"
+  item: "Deprecated feature"
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `list` | number \| string | Yes | Zero-based list index or section ID containing the list |
+| `item` | number \| string | Yes | Zero-based index of the item to remove, or text to match |
+
+**Example:**
+
+Input:
+
+```markdown
+- Keep this
+- Remove this
+- Keep this too
+```
+
+Config:
+
+```yaml
+- op: remove-list-item
+  list: 0
+  item: "Remove this"
+```
+
+Output:
+
+```markdown
+- Keep this
+- Keep this too
+```
+
+**Notes:**
+- When `item` is a string, the first item whose text matches exactly is removed
+- Sub-items (nested lines) attached to the removed item are also removed
+
+### `set-list-item` - Replace Item in List
+
+Replace a list item by index or text match, preserving task checkbox prefix if present.
+
+```yaml
+# Replace by index
+- op: set-list-item
+  list: 0
+  item: 0              # replace the first item
+  new: "Updated text"
+
+# Replace by text match
+- op: set-list-item
+  list: "my-section"
+  item: "Old text"
+  new: "New text"
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `list` | number \| string | Yes | Zero-based list index or section ID containing the list |
+| `item` | number \| string | Yes | Zero-based index of the item to replace, or text to match |
+| `new` | string | Yes | New text for the item (without bullet prefix) |
+
+**Example:**
+
+Input:
+
+```markdown
+## Tasks
+
+- [x] Design the API
+- [ ] Write documentation
+- [ ] Add tests
+```
+
+Config:
+
+```yaml
+- op: set-list-item
+  list: "tasks"
+  item: "Write documentation"
+  new: "Write documentation"    # task checkbox [x] is preserved automatically
+```
+
+Output after marking complete (the checkbox prefix is preserved):
+
+```markdown
+## Tasks
+
+- [x] Design the API
+- [x] Write documentation
+- [ ] Add tests
+```
+
+**Notes:**
+- Task list prefixes (`[ ]`, `[x]`, `[X]`) are preserved — only the text after the prefix is replaced
+- When `item` is a string, the first item whose text matches exactly is replaced
+- Sub-items attached to the matched item are preserved
+
+### Real-World Example
+
+```yaml
+apiVersion: kustomark/v1
+kind: Kustomization
+
+output: ./output
+
+resources:
+  - ./source/
+
+patches:
+  # Add a new feature to the features list
+  - op: add-list-item
+    list: "features"
+    item: "Plugin support"
+
+  # Remove a deprecated item by text
+  - op: remove-list-item
+    list: "features"
+    item: "Legacy XML import"
+
+  # Mark a task complete (preserves [x] prefix)
+  - op: set-list-item
+    list: "roadmap"
+    item: "Ship v2.0"
+    new: "Ship v2.0"
+```
 
 ## File Operations
 
