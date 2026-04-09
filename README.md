@@ -3610,6 +3610,129 @@ Output:
 - Removing a column affects all rows in the table
 - The header row and alignment row are also updated
 
+### `rename-table-column` - Rename Column Header
+
+Rename a column header while preserving all cell data and column alignment.
+
+```yaml
+- op: rename-table-column
+  table: 0          # zero-based table index or section ID
+  column: "Name"    # column to rename (0-based index or current header name)
+  new: "Full Name"  # new header name
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `table` | number \| string | Yes | Zero-based table index or section ID containing the table |
+| `column` | number \| string | Yes | Column identifier: 0-based index or current header name |
+| `new` | string | Yes | New header name for the column |
+
+**Example:**
+
+Input:
+```markdown
+| Name  | Role       | Joined |
+|-------|------------|--------|
+| Alice | Engineer   | 2021   |
+| Bob   | Designer   | 2022   |
+```
+
+Config:
+```yaml
+- op: rename-table-column
+  table: 0
+  column: "Role"
+  new: "Position"
+```
+
+Output:
+```markdown
+| Name  | Position   | Joined |
+|-------|------------|--------|
+| Alice | Engineer   | 2021   |
+| Bob   | Designer   | 2022   |
+```
+
+**Notes:**
+- Only the header is changed — all data rows remain unchanged
+- Column alignment (`:---`, `:---:`, `---:`) is preserved
+- Use a numeric index to rename a column when the header name contains special characters
+
+### `sort-table` - Sort Table Rows
+
+Sort the data rows of a table by any column, in ascending or descending order, using string, numeric, or date comparison.
+
+```yaml
+- op: sort-table
+  table: 0          # zero-based table index or section ID
+  column: "Name"    # column to sort by (0-based index or header name)
+  direction: asc    # "asc" (default) or "desc"
+  type: string      # "string" (default), "number", or "date"
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `table` | number \| string | Yes | Zero-based table index or section ID containing the table |
+| `column` | number \| string | Yes | Column to sort by: 0-based index or header name |
+| `direction` | string | No | Sort direction: `"asc"` (default) or `"desc"` |
+| `type` | string | No | Comparison type: `"string"` (default), `"number"`, or `"date"` |
+
+**Example — alphabetical sort:**
+
+Input:
+```markdown
+| Name    | Score |
+|---------|-------|
+| Charlie | 90    |
+| Alice   | 100   |
+| Bob     | 75    |
+```
+
+Config:
+```yaml
+- op: sort-table
+  table: 0
+  column: "Name"
+```
+
+Output:
+```markdown
+| Name    | Score |
+|---------|-------|
+| Alice   | 100   |
+| Bob     | 75    |
+| Charlie | 90    |
+```
+
+**Example — numeric sort descending:**
+
+```yaml
+- op: sort-table
+  table: 0
+  column: "Score"
+  type: number
+  direction: desc
+```
+
+**Example — date sort:**
+
+```yaml
+- op: sort-table
+  table: "releases"    # section heading containing the table
+  column: "Released"
+  type: date
+```
+
+**Notes:**
+- The header row and alignment row are never moved — only data rows are sorted
+- `type: number` — non-numeric values are treated as `0`
+- `type: date` — supports ISO 8601 and common date strings; unparseable dates treated as epoch
+- If the column is not found, the operation applies 0 patches (triggers `onNoMatch`)
+
 ## List Operations
 
 List operations allow you to manipulate unordered (`-`, `*`, `+`) and ordered (`1.`, `2.`, ...) markdown lists, including task lists (`[ ]`/`[x]`). Lists can be identified by their zero-based index in the document or by the section ID of the heading that contains them.
@@ -3790,6 +3913,66 @@ Output after marking complete (the checkbox prefix is preserved):
 - When `item` is a string, the first item whose text matches exactly is replaced
 - Sub-items attached to the matched item are preserved
 
+### `sort-list` - Sort List Items
+
+Sort list items alphabetically or numerically, in ascending or descending order. Sub-items are kept attached to their parent during the sort.
+
+```yaml
+- op: sort-list
+  list: 0           # zero-based list index or section ID
+  direction: asc    # "asc" (default) or "desc"
+  type: string      # "string" (default) or "number"
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `list` | number \| string | Yes | Zero-based list index or section ID containing the list |
+| `direction` | string | No | Sort direction: `"asc"` (default) or `"desc"` |
+| `type` | string | No | Comparison type: `"string"` (default) or `"number"` |
+
+**Example — alphabetical sort:**
+
+Input:
+```markdown
+## Features
+
+- Zebra striping
+- Auto-refresh
+- Multi-format export
+```
+
+Config:
+```yaml
+- op: sort-list
+  list: "features"
+```
+
+Output:
+```markdown
+## Features
+
+- Auto-refresh
+- Multi-format export
+- Zebra striping
+```
+
+**Example — numeric sort descending:**
+
+```yaml
+- op: sort-list
+  list: 0
+  type: number
+  direction: desc
+```
+
+**Notes:**
+- `type: string` — locale-aware alphabetical sort (default)
+- `type: number` — numeric comparison; non-numeric values are treated as `0`
+- Sub-items (indented lines) are reordered as a unit with their parent
+- The original bullet style (`-`, `*`, `+`, `1.`) is preserved after sorting
+
 ### Real-World Example
 
 ```yaml
@@ -3817,6 +4000,10 @@ patches:
     list: "roadmap"
     item: "Ship v2.0"
     new: "Ship v2.0"
+
+  # Keep the features list alphabetical
+  - op: sort-list
+    list: "features"
 ```
 
 ## File Operations

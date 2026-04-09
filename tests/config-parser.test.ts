@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { parseConfig, validateConfig } from '../src/core/config-parser.js';
-import type { KustomarkConfig } from '../src/core/types.js';
+import type { KustomarkConfig, PatchOperation } from '../src/core/types.js';
 
 describe('parseConfig', () => {
   describe('valid YAML parsing', () => {
@@ -3979,5 +3979,35 @@ describe('validateConfig', () => {
         expect(result.errors).toHaveLength(0);
       });
     });
+  });
+
+  describe('patch validation - previously missing operations', () => {
+    const validOpsToTest = [
+      { op: 'sort-table', table: 0, column: 'Name' },
+      { op: 'rename-table-column', table: 0, column: 'Name', new: 'Full Name' },
+      { op: 'json-set', path: 'key', value: 'val' },
+      { op: 'json-delete', path: 'key' },
+      { op: 'json-merge', value: { key: 'val' } },
+      { op: 'add-list-item', list: 0, item: 'New item' },
+      { op: 'remove-list-item', list: 0, item: 0 },
+      { op: 'set-list-item', list: 0, item: 0, new: 'Updated item' },
+      { op: 'sort-list', list: 0 },
+    ];
+
+    for (const patch of validOpsToTest) {
+      test(`validates ${patch.op} as a valid operation`, () => {
+        const config: KustomarkConfig = {
+          apiVersion: 'kustomark/v1',
+          kind: 'Kustomization',
+          resources: ['*.md'],
+          output: 'out',
+          patches: [patch as PatchOperation],
+        };
+
+        const result = validateConfig(config);
+
+        expect(result.errors.filter(e => e.field === 'patches[0].op')).toHaveLength(0);
+      });
+    }
   });
 });

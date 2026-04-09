@@ -1896,4 +1896,140 @@ Some text after the table`;
       expect(lines[1]).toContain("---:");
     });
   });
+
+  describe("rename-table-column operation", () => {
+    test("renames a column by header name", async () => {
+      const content = `| Name | Age | City |
+| :--- | ---: | :--- |
+| Alice | 30 | NYC |
+| Bob | 25 | LA |`;
+
+      const patches: PatchOperation[] = [
+        { op: "rename-table-column", table: 0, column: "Name", new: "Full Name" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.content).toContain("Full Name");
+      expect(result.content).not.toContain("| Name |");
+      expect(result.content).toContain("Age");
+      expect(result.content).toContain("City");
+      expect(result.applied).toBe(1);
+    });
+
+    test("renames a column by 0-based index", async () => {
+      const content = `| Name | Age | City |
+| :--- | ---: | :--- |
+| Alice | 30 | NYC |
+| Bob | 25 | LA |`;
+
+      const patches: PatchOperation[] = [
+        { op: "rename-table-column", table: 0, column: 1, new: "Years" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.content).toContain("Years");
+      expect(result.content).not.toContain("| Age |");
+      expect(result.content).toContain("Name");
+      expect(result.content).toContain("City");
+      expect(result.applied).toBe(1);
+    });
+
+    test("preserves all data rows unchanged", async () => {
+      const content = `| Name | Score |
+| :--- | ---: |
+| Alice | 100 |
+| Bob | 75 |
+| Charlie | 90 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "rename-table-column", table: 0, column: "Score", new: "Points" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const lines = result.content.split("\n");
+      expect(lines[2]).toContain("Alice");
+      expect(lines[2]).toContain("100");
+      expect(lines[3]).toContain("Bob");
+      expect(lines[3]).toContain("75");
+      expect(lines[4]).toContain("Charlie");
+      expect(lines[4]).toContain("90");
+    });
+
+    test("preserves column alignment", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "rename-table-column", table: 0, column: "Age", new: "Years" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const lines = result.content.split("\n");
+      expect(lines[1]).toContain(":---");
+      expect(lines[1]).toContain("---:");
+    });
+
+    test("returns count 0 when table not found", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "rename-table-column", table: 99, column: "Name", new: "Full Name" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test("returns count 0 when column not found", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "rename-table-column", table: 0, column: "NonExistent", new: "Whatever" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test("renames column identified by section heading", async () => {
+      const content = `## team
+
+| Name | Role |
+| :--- | :--- |
+| Alice | Engineer |
+| Bob | Designer |`;
+
+      const patches: PatchOperation[] = [
+        { op: "rename-table-column", table: "team", column: "Role", new: "Position" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.content).toContain("Position");
+      expect(result.content).not.toContain("| Role |");
+      expect(result.content).toContain("Alice");
+      expect(result.applied).toBe(1);
+    });
+
+    test("renames the last column", async () => {
+      const content = `| A | B | C |
+| :--- | :--- | :--- |
+| 1 | 2 | 3 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "rename-table-column", table: 0, column: 2, new: "Z" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.content).toContain("Z");
+      expect(result.content).toContain("A");
+      expect(result.content).toContain("B");
+    });
+  });
 });

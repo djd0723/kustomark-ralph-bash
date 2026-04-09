@@ -618,8 +618,17 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "remove-table-row",
     "add-table-column",
     "remove-table-column",
+    "sort-table",
+    "rename-table-column",
     "exec",
     "plugin",
+    "json-set",
+    "json-delete",
+    "json-merge",
+    "add-list-item",
+    "remove-list-item",
+    "set-list-item",
+    "sort-list",
   ];
 
   if (!validOps.includes(p.op as string)) {

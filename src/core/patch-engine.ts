@@ -1376,6 +1376,46 @@ export function applyRemoveTableColumn(
 }
 
 /**
+ * Apply a rename-table-column patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table index (number) or section ID (string) containing the table
+ * @param columnIdentifier - Column index (number) or current header name (string) to rename
+ * @param newName - New header name for the column
+ * @returns Object with patched content and count (1 if renamed, 0 if table/column not found)
+ */
+export function applyRenameTableColumn(
+  content: string,
+  tableIdentifier: number | string,
+  columnIdentifier: number | string,
+  newName: string,
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  // Find column index
+  const columnIndex = getColumnIndex(table, columnIdentifier);
+  if (columnIndex === -1) {
+    return { content, count: 0 };
+  }
+
+  // Rename the header
+  table.headers[columnIndex] = newName;
+
+  // Serialize the modified table
+  const newTableContent = serializeTable(table);
+
+  // Replace the table in the content
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply a sort-table patch operation
  *
  * @param content - The content to patch
@@ -2589,6 +2629,10 @@ export async function applySinglePatch(
       result = applyRemoveTableColumn(content, patch.table, patch.column);
       break;
 
+    case "rename-table-column":
+      result = applyRenameTableColumn(content, patch.table, patch.column, patch.new);
+      break;
+
     case "sort-table":
       result = applySortTable(content, patch.table, patch.column, patch.direction, patch.type);
       break;
@@ -2751,6 +2795,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `add-table-column '${patch.header}' to table '${patch.table}' at position ${patch.position ?? "end"}`;
     case "remove-table-column":
       return `remove-table-column '${patch.column}' from table '${patch.table}'`;
+    case "rename-table-column":
+      return `rename-table-column '${patch.column}' to '${patch.new}' in table '${patch.table}'`;
     case "sort-table":
       return `sort-table '${patch.table}' by column '${patch.column}' ${patch.direction ?? "asc"} (${patch.type ?? "string"})`;
     case "exec":

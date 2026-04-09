@@ -1,10 +1,56 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (rename-table-column + validOps Bug Fix - COMPLETE!):**
+
+* ✅ **`rename-table-column`**: New operation to rename a column header while preserving all data and alignment
+* ✅ **STRING OR INDEX**: Column can be identified by header name or 0-based index
+* ✅ **SECTION ID SUPPORT**: Tables can be identified by section heading (same pattern as other table ops)
+* ✅ **DATA PRESERVED**: All cell values and column alignment remain unchanged
+* ✅ **CRITICAL BUG FIX**: Added 9 missing operations to `validOps` in `config-parser.ts`:
+  * `sort-table`, `rename-table-column`, `json-set`, `json-delete`, `json-merge`
+  * `add-list-item`, `remove-list-item`, `set-list-item`, `sort-list`
+  * Previously these operations caused "Invalid operation" validation errors in the CLI
+* ✅ **README DOCS**: Added full documentation for `rename-table-column`, `sort-table`, and `sort-list`
+* ✅ **17 NEW TESTS PASSING**: 8 tests for `rename-table-column`, 9 tests for validOps coverage
+* ✅ **3,679 TESTS PASSING**: All tests pass with 0 failures
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # Rename a column by header name
+   patches:
+     - op: rename-table-column
+       table: 0              # zero-based table index or section ID
+       column: "Name"        # column to rename (by name or 0-based index)
+       new: "Full Name"      # new header name
+
+   # Rename a column by index
+     - op: rename-table-column
+       table: "team"         # section heading containing the table
+       column: 1             # rename second column (0-based)
+       new: "Position"
+   ```
+
+2. **Implementation Files**
+   * `src/core/types.ts` — Added `RenameTableColumnPatch` interface; added to `PatchOperation` union
+   * `src/core/patch-engine.ts` — Added `applyRenameTableColumn()`; wired into `applySinglePatch()` and `getPatchDescription()`
+   * `src/core/schema.ts` — Added JSON schema definition for `rename-table-column`
+   * `src/core/index.ts` — Exported `applyRenameTableColumn` and `RenameTableColumnPatch`
+   * `src/core/config-parser.ts` — Added 9 missing operations to `validOps` array
+   * `tests/core/table-operations-integration.test.ts` — 8 tests covering rename by name, index, section ID, missing table/column, data preservation, alignment preservation
+   * `tests/config-parser.test.ts` — 9 tests verifying each previously-missing operation now validates correctly
+   * `README.md` — Full documentation for `rename-table-column`, `sort-table`, and `sort-list`
+
+**Status:** rename-table-column + validOps Bug Fix COMPLETE! ✅
+
+---
 
 **2026-04-09 (sort-list Operation - COMPLETE!):**
 

@@ -445,6 +445,19 @@ export interface RemoveTableColumnPatch extends PatchCommonFields {
 }
 
 /**
+ * Rename table column operation - renames a column header while preserving all data
+ */
+export interface RenameTableColumnPatch extends PatchCommonFields {
+  op: "rename-table-column";
+  /** Table identifier (index 0-based or heading text) */
+  table: number | string;
+  /** Column to rename (0-based index or current header name) */
+  column: number | string;
+  /** New header name for the column */
+  new: string;
+}
+
+/**
  * Sort table rows by a column
  */
 export interface SortTablePatch extends PatchCommonFields {
@@ -593,6 +606,7 @@ export type PatchOperation =
   | RemoveTableRowPatch
   | AddTableColumnPatch
   | RemoveTableColumnPatch
+  | RenameTableColumnPatch
   | SortTablePatch
   | ExecPatch
   | PluginPatch
