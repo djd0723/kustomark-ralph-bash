@@ -4034,7 +4034,10 @@ async function watchCommand(path: string, options: CLIOptions): Promise<number> 
     // Perform initial build
     log("Performing initial build...", 2, options);
     const config = readKustomarkConfig(inputPath);
-    await performWatchBuild(inputPath, options, basePath, config.watch);
+
+    // In-memory cache persisted across watch rebuilds (only used when --incremental is set)
+    let watchBuildCache: BuildCache | null = null;
+    watchBuildCache = await performWatchBuild(inputPath, options, basePath, config.watch, null);
 
     // Set up file watching
     const watchedPaths = new Set<string>();
@@ -4068,13 +4071,19 @@ async function watchCommand(path: string, options: CLIOptions): Promise<number> 
               });
             }
 
-            performWatchBuild(inputPath, options, basePath, config.watch).catch((error) => {
-              log(
-                `Error during rebuild: ${error instanceof Error ? error.message : String(error)}`,
-                1,
-                options,
-              );
-            });
+            performWatchBuild(inputPath, options, basePath, config.watch, watchBuildCache)
+              .then((newCache) => {
+                if (newCache !== null) {
+                  watchBuildCache = newCache;
+                }
+              })
+              .catch((error) => {
+                log(
+                  `Error during rebuild: ${error instanceof Error ? error.message : String(error)}`,
+                  1,
+                  options,
+                );
+              });
           }, debounceMs);
         });
 
@@ -4193,14 +4202,16 @@ async function watchCommand(path: string, options: CLIOptions): Promise<number> 
 }
 
 /**
- * Perform a build for watch mode and output results according to format
+ * Perform a build for watch mode and output results according to format.
+ * Returns updated BuildCache when incremental mode is enabled, null otherwise.
  */
 async function performWatchBuild(
   inputPath: string,
   options: CLIOptions,
   basePath: string,
   watchHooks?: WatchHooks,
-): Promise<void> {
+  currentCache?: BuildCache | null,
+): Promise<BuildCache | null> {
   try {
     log("Loading config...", 3, options);
     const config = readKustomarkConfig(inputPath);
@@ -4240,16 +4251,95 @@ async function performWatchBuild(
       lockEntries,
     );
 
-    // Apply patches
+    // *** Incremental build logic for watch mode ***
+    let buildCache: BuildCache | null = null;
+    let filesToRebuild = new Set<string>(resources.keys());
+    let filesUnchanged = 0;
+
+    if (options.incremental) {
+      // Hash config to detect changes that would invalidate the cache
+      const configPath = resolve(basePath, "kustomark.yaml");
+      const configHash = calculateFileHash(readFileSync(configPath, "utf-8"));
+
+      const referencedConfigPaths = findReferencedConfigs(config.resources, basePath);
+      const allConfigHashes: Record<string, string> = {};
+      for (const refPath of referencedConfigPaths) {
+        try {
+          allConfigHashes[refPath] = calculateFileHash(readFileSync(refPath, "utf-8"));
+        } catch {
+          // Skip unreadable referenced configs
+        }
+      }
+
+      // Determine if the in-memory cache is still valid
+      let cacheValid = currentCache != null && currentCache.configHash === configHash;
+
+      if (cacheValid && currentCache && referencedConfigPaths.length > 0) {
+        for (const refPath of referencedConfigPaths) {
+          if (currentCache.configHashes?.[refPath] !== allConfigHashes[refPath]) {
+            cacheValid = false;
+            log("Base config changed, invalidating cache", 2, options);
+            break;
+          }
+        }
+      }
+
+      if (cacheValid && currentCache) {
+        buildCache = currentCache;
+      } else {
+        buildCache = createEmptyCache(
+          configHash,
+          referencedConfigPaths.length > 0 ? allConfigHashes : undefined,
+        );
+        if (currentCache != null) {
+          log("Config changed, performing full rebuild", 2, options);
+        }
+      }
+
+      // Partition patches to check only content operations for cache keys
+      const { contentOps } = partitionPatches(config.patches || []);
+
+      // Determine which files actually need rebuilding
+      filesToRebuild = new Set<string>();
+      for (const [filePath, sourceContent] of resources.entries()) {
+        const applicablePatches = contentOps.filter(
+          (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
+        );
+        const sourceHash = calculateFileHash(sourceContent);
+        const patchHash = calculateFileHash(
+          JSON.stringify(applicablePatches, Object.keys(applicablePatches).sort()),
+        );
+        const entry = buildCache.entries.get(filePath);
+        if (!entry || entry.sourceHash !== sourceHash || entry.patchHash !== patchHash) {
+          filesToRebuild.add(filePath);
+          log(`  ${filePath}: needs rebuild`, 3, options);
+        } else {
+          filesUnchanged++;
+        }
+      }
+
+      log(
+        `Incremental: ${filesToRebuild.size} to rebuild, ${filesUnchanged} unchanged`,
+        2,
+        options,
+      );
+    }
+
+    // Apply patches (only to files that need rebuilding in incremental mode)
     log("Applying patches...", 3, options);
     const outputDir = resolve(basePath, config.output ?? ".");
+
+    const resourcesToProcess = options.incremental
+      ? new Map(Array.from(resources.entries()).filter(([path]) => filesToRebuild.has(path)))
+      : resources;
+
     const {
       resources: patchedResources,
       patchesApplied,
       warnings,
       validationErrors: patchValidationErrors,
     } = await applyPatches(
-      resources,
+      resourcesToProcess,
       config.patches || [],
       config.onNoMatch || (options.autoFix ? "error" : "warn"),
       options,
@@ -4258,12 +4348,22 @@ async function performWatchBuild(
       pluginRegistry,
     );
 
+    // For incremental builds, merge rebuilt files with unchanged source content
+    const allPatchedResources = new Map(patchedResources);
+    if (options.incremental) {
+      for (const [filePath, sourceContent] of resources.entries()) {
+        if (!filesToRebuild.has(filePath)) {
+          allPatchedResources.set(filePath, sourceContent);
+        }
+      }
+    }
+
     // Collect all validation errors (from patches and global validators)
     const allValidationErrors: ValidationError[] = [...patchValidationErrors];
 
     // Run global validators on each patched file
     if (config.validators && config.validators.length > 0) {
-      for (const [filePath, content] of patchedResources.entries()) {
+      for (const [filePath, content] of allPatchedResources.entries()) {
         const errors = runValidators(content, config.validators);
         for (const error of errors) {
           allValidationErrors.push({
@@ -4282,13 +4382,19 @@ async function performWatchBuild(
       throw new Error(`Validation failed: ${errorMessages}`);
     }
 
-    // Write output files
+    // Write output files (only changed files in incremental mode)
     mkdirSync(outputDir, { recursive: true });
 
     const sourceFiles = new Set<string>();
     let filesWritten = 0;
 
-    for (const [filePath, content] of patchedResources.entries()) {
+    const filesToWrite = options.incremental
+      ? new Map(
+          Array.from(allPatchedResources.entries()).filter(([path]) => filesToRebuild.has(path)),
+        )
+      : allPatchedResources;
+
+    for (const [filePath, content] of filesToWrite.entries()) {
       const outputPath = join(outputDir, filePath);
       sourceFiles.add(filePath);
 
@@ -4299,11 +4405,51 @@ async function performWatchBuild(
       log(`  Wrote ${filePath}`, 4, options);
     }
 
+    // Track all source files (needed for clean operation)
+    for (const filePath of allPatchedResources.keys()) {
+      sourceFiles.add(filePath);
+    }
+
     // Clean if requested
     if (options.clean) {
       log("Cleaning output directory...", 3, options);
       const removed = cleanOutputDir(outputDir, sourceFiles);
       log(`  Removed ${removed} files`, 3, options);
+    }
+
+    // Update in-memory build cache for next incremental rebuild
+    let updatedCache: BuildCache | null = null;
+    if (options.incremental && buildCache) {
+      const { contentOps } = partitionPatches(config.patches || []);
+      const newCacheEntries = new Map<string, BuildCacheEntry>();
+
+      for (const [filePath, sourceContent] of resources.entries()) {
+        if (filesToRebuild.has(filePath)) {
+          const outputContent = allPatchedResources.get(filePath);
+          if (!outputContent) continue;
+          const applicablePatches = contentOps.filter(
+            (patch) => shouldApplyPatchGroup(patch, options) && shouldApplyPatch(patch, filePath),
+          );
+          newCacheEntries.set(filePath, {
+            file: filePath,
+            sourceHash: calculateFileHash(sourceContent),
+            patchHash: calculateFileHash(
+              JSON.stringify(applicablePatches, Object.keys(applicablePatches).sort()),
+            ),
+            outputHash: calculateFileHash(outputContent),
+            built: new Date().toISOString(),
+          });
+        } else {
+          const existingEntry = buildCache.entries.get(filePath);
+          if (existingEntry) {
+            newCacheEntries.set(filePath, existingEntry);
+          }
+        }
+      }
+
+      updatedCache = updateBuildCache(buildCache, newCacheEntries);
+      updatedCache = pruneCache(updatedCache, new Set(resources.keys()));
+      log(`Cache updated: ${updatedCache.entries.size} entries`, 3, options);
     }
 
     // Execute onBuild hooks after successful build
@@ -4324,8 +4470,10 @@ async function performWatchBuild(
       };
       console.log(JSON.stringify(event));
     } else {
+      const cacheInfo =
+        options.incremental && filesUnchanged > 0 ? ` (${filesUnchanged} unchanged)` : "";
       log(
-        `Build complete: ${filesWritten} file(s) written, ${patchesApplied} patch(es) applied`,
+        `Build complete: ${filesWritten} file(s) written, ${patchesApplied} patch(es) applied${cacheInfo}`,
         1,
         options,
       );
@@ -4333,6 +4481,8 @@ async function performWatchBuild(
         log(`Warnings: ${warnings.join(", ")}`, 2, options);
       }
     }
+
+    return updatedCache;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 

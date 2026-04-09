@@ -592,6 +592,7 @@ ${formatSection("ARGUMENTS")}
 ${formatSection("OPTIONS")}
   ${formatFlag("--debounce")} <ms>         Debounce interval in milliseconds (default: 300)
   ${formatFlag("--no-hooks")}             Disable watch hooks for security
+  ${formatFlag("--incremental")}          Only rebuild changed files (near-instant rebuilds)
   ${formatFlag("--format")} <text|json>    Output format (default: text)
   ${formatFlag("-v, -vv, -vvv")}          Increase verbosity
   ${formatFlag("-q")}                     Quiet mode (errors only)
@@ -601,6 +602,9 @@ ${formatSection("OPTIONS")}
 ${formatSection("EXAMPLES")}
   ${formatExample("# Start watch mode")}
   ${formatCommand("kustomark watch ./team/")}
+
+  ${formatExample("# Watch with incremental rebuilds (fastest)")}
+  ${formatCommand("kustomark watch ./team/ --incremental")}
 
   ${formatExample("# Watch with custom debounce interval")}
   ${formatCommand("kustomark watch ./team/ --debounce=500")}

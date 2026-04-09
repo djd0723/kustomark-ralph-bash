@@ -5824,7 +5824,13 @@ Typical speedups with incremental builds:
 
 **Combining with watch mode:**
 
-In future releases, incremental builds will integrate with watch mode for near-instant rebuilds during development.
+Use `--incremental` with `watch` for near-instant rebuilds during development — only changed files are reprocessed:
+
+```bash
+kustomark watch . --incremental
+```
+
+The in-memory cache persists across rebuilds in the same watch session. When a source file or patch changes, only affected files are rebuilt. When the config file itself changes, a full rebuild is performed to ensure correctness.
 
 ## Exit Codes
 

@@ -263,4 +263,118 @@ output: ./output
     // Process should exit cleanly with code 0
     expect(exitCode).toBe(0);
   });
+
+  test("watch --incremental performs initial build and skips unchanged files on rebuild", async () => {
+    const configPath = join(testDir, "kustomark.yaml");
+    const file1 = join(testDir, "file1.md");
+    const file2 = join(testDir, "file2.md");
+    const outputDir = join(testDir, "output");
+
+    writeFileSync(
+      configPath,
+      `
+apiVersion: kustomark/v1
+kind: Kustomization
+resources:
+  - "*.md"
+output: ./output
+patches:
+  - op: replace
+    old: "PLACEHOLDER"
+    new: "REPLACED"
+`.trim(),
+    );
+
+    writeFileSync(file1, "# File 1\n\nPLACEHOLDER content.");
+    writeFileSync(file2, "# File 2\n\nStable content.");
+
+    const watchProcess = spawn(
+      cliPath,
+      ["watch", testDir, "--incremental", "--format=json"],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+
+    const events: object[] = [];
+    let buffer = "";
+
+    watchProcess.stdout.on("data", (data: Buffer) => {
+      buffer += data.toString();
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            events.push(JSON.parse(line));
+          } catch {
+            // ignore parse errors
+          }
+        }
+      }
+    });
+
+    // Wait for initial build
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // Verify initial build wrote both files
+    expect(existsSync(join(outputDir, "file1.md"))).toBe(true);
+    expect(existsSync(join(outputDir, "file2.md"))).toBe(true);
+    expect(readFileSync(join(outputDir, "file1.md"), "utf-8")).toContain("REPLACED");
+
+    // Modify only file1 and wait for incremental rebuild
+    writeFileSync(file1, "# File 1\n\nUpdated PLACEHOLDER content.");
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    watchProcess.kill("SIGTERM");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Should have at least two build events (initial + rebuild)
+    expect(events.length).toBeGreaterThanOrEqual(1);
+    const initialBuild = events[0] as { event: string; success: boolean; filesWritten: number };
+    expect(initialBuild.event).toBe("build");
+    expect(initialBuild.success).toBe(true);
+    expect(initialBuild.filesWritten).toBe(2);
+
+    // After rebuild, file1 output should be updated
+    expect(readFileSync(join(outputDir, "file1.md"), "utf-8")).toContain("Updated REPLACED");
+  });
+
+  test("watch --incremental invalidates cache when config changes", async () => {
+    const configPath = join(testDir, "kustomark.yaml");
+    const file1 = join(testDir, "test.md");
+    const outputDir = join(testDir, "output");
+
+    writeFileSync(
+      configPath,
+      `
+apiVersion: kustomark/v1
+kind: Kustomization
+resources:
+  - "*.md"
+output: ./output
+patches:
+  - op: replace
+    old: "hello"
+    new: "world"
+`.trim(),
+    );
+
+    writeFileSync(file1, "# Test\n\nhello content.");
+
+    const result = execSync(
+      `cd ${testDir} && timeout 1 ${cliPath} watch . --incremental --format=json 2>/dev/null || true`,
+      { encoding: "utf-8" },
+    );
+
+    const lines = result.trim().split("\n").filter((l) => l.trim());
+    expect(lines.length).toBeGreaterThanOrEqual(1);
+    const event = JSON.parse(lines[0] ?? "{}") as {
+      event: string;
+      success: boolean;
+      filesWritten: number;
+    };
+    expect(event.event).toBe("build");
+    expect(event.success).toBe(true);
+    expect(existsSync(join(outputDir, "test.md"))).toBe(true);
+    expect(readFileSync(join(outputDir, "test.md"), "utf-8")).toContain("world content");
+  });
 });

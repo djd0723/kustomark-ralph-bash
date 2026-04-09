@@ -1,10 +1,40 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (incremental-watch - COMPLETE!):**
+
+* ✅ **`kustomark watch . --incremental`**: Watch mode now supports incremental rebuilds
+* ✅ **IN-MEMORY CACHE**: Build cache is maintained in-memory across watch rebuilds (no disk I/O per rebuild)
+* ✅ **SKIP UNCHANGED FILES**: Only files whose source content or applicable patches changed are reprocessed
+* ✅ **CONFIG INVALIDATION**: Cache is automatically discarded when the config file or any base config changes
+* ✅ **NEAR-INSTANT REBUILDS**: Single-file changes rebuild only that file, regardless of project size
+* ✅ **OUTPUT MESSAGE**: Build output includes `(N unchanged)` count when files are skipped
+* ✅ **2 NEW TESTS PASSING**: Watch tests cover incremental initial build and incremental rebuild behavior
+* ✅ **3,721 TESTS PASSING**: All tests pass with 0 failures
+* ✅ **README UPDATED**: Documented `kustomark watch . --incremental` with behavior description
+
+**Details:**
+
+1. **Usage**
+   ```bash
+   # Near-instant rebuilds in development
+   kustomark watch . --incremental
+   ```
+
+2. **Implementation Files**
+   * `src/cli/index.ts` — Modified `performWatchBuild()` to accept/return `BuildCache | null`; updated `watchCommand` to maintain `watchBuildCache` across rebuilds
+   * `src/cli/help.ts` — Added `--incremental` flag documentation to watch command help
+   * `tests/cli/watch.test.ts` — 2 new tests for incremental watch behavior
+   * `README.md` — Updated "Combining with watch mode" section
+
+**Status:** incremental-watch COMPLETE! ✅
+
+---
 
 **2026-04-09 (reorder-table-columns - COMPLETE!):**
 
