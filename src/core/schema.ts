@@ -2525,6 +2525,257 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            // add-list-item
+            {
+              type: "object",
+              required: ["op", "list", "item"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "add-list-item",
+                  description: "Add a new item to a markdown list",
+                },
+                list: {
+                  oneOf: [
+                    {
+                      type: "integer",
+                      minimum: 0,
+                      description: "Zero-based list index (0 = first list in file)",
+                    },
+                    {
+                      type: "string",
+                      description: "Section ID containing the list",
+                    },
+                  ],
+                  description: "List identifier: zero-based index or section ID",
+                },
+                item: {
+                  type: "string",
+                  description: "Text of the item to add (without bullet prefix)",
+                },
+                position: {
+                  type: "integer",
+                  description:
+                    "Where to insert: 0 = beginning, -1 or omit = end, N = after N-th item (0-based)",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            // remove-list-item
+            {
+              type: "object",
+              required: ["op", "list", "item"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "remove-list-item",
+                  description: "Remove an item from a markdown list",
+                },
+                list: {
+                  oneOf: [
+                    {
+                      type: "integer",
+                      minimum: 0,
+                      description: "Zero-based list index (0 = first list in file)",
+                    },
+                    {
+                      type: "string",
+                      description: "Section ID containing the list",
+                    },
+                  ],
+                  description: "List identifier: zero-based index or section ID",
+                },
+                item: {
+                  oneOf: [
+                    {
+                      type: "integer",
+                      minimum: 0,
+                      description: "Zero-based item index",
+                    },
+                    {
+                      type: "string",
+                      description: "Exact text of the item to remove",
+                    },
+                  ],
+                  description: "Item to remove: zero-based index or exact text to match",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            // set-list-item
+            {
+              type: "object",
+              required: ["op", "list", "item", "new"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "set-list-item",
+                  description: "Replace an item in a markdown list",
+                },
+                list: {
+                  oneOf: [
+                    {
+                      type: "integer",
+                      minimum: 0,
+                      description: "Zero-based list index (0 = first list in file)",
+                    },
+                    {
+                      type: "string",
+                      description: "Section ID containing the list",
+                    },
+                  ],
+                  description: "List identifier: zero-based index or section ID",
+                },
+                item: {
+                  oneOf: [
+                    {
+                      type: "integer",
+                      minimum: 0,
+                      description: "Zero-based item index",
+                    },
+                    {
+                      type: "string",
+                      description: "Exact text of the item to replace",
+                    },
+                  ],
+                  description: "Item to replace: zero-based index or exact text to match",
+                },
+                new: {
+                  type: "string",
+                  description: "New text for the item (without bullet prefix)",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
             {
               type: "object",
               required: ["op", "command"],

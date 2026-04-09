@@ -147,6 +147,13 @@ export {
 } from "./http-fetcher.js";
 // Export HTTP archive URL parser functions
 export { isHttpArchiveUrl, parseHttpArchiveUrl } from "./http-url-parser.js";
+export {
+  findList,
+  type ListItem,
+  type ListType,
+  type MarkdownList,
+  parseLists,
+} from "./list-parser.js";
 // Export lock file functions and types
 export {
   calculateContentHash,
@@ -265,6 +272,7 @@ export { parseTestSuite, validateTestSuite } from "./test-suite-parser.js";
 // Export test types
 // Export analytics types
 export type {
+  AddListItemPatch,
   AllOfCondition,
   AnalyticsReport,
   AnyOfCondition,
@@ -309,6 +317,7 @@ export type {
   PatchValidation,
   PrependToSectionPatch,
   RemoveFrontmatterPatch,
+  RemoveListItemPatch,
   RemoveSectionPatch,
   RenameFrontmatterPatch,
   ReplacePatch,
@@ -320,6 +329,7 @@ export type {
   SafetyReport,
   SecurityConfig,
   SetFrontmatterPatch,
+  SetListItemPatch,
   TestResult,
   TestSuiteResult,
   ValidationError,

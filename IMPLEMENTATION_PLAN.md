@@ -1,10 +1,62 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (List Item Operations - COMPLETE!):**
+
+* ✅ **`add-list-item`**: Add items to unordered or ordered markdown lists at beginning, end, or specific position
+* ✅ **`remove-list-item`**: Remove items from lists by zero-based index or exact text match
+* ✅ **`set-list-item`**: Replace list items by index or text match, preserving task checkbox prefix
+* ✅ **TASK LIST SUPPORT**: All three operations understand `[ ]`/`[x]`/`[X]` task list syntax
+* ✅ **SUB-ITEM PRESERVATION**: Operations on top-level items preserve nested sub-items
+* ✅ **SECTION ID LOOKUP**: Lists can be identified by section ID (same pattern as table operations)
+* ✅ **46 NEW TESTS PASSING**: Added to `src/core/list-parser.test.ts`
+* ✅ **3,640 TESTS PASSING**: All tests pass with 0 failures
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # Add an item to the end of a list
+   patches:
+     - op: add-list-item
+       list: 0              # zero-based list index or section ID
+       item: "New feature"
+       position: -1         # -1 or omit = end, 0 = beginning, N = after N-th item
+
+   # Remove an item by text match
+     - op: remove-list-item
+       list: "my-section"   # section ID containing the list
+       item: "Deprecated feature"
+
+   # Replace an item (preserving task checkbox)
+     - op: set-list-item
+       list: 0
+       item: 0              # index or text to match
+       new: "Updated item"
+   ```
+
+2. **Format Details**
+   - Works on unordered (`-`, `*`, `+`) and ordered (`1.`, `2.`, ...) lists
+   - Task items (`[ ] text`, `[x] text`) are parsed and preserved on `set-list-item`
+   - Sub-items (indented lines) are treated as part of the parent item's range and preserved
+   - List ends at first blank line or heading line
+
+3. **Implementation Files**
+   * `src/core/list-parser.ts` — New module: `parseLists()`, `findList()` (mirrors table-parser.ts pattern)
+   * `src/core/types.ts` — Added `AddListItemPatch`, `RemoveListItemPatch`, `SetListItemPatch` interfaces; updated `PatchOperation` union
+   * `src/core/patch-engine.ts` — Added `applyAddListItem()`, `applyRemoveListItem()`, `applySetListItem()`; wired into `applySinglePatch()` and `getPatchDescription()`
+   * `src/core/schema.ts` — Added JSON schema definitions for all three operations
+   * `src/core/index.ts` — Re-exported list-parser functions and new patch types
+   * `src/core/list-parser.test.ts` — 46 tests covering parser, findList, and all three operations
+
+**Status:** List Item Operations COMPLETE! ✅
+
+---
 
 **2026-04-09 (.env and .properties File Support - COMPLETE!):**
 

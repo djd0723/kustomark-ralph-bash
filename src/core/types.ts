@@ -498,6 +498,43 @@ export interface JsonMergePatch extends PatchCommonFields {
 }
 
 /**
+ * Add list item operation - adds an item to a markdown list
+ */
+export interface AddListItemPatch extends PatchCommonFields {
+  op: "add-list-item";
+  /** List identifier (zero-based index or section ID containing the list) */
+  list: number | string;
+  /** Text of the item to add (without bullet prefix) */
+  item: string;
+  /** Position to insert (0 = beginning, -1/undefined = end, N = after N-th item) */
+  position?: number;
+}
+
+/**
+ * Remove list item operation - removes an item from a markdown list
+ */
+export interface RemoveListItemPatch extends PatchCommonFields {
+  op: "remove-list-item";
+  /** List identifier (zero-based index or section ID containing the list) */
+  list: number | string;
+  /** Item to remove: zero-based index (number) or text to match (string) */
+  item: number | string;
+}
+
+/**
+ * Set list item operation - replaces an item in a markdown list
+ */
+export interface SetListItemPatch extends PatchCommonFields {
+  op: "set-list-item";
+  /** List identifier (zero-based index or section ID containing the list) */
+  list: number | string;
+  /** Item to replace: zero-based index (number) or text to match (string) */
+  item: number | string;
+  /** New text for the item (without bullet prefix) */
+  new: string;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -532,7 +569,10 @@ export type PatchOperation =
   | PluginPatch
   | JsonSetPatch
   | JsonDeletePatch
-  | JsonMergePatch;
+  | JsonMergePatch
+  | AddListItemPatch
+  | RemoveListItemPatch
+  | SetListItemPatch;
 
 /**
  * Global validator configuration

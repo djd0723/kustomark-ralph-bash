@@ -14,6 +14,7 @@ import * as yaml from "js-yaml";
 import * as smolToml from "smol-toml";
 import { evaluateCondition } from "./condition-evaluator.js";
 import { extractSnippet, findFailurePosition, findSimilarContent, PatchError } from "./errors.js";
+import { findList } from "./list-parser.js";
 import { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
 import { resolveInheritance } from "./patch-inheritance.js";
 import { PluginNotFoundError } from "./plugin-errors.js";
@@ -1375,6 +1376,139 @@ export function applyRemoveTableColumn(
 }
 
 /**
+ * Apply an add-list-item patch operation
+ *
+ * @param content - The content to patch
+ * @param listIdentifier - List index (number) or section ID (string) containing the list
+ * @param itemText - Text of the item to add (without bullet prefix)
+ * @param position - Where to insert: 0 = beginning, -1/undefined = end, N = after N-th item (0-based)
+ * @returns Object with patched content and count (1 if added, 0 if list not found)
+ */
+export function applyAddListItem(
+  content: string,
+  listIdentifier: number | string,
+  itemText: string,
+  position?: number,
+): { content: string; count: number } {
+  const list = findList(content, listIdentifier);
+  if (!list) {
+    return { content, count: 0 };
+  }
+
+  const newLine = `${list.bullet}${itemText}`;
+  const lines = content.split("\n");
+
+  // Determine insertion line
+  let insertAfterLine: number;
+  if (position === undefined || position === -1 || position >= list.items.length) {
+    // Append after the last item
+    insertAfterLine = list.endLine;
+  } else if (position === 0) {
+    // Prepend before the first item
+    insertAfterLine = list.startLine - 1;
+  } else {
+    // After the (position-1)-th item's last line
+    const range = list.itemRanges[position - 1];
+    insertAfterLine = range ? range.endLine : list.endLine;
+  }
+
+  lines.splice(insertAfterLine + 1, 0, newLine);
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply a remove-list-item patch operation
+ *
+ * @param content - The content to patch
+ * @param listIdentifier - List index (number) or section ID (string) containing the list
+ * @param itemIdentifier - Item to remove: zero-based index (number) or text to match (string)
+ * @returns Object with patched content and count (1 if removed, 0 if list/item not found)
+ */
+export function applyRemoveListItem(
+  content: string,
+  listIdentifier: number | string,
+  itemIdentifier: number | string,
+): { content: string; count: number } {
+  const list = findList(content, listIdentifier);
+  if (!list) {
+    return { content, count: 0 };
+  }
+
+  // Resolve item index
+  let itemIndex: number;
+  if (typeof itemIdentifier === "number") {
+    itemIndex = itemIdentifier;
+  } else {
+    itemIndex = list.items.findIndex((it) => it.text === itemIdentifier);
+  }
+
+  if (itemIndex < 0 || itemIndex >= list.items.length) {
+    return { content, count: 0 };
+  }
+
+  const range = list.itemRanges[itemIndex];
+  if (!range) {
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+  lines.splice(range.startLine, range.endLine - range.startLine + 1);
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
+ * Apply a set-list-item patch operation
+ *
+ * @param content - The content to patch
+ * @param listIdentifier - List index (number) or section ID (string) containing the list
+ * @param itemIdentifier - Item to replace: zero-based index (number) or text to match (string)
+ * @param newText - New text for the item (without bullet prefix)
+ * @returns Object with patched content and count (1 if replaced, 0 if list/item not found)
+ */
+export function applySetListItem(
+  content: string,
+  listIdentifier: number | string,
+  itemIdentifier: number | string,
+  newText: string,
+): { content: string; count: number } {
+  const list = findList(content, listIdentifier);
+  if (!list) {
+    return { content, count: 0 };
+  }
+
+  // Resolve item index
+  let itemIndex: number;
+  if (typeof itemIdentifier === "number") {
+    itemIndex = itemIdentifier;
+  } else {
+    itemIndex = list.items.findIndex((it) => it.text === itemIdentifier);
+  }
+
+  if (itemIndex < 0 || itemIndex >= list.items.length) {
+    return { content, count: 0 };
+  }
+
+  const range = list.itemRanges[itemIndex];
+  if (!range) {
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+  // Replace only the first line of the item (the marker line); preserve sub-item lines
+  const item = list.items.at(itemIndex);
+  if (!item) {
+    return { content, count: 0 };
+  }
+  // Rebuild the marker line: bullet + (task prefix if was a task) + new text
+  let prefix = list.bullet;
+  if (item.isTask) {
+    prefix += item.checked ? "[x] " : "[ ] ";
+  }
+  lines[range.startLine] = `${prefix}${newText}`;
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply an exec patch operation - runs a shell command to transform content
  *
  * This function executes a shell command with the markdown content piped to stdin,
@@ -2361,6 +2495,18 @@ export async function applySinglePatch(
       result = applyJsonMerge(content, patch.value, filePath, patch.path);
       break;
 
+    case "add-list-item":
+      result = applyAddListItem(content, patch.list, patch.item, patch.position);
+      break;
+
+    case "remove-list-item":
+      result = applyRemoveListItem(content, patch.list, patch.item);
+      break;
+
+    case "set-list-item":
+      result = applySetListItem(content, patch.list, patch.item, patch.new);
+      break;
+
     case "plugin":
       // Plugin operation requires a registry to be passed
       // This will be handled by applyPatchesWithPlugins
@@ -2497,6 +2643,12 @@ function getPatchDescription(patch: PatchOperation): string {
       return patch.path ? `json-merge into '${patch.path}'` : "json-merge";
     case "plugin":
       return `plugin '${patch.plugin}'`;
+    case "add-list-item":
+      return `add-list-item '${patch.item}' to list '${patch.list}' at position ${patch.position ?? "end"}`;
+    case "remove-list-item":
+      return `remove-list-item ${typeof patch.item === "number" ? patch.item : `'${patch.item}'`} from list '${patch.list}'`;
+    case "set-list-item":
+      return `set-list-item ${typeof patch.item === "number" ? patch.item : `'${patch.item}'`} in list '${patch.list}' to '${patch.new}'`;
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":
