@@ -1,0 +1,39 @@
+tests/core/table-operations-integration.test.ts
+  1a078166f504c0c4 1899-2034
+src/core/patch-engine.ts
+  1a078166f504c0c4 1379-1417,2632-2635,2798-2799
+README.md
+  1a078166f504c0c4 3613-3735,3916-3975,4003-4006
+IMPLEMENTATION_PLAN.md
+  1a078166f504c0c4 3,9-53
+src/core/types.ts
+  1a078166f504c0c4 448-459,609
+src/core/index.ts
+  1a078166f504c0c4 180,324
+src/core/config-parser.ts
+  1a078166f504c0c4 621-622,625-631
+src/core/schema.ts
+  1a078166f504c0c4 2528-2560
+tests/config-parser.test.ts
+  1a078166f504c0c4 7,3983-4012
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "805a83f8947835a682f26e729eaac4ef9d641489",
+  "prompts": {
+    "1a078166f504c0c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "312266ae-db2b-4667-8fe8-1b26436a13b1",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 560,
+      "total_deletions": 4,
+      "accepted_lines": 558,
+      "overriden_lines": 0
+    }
+  }
+}
