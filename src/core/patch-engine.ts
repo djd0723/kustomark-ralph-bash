@@ -1473,6 +1473,58 @@ export function applySortTable(
 }
 
 /**
+ * Apply a filter-table-rows patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table line number (number) or section ID (string) containing the table
+ * @param columnIdentifier - Column index (number) or column name (string) to filter on
+ * @param matchValue - Exact string to match (use null to rely on pattern instead)
+ * @param pattern - Regex pattern to match against column value
+ * @param invert - When true, keep rows that do NOT match (default: false)
+ * @returns Object with patched content and count (rows removed, or 0 if table/column not found)
+ */
+export function applyFilterTableRows(
+  content: string,
+  tableIdentifier: number | string,
+  columnIdentifier: number | string,
+  matchValue: string | undefined,
+  pattern: string | undefined,
+  invert = false,
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  const columnIndex = getColumnIndex(table, columnIdentifier);
+  if (columnIndex === -1) {
+    return { content, count: 0 };
+  }
+
+  const regex = pattern !== undefined ? new RegExp(pattern) : undefined;
+
+  table.rows = table.rows.filter((row) => {
+    const cellValue = (row[columnIndex] ?? "").trim();
+    let matches: boolean;
+    if (regex !== undefined) {
+      matches = regex.test(cellValue);
+    } else if (matchValue !== undefined) {
+      matches = cellValue === matchValue;
+    } else {
+      matches = true;
+    }
+    return invert ? !matches : matches;
+  });
+
+  const newTableContent = serializeTable(table);
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply an add-list-item patch operation
  *
  * @param content - The content to patch
@@ -2637,6 +2689,17 @@ export async function applySinglePatch(
       result = applySortTable(content, patch.table, patch.column, patch.direction, patch.type);
       break;
 
+    case "filter-table-rows":
+      result = applyFilterTableRows(
+        content,
+        patch.table,
+        patch.column,
+        patch.match,
+        patch.pattern,
+        patch.invert,
+      );
+      break;
+
     case "exec":
       result = await applyExec(content, patch.command, patch.timeout);
       break;
@@ -2799,6 +2862,14 @@ function getPatchDescription(patch: PatchOperation): string {
       return `rename-table-column '${patch.column}' to '${patch.new}' in table '${patch.table}'`;
     case "sort-table":
       return `sort-table '${patch.table}' by column '${patch.column}' ${patch.direction ?? "asc"} (${patch.type ?? "string"})`;
+    case "filter-table-rows": {
+      const filterDesc = patch.pattern
+        ? `pattern /${patch.pattern}/`
+        : patch.match !== undefined
+          ? `match "${patch.match}"`
+          : "no filter";
+      return `filter-table-rows in table '${patch.table}' on column '${patch.column}' by ${filterDesc}${patch.invert ? " (inverted)" : ""}`;
+    }
     case "exec":
       return `exec '${patch.command}'`;
     case "json-set":

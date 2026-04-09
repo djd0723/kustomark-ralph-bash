@@ -170,6 +170,7 @@ export { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-valu
 // Export all patch engine functions
 export {
   applyAppendToSection,
+  applyFilterTableRows,
   applyMergeFrontmatter,
   applyPatches,
   applyPatchesWithPlugins,
@@ -296,6 +297,7 @@ export type {
   FileComplexity,
   FileContainsCondition,
   FileMatchesCondition,
+  FilterTableRowsPatch,
   FrontmatterEqualsCondition,
   FrontmatterExistsCondition,
   ImpactReport,

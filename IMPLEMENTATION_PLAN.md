@@ -1,10 +1,63 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (filter-table-rows + CI Action Bumps - COMPLETE!):**
+
+* ✅ **`filter-table-rows`**: New operation to filter table rows by column value
+* ✅ **EXACT MATCH**: `match` field for case-sensitive exact string comparison
+* ✅ **REGEX MATCH**: `pattern` field for JavaScript regex matching
+* ✅ **INVERT**: `invert: true` to keep rows that do NOT match
+* ✅ **COLUMN SELECTOR**: Column identified by header name or 0-based index
+* ✅ **SECTION ID SUPPORT**: Tables identified by section heading (same pattern as other table ops)
+* ✅ **HEADER PRESERVED**: Header and alignment rows are always kept
+* ✅ **CI ACTIONS BUMPED**: `actions/github-script` v7→v8, `actions/upload-artifact` v4→v7 in `performance.yml`
+* ✅ **README DOCS**: Full documentation with examples including exact match, regex, and inverted filter
+* ✅ **15 NEW TESTS PASSING**: 15 tests covering exact match, regex, invert, error handling, section ID, content preservation
+* ✅ **3,694 TESTS PASSING**: All tests pass with 0 failures
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # Keep only active rows
+   patches:
+     - op: filter-table-rows
+       table: 0              # line number or section heading ID
+       column: "Status"      # column to filter on (header name or 0-based index)
+       match: "Active"       # exact match
+
+   # Keep rows with version matching regex
+     - op: filter-table-rows
+       table: "releases"
+       column: "Version"
+       pattern: "^2\\."      # regex pattern
+
+   # Remove deprecated rows (inverted filter)
+     - op: filter-table-rows
+       table: 0
+       column: "Status"
+       match: "Deprecated"
+       invert: true          # keep non-matching rows
+   ```
+
+2. **Implementation Files**
+   * `src/core/types.ts` — Added `FilterTableRowsPatch` interface; added to `PatchOperation` union
+   * `src/core/patch-engine.ts` — Added `applyFilterTableRows()`; wired into `applySinglePatch()` and `getPatchDescription()`
+   * `src/core/schema.ts` — Added JSON schema definition for `filter-table-rows`
+   * `src/core/config-parser.ts` — Added `filter-table-rows` to `validOps`; added field validation
+   * `src/core/index.ts` — Exported `applyFilterTableRows` and `FilterTableRowsPatch`
+   * `tests/core/table-operations-integration.test.ts` — 15 tests covering all scenarios
+   * `README.md` — Full documentation for `filter-table-rows`
+   * `.github/workflows/performance.yml` — Bumped `actions/github-script` v7→v8 and `actions/upload-artifact` v4→v7
+
+**Status:** filter-table-rows + CI Action Bumps COMPLETE! ✅
+
+---
 
 **2026-04-09 (rename-table-column + validOps Bug Fix - COMPLETE!):**
 

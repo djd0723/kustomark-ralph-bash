@@ -2033,3 +2033,229 @@ Some text after the table`;
     });
   });
 });
+
+describe("Table Operations Integration - filter-table-rows", () => {
+  const baseTable = `| Name | Status | Score |
+| :--- | :--- | ---: |
+| Alice | Active | 90 |
+| Bob | Inactive | 75 |
+| Charlie | Active | 85 |
+| Diana | Inactive | 60 |`;
+
+  describe("exact match filtering", () => {
+    test("keeps only rows matching exact column value", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "Status", match: "Active" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.content).toContain("Alice");
+      expect(result.content).toContain("Charlie");
+      expect(result.content).not.toContain("Bob");
+      expect(result.content).not.toContain("Diana");
+      expect(result.applied).toBe(1);
+    });
+
+    test("filters by numeric column index", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: 1, match: "Inactive" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.content).toContain("Bob");
+      expect(result.content).toContain("Diana");
+      expect(result.content).not.toContain("Alice");
+      expect(result.content).not.toContain("Charlie");
+      expect(result.applied).toBe(1);
+    });
+
+    test("preserves header and alignment rows", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "Status", match: "Active" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.content).toContain("| Name | Status | Score |");
+      expect(result.content).toContain("| :--- | :--- | ---: |");
+    });
+
+    test("removes all rows when no match", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "Status", match: "Pending" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.content).not.toContain("Alice");
+      expect(result.content).not.toContain("Bob");
+      expect(result.content).not.toContain("Charlie");
+      expect(result.content).not.toContain("Diana");
+      expect(result.content).toContain("| Name | Status | Score |");
+      expect(result.applied).toBe(1);
+    });
+
+    test("keeps all rows when all match", async () => {
+      const allActive = `| Name | Status |
+| :--- | :--- |
+| Alice | Active |
+| Charlie | Active |`;
+
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "Status", match: "Active" },
+      ];
+
+      const result = await applyPatches(allActive, patches);
+      expect(result.content).toContain("Alice");
+      expect(result.content).toContain("Charlie");
+      expect(result.applied).toBe(1);
+    });
+  });
+
+  describe("regex pattern filtering", () => {
+    test("keeps rows matching regex pattern", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "Name", pattern: "^A" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.content).toContain("Alice");
+      expect(result.content).not.toContain("Bob");
+      expect(result.content).not.toContain("Charlie");
+      expect(result.content).not.toContain("Diana");
+      expect(result.applied).toBe(1);
+    });
+
+    test("filters by numeric score pattern", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "Score", pattern: "^[89]" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.content).toContain("Alice");
+      expect(result.content).toContain("Charlie");
+      expect(result.content).not.toContain("Bob");
+      expect(result.content).not.toContain("Diana");
+      expect(result.applied).toBe(1);
+    });
+
+    test("regex filter with alternation", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "Status", pattern: "Active|Pending" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.content).toContain("Alice");
+      expect(result.content).toContain("Charlie");
+      expect(result.content).not.toContain("Bob");
+      expect(result.content).not.toContain("Diana");
+      expect(result.applied).toBe(1);
+    });
+  });
+
+  describe("inverted filtering", () => {
+    test("keeps rows NOT matching when invert is true", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "Status", match: "Active", invert: true },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.content).not.toContain("Alice");
+      expect(result.content).not.toContain("Charlie");
+      expect(result.content).toContain("Bob");
+      expect(result.content).toContain("Diana");
+      expect(result.applied).toBe(1);
+    });
+
+    test("invert with regex pattern", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "Name", pattern: "^A", invert: true },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.content).not.toContain("Alice");
+      expect(result.content).toContain("Bob");
+      expect(result.content).toContain("Charlie");
+      expect(result.content).toContain("Diana");
+      expect(result.applied).toBe(1);
+    });
+  });
+
+  describe("error handling", () => {
+    test("returns count 0 when table not found", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 99, column: "Status", match: "Active" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(baseTable);
+    });
+
+    test("returns count 0 when column not found", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: "NonExistent", match: "Active" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(baseTable);
+    });
+
+    test("returns count 0 when column index out of bounds", async () => {
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 0, column: 99, match: "Active" },
+      ];
+
+      const result = await applyPatches(baseTable, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(baseTable);
+    });
+  });
+
+  describe("section heading lookup", () => {
+    test("filters table identified by section heading", async () => {
+      const content = `## team
+
+| Name | Status |
+| :--- | :--- |
+| Alice | Active |
+| Bob | Inactive |
+| Charlie | Active |`;
+
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: "team", column: "Status", match: "Active" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.content).toContain("Alice");
+      expect(result.content).toContain("Charlie");
+      expect(result.content).not.toContain("Bob");
+      expect(result.applied).toBe(1);
+    });
+  });
+
+  describe("content surrounding table is preserved", () => {
+    test("text before and after table is unchanged", async () => {
+      const content = `# Report
+
+Some introduction text.
+
+| Name | Status |
+| :--- | :--- |
+| Alice | Active |
+| Bob | Inactive |
+
+Conclusion text.`;
+
+      const patches: PatchOperation[] = [
+        { op: "filter-table-rows", table: 4, column: "Status", match: "Active" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.content).toContain("# Report");
+      expect(result.content).toContain("Some introduction text.");
+      expect(result.content).toContain("Conclusion text.");
+      expect(result.content).toContain("Alice");
+      expect(result.content).not.toContain("Bob");
+    });
+  });
+});

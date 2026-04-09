@@ -2703,6 +2703,83 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            // filter-table-rows
+            {
+              type: "object",
+              required: ["op", "table", "column"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "filter-table-rows",
+                  description:
+                    "Filter table rows, keeping only rows where a column matches a value or pattern",
+                },
+                table: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Table identifier (line number or section heading ID)",
+                },
+                column: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Column to filter on (0-based index or header name)",
+                },
+                match: {
+                  type: "string",
+                  description: "Exact value to match (case-sensitive)",
+                },
+                pattern: {
+                  type: "string",
+                  description: "Regex pattern to match against column value",
+                },
+                invert: {
+                  type: "boolean",
+                  description: "When true, keep rows that do NOT match the filter (default: false)",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
             // add-list-item
             {
               type: "object",

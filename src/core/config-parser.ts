@@ -620,6 +620,7 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "remove-table-column",
     "sort-table",
     "rename-table-column",
+    "filter-table-rows",
     "exec",
     "plugin",
     "json-set",
@@ -1047,6 +1048,53 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         errors.push({
           field: `${prefix}.column`,
           message: "'column' must be a number or string",
+        });
+      }
+      break;
+
+    case "filter-table-rows":
+      if (p.table === undefined) {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "filter-table-rows operation requires 'table' field",
+        });
+      } else if (typeof p.table !== "number" && typeof p.table !== "string") {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "'table' must be a number or string",
+        });
+      }
+
+      if (p.column === undefined) {
+        errors.push({
+          field: `${prefix}.column`,
+          message: "filter-table-rows operation requires 'column' field",
+        });
+      } else if (typeof p.column !== "number" && typeof p.column !== "string") {
+        errors.push({
+          field: `${prefix}.column`,
+          message: "'column' must be a number or string",
+        });
+      }
+
+      if (p.match !== undefined && typeof p.match !== "string") {
+        errors.push({
+          field: `${prefix}.match`,
+          message: "'match' must be a string",
+        });
+      }
+
+      if (p.pattern !== undefined && typeof p.pattern !== "string") {
+        errors.push({
+          field: `${prefix}.pattern`,
+          message: "'pattern' must be a string",
+        });
+      }
+
+      if (p.invert !== undefined && typeof p.invert !== "boolean") {
+        errors.push({
+          field: `${prefix}.invert`,
+          message: "'invert' must be a boolean",
         });
       }
       break;

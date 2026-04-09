@@ -3733,6 +3733,81 @@ Output:
 - `type: date` — supports ISO 8601 and common date strings; unparseable dates treated as epoch
 - If the column is not found, the operation applies 0 patches (triggers `onNoMatch`)
 
+### `filter-table-rows` - Filter Table Rows
+
+Keep only table rows where a column value matches an exact string or regex pattern. Optionally invert to remove matching rows.
+
+```yaml
+- op: filter-table-rows
+  table: 0           # line number or section heading ID
+  column: "Status"   # column to filter on (0-based index or header name)
+  match: "Active"    # exact match (case-sensitive)
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `table` | number \| string | Yes | Line number or section heading ID containing the table |
+| `column` | number \| string | Yes | Column to filter on: 0-based index or header name |
+| `match` | string | No* | Exact value to match (case-sensitive) |
+| `pattern` | string | No* | Regex pattern to match against column value |
+| `invert` | boolean | No | When `true`, keep rows that do NOT match (default: `false`) |
+
+\* At least one of `match` or `pattern` should be provided.
+
+**Example — keep only active rows:**
+
+Input:
+```markdown
+| Name    | Status   |
+|---------|----------|
+| Alice   | Active   |
+| Bob     | Inactive |
+| Charlie | Active   |
+```
+
+Config:
+```yaml
+- op: filter-table-rows
+  table: 0
+  column: "Status"
+  match: "Active"
+```
+
+Output:
+```markdown
+| Name    | Status |
+|---------|--------|
+| Alice   | Active |
+| Charlie | Active |
+```
+
+**Example — regex filter:**
+
+```yaml
+- op: filter-table-rows
+  table: 0
+  column: "Version"
+  pattern: "^2\\."    # keep only 2.x versions
+```
+
+**Example — inverted filter (exclude matching rows):**
+
+```yaml
+- op: filter-table-rows
+  table: "releases"   # section heading containing the table
+  column: "Status"
+  match: "Deprecated"
+  invert: true        # keep everything EXCEPT deprecated rows
+```
+
+**Notes:**
+- The header row and alignment row are always preserved
+- If the table or column is not found, the operation applies 0 patches (triggers `onNoMatch`)
+- `match` uses exact, case-sensitive string comparison
+- `pattern` is a JavaScript regular expression; inline flags like `(?i)` are not supported
+
 ## List Operations
 
 List operations allow you to manipulate unordered (`-`, `*`, `+`) and ordered (`1.`, `2.`, ...) markdown lists, including task lists (`[ ]`/`[x]`). Lists can be identified by their zero-based index in the document or by the section ID of the heading that contains them.

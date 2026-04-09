@@ -473,6 +473,23 @@ export interface SortTablePatch extends PatchCommonFields {
 }
 
 /**
+ * Filter table rows by column value
+ */
+export interface FilterTableRowsPatch extends PatchCommonFields {
+  op: "filter-table-rows";
+  /** Table identifier (line number or section heading ID) */
+  table: number | string;
+  /** Column to filter on (0-based index or header name) */
+  column: number | string;
+  /** Exact value to match against (case-sensitive) */
+  match?: string;
+  /** Regex pattern to match against */
+  pattern?: string;
+  /** When true, keep rows that do NOT match (default: false) */
+  invert?: boolean;
+}
+
+/**
  * Exec operation - runs a shell command to transform content
  */
 export interface ExecPatch extends PatchCommonFields {
@@ -608,6 +625,7 @@ export type PatchOperation =
   | RemoveTableColumnPatch
   | RenameTableColumnPatch
   | SortTablePatch
+  | FilterTableRowsPatch
   | ExecPatch
   | PluginPatch
   | JsonSetPatch
