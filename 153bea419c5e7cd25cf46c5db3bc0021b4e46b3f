@@ -1,0 +1,31 @@
+src/core/list-parser.test.ts
+  387a84cbc10ec92a 14-19,387-505
+src/core/patch-engine.ts
+  387a84cbc10ec92a 1569-1620,2624-2627,2772-2773
+src/core/types.ts
+  387a84cbc10ec92a 553-564,604-605
+IMPLEMENTATION_PLAN.md
+  387a84cbc10ec92a 3,9-55
+src/core/schema.ts
+  387a84cbc10ec92a 2783-2836
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "153bea419c5e7cd25cf46c5db3bc0021b4e46b3f",
+  "prompts": {
+    "387a84cbc10ec92a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "66eb2a93-e6cb-4136-bd81-04026fd9ae47",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 353,
+      "total_deletions": 29,
+      "accepted_lines": 327,
+      "overriden_lines": 0
+    }
+  }
+}
