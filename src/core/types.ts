@@ -639,6 +639,8 @@ export interface KustomarkConfig {
   plugins?: PluginConfig[];
   /** Variable definitions for substitution in patch values. Reference as ${varName}. */
   vars?: Record<string, string>;
+  /** Whitelist of environment variable names to expose for substitution in patch values. Reference as ${NAME}. */
+  envVars?: string[];
 }
 
 /**

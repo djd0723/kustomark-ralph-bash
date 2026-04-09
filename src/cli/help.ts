@@ -201,14 +201,22 @@ ${formatSection("PERFORMANCE OPTIONS")}
   ${formatFlag("--cache-dir")} <path>     Custom cache directory
 
 ${formatSection("VARIABLE SUBSTITUTION")}
-  ${formatFlag("--var")} <NAME=VALUE>        Override a variable defined in the vars section of kustomark.yaml (can be repeated)
+  ${formatFlag("--var")} <NAME=VALUE>        Override a variable (can be repeated)
+  ${formatFlag("--env-var")} <NAME>          Expose an environment variable by name (can be repeated)
 
   Variables defined under the ${formatHighlight("vars")} key in kustomark.yaml can be referenced
-  in any patch string value as ${formatHighlight("$" + "{varName}")}. CLI flags override config-defined vars.
+  in any patch string value as ${formatHighlight("$" + "{varName}")}. Environment variables can be
+  whitelisted in the ${formatHighlight("envVars")} config key or passed via ${formatFlag("--env-var")}.
+
+  Resolution priority (highest to lowest):
+    1. ${formatFlag("--var")} CLI flags
+    2. ${formatHighlight("envVars")} config list / ${formatFlag("--env-var")} flags (from process.env)
+    3. ${formatHighlight("vars")} config defaults
 
   Example:
-    kustomark.yaml: ${formatExample("vars:\n    environment: staging")}
+    kustomark.yaml: ${formatExample("vars:\n    environment: staging\nenvVars:\n  - APP_VERSION\n  - GIT_COMMIT_SHA")}
     Override:       ${formatFlag("--var environment=production")}
+    From env:       ${formatFlag("--env-var NODE_ENV")}
 
 ${formatSection("GROUP FILTERING")}
   ${formatFlag("--enable-groups")} <list>   Enable only specified groups (comma-separated)

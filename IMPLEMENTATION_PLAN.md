@@ -1,10 +1,60 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (Environment Variable Templating - COMPLETE!):**
+
+* ✅ **`envVars` CONFIG KEY**: Whitelist environment variable names in `kustomark.yaml` under `envVars:` to expose them for `${NAME}` substitution in patches
+* ✅ **`--env-var NAME` CLI FLAG**: Expose env vars by name at the command line without modifying config
+* ✅ **PRIORITY ORDER**: `--var` (highest) > `envVars`/`--env-var` from process.env > `vars:` config defaults
+* ✅ **SECURITY BY DEFAULT**: Only explicitly whitelisted variables are exposed — no implicit env leakage
+* ✅ **6 NEW INTEGRATION TESTS PASSING**: Added to `tests/cli/vars-integration.test.ts`
+* ✅ **3,569 TESTS PASSING**: All tests pass with 0 failures
+
+**Environment Variable Templating Details:**
+
+1. **Usage**
+   ```yaml
+   apiVersion: kustomark/v1
+   kind: Kustomization
+   vars:
+     APP_VERSION: "0.0.0"      # default when env var is not set
+   envVars:
+     - APP_VERSION             # read from process.env at build time
+     - GIT_COMMIT_SHA
+     - NODE_ENV
+   patches:
+     - op: replace
+       old: "version: placeholder"
+       new: "version: ${APP_VERSION}"
+     - op: replace
+       old: "commit: placeholder"
+       new: "commit: ${GIT_COMMIT_SHA}"
+   ```
+   ```bash
+   # CLI flag to expose vars without changing config
+   kustomark build . --env-var APP_VERSION --env-var BUILD_ID
+   ```
+
+2. **Resolution order**
+   1. `--var KEY=VALUE` CLI flags (explicit override)
+   2. `envVars:` config list / `--env-var NAME` flags (from process.env)
+   3. `vars:` config defaults (fallback)
+
+3. **Implementation Files**
+   * `src/core/types.ts` — Added `envVars?: string[]` to `KustomarkConfig`
+   * `src/core/schema.ts` — Added `envVars` JSON schema definition
+   * `src/cli/index.ts` — Added `envVar?: string[]` to `CLIOptions`, `--env-var` flag parsing, and env var resolution in `applyPatches()`
+   * `src/cli/help.ts` — Updated VARIABLE SUBSTITUTION section with `--env-var` flag and priority docs
+   * `tests/cli/vars-integration.test.ts` — 6 new integration tests
+
+**Status:** Environment Variable Templating COMPLETE! ✅
+
+---
 
 **2026-04-09 (Variable Substitution in Patches - COMPLETE!):**
 

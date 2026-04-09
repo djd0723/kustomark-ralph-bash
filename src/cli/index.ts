@@ -167,6 +167,7 @@ export interface CLIOptions {
   target?: string; // For suggest --target option (target file or directory)
   minConfidence?: number; // For suggest --min-confidence option (0.0-1.0)
   var?: Record<string, string>; // For template apply --var key=value
+  envVar?: string[]; // For build --env-var NAME (expose env vars by name)
   // History command options
   limit?: number; // For history list --limit N
   offset?: number; // For history list --offset N
@@ -828,6 +829,22 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
           options.var[key] = value;
         }
       }
+    } else if (arg === "--env-var" || arg.startsWith("--env-var=")) {
+      let envVarName = "";
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) envVarName = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith("-")) {
+          envVarName = nextArg;
+          i++;
+        }
+      }
+      if (envVarName) {
+        if (!options.envVar) options.envVar = [];
+        options.envVar.push(envVarName);
+      }
     }
   }
 
@@ -1098,8 +1115,17 @@ async function applyPatches(
       continue;
     }
 
-    // Resolve variables in patch string fields
-    const vars = { ...(config.vars ?? {}), ...(options.var ?? {}) };
+    // Resolve variables in patch string fields.
+    // Priority order (highest to lowest): --var flags > envVars (config + --env-var) > vars: config defaults
+    const envVarNames = [...(config.envVars ?? []), ...(options.envVar ?? [])];
+    const envVarValues: Record<string, string> = {};
+    for (const name of envVarNames) {
+      const val = process.env[name];
+      if (val !== undefined) {
+        envVarValues[name] = val;
+      }
+    }
+    const vars = { ...(config.vars ?? {}), ...envVarValues, ...(options.var ?? {}) };
     const resolvedPatches =
       Object.keys(vars).length > 0
         ? applicablePatches.map(

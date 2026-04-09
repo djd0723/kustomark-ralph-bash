@@ -231,6 +231,14 @@ export function generateSchema(): object {
           "Variable definitions for substitution in patch values. Reference as $" + "{varName}.",
         additionalProperties: { type: "string" },
       },
+      envVars: {
+        type: "array",
+        description:
+          "Whitelist of environment variable names to expose for substitution in patch values. Reference as $" +
+          "{NAME}. Resolved from process.env at build time. Lower priority than vars: and --var flags.",
+        items: { type: "string" },
+        uniqueItems: true,
+      },
       onNoMatch: {
         type: "string",
         enum: ["skip", "warn", "error"],
