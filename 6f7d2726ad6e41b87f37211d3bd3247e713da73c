@@ -1,0 +1,39 @@
+src/core/patch-engine.ts
+  16305cc4ecc99af1 36-69
+tests/cli/vars-integration.test.ts
+  16305cc4ecc99af1 1-142
+src/core/schema.ts
+  16305cc4ecc99af1 228-233
+IMPLEMENTATION_PLAN.md
+  16305cc4ecc99af1 3,9-50
+src/core/index.ts
+  16305cc4ecc99af1 181-182
+src/core/types.ts
+  16305cc4ecc99af1 640-641
+src/cli/index.ts
+  16305cc4ecc99af1 63,1101-1113,1124-1125,1260,1271,1279,1285,1289
+src/cli/help.ts
+  16305cc4ecc99af1 203-212
+tests/core/vars.test.ts
+  16305cc4ecc99af1 1-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "6f7d2726ad6e41b87f37211d3bd3247e713da73c",
+  "prompts": {
+    "16305cc4ecc99af1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc478a2a-00c2-4ebc-b146-619bb01277aa",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 335,
+      "total_deletions": 19,
+      "accepted_lines": 324,
+      "overriden_lines": 0
+    }
+  }
+}
