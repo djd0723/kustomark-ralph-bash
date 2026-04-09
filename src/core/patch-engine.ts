@@ -1376,6 +1376,63 @@ export function applyRemoveTableColumn(
 }
 
 /**
+ * Apply a sort-table patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table index (number) or section ID (string) containing the table
+ * @param columnIdentifier - Column index (number) or column name (string) to sort by
+ * @param direction - Sort direction: "asc" (default) or "desc"
+ * @param type - Comparison type: "string" (default), "number", or "date"
+ * @returns Object with patched content and count (1 if sorted, 0 if table/column not found)
+ */
+export function applySortTable(
+  content: string,
+  tableIdentifier: number | string,
+  columnIdentifier: number | string,
+  direction: "asc" | "desc" = "asc",
+  type: "string" | "number" | "date" = "string",
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  const columnIndex = getColumnIndex(table, columnIdentifier);
+  if (columnIndex === -1) {
+    return { content, count: 0 };
+  }
+
+  const sortedRows = [...table.rows].sort((a, b) => {
+    const aVal = (a[columnIndex] ?? "").trim();
+    const bVal = (b[columnIndex] ?? "").trim();
+
+    let cmp: number;
+    if (type === "number") {
+      const aNum = Number.parseFloat(aVal) || 0;
+      const bNum = Number.parseFloat(bVal) || 0;
+      cmp = aNum - bNum;
+    } else if (type === "date") {
+      const aTime = new Date(aVal).getTime();
+      const bTime = new Date(bVal).getTime();
+      cmp = (Number.isNaN(aTime) ? 0 : aTime) - (Number.isNaN(bTime) ? 0 : bTime);
+    } else {
+      cmp = aVal.localeCompare(bVal);
+    }
+
+    return direction === "desc" ? -cmp : cmp;
+  });
+
+  table.rows = sortedRows;
+
+  const newTableContent = serializeTable(table);
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply an add-list-item patch operation
  *
  * @param content - The content to patch
@@ -2479,6 +2536,10 @@ export async function applySinglePatch(
       result = applyRemoveTableColumn(content, patch.table, patch.column);
       break;
 
+    case "sort-table":
+      result = applySortTable(content, patch.table, patch.column, patch.direction, patch.type);
+      break;
+
     case "exec":
       result = await applyExec(content, patch.command, patch.timeout);
       break;
@@ -2633,6 +2694,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `add-table-column '${patch.header}' to table '${patch.table}' at position ${patch.position ?? "end"}`;
     case "remove-table-column":
       return `remove-table-column '${patch.column}' from table '${patch.table}'`;
+    case "sort-table":
+      return `sort-table '${patch.table}' by column '${patch.column}' ${patch.direction ?? "asc"} (${patch.type ?? "string"})`;
     case "exec":
       return `exec '${patch.command}'`;
     case "json-set":

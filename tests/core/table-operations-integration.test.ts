@@ -1,7 +1,7 @@
 /**
  * Integration tests for table operations with applyPatches
  *
- * These tests verify the complete integration of 5 table operations:
+ * These tests verify the complete integration of 6 table operations:
  * 1. replace-table-cell - Replace content in specific table cells
  * 2. add-table-row - Add new rows to tables
  * 3. remove-table-row - Remove rows from tables
@@ -1712,6 +1712,188 @@ Some text after the table`;
 
       expect(result.content).toContain("São Paulo");
       expect(result.applied).toBe(1);
+    });
+  });
+
+  describe("sort-table operation", () => {
+    test("sorts rows ascending by string column (default)", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Charlie | 35 |
+| Alice | 30 |
+| Bob | 25 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: 0, column: "Name" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const rows = result.content.split("\n").slice(2);
+      expect(rows[0]).toContain("Alice");
+      expect(rows[1]).toContain("Bob");
+      expect(rows[2]).toContain("Charlie");
+      expect(result.applied).toBe(1);
+    });
+
+    test("sorts rows descending by string column", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |
+| Charlie | 35 |
+| Bob | 25 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: 0, column: "Name", direction: "desc" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const rows = result.content.split("\n").slice(2);
+      expect(rows[0]).toContain("Charlie");
+      expect(rows[1]).toContain("Bob");
+      expect(rows[2]).toContain("Alice");
+      expect(result.applied).toBe(1);
+    });
+
+    test("sorts rows by numeric column", async () => {
+      const content = `| Name | Score |
+| :--- | ---: |
+| Bob | 100 |
+| Alice | 5 |
+| Charlie | 50 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: 0, column: "Score", type: "number" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const rows = result.content.split("\n").slice(2);
+      expect(rows[0]).toContain("Alice");
+      expect(rows[1]).toContain("Charlie");
+      expect(rows[2]).toContain("Bob");
+      expect(result.applied).toBe(1);
+    });
+
+    test("sorts rows by numeric column descending", async () => {
+      const content = `| Name | Score |
+| :--- | ---: |
+| Alice | 5 |
+| Bob | 100 |
+| Charlie | 50 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: 0, column: "Score", type: "number", direction: "desc" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const rows = result.content.split("\n").slice(2);
+      expect(rows[0]).toContain("Bob");
+      expect(rows[1]).toContain("Charlie");
+      expect(rows[2]).toContain("Alice");
+      expect(result.applied).toBe(1);
+    });
+
+    test("sorts by column index instead of name", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Charlie | 35 |
+| Alice | 30 |
+| Bob | 25 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: 0, column: 0 },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const rows = result.content.split("\n").slice(2);
+      expect(rows[0]).toContain("Alice");
+      expect(rows[1]).toContain("Bob");
+      expect(rows[2]).toContain("Charlie");
+      expect(result.applied).toBe(1);
+    });
+
+    test("returns count 0 when table not found", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: 99, column: "Name" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test("returns count 0 when column not found", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: 0, column: "NonExistent" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(0);
+    });
+
+    test("sorts by date column", async () => {
+      const content = `| Event | Date |
+| :--- | :--- |
+| Release | 2024-03-15 |
+| Launch | 2023-01-01 |
+| Update | 2024-01-10 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: 0, column: "Date", type: "date" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const rows = result.content.split("\n").slice(2);
+      expect(rows[0]).toContain("Launch");
+      expect(rows[1]).toContain("Update");
+      expect(rows[2]).toContain("Release");
+      expect(result.applied).toBe(1);
+    });
+
+    test("selects table by section heading", async () => {
+      const content = `# Team
+
+| Name | Role |
+| :--- | :--- |
+| Charlie | Dev |
+| Alice | Lead |
+| Bob | QA |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: "team", column: "Name" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const rows = result.content.split("\n").slice(4);
+      expect(rows[0]).toContain("Alice");
+      expect(rows[1]).toContain("Bob");
+      expect(rows[2]).toContain("Charlie");
+      expect(result.applied).toBe(1);
+    });
+
+    test("preserves header and alignment row", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Bob | 25 |
+| Alice | 30 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "sort-table", table: 0, column: "Name" },
+      ];
+
+      const result = await applyPatches(content, patches);
+      const lines = result.content.split("\n");
+      expect(lines[0]).toContain("Name");
+      expect(lines[0]).toContain("Age");
+      expect(lines[1]).toContain(":---");
+      expect(lines[1]).toContain("---:");
     });
   });
 });

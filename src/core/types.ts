@@ -445,6 +445,21 @@ export interface RemoveTableColumnPatch extends PatchCommonFields {
 }
 
 /**
+ * Sort table rows by a column
+ */
+export interface SortTablePatch extends PatchCommonFields {
+  op: "sort-table";
+  /** Table identifier (index 0-based or heading text) */
+  table: number | string;
+  /** Column to sort by (0-based index or header name) */
+  column: number | string;
+  /** Sort direction (default: "asc") */
+  direction?: "asc" | "desc";
+  /** Comparison type for sorting (default: "string") */
+  type?: "string" | "number" | "date";
+}
+
+/**
  * Exec operation - runs a shell command to transform content
  */
 export interface ExecPatch extends PatchCommonFields {
@@ -565,6 +580,7 @@ export type PatchOperation =
   | RemoveTableRowPatch
   | AddTableColumnPatch
   | RemoveTableColumnPatch
+  | SortTablePatch
   | ExecPatch
   | PluginPatch
   | JsonSetPatch

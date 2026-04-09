@@ -1,8 +1,65 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-09 (sort-table Operation - COMPLETE!):**
+
+* ✅ **`sort-table`**: Sort markdown table rows by any column
+* ✅ **STRING SORT**: Locale-aware alphabetical sorting (default)
+* ✅ **NUMBER SORT**: Numeric comparison via `type: "number"` (handles decimal values)
+* ✅ **DATE SORT**: Chronological sorting via `type: "date"` (ISO 8601 and common date strings)
+* ✅ **DIRECTION CONTROL**: `direction: "asc"` (default) or `direction: "desc"`
+* ✅ **COLUMN SELECTION**: Identify column by zero-based index or header name
+* ✅ **SECTION ID LOOKUP**: Tables can be identified by section heading (same pattern as other table ops)
+* ✅ **HEADER PRESERVATION**: Sort only affects data rows; header and alignment rows are unchanged
+* ✅ **10 NEW TESTS PASSING**: Added to `tests/core/table-operations-integration.test.ts`
+* ✅ **3,650 TESTS PASSING**: All tests pass with 0 failures
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # Sort a table alphabetically by Name column
+   patches:
+     - op: sort-table
+       table: 0              # zero-based table index or section ID
+       column: "Name"        # column header name or zero-based index
+
+   # Sort numerically descending
+     - op: sort-table
+       table: "team"         # section heading containing the table
+       column: "Score"
+       type: number
+       direction: desc
+
+   # Sort by date
+     - op: sort-table
+       table: 0
+       column: "Released"
+       type: date
+   ```
+
+2. **Format Details**
+   - `type: "string"` (default) — locale-aware alphabetical sort
+   - `type: "number"` — numeric sort; non-numeric values treated as 0
+   - `type: "date"` — chronological sort; unparseable dates treated as epoch
+   - `direction: "asc"` (default) or `"desc"`
+   - Column can be specified as header name (string) or 0-based index (number)
+   - Table not found or column not found → count 0, content unchanged (onNoMatch applies)
+
+3. **Implementation Files**
+   * `src/core/types.ts` — Added `SortTablePatch` interface; added to `PatchOperation` union
+   * `src/core/patch-engine.ts` — Added `applySortTable()`; wired into `applySinglePatch()` and `getPatchDescription()`
+   * `src/core/schema.ts` — Added JSON schema definition for `sort-table`
+   * `tests/core/table-operations-integration.test.ts` — 10 tests covering all sort types, directions, column selectors, error cases
+
+**Status:** sort-table Operation COMPLETE! ✅
+
+---
 
 ## Recent Enhancements
 
