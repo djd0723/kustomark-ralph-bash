@@ -2780,6 +2780,76 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            // deduplicate-table-rows
+            {
+              type: "object",
+              required: ["op", "table"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "deduplicate-table-rows",
+                  description: "Remove duplicate rows from a markdown table",
+                },
+                table: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description: "Table identifier (line number or section heading ID)",
+                },
+                column: {
+                  oneOf: [{ type: "number" }, { type: "string" }],
+                  description:
+                    "Optional column to deduplicate by (0-based index or header name). If omitted, compares all columns.",
+                },
+                keep: {
+                  type: "string",
+                  enum: ["first", "last"],
+                  description: 'Which occurrence to keep when duplicates found (default: "first")',
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
             // add-list-item
             {
               type: "object",
@@ -3060,6 +3130,81 @@ export function generateSchema(): object {
                   type: "boolean",
                   description:
                     "When true, keep items that do NOT match the filter (default: false)",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            // deduplicate-list-items
+            {
+              type: "object",
+              required: ["op", "list"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "deduplicate-list-items",
+                  description: "Remove duplicate items from a markdown list",
+                },
+                list: {
+                  oneOf: [
+                    {
+                      type: "integer",
+                      minimum: 0,
+                      description: "Zero-based list index (0 = first list in file)",
+                    },
+                    {
+                      type: "string",
+                      description: "Section ID containing the list",
+                    },
+                  ],
+                  description: "List identifier: zero-based index or section ID",
+                },
+                keep: {
+                  type: "string",
+                  enum: ["first", "last"],
+                  description: 'Which occurrence to keep when duplicates found (default: "first")',
                 },
                 include: {
                   oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],

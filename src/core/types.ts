@@ -490,6 +490,19 @@ export interface FilterTableRowsPatch extends PatchCommonFields {
 }
 
 /**
+ * Deduplicate table rows operation - removes duplicate rows
+ */
+export interface DeduplicateTableRowsPatch extends PatchCommonFields {
+  op: "deduplicate-table-rows";
+  /** Table identifier (line number or section heading ID) */
+  table: number | string;
+  /** Optional column to deduplicate by (0-based index or header name). If omitted, compares all columns. */
+  column?: number | string;
+  /** Which occurrence to keep when duplicates found: "first" (default) or "last" */
+  keep?: "first" | "last";
+}
+
+/**
  * Exec operation - runs a shell command to transform content
  */
 export interface ExecPatch extends PatchCommonFields {
@@ -608,6 +621,17 @@ export interface FilterListItemsPatch extends PatchCommonFields {
 }
 
 /**
+ * Deduplicate list items operation - removes duplicate items from a markdown list
+ */
+export interface DeduplicateListItemsPatch extends PatchCommonFields {
+  op: "deduplicate-list-items";
+  /** List identifier (zero-based index or section ID containing the list) */
+  list: number | string;
+  /** Which occurrence to keep when duplicates found: "first" (default) or "last" */
+  keep?: "first" | "last";
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -641,6 +665,7 @@ export type PatchOperation =
   | RenameTableColumnPatch
   | SortTablePatch
   | FilterTableRowsPatch
+  | DeduplicateTableRowsPatch
   | ExecPatch
   | PluginPatch
   | JsonSetPatch
@@ -650,7 +675,8 @@ export type PatchOperation =
   | RemoveListItemPatch
   | SetListItemPatch
   | SortListPatch
-  | FilterListItemsPatch;
+  | FilterListItemsPatch
+  | DeduplicateListItemsPatch;
 
 /**
  * Global validator configuration

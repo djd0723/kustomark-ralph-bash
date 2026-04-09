@@ -631,6 +631,8 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "set-list-item",
     "sort-list",
     "filter-list-items",
+    "deduplicate-table-rows",
+    "deduplicate-list-items",
   ];
 
   if (!validOps.includes(p.op as string)) {
@@ -1131,6 +1133,55 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         errors.push({
           field: `${prefix}.invert`,
           message: "'invert' must be a boolean",
+        });
+      }
+      break;
+
+    case "deduplicate-table-rows":
+      if (p.table === undefined) {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "deduplicate-table-rows operation requires 'table' field",
+        });
+      } else if (typeof p.table !== "number" && typeof p.table !== "string") {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "'table' must be a number or string",
+        });
+      }
+
+      if (p.column !== undefined && typeof p.column !== "number" && typeof p.column !== "string") {
+        errors.push({
+          field: `${prefix}.column`,
+          message: "'column' must be a number or string",
+        });
+      }
+
+      if (p.keep !== undefined && p.keep !== "first" && p.keep !== "last") {
+        errors.push({
+          field: `${prefix}.keep`,
+          message: '\'keep\' must be "first" or "last"',
+        });
+      }
+      break;
+
+    case "deduplicate-list-items":
+      if (p.list === undefined) {
+        errors.push({
+          field: `${prefix}.list`,
+          message: "deduplicate-list-items operation requires 'list' field",
+        });
+      } else if (typeof p.list !== "number" && typeof p.list !== "string") {
+        errors.push({
+          field: `${prefix}.list`,
+          message: "'list' must be a number or string",
+        });
+      }
+
+      if (p.keep !== undefined && p.keep !== "first" && p.keep !== "last") {
+        errors.push({
+          field: `${prefix}.keep`,
+          message: '\'keep\' must be "first" or "last"',
         });
       }
       break;

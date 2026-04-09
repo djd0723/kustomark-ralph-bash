@@ -3808,6 +3808,46 @@ Output:
 - `match` uses exact, case-sensitive string comparison
 - `pattern` is a JavaScript regular expression; inline flags like `(?i)` are not supported
 
+### `deduplicate-table-rows` - Remove Duplicate Table Rows
+
+Remove duplicate rows from a table. Compares all columns by default, or deduplicate by a specific column. Choose whether to keep the first or last occurrence.
+
+```yaml
+- op: deduplicate-table-rows
+  table: 0           # zero-based index or section heading ID
+```
+
+**Fields:**
+
+| Field    | Type             | Required | Description                                                             |
+| -------- | ---------------- | -------- | ----------------------------------------------------------------------- |
+| `table`  | number \| string | Yes      | Zero-based table index or section heading ID containing the table       |
+| `column` | number \| string | No       | Column to deduplicate by: 0-based index or header name. Omit to compare all columns. |
+| `keep`   | `"first"` \| `"last"` | No  | Which occurrence to keep (default: `"first"`)                          |
+
+**Example — remove fully duplicate rows:**
+
+```yaml
+- op: deduplicate-table-rows
+  table: 0
+```
+
+**Example — deduplicate by column, keep last occurrence:**
+
+```yaml
+- op: deduplicate-table-rows
+  table: "team"
+  column: "Name"
+  keep: "last"
+```
+
+**Notes:**
+
+- The header and alignment rows are always preserved
+- When `column` is omitted, all cell values in a row are compared (entire-row deduplication)
+- `keep: "first"` retains the first occurrence and removes later duplicates; `keep: "last"` retains the last
+- Returns count of rows removed (0 triggers `onNoMatch`)
+
 ## List Operations
 
 List operations allow you to manipulate unordered (`-`, `*`, `+`) and ordered (`1.`, `2.`, ...) markdown lists, including task lists (`[ ]`/`[x]`). Lists can be identified by their zero-based index in the document or by the section ID of the heading that contains them.
@@ -4124,6 +4164,43 @@ Output:
 - `type: number` — numeric comparison; non-numeric values are treated as `0`
 - Sub-items (indented lines) are reordered as a unit with their parent
 - The original bullet style (`-`, `*`, `+`, `1.`) is preserved after sorting
+
+### `deduplicate-list-items` - Remove Duplicate List Items
+
+Remove duplicate items from a markdown list. Comparison is case-sensitive. Choose whether to keep the first or last occurrence.
+
+```yaml
+- op: deduplicate-list-items
+  list: 0           # zero-based index or section heading ID
+```
+
+**Fields:**
+
+| Field  | Type                   | Required | Description                                                      |
+| ------ | ---------------------- | -------- | ---------------------------------------------------------------- |
+| `list` | number \| string       | Yes      | Zero-based list index or section heading ID containing the list  |
+| `keep` | `"first"` \| `"last"` | No       | Which occurrence to keep (default: `"first"`)                    |
+
+**Example — remove duplicate entries:**
+
+```yaml
+- op: deduplicate-list-items
+  list: "dependencies"
+```
+
+**Example — keep last occurrence:**
+
+```yaml
+- op: deduplicate-list-items
+  list: 0
+  keep: "last"
+```
+
+**Notes:**
+
+- Comparison is exact and case-sensitive (`Apple` and `apple` are treated as distinct)
+- `keep: "first"` removes later duplicates; `keep: "last"` removes earlier ones
+- Returns count of items removed (0 triggers `onNoMatch`)
 
 ### Real-World Example
 

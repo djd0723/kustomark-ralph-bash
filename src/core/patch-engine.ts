@@ -1525,6 +1525,72 @@ export function applyFilterTableRows(
 }
 
 /**
+ * Apply a deduplicate-table-rows patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table index (number) or section ID (string) containing the table
+ * @param columnIdentifier - Optional column (0-based index or header name) to deduplicate by; if omitted, compares all columns
+ * @param keep - Which occurrence to keep: "first" (default) or "last"
+ * @returns Object with patched content and count (rows removed, or 0 if table not found)
+ */
+export function applyDeduplicateTableRows(
+  content: string,
+  tableIdentifier: number | string,
+  columnIdentifier: number | string | undefined,
+  keep: "first" | "last" = "first",
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  let columnIndex: number | undefined;
+  if (columnIdentifier !== undefined) {
+    const idx = getColumnIndex(table, columnIdentifier);
+    if (idx === -1) {
+      return { content, count: 0 };
+    }
+    columnIndex = idx;
+  }
+
+  const originalCount = table.rows.length;
+  const seen = new Set<string>();
+
+  let rows = table.rows;
+  if (keep === "last") {
+    rows = [...rows].reverse();
+  }
+
+  const deduped = rows.filter((row) => {
+    const key =
+      columnIndex !== undefined
+        ? (row[columnIndex] ?? "").trim()
+        : row.map((cell) => cell.trim()).join("\0");
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+
+  if (keep === "last") {
+    deduped.reverse();
+  }
+
+  const removedCount = originalCount - deduped.length;
+  if (removedCount === 0) {
+    return { content, count: 0 };
+  }
+
+  table.rows = deduped;
+  const newTableContent = serializeTable(table);
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: removedCount };
+}
+
+/**
  * Apply an add-list-item patch operation
  *
  * @param content - The content to patch
@@ -1747,6 +1813,51 @@ export function applyFilterListItems(
     }
     return invert ? !matches : matches;
   });
+
+  const removedCount = keepIndices.filter((k) => !k).length;
+  if (removedCount === 0) {
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+  const blocks = list.itemRanges.map((range) => lines.slice(range.startLine, range.endLine + 1));
+  const filteredLines = keepIndices.flatMap((keep, i) => (keep ? (blocks[i] ?? []) : []));
+
+  lines.splice(list.startLine, list.endLine - list.startLine + 1, ...filteredLines);
+
+  return { content: lines.join("\n"), count: removedCount };
+}
+
+/**
+ * Apply a deduplicate-list-items patch operation
+ *
+ * @param content - The content to patch
+ * @param listIdentifier - List index (number) or section ID (string) containing the list
+ * @param keep - Which occurrence to keep: "first" (default) or "last"
+ * @returns Object with patched content and count (items removed, or 0 if list not found)
+ */
+export function applyDeduplicateListItems(
+  content: string,
+  listIdentifier: number | string,
+  keep: "first" | "last" = "first",
+): { content: string; count: number } {
+  const list = findList(content, listIdentifier);
+  if (!list || list.items.length === 0) {
+    return { content, count: 0 };
+  }
+
+  const seen = new Set<string>();
+  const keepIndices: boolean[] = new Array(list.items.length).fill(false);
+
+  const indices = keep === "last" ? [...list.items.keys()].reverse() : [...list.items.keys()];
+
+  for (const i of indices) {
+    const key = list.items[i]?.text ?? "";
+    if (!seen.has(key)) {
+      seen.add(key);
+      keepIndices[i] = true;
+    }
+  }
 
   const removedCount = keepIndices.filter((k) => !k).length;
   if (removedCount === 0) {
@@ -2752,6 +2863,10 @@ export async function applySinglePatch(
       );
       break;
 
+    case "deduplicate-table-rows":
+      result = applyDeduplicateTableRows(content, patch.table, patch.column, patch.keep);
+      break;
+
     case "exec":
       result = await applyExec(content, patch.command, patch.timeout);
       break;
@@ -2786,6 +2901,10 @@ export async function applySinglePatch(
 
     case "filter-list-items":
       result = applyFilterListItems(content, patch.list, patch.match, patch.pattern, patch.invert);
+      break;
+
+    case "deduplicate-list-items":
+      result = applyDeduplicateListItems(content, patch.list, patch.keep);
       break;
 
     case "plugin":
@@ -2926,6 +3045,8 @@ function getPatchDescription(patch: PatchOperation): string {
           : "no filter";
       return `filter-table-rows in table '${patch.table}' on column '${patch.column}' by ${filterDesc}${patch.invert ? " (inverted)" : ""}`;
     }
+    case "deduplicate-table-rows":
+      return `deduplicate-table-rows in table '${patch.table}'${patch.column !== undefined ? ` by column '${patch.column}'` : ""}${patch.keep ? ` (keep=${patch.keep})` : ""}`;
     case "exec":
       return `exec '${patch.command}'`;
     case "json-set":
@@ -2949,6 +3070,8 @@ function getPatchDescription(patch: PatchOperation): string {
         patch.pattern !== undefined ? `pattern='${patch.pattern}'` : `match='${patch.match}'`;
       return `filter-list-items '${patch.list}' ${filterDesc}${patch.invert ? " (inverted)" : ""}`;
     }
+    case "deduplicate-list-items":
+      return `deduplicate-list-items '${patch.list}'${patch.keep ? ` (keep=${patch.keep})` : ""}`;
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":

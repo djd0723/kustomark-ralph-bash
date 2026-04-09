@@ -1,10 +1,62 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (deduplicate-table-rows + deduplicate-list-items - COMPLETE!):**
+
+* ✅ **`deduplicate-table-rows`**: New operation to remove duplicate rows from a markdown table
+* ✅ **ALL-COLUMNS MODE**: When no `column` specified, compares all cell values in each row
+* ✅ **COLUMN MODE**: `column` field (name or 0-based index) to deduplicate by a single column's value
+* ✅ **KEEP CONTROL**: `keep: "first"` (default) or `keep: "last"` — choose which occurrence to retain
+* ✅ **SECTION ID SUPPORT**: Tables identified by section heading (same pattern as all other table ops)
+* ✅ **`deduplicate-list-items`**: New operation to remove duplicate items from a markdown list
+* ✅ **CASE-SENSITIVE**: Exact text comparison (`Apple` and `apple` are distinct)
+* ✅ **KEEP CONTROL**: `keep: "first"` (default) or `keep: "last"` for occurrence preference
+* ✅ **README DOCS**: Full documentation with field tables and examples for both operations
+* ✅ **24 NEW TESTS PASSING**: Unit + integration tests covering all scenarios
+* ✅ **3,737 TESTS PASSING**: All tests pass with 0 failures
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # Remove fully duplicate rows
+   patches:
+     - op: deduplicate-table-rows
+       table: 0
+
+   # Deduplicate by column, keep last
+     - op: deduplicate-table-rows
+       table: "team"
+       column: "Name"
+       keep: "last"
+
+   # Remove duplicate list items
+     - op: deduplicate-list-items
+       list: 0
+
+   # Keep last occurrence
+     - op: deduplicate-list-items
+       list: "dependencies"
+       keep: "last"
+   ```
+
+2. **Implementation Files**
+   * `src/core/types.ts` — Added `DeduplicateTableRowsPatch` and `DeduplicateListItemsPatch` interfaces; added to `PatchOperation` union
+   * `src/core/patch-engine.ts` — Added `applyDeduplicateTableRows()` and `applyDeduplicateListItems()`; wired into `applySinglePatch()` and `getPatchDescription()`
+   * `src/core/schema.ts` — Added JSON schema definitions for both operations
+   * `src/core/config-parser.ts` — Added both operations to `validOps`; added field validation
+   * `src/core/index.ts` — Exported both functions and types
+   * `tests/core/deduplicate-operations.test.ts` — 24 tests covering all scenarios
+   * `README.md` — Full documentation for both operations
+
+**Status:** deduplicate-table-rows + deduplicate-list-items COMPLETE! ✅
+
+---
 
 **2026-04-09 (filter-list-items - COMPLETE!):**
 
