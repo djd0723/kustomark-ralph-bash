@@ -630,6 +630,7 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "remove-list-item",
     "set-list-item",
     "sort-list",
+    "filter-list-items",
   ];
 
   if (!validOps.includes(p.op as string)) {
@@ -1074,6 +1075,41 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         errors.push({
           field: `${prefix}.column`,
           message: "'column' must be a number or string",
+        });
+      }
+
+      if (p.match !== undefined && typeof p.match !== "string") {
+        errors.push({
+          field: `${prefix}.match`,
+          message: "'match' must be a string",
+        });
+      }
+
+      if (p.pattern !== undefined && typeof p.pattern !== "string") {
+        errors.push({
+          field: `${prefix}.pattern`,
+          message: "'pattern' must be a string",
+        });
+      }
+
+      if (p.invert !== undefined && typeof p.invert !== "boolean") {
+        errors.push({
+          field: `${prefix}.invert`,
+          message: "'invert' must be a boolean",
+        });
+      }
+      break;
+
+    case "filter-list-items":
+      if (p.list === undefined) {
+        errors.push({
+          field: `${prefix}.list`,
+          message: "filter-list-items operation requires 'list' field",
+        });
+      } else if (typeof p.list !== "number" && typeof p.list !== "string") {
+        errors.push({
+          field: `${prefix}.list`,
+          message: "'list' must be a number or string",
         });
       }
 

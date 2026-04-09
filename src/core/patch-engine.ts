@@ -1711,6 +1711,58 @@ export function applySortList(
 }
 
 /**
+ * Apply a filter-list-items patch operation
+ *
+ * @param content - The content to patch
+ * @param listIdentifier - List index (number) or section ID (string) containing the list
+ * @param matchValue - Exact string to match against item text (undefined to rely on pattern)
+ * @param pattern - Regex pattern to match against item text
+ * @param invert - When true, keep items that do NOT match (default: false)
+ * @returns Object with patched content and count (items removed, or 0 if list not found)
+ */
+export function applyFilterListItems(
+  content: string,
+  listIdentifier: number | string,
+  matchValue: string | undefined,
+  pattern: string | undefined,
+  invert = false,
+): { content: string; count: number } {
+  const list = findList(content, listIdentifier);
+  if (!list || list.items.length === 0) {
+    return { content, count: 0 };
+  }
+
+  const regex = pattern !== undefined ? new RegExp(pattern) : undefined;
+
+  // Determine which item indices to keep
+  const keepIndices: boolean[] = list.items.map((item) => {
+    const text = item.text;
+    let matches: boolean;
+    if (regex !== undefined) {
+      matches = regex.test(text);
+    } else if (matchValue !== undefined) {
+      matches = text === matchValue;
+    } else {
+      matches = true;
+    }
+    return invert ? !matches : matches;
+  });
+
+  const removedCount = keepIndices.filter((k) => !k).length;
+  if (removedCount === 0) {
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+  const blocks = list.itemRanges.map((range) => lines.slice(range.startLine, range.endLine + 1));
+  const filteredLines = keepIndices.flatMap((keep, i) => (keep ? (blocks[i] ?? []) : []));
+
+  lines.splice(list.startLine, list.endLine - list.startLine + 1, ...filteredLines);
+
+  return { content: lines.join("\n"), count: removedCount };
+}
+
+/**
  * Apply an exec patch operation - runs a shell command to transform content
  *
  * This function executes a shell command with the markdown content piped to stdin,
@@ -2732,6 +2784,10 @@ export async function applySinglePatch(
       result = applySortList(content, patch.list, patch.direction, patch.type);
       break;
 
+    case "filter-list-items":
+      result = applyFilterListItems(content, patch.list, patch.match, patch.pattern, patch.invert);
+      break;
+
     case "plugin":
       // Plugin operation requires a registry to be passed
       // This will be handled by applyPatchesWithPlugins
@@ -2888,6 +2944,11 @@ function getPatchDescription(patch: PatchOperation): string {
       return `set-list-item ${typeof patch.item === "number" ? patch.item : `'${patch.item}'`} in list '${patch.list}' to '${patch.new}'`;
     case "sort-list":
       return `sort-list '${patch.list}' ${patch.direction ?? "asc"} (${patch.type ?? "string"})`;
+    case "filter-list-items": {
+      const filterDesc =
+        patch.pattern !== undefined ? `pattern='${patch.pattern}'` : `match='${patch.match}'`;
+      return `filter-list-items '${patch.list}' ${filterDesc}${patch.invert ? " (inverted)" : ""}`;
+    }
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":

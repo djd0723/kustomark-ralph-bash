@@ -593,6 +593,21 @@ export interface SortListPatch extends PatchCommonFields {
 }
 
 /**
+ * Filter list items operation - keeps or removes items matching a pattern
+ */
+export interface FilterListItemsPatch extends PatchCommonFields {
+  op: "filter-list-items";
+  /** List identifier (zero-based index or section ID containing the list) */
+  list: number | string;
+  /** Exact value to match against item text (case-sensitive) */
+  match?: string;
+  /** Regex pattern to match against item text */
+  pattern?: string;
+  /** When true, keep items that do NOT match (default: false) */
+  invert?: boolean;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -634,7 +649,8 @@ export type PatchOperation =
   | AddListItemPatch
   | RemoveListItemPatch
   | SetListItemPatch
-  | SortListPatch;
+  | SortListPatch
+  | FilterListItemsPatch;
 
 /**
  * Global validator configuration

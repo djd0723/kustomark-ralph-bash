@@ -3988,6 +3988,83 @@ Output after marking complete (the checkbox prefix is preserved):
 - When `item` is a string, the first item whose text matches exactly is replaced
 - Sub-items attached to the matched item are preserved
 
+### `filter-list-items` - Filter List Items
+
+Keep or remove list items matching an exact value or regex pattern. Mirrors the behavior of `filter-table-rows` for markdown lists.
+
+```yaml
+- op: filter-list-items
+  list: 0           # zero-based list index or section ID
+  match: "Active"   # exact match (case-sensitive)
+  # OR
+  pattern: "^TODO:" # regex pattern
+  invert: false     # when true, keep items that do NOT match (default: false)
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `list` | number \| string | Yes | Zero-based list index or section ID containing the list |
+| `match` | string | No | Exact value to match against item text (case-sensitive) |
+| `pattern` | string | No | Regex pattern to match against item text |
+| `invert` | boolean | No | When `true`, keep items that do NOT match (default: `false`) |
+
+At least one of `match` or `pattern` should be provided; if neither is given, no items are removed.
+
+**Example — keep only TODO items:**
+
+Input:
+```markdown
+## Tasks
+
+- TODO: fix login bug
+- DONE: add tests
+- TODO: write docs
+- NOTE: see readme
+```
+
+Config:
+```yaml
+- op: filter-list-items
+  list: "tasks"
+  pattern: "^TODO:"
+```
+
+Output:
+```markdown
+## Tasks
+
+- TODO: fix login bug
+- TODO: write docs
+```
+
+**Example — remove deprecated items (invert):**
+
+```yaml
+- op: filter-list-items
+  list: 0
+  match: "Deprecated"
+  invert: true
+```
+
+**Example — keep only active features by section:**
+
+```yaml
+- op: filter-list-items
+  list: "features"
+  pattern: "\\[active\\]"
+```
+
+**Notes:**
+- `match` is case-sensitive exact comparison; `pattern` uses JavaScript `RegExp`
+- `invert: true` turns the operation into a "remove matching items" filter
+- Items are matched against their text content (without the bullet prefix)
+- The original bullet style (`-`, `*`, `+`, `1.`) is preserved
+- Returns count of items removed; `0` means no items were filtered out
+
+---
+
 ### `sort-list` - Sort List Items
 
 Sort list items alphabetically or numerically, in ascending or descending order. Sub-items are kept attached to their parent during the sort.

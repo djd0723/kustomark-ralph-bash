@@ -1,10 +1,21 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (filter-list-items - COMPLETE!):**
+
+* ✅ **`filter-list-items`**: New operation to filter markdown list items by value or regex pattern
+* ✅ **EXACT MATCH**: `match` field for case-sensitive exact string comparison
+* ✅ **REGEX MATCH**: `pattern` field for JavaScript regex matching
+* ✅ **INVERT**: `invert: true` to keep items that do NOT match
+* ✅ **LIST SELECTOR**: List identified by 0-based index or section heading slug
+* ✅ **README DOCS**: Full documentation with field table, examples, and notes
+* ✅ **19 NEW TESTS PASSING**: Unit + integration tests covering all edge cases
+* ✅ **3,713 TESTS PASSING**: All tests pass with 0 failures
 
 **2026-04-09 (filter-table-rows + CI Action Bumps - COMPLETE!):**
 
@@ -7280,3 +7291,50 @@ This high-value feature enables users to leverage shell commands and custom scri
 - ✅ TypeScript compilation clean
 
 **Status:** TOML Support COMPLETE! ✅ Multi-Format Support is now fully implemented for JSON, YAML, and TOML.
+
+---
+
+**2026-04-09 (filter-list-items - COMPLETE!):**
+
+- ✅ **`filter-list-items`**: New operation to filter list items by exact value or regex pattern
+
+**Implementation Details:**
+
+1. **Type System** (`src/core/types.ts`)
+   - Added `FilterListItemsPatch` interface with `op: "filter-list-items"`, `list`, `match?`, `pattern?`, `invert?` fields
+   - Added to `PatchOperation` union type
+
+2. **Patch Engine** (`src/core/patch-engine.ts`)
+   - Implemented `applyFilterListItems()` using `findList` + `itemRanges` block approach (mirrors `applySortList`)
+   - Wired into `applySinglePatch()` switch statement
+   - Added `getPatchDescription()` case
+
+3. **Schema** (`src/core/schema.ts`)
+   - Added complete JSON Schema definition for `filter-list-items`
+   - `list` required; `match`, `pattern`, `invert` optional
+
+4. **Config Validation** (`src/core/config-parser.ts`)
+   - Added `"filter-list-items"` to `validOps` array
+   - Added field validation case for `list`, `match`, `pattern`, `invert`
+
+5. **Exports** (`src/core/index.ts`)
+   - Exported `applyFilterListItems` and `FilterListItemsPatch`
+
+6. **Tests** (`tests/core/list-operations.test.ts`) — 19 new tests:
+   - Exact match (keeps matching, removes non-matching, count=0 when all match, case-sensitivity)
+   - Regex pattern (partial match, multi-match)
+   - Invert flag (keep non-matching, invert with pattern, invert=false is default)
+   - List identifier (by index, by section heading slug, not-found returns count=0)
+   - Content preservation (surrounding text, bullet style)
+   - Edge cases (no match/pattern specified)
+   - Integration tests via `applyPatches`
+
+7. **Documentation** (`README.md`)
+   - Full documentation section with field table, examples, and notes
+
+**Testing Results:**
+- ✅ All 3,713 tests passing (19 new list-operations tests added)
+- ✅ All linting checks passing (`bun check`)
+- ✅ TypeScript compilation clean
+
+**Status:** filter-list-items COMPLETE! ✅
