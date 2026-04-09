@@ -7430,3 +7430,38 @@ This high-value feature enables users to leverage shell commands and custom scri
 - ✅ TypeScript compilation clean
 
 **Status:** filter-list-items COMPLETE! ✅
+
+---
+
+**2026-04-09 (Build History API Migration - COMPLETE!):**
+
+- ✅ **REWRITTEN `src/core/build-history.ts`**: Migrated from internal ad-hoc types to canonical types from `types.ts`
+- ✅ **NEW PUBLIC API**: All functions now use `BuildHistoryEntry`, `BuildHistoryManifest`, `BuildFileEntry`, `BuildComparisonResult` from `types.ts`
+- ✅ **ENABLED SKIPPED TEST SUITE**: Renamed `build-history.test.ts.skip` → `build-history.test.ts` (46 tests, all passing)
+
+**Implementation Details:**
+
+1. **New disk format** (`src/core/build-history.ts`)
+   - Lightweight manifest: `{version, latestBuildId?, lastCleanup?}` — no redundant buildIds array
+   - Individual build files: `builds/{id}.json` storing full `BuildHistoryEntry`
+   - `loadManifest` scans the builds directory for actual count (handles concurrent writes correctly)
+
+2. **New function signatures**
+   - `recordBuild(entry: BuildHistoryEntry, configPath: string): Promise<void>`
+   - `loadBuild(buildId: string, configPath: string): Promise<BuildHistoryEntry | null>`
+   - `loadManifest(configPath): Promise<BuildHistoryManifest | null>` — returns Map-based manifest
+   - `listBuilds(configPath, filter?{success?, tags?, after?, limit?}): Promise<BuildHistoryEntry[]>`
+   - `compareBuildHistory(baselineId, targetId, configPath): Promise<BuildComparisonResult>`
+   - `rollbackBuild(buildId, outputDir, configPath): Promise<{success, filesRestored}>`
+   - `pruneHistory(configPath, keep?, before?): Promise<{buildsPruned, buildsRemaining}>`
+   - `clearHistory(configPath, options?): Promise<{buildsCleared}>`
+   - `getBuildById`, `getLatestBuild`, `deleteBuild`, `saveBuildToHistory` — new functions
+
+3. **Updated `src/core/index.ts`** to export all new function names
+
+**Testing Results:**
+- ✅ All 3,719 tests passing (46 build-history tests now active, up from 0)
+- ✅ All linting checks passing (`bun check`)
+- ✅ TypeScript compilation clean
+
+**Status:** Build History API Migration COMPLETE! ✅

@@ -1,108 +1,59 @@
 /**
- * Tests for build history module
+ * Tests for build history system
  *
- * These tests verify the build history system's functionality:
- * - File hash calculation
- * - Build recording and retrieval
- * - Build manifest management
- * - Build comparison and diffing
- * - Rollback operations
- * - History pruning and cleanup
- * - Statistics gathering
- * - Validation and error handling
+ * These tests verify the build history tracking functionality:
+ * - Recording builds with complete metadata
+ * - Loading builds and manifest from disk
+ * - Listing builds with filtering capabilities
+ * - Comparing builds to detect differences
+ * - Rollback operations to restore previous states
+ * - Pruning history to manage storage
+ * - Clearing history
+ * - Error handling (corrupted data, missing files)
+ * - Complete workflow integration
  */
 
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import type {
+  BuildHistoryEntry,
+  BuildHistoryManifest,
+  BuildFileEntry,
+  BuildComparisonResult,
+  ValidationError,
+  ValidationWarning,
+} from "../../src/core/types.js";
 
-// Import functions from build-history module
+// Import functions from build-history module (to be implemented)
 import {
-  calculateFileHash,
-  getHistoryDirectory,
   recordBuild,
   loadBuild,
+  loadManifest,
   listBuilds,
-  compareBuilds,
-  rollbackToBuild,
+  compareBuildHistory,
+  rollbackBuild,
   pruneHistory,
   clearHistory,
-  getHistoryStats,
-  loadManifest,
-  type BuildRecord,
-  type BuildFileRecord,
-  type BuildManifest,
-  type BuildManifestEntry,
-  type BuildComparison,
-  type BuildListFilter,
-  type HistoryStats,
+  getHistoryDirectory,
+  saveBuildToHistory,
+  getBuildById,
+  getLatestBuild,
+  deleteBuild,
 } from "../../src/core/build-history.js";
 
 const TEST_DIR = join(tmpdir(), "kustomark-test-history", `history-test-${Date.now()}`);
 
 describe("Build History Module", () => {
   beforeEach(async () => {
-    await mkdir(TEST_DIR, { recursive: true });
+    await mkdirSync(TEST_DIR, { recursive: true });
   });
 
   afterEach(async () => {
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }
-  });
-
-  describe("calculateFileHash", () => {
-    test("should produce consistent hashes for same content", () => {
-      const content = "# Hello World\n\nThis is test content.";
-      const hash1 = calculateFileHash(content);
-      const hash2 = calculateFileHash(content);
-
-      expect(hash1).toBe(hash2);
-      expect(hash1).toMatch(/^[a-f0-9]{64}$/);
-    });
-
-    test("should produce different hashes for different content", () => {
-      const content1 = "# Hello World";
-      const content2 = "# Goodbye World";
-
-      const hash1 = calculateFileHash(content1);
-      const hash2 = calculateFileHash(content2);
-
-      expect(hash1).not.toBe(hash2);
-    });
-
-    test("should handle empty content", () => {
-      const hash = calculateFileHash("");
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
-    });
-
-    test("should handle unicode content", () => {
-      const content = "こんにちは世界 🌍";
-      const hash = calculateFileHash(content);
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
-    });
-
-    test("should be sensitive to whitespace changes", () => {
-      const content1 = "Hello\nWorld";
-      const content2 = "Hello\r\nWorld";
-      const content3 = "Hello  World";
-
-      const hash1 = calculateFileHash(content1);
-      const hash2 = calculateFileHash(content2);
-      const hash3 = calculateFileHash(content3);
-
-      expect(hash1).not.toBe(hash2);
-      expect(hash1).not.toBe(hash3);
-      expect(hash2).not.toBe(hash3);
-    });
-
-    test("should handle large content", () => {
-      const content = "x".repeat(100000);
-      const hash = calculateFileHash(content);
-      expect(hash).toMatch(/^[a-f0-9]{64}$/);
-    });
   });
 
   describe("getHistoryDirectory", () => {
@@ -120,331 +71,285 @@ describe("Build History Module", () => {
       expect(historyDir).toBe(join(TEST_DIR, "nested", "config", ".kustomark", "history"));
     });
 
-    test("should handle absolute paths", () => {
-      const configPath = "/absolute/path/to/kustomark.yaml";
+    test("should handle file paths at root level", () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
       const historyDir = getHistoryDirectory(configPath);
 
-      expect(historyDir).toBe("/absolute/path/to/.kustomark/history");
+      expect(historyDir).toBe(join(TEST_DIR, ".kustomark", "history"));
     });
   });
 
   describe("recordBuild", () => {
-    test("should record a successful build with files", async () => {
+    test("should record a successful build", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const content1 = "# File 1 content";
-      const content2 = "# File 2 content";
-
-      const files = new Map([
-        [
-          "file1.md",
-          {
-            content: content1,
-            sourceHash: calculateFileHash(content1),
-            patchHash: calculateFileHash("patch1"),
-            outputHash: calculateFileHash(content1 + "patched"),
-          },
-        ],
-        [
-          "file2.md",
-          {
-            content: content2,
-            sourceHash: calculateFileHash(content2),
-            patchHash: calculateFileHash("patch2"),
-            outputHash: calculateFileHash(content2 + "patched"),
-          },
-        ],
-      ]);
-
-      const configHash = calculateFileHash("config content");
-      const record = await recordBuild(configPath, files, configHash, true);
-
-      expect(record.success).toBe(true);
-      expect(record.fileCount).toBe(2);
-      expect(record.configHash).toBe(configHash);
-      expect(record.files["file1.md"]).toBeDefined();
-      expect(record.files["file2.md"]).toBeDefined();
-      expect(record.totalSize).toBeGreaterThan(0);
-      expect(record.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-      expect(record.id.startsWith(record.timestamp)).toBe(true);
-    });
-
-    test("should record a failed build with error message", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const record = await recordBuild(configPath, files, configHash, false, {
-        error: "Build failed due to syntax error",
-      });
-
-      expect(record.success).toBe(false);
-      expect(record.error).toBe("Build failed due to syntax error");
-      expect(record.fileCount).toBe(0);
-    });
-
-    test("should record build with duration", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const record = await recordBuild(configPath, files, configHash, true, {
+      const buildEntry: BuildHistoryEntry = {
+        id: "build-001",
+        timestamp: new Date().toISOString(),
         duration: 1500,
-      });
-
-      expect(record.duration).toBe(1500);
-    });
-
-    test("should record build with config hashes", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const configHashes = {
-        "base.yaml": calculateFileHash("base config"),
-        "overlay.yaml": calculateFileHash("overlay config"),
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 2,
+        totalPatchesApplied: 5,
+        files: [
+          {
+            path: "readme.md",
+            sourceHash: "hash1",
+            outputHash: "hash2",
+            patchesApplied: 3,
+            sourceSize: 100,
+            outputSize: 120,
+            processedAt: new Date().toISOString(),
+          },
+          {
+            path: "docs/guide.md",
+            sourceHash: "hash3",
+            outputHash: "hash4",
+            patchesApplied: 2,
+            sourceSize: 200,
+            outputSize: 210,
+            processedAt: new Date().toISOString(),
+          },
+        ],
+        errors: [],
+        warnings: [],
       };
 
-      const record = await recordBuild(configPath, files, configHash, true, {
-        configHashes,
-      });
+      await recordBuild(buildEntry, configPath);
 
-      expect(record.configHashes).toEqual(configHashes);
+      const historyDir = getHistoryDirectory(configPath);
+      expect(existsSync(historyDir)).toBe(true);
+
+      // Verify build file exists
+      const buildFilePath = join(historyDir, "builds", `${buildEntry.id}.json`);
+      expect(existsSync(buildFilePath)).toBe(true);
+
+      // Verify manifest was created/updated
+      const manifestPath = join(historyDir, "manifest.json");
+      expect(existsSync(manifestPath)).toBe(true);
+    });
+
+    test("should record a failed build with errors", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+      const buildEntry: BuildHistoryEntry = {
+        id: "build-002",
+        timestamp: new Date().toISOString(),
+        duration: 500,
+        success: false,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 0,
+        files: [],
+        errors: [
+          {
+            message: "File not found",
+            path: "missing.md",
+            line: 0,
+            column: 0,
+            severity: "error",
+          },
+        ],
+        warnings: [],
+      };
+
+      await recordBuild(buildEntry, configPath);
+
+      const loadedBuild = await loadBuild(buildEntry.id, configPath);
+      expect(loadedBuild).not.toBeNull();
+      if (loadedBuild) {
+        expect(loadedBuild.success).toBe(false);
+        expect(loadedBuild.errors).toHaveLength(1);
+        expect(loadedBuild.errors[0]?.message).toBe("File not found");
+      }
+    });
+
+    test("should create history directory if it doesn't exist", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+      const historyDir = getHistoryDirectory(configPath);
+
+      expect(existsSync(historyDir)).toBe(false);
+
+      const buildEntry: BuildHistoryEntry = {
+        id: "build-003",
+        timestamp: new Date().toISOString(),
+        duration: 1000,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 0,
+        totalPatchesApplied: 0,
+        files: [],
+        errors: [],
+        warnings: [],
+      };
+
+      await recordBuild(buildEntry, configPath);
+
+      expect(existsSync(historyDir)).toBe(true);
+    });
+
+    test("should record build with tags and description", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+      const buildEntry: BuildHistoryEntry = {
+        id: "build-004",
+        timestamp: new Date().toISOString(),
+        duration: 1200,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 2,
+        files: [],
+        errors: [],
+        warnings: [],
+        tags: ["production", "release"],
+        description: "Production release v2.0",
+      };
+
+      await recordBuild(buildEntry, configPath);
+
+      const loadedBuild = await loadBuild(buildEntry.id, configPath);
+      expect(loadedBuild?.tags).toEqual(["production", "release"]);
+      expect(loadedBuild?.description).toBe("Production release v2.0");
     });
 
     test("should record build with group filters", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const groupFilters = {
-        enabled: ["group1", "group2"],
-        disabled: ["group3"],
+      const buildEntry: BuildHistoryEntry = {
+        id: "build-005",
+        timestamp: new Date().toISOString(),
+        duration: 1100,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 1,
+        files: [],
+        errors: [],
+        warnings: [],
+        groupFilters: {
+          enabled: ["docs", "api"],
+          disabled: ["internal"],
+        },
       };
 
-      const record = await recordBuild(configPath, files, configHash, true, {
-        groupFilters,
-      });
+      await recordBuild(buildEntry, configPath);
 
-      expect(record.groupFilters).toEqual(groupFilters);
+      const loadedBuild = await loadBuild(buildEntry.id, configPath);
+      expect(loadedBuild?.groupFilters?.enabled).toEqual(["docs", "api"]);
+      expect(loadedBuild?.groupFilters?.disabled).toEqual(["internal"]);
     });
 
-    test("should calculate correct file sizes", async () => {
+    test("should handle builds with warnings", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const content = "Hello, World!";
-      const expectedSize = Buffer.byteLength(content, "utf-8");
-
-      const files = new Map([
-        [
-          "file.md",
+      const buildEntry: BuildHistoryEntry = {
+        id: "build-006",
+        timestamp: new Date().toISOString(),
+        duration: 1300,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 2,
+        totalPatchesApplied: 3,
+        files: [],
+        errors: [],
+        warnings: [
           {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
+            message: "Deprecated syntax used",
+            path: "old-doc.md",
+            line: 10,
+            column: 5,
+            severity: "warning",
           },
         ],
-      ]);
+      };
 
-      const record = await recordBuild(configPath, files, calculateFileHash("config"), true);
+      await recordBuild(buildEntry, configPath);
 
-      expect(record.files["file.md"]?.size).toBe(expectedSize);
-      expect(record.totalSize).toBe(expectedSize);
-    });
-
-    test("should create manifest on first build", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-
-      const manifest = await loadManifest(configPath);
-      expect(manifest).not.toBeNull();
-      expect(manifest?.version).toBe(1);
-      expect(manifest?.totalBuilds).toBe(1);
-      expect(manifest?.builds.length).toBe(1);
-    });
-
-    test("should update manifest on subsequent builds", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-
-      const manifest = await loadManifest(configPath);
-      expect(manifest?.totalBuilds).toBe(3);
-      expect(manifest?.builds.length).toBe(3);
-    });
-
-    test("should update current.json for successful builds", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const record = await recordBuild(configPath, files, configHash, true);
-
-      const historyDir = getHistoryDirectory(configPath);
-      const currentPath = join(historyDir, "current.json");
-
-      expect(existsSync(currentPath)).toBe(true);
-
-      const currentContent = await readFile(currentPath, "utf-8");
-      const current = JSON.parse(currentContent);
-      expect(current.id).toBe(record.id);
-    });
-
-    test("should not update current.json for failed builds", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      // First successful build
-      await recordBuild(configPath, files, configHash, true);
-
-      const historyDir = getHistoryDirectory(configPath);
-      const currentPath = join(historyDir, "current.json");
-      const initialContent = await readFile(currentPath, "utf-8");
-      const initialTimestamp = JSON.parse(initialContent).timestamp;
-
-      // Failed build should not update current.json
-      await recordBuild(configPath, files, configHash, false, {
-        error: "Build failed",
-      });
-
-      const updatedContent = await readFile(currentPath, "utf-8");
-      const updatedTimestamp = JSON.parse(updatedContent).timestamp;
-
-      expect(updatedTimestamp).toBe(initialTimestamp);
-    });
-
-    test("should handle builds with no files", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const record = await recordBuild(configPath, files, configHash, true);
-
-      expect(record.fileCount).toBe(0);
-      expect(record.totalSize).toBe(0);
-      expect(Object.keys(record.files).length).toBe(0);
-    });
-
-    test("should handle unicode content in files", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const content = "こんにちは世界 🌍";
-
-      const files = new Map([
-        [
-          "unicode.md",
-          {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
-          },
-        ],
-      ]);
-
-      const record = await recordBuild(configPath, files, calculateFileHash("config"), true);
-
-      expect(record.files["unicode.md"]).toBeDefined();
-      expect(record.files["unicode.md"]?.size).toBe(Buffer.byteLength(content, "utf-8"));
+      const loadedBuild = await loadBuild(buildEntry.id, configPath);
+      expect(loadedBuild?.warnings).toHaveLength(1);
+      expect(loadedBuild?.warnings[0]?.message).toBe("Deprecated syntax used");
     });
   });
 
-  describe("loadBuild", () => {
-    test("should load existing build record", async () => {
+  describe("loadBuild and loadManifest", () => {
+    test("should load existing build by ID", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
+      const buildEntry: BuildHistoryEntry = {
+        id: "build-007",
+        timestamp: "2024-01-01T12:00:00Z",
+        duration: 1400,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 2,
+        files: [
+          {
+            path: "test.md",
+            sourceHash: "src1",
+            outputHash: "out1",
+            patchesApplied: 2,
+            sourceSize: 50,
+            outputSize: 60,
+            processedAt: "2024-01-01T12:00:01Z",
+          },
+        ],
+        errors: [],
+        warnings: [],
+      };
 
-      const savedRecord = await recordBuild(configPath, files, configHash, true);
-      const loadedRecord = await loadBuild(configPath, savedRecord.id);
+      await recordBuild(buildEntry, configPath);
 
-      expect(loadedRecord).not.toBeNull();
-      expect(loadedRecord?.id).toBe(savedRecord.id);
-      expect(loadedRecord?.timestamp).toBe(savedRecord.timestamp);
-      expect(loadedRecord?.success).toBe(savedRecord.success);
+      const loadedBuild = await loadBuild("build-007", configPath);
+      expect(loadedBuild).not.toBeNull();
+      if (loadedBuild) {
+        expect(loadedBuild.id).toBe("build-007");
+        expect(loadedBuild.timestamp).toBe("2024-01-01T12:00:00Z");
+        expect(loadedBuild.duration).toBe(1400);
+        expect(loadedBuild.fileCount).toBe(1);
+        expect(loadedBuild.files).toHaveLength(1);
+      }
     });
 
     test("should return null for non-existent build", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const loadedRecord = await loadBuild(configPath, "2024-01-01T00:00:00.000Z");
+      const build = await loadBuild("non-existent-build", configPath);
 
-      expect(loadedRecord).toBeNull();
+      expect(build).toBeNull();
     });
 
-    test("should return null for invalid JSON", async () => {
+    test("should load manifest with multiple builds", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const historyDir = getHistoryDirectory(configPath);
-      const buildsDir = join(historyDir, "builds");
 
-      await mkdir(buildsDir, { recursive: true });
-
-      const buildId = "2024-01-01T00:00:00.000Z";
-      const buildPath = join(buildsDir, `${buildId}.json`);
-      await writeFile(buildPath, "invalid json {", "utf-8");
-
-      const loadedRecord = await loadBuild(configPath, buildId);
-      expect(loadedRecord).toBeNull();
-    });
-
-    test("should return null for build record missing required fields", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const historyDir = getHistoryDirectory(configPath);
-      const buildsDir = join(historyDir, "builds");
-
-      await mkdir(buildsDir, { recursive: true });
-
-      const buildId = "2024-01-01T00:00:00.000Z";
-      const buildPath = join(buildsDir, `${buildId}.json`);
-      await writeFile(
-        buildPath,
-        JSON.stringify({
-          id: buildId,
-          timestamp: buildId,
-          // missing required fields
-        }),
-        "utf-8",
-      );
-
-      const loadedRecord = await loadBuild(configPath, buildId);
-      expect(loadedRecord).toBeNull();
-    });
-
-    test("should validate timestamp format", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const historyDir = getHistoryDirectory(configPath);
-      const buildsDir = join(historyDir, "builds");
-
-      await mkdir(buildsDir, { recursive: true });
-
-      const buildId = "2024-01-01T00:00:00.000Z";
-      const buildPath = join(buildsDir, `${buildId}.json`);
-      await writeFile(
-        buildPath,
-        JSON.stringify({
-          id: buildId,
-          timestamp: "invalid-timestamp",
-          version: "1.0.0",
-          configHash: "abc123",
+      // Record multiple builds
+      for (let i = 1; i <= 3; i++) {
+        const buildEntry: BuildHistoryEntry = {
+          id: `build-${i}`,
+          timestamp: new Date(Date.now() + i * 1000).toISOString(),
+          duration: 1000 + i * 100,
           success: true,
-          files: {},
-          fileCount: 0,
-          totalSize: 0,
-        }),
-        "utf-8",
-      );
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: i,
+          totalPatchesApplied: i * 2,
+          files: [],
+          errors: [],
+          warnings: [],
+        };
+        await recordBuild(buildEntry, configPath);
+      }
 
-      const loadedRecord = await loadBuild(configPath, buildId);
-      expect(loadedRecord).toBeNull();
+      const manifest = await loadManifest(configPath);
+      expect(manifest).not.toBeNull();
+      if (manifest) {
+        expect(manifest.totalBuilds).toBe(3);
+        expect(manifest.builds.size).toBe(3);
+        expect(manifest.latestBuildId).toBe("build-3");
+      }
     });
-  });
 
-  describe("loadManifest", () => {
     test("should return null for non-existent manifest", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
       const manifest = await loadManifest(configPath);
@@ -452,49 +357,35 @@ describe("Build History Module", () => {
       expect(manifest).toBeNull();
     });
 
-    test("should load valid manifest", async () => {
+    test("should handle corrupted build file gracefully", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
+      const historyDir = getHistoryDirectory(configPath);
+      const buildsDir = join(historyDir, "builds");
 
-      await recordBuild(configPath, files, configHash, true);
+      mkdirSync(buildsDir, { recursive: true });
+      writeFileSync(join(buildsDir, "corrupted-build.json"), "invalid json {", "utf-8");
 
-      const manifest = await loadManifest(configPath);
-
-      expect(manifest).not.toBeNull();
-      expect(manifest?.version).toBe(1);
-      expect(manifest?.builds).toBeInstanceOf(Array);
-      expect(manifest?.totalBuilds).toBeGreaterThan(0);
+      const build = await loadBuild("corrupted-build", configPath);
+      expect(build).toBeNull();
     });
 
-    test("should return null for invalid manifest JSON", async () => {
+    test("should handle corrupted manifest gracefully", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
       const historyDir = getHistoryDirectory(configPath);
 
-      await mkdir(historyDir, { recursive: true });
-
-      const manifestPath = join(historyDir, "manifest.json");
-      await writeFile(manifestPath, "invalid json {", "utf-8");
+      mkdirSync(historyDir, { recursive: true });
+      writeFileSync(join(historyDir, "manifest.json"), "not valid json {", "utf-8");
 
       const manifest = await loadManifest(configPath);
       expect(manifest).toBeNull();
     });
 
-    test("should return null for manifest missing required fields", async () => {
+    test("should handle empty manifest file", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
       const historyDir = getHistoryDirectory(configPath);
 
-      await mkdir(historyDir, { recursive: true });
-
-      const manifestPath = join(historyDir, "manifest.json");
-      await writeFile(
-        manifestPath,
-        JSON.stringify({
-          version: 1,
-          // missing builds and totalBuilds
-        }),
-        "utf-8",
-      );
+      mkdirSync(historyDir, { recursive: true });
+      writeFileSync(join(historyDir, "manifest.json"), "", "utf-8");
 
       const manifest = await loadManifest(configPath);
       expect(manifest).toBeNull();
@@ -502,1033 +393,1071 @@ describe("Build History Module", () => {
   });
 
   describe("listBuilds", () => {
+    test("should list all builds in chronological order", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      // Record builds with different timestamps
+      for (let i = 1; i <= 5; i++) {
+        const buildEntry: BuildHistoryEntry = {
+          id: `build-${i}`,
+          timestamp: new Date(Date.now() - (5 - i) * 60000).toISOString(), // Ascending time
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 1,
+          files: [],
+          errors: [],
+          warnings: [],
+        };
+        await recordBuild(buildEntry, configPath);
+      }
+
+      const builds = await listBuilds(configPath);
+      expect(builds).toHaveLength(5);
+      expect(builds[0]?.id).toBe("build-5"); // Most recent first
+      expect(builds[4]?.id).toBe("build-1"); // Oldest last
+    });
+
+    test("should filter builds by success status", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      // Record successful builds
+      for (let i = 1; i <= 3; i++) {
+        await recordBuild(
+          {
+            id: `success-${i}`,
+            timestamp: new Date(Date.now() + i * 1000).toISOString(),
+            duration: 1000,
+            success: true,
+            configHash: "abc123",
+            version: "1.0.0",
+            fileCount: 1,
+            totalPatchesApplied: 1,
+            files: [],
+            errors: [],
+            warnings: [],
+          },
+          configPath,
+        );
+      }
+
+      // Record failed builds
+      for (let i = 1; i <= 2; i++) {
+        await recordBuild(
+          {
+            id: `failed-${i}`,
+            timestamp: new Date(Date.now() + (i + 3) * 1000).toISOString(),
+            duration: 500,
+            success: false,
+            configHash: "abc123",
+            version: "1.0.0",
+            fileCount: 0,
+            totalPatchesApplied: 0,
+            files: [],
+            errors: [{ message: "Error", path: "", line: 0, column: 0, severity: "error" }],
+            warnings: [],
+          },
+          configPath,
+        );
+      }
+
+      const successBuilds = await listBuilds(configPath, { success: true });
+      expect(successBuilds).toHaveLength(3);
+      expect(successBuilds.every((b) => b.success)).toBe(true);
+
+      const failedBuilds = await listBuilds(configPath, { success: false });
+      expect(failedBuilds).toHaveLength(2);
+      expect(failedBuilds.every((b) => !b.success)).toBe(true);
+    });
+
+    test("should filter builds by tags", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      await recordBuild(
+        {
+          id: "build-1",
+          timestamp: new Date().toISOString(),
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 1,
+          files: [],
+          errors: [],
+          warnings: [],
+          tags: ["production", "release"],
+        },
+        configPath,
+      );
+
+      await recordBuild(
+        {
+          id: "build-2",
+          timestamp: new Date().toISOString(),
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 1,
+          files: [],
+          errors: [],
+          warnings: [],
+          tags: ["development"],
+        },
+        configPath,
+      );
+
+      const prodBuilds = await listBuilds(configPath, { tags: ["production"] });
+      expect(prodBuilds).toHaveLength(1);
+      expect(prodBuilds[0]?.id).toBe("build-1");
+    });
+
+    test("should filter builds by date range", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+      const now = Date.now();
+
+      // Build from yesterday
+      await recordBuild(
+        {
+          id: "build-yesterday",
+          timestamp: new Date(now - 86400000).toISOString(),
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 1,
+          files: [],
+          errors: [],
+          warnings: [],
+        },
+        configPath,
+      );
+
+      // Build from today
+      await recordBuild(
+        {
+          id: "build-today",
+          timestamp: new Date(now).toISOString(),
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 1,
+          files: [],
+          errors: [],
+          warnings: [],
+        },
+        configPath,
+      );
+
+      const todayBuilds = await listBuilds(configPath, {
+        after: new Date(now - 3600000).toISOString(), // 1 hour ago
+      });
+      expect(todayBuilds).toHaveLength(1);
+      expect(todayBuilds[0]?.id).toBe("build-today");
+    });
+
+    test("should limit number of results", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      for (let i = 1; i <= 10; i++) {
+        await recordBuild(
+          {
+            id: `build-${i}`,
+            timestamp: new Date(Date.now() + i * 1000).toISOString(),
+            duration: 1000,
+            success: true,
+            configHash: "abc123",
+            version: "1.0.0",
+            fileCount: 1,
+            totalPatchesApplied: 1,
+            files: [],
+            errors: [],
+            warnings: [],
+          },
+          configPath,
+        );
+      }
+
+      const builds = await listBuilds(configPath, { limit: 5 });
+      expect(builds).toHaveLength(5);
+    });
+
     test("should return empty array when no builds exist", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
       const builds = await listBuilds(configPath);
 
       expect(builds).toEqual([]);
     });
+  });
 
-    test("should list all builds without filter", async () => {
+  describe("compareBuildHistory", () => {
+    test("should compare two builds and detect file additions", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
 
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, false, { error: "Failed" });
+      const build1: BuildHistoryEntry = {
+        id: "build-baseline",
+        timestamp: "2024-01-01T12:00:00Z",
+        duration: 1000,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 2,
+        files: [
+          {
+            path: "readme.md",
+            sourceHash: "hash1",
+            outputHash: "hash2",
+            patchesApplied: 2,
+            sourceSize: 100,
+            outputSize: 120,
+            processedAt: "2024-01-01T12:00:01Z",
+          },
+        ],
+        errors: [],
+        warnings: [],
+      };
 
-      const builds = await listBuilds(configPath);
+      const build2: BuildHistoryEntry = {
+        id: "build-target",
+        timestamp: "2024-01-02T12:00:00Z",
+        duration: 1200,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 2,
+        totalPatchesApplied: 4,
+        files: [
+          {
+            path: "readme.md",
+            sourceHash: "hash1",
+            outputHash: "hash2",
+            patchesApplied: 2,
+            sourceSize: 100,
+            outputSize: 120,
+            processedAt: "2024-01-02T12:00:01Z",
+          },
+          {
+            path: "new-file.md",
+            sourceHash: "hash3",
+            outputHash: "hash4",
+            patchesApplied: 2,
+            sourceSize: 50,
+            outputSize: 60,
+            processedAt: "2024-01-02T12:00:02Z",
+          },
+        ],
+        errors: [],
+        warnings: [],
+      };
 
-      expect(builds.length).toBe(3);
+      await recordBuild(build1, configPath);
+      await recordBuild(build2, configPath);
+
+      const comparison = await compareBuildHistory("build-baseline", "build-target", configPath);
+
+      expect(comparison.filesAdded).toEqual(["new-file.md"]);
+      expect(comparison.filesRemoved).toHaveLength(0);
+      expect(comparison.filesModified).toHaveLength(0);
+      expect(comparison.differenceCount).toBe(1);
+      expect(comparison.configChanged).toBe(false);
     });
 
-    test("should filter builds by success status", async () => {
+    test("should detect file removals", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
 
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, false, { error: "Failed" });
+      const build1: BuildHistoryEntry = {
+        id: "build-with-files",
+        timestamp: "2024-01-01T12:00:00Z",
+        duration: 1000,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 2,
+        totalPatchesApplied: 4,
+        files: [
+          {
+            path: "readme.md",
+            sourceHash: "hash1",
+            outputHash: "hash2",
+            patchesApplied: 2,
+            sourceSize: 100,
+            outputSize: 120,
+            processedAt: "2024-01-01T12:00:01Z",
+          },
+          {
+            path: "removed.md",
+            sourceHash: "hash3",
+            outputHash: "hash4",
+            patchesApplied: 2,
+            sourceSize: 50,
+            outputSize: 60,
+            processedAt: "2024-01-01T12:00:02Z",
+          },
+        ],
+        errors: [],
+        warnings: [],
+      };
 
-      const successfulBuilds = await listBuilds(configPath, { success: true });
-      const failedBuilds = await listBuilds(configPath, { success: false });
+      const build2: BuildHistoryEntry = {
+        id: "build-without-file",
+        timestamp: "2024-01-02T12:00:00Z",
+        duration: 800,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 2,
+        files: [
+          {
+            path: "readme.md",
+            sourceHash: "hash1",
+            outputHash: "hash2",
+            patchesApplied: 2,
+            sourceSize: 100,
+            outputSize: 120,
+            processedAt: "2024-01-02T12:00:01Z",
+          },
+        ],
+        errors: [],
+        warnings: [],
+      };
 
-      expect(successfulBuilds.length).toBe(2);
-      expect(failedBuilds.length).toBe(1);
-      expect(successfulBuilds.every((b) => b.success)).toBe(true);
-      expect(failedBuilds.every((b) => !b.success)).toBe(true);
+      await recordBuild(build1, configPath);
+      await recordBuild(build2, configPath);
+
+      const comparison = await compareBuildHistory("build-with-files", "build-without-file", configPath);
+
+      expect(comparison.filesRemoved).toEqual(["removed.md"]);
+      expect(comparison.filesAdded).toHaveLength(0);
+      expect(comparison.differenceCount).toBe(1);
     });
 
-    test("should filter builds by date range", async () => {
+    test("should detect file modifications", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
 
-      const build1 = await recordBuild(configPath, files, configHash, true);
+      const build1: BuildHistoryEntry = {
+        id: "build-original",
+        timestamp: "2024-01-01T12:00:00Z",
+        duration: 1000,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 2,
+        files: [
+          {
+            path: "readme.md",
+            sourceHash: "hash1",
+            outputHash: "hash2",
+            patchesApplied: 2,
+            sourceSize: 100,
+            outputSize: 120,
+            processedAt: "2024-01-01T12:00:01Z",
+          },
+        ],
+        errors: [],
+        warnings: [],
+      };
 
-      // Wait a bit to ensure different timestamps
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      const build2: BuildHistoryEntry = {
+        id: "build-modified",
+        timestamp: "2024-01-02T12:00:00Z",
+        duration: 1100,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 3,
+        files: [
+          {
+            path: "readme.md",
+            sourceHash: "hash1-modified",
+            outputHash: "hash2-modified",
+            patchesApplied: 3,
+            sourceSize: 100,
+            outputSize: 150,
+            processedAt: "2024-01-02T12:00:01Z",
+          },
+        ],
+        errors: [],
+        warnings: [],
+      };
 
-      const build2 = await recordBuild(configPath, files, configHash, true);
+      await recordBuild(build1, configPath);
+      await recordBuild(build2, configPath);
 
-      const buildsAfterFirst = await listBuilds(configPath, { since: build1.timestamp });
+      const comparison = await compareBuildHistory("build-original", "build-modified", configPath);
 
-      expect(buildsAfterFirst.length).toBeGreaterThanOrEqual(2);
-
-      const buildsUntilFirst = await listBuilds(configPath, { until: build1.timestamp });
-      expect(buildsUntilFirst.length).toBeGreaterThanOrEqual(1);
-    });
-
-    test("should limit number of results", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-
-      const builds = await listBuilds(configPath, { limit: 2 });
-
-      expect(builds.length).toBe(2);
-    });
-
-    test("should return builds sorted by timestamp descending", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      await recordBuild(configPath, files, configHash, true);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      await recordBuild(configPath, files, configHash, true);
-
-      const builds = await listBuilds(configPath);
-
-      expect(builds.length).toBe(3);
-
-      // Check that builds are sorted newest first
-      for (let i = 0; i < builds.length - 1; i++) {
-        const current = new Date(builds[i]!.timestamp).getTime();
-        const next = new Date(builds[i + 1]!.timestamp).getTime();
-        expect(current).toBeGreaterThanOrEqual(next);
+      expect(comparison.filesModified).toHaveLength(1);
+      const modified = comparison.filesModified[0];
+      if (modified) {
+        expect(modified.path).toBe("readme.md");
+        expect(modified.baselineHash).toBe("hash2");
+        expect(modified.targetHash).toBe("hash2-modified");
+        expect(modified.sizeChange).toBe(30);
+        expect(modified.patchCountChange).toBe(1);
       }
     });
 
-    test("should combine multiple filters", async () => {
+    test("should detect config changes", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
 
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, false, { error: "Failed" });
-      await recordBuild(configPath, files, configHash, true);
-
-      const builds = await listBuilds(configPath, {
+      const build1: BuildHistoryEntry = {
+        id: "build-config-1",
+        timestamp: "2024-01-01T12:00:00Z",
+        duration: 1000,
         success: true,
-        limit: 1,
-      });
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 0,
+        totalPatchesApplied: 0,
+        files: [],
+        errors: [],
+        warnings: [],
+      };
 
-      expect(builds.length).toBe(1);
-      expect(builds[0]?.success).toBe(true);
-    });
-  });
+      const build2: BuildHistoryEntry = {
+        id: "build-config-2",
+        timestamp: "2024-01-02T12:00:00Z",
+        duration: 1000,
+        success: true,
+        configHash: "def456",
+        version: "1.0.0",
+        fileCount: 0,
+        totalPatchesApplied: 0,
+        files: [],
+        errors: [],
+        warnings: [],
+      };
 
-  describe("compareBuilds", () => {
-    test("should detect added files", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const configHash = calculateFileHash("config");
+      await recordBuild(build1, configPath);
+      await recordBuild(build2, configPath);
 
-      const files1 = new Map([
-        [
-          "file1.md",
-          {
-            content: "content1",
-            sourceHash: calculateFileHash("content1"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("content1"),
-          },
-        ],
-      ]);
+      const comparison = await compareBuildHistory("build-config-1", "build-config-2", configPath);
 
-      const files2 = new Map([
-        [
-          "file1.md",
-          {
-            content: "content1",
-            sourceHash: calculateFileHash("content1"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("content1"),
-          },
-        ],
-        [
-          "file2.md",
-          {
-            content: "content2",
-            sourceHash: calculateFileHash("content2"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("content2"),
-          },
-        ],
-      ]);
-
-      const build1 = await recordBuild(configPath, files1, configHash, true);
-      const build2 = await recordBuild(configPath, files2, configHash, true);
-
-      const comparison = await compareBuilds(configPath, build1.id, build2.id);
-
-      expect(comparison.added).toContain("file2.md");
-      expect(comparison.stats.addedCount).toBe(1);
-      expect(comparison.unchanged).toContain("file1.md");
+      expect(comparison.configChanged).toBe(true);
     });
 
-    test("should detect removed files", async () => {
+    test("should calculate build duration change", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const configHash = calculateFileHash("config");
 
-      const files1 = new Map([
-        [
-          "file1.md",
-          {
-            content: "content1",
-            sourceHash: calculateFileHash("content1"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("content1"),
-          },
-        ],
-        [
-          "file2.md",
-          {
-            content: "content2",
-            sourceHash: calculateFileHash("content2"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("content2"),
-          },
-        ],
-      ]);
+      const build1: BuildHistoryEntry = {
+        id: "build-slow",
+        timestamp: "2024-01-01T12:00:00Z",
+        duration: 2000,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 2,
+        files: [],
+        errors: [],
+        warnings: [],
+      };
 
-      const files2 = new Map([
-        [
-          "file1.md",
-          {
-            content: "content1",
-            sourceHash: calculateFileHash("content1"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("content1"),
-          },
-        ],
-      ]);
+      const build2: BuildHistoryEntry = {
+        id: "build-fast",
+        timestamp: "2024-01-02T12:00:00Z",
+        duration: 1000,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 2,
+        files: [],
+        errors: [],
+        warnings: [],
+      };
 
-      const build1 = await recordBuild(configPath, files1, configHash, true);
-      const build2 = await recordBuild(configPath, files2, configHash, true);
+      await recordBuild(build1, configPath);
+      await recordBuild(build2, configPath);
 
-      const comparison = await compareBuilds(configPath, build1.id, build2.id);
+      const comparison = await compareBuildHistory("build-slow", "build-fast", configPath);
 
-      expect(comparison.removed).toContain("file2.md");
-      expect(comparison.stats.removedCount).toBe(1);
-      expect(comparison.unchanged).toContain("file1.md");
+      expect(comparison.summary.durationChange).toBe(-1000);
     });
 
-    test("should detect modified files", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const configHash = calculateFileHash("config");
-
-      const files1 = new Map([
-        [
-          "file1.md",
-          {
-            content: "original content",
-            sourceHash: calculateFileHash("original"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("original content"),
-          },
-        ],
-      ]);
-
-      const files2 = new Map([
-        [
-          "file1.md",
-          {
-            content: "modified content",
-            sourceHash: calculateFileHash("modified"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("modified content"),
-          },
-        ],
-      ]);
-
-      const build1 = await recordBuild(configPath, files1, configHash, true);
-      const build2 = await recordBuild(configPath, files2, configHash, true);
-
-      const comparison = await compareBuilds(configPath, build1.id, build2.id);
-
-      expect(comparison.modified.length).toBe(1);
-      expect(comparison.modified[0]?.file).toBe("file1.md");
-      expect(comparison.stats.modifiedCount).toBe(1);
-    });
-
-    test("should detect unchanged files", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const configHash = calculateFileHash("config");
-
-      const content = "same content";
-      const files1 = new Map([
-        [
-          "file1.md",
-          {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
-          },
-        ],
-      ]);
-
-      const files2 = new Map([
-        [
-          "file1.md",
-          {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
-          },
-        ],
-      ]);
-
-      const build1 = await recordBuild(configPath, files1, configHash, true);
-      const build2 = await recordBuild(configPath, files2, configHash, true);
-
-      const comparison = await compareBuilds(configPath, build1.id, build2.id);
-
-      expect(comparison.unchanged).toContain("file1.md");
-      expect(comparison.stats.unchangedCount).toBe(1);
-    });
-
-    test("should calculate size changes", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const configHash = calculateFileHash("config");
-
-      const files1 = new Map([
-        [
-          "file1.md",
-          {
-            content: "short",
-            sourceHash: calculateFileHash("short"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("short"),
-          },
-        ],
-      ]);
-
-      const files2 = new Map([
-        [
-          "file1.md",
-          {
-            content: "much longer content here",
-            sourceHash: calculateFileHash("much longer"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("much longer content here"),
-          },
-        ],
-      ]);
-
-      const build1 = await recordBuild(configPath, files1, configHash, true);
-      const build2 = await recordBuild(configPath, files2, configHash, true);
-
-      const comparison = await compareBuilds(configPath, build1.id, build2.id);
-
-      expect(comparison.modified.length).toBe(1);
-      expect(comparison.modified[0]?.sizeChange).toBeGreaterThan(0);
-      expect(comparison.stats.totalSizeChange).toBeGreaterThan(0);
-    });
-
-    test("should throw error for non-existent baseline build", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const build = await recordBuild(configPath, files, configHash, true);
-
-      await expect(
-        compareBuilds(configPath, "2024-01-01T00:00:00.000Z", build.id),
-      ).rejects.toThrow("not found");
-    });
-
-    test("should throw error for non-existent current build", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const build = await recordBuild(configPath, files, configHash, true);
-
-      await expect(
-        compareBuilds(configPath, build.id, "2024-01-01T00:00:00.000Z"),
-      ).rejects.toThrow("not found");
-    });
-
-    test("should handle complex multi-file comparison", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const configHash = calculateFileHash("config");
-
-      const files1 = new Map([
-        [
-          "unchanged.md",
-          {
-            content: "same",
-            sourceHash: calculateFileHash("same"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("same"),
-          },
-        ],
-        [
-          "modified.md",
-          {
-            content: "original",
-            sourceHash: calculateFileHash("original"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("original"),
-          },
-        ],
-        [
-          "removed.md",
-          {
-            content: "will be removed",
-            sourceHash: calculateFileHash("removed"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("will be removed"),
-          },
-        ],
-      ]);
-
-      const files2 = new Map([
-        [
-          "unchanged.md",
-          {
-            content: "same",
-            sourceHash: calculateFileHash("same"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("same"),
-          },
-        ],
-        [
-          "modified.md",
-          {
-            content: "changed",
-            sourceHash: calculateFileHash("changed"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("changed"),
-          },
-        ],
-        [
-          "added.md",
-          {
-            content: "new file",
-            sourceHash: calculateFileHash("new"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("new file"),
-          },
-        ],
-      ]);
-
-      const build1 = await recordBuild(configPath, files1, configHash, true);
-      const build2 = await recordBuild(configPath, files2, configHash, true);
-
-      const comparison = await compareBuilds(configPath, build1.id, build2.id);
-
-      expect(comparison.added).toContain("added.md");
-      expect(comparison.removed).toContain("removed.md");
-      expect(comparison.modified.map((m) => m.file)).toContain("modified.md");
-      expect(comparison.unchanged).toContain("unchanged.md");
-      expect(comparison.stats.addedCount).toBe(1);
-      expect(comparison.stats.removedCount).toBe(1);
-      expect(comparison.stats.modifiedCount).toBe(1);
-      expect(comparison.stats.unchangedCount).toBe(1);
-    });
-
-    test("should sort comparison results", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const configHash = calculateFileHash("config");
-
-      const files1 = new Map();
-      const files2 = new Map([
-        [
-          "z-file.md",
-          {
-            content: "z",
-            sourceHash: calculateFileHash("z"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("z"),
-          },
-        ],
-        [
-          "a-file.md",
-          {
-            content: "a",
-            sourceHash: calculateFileHash("a"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("a"),
-          },
-        ],
-        [
-          "m-file.md",
-          {
-            content: "m",
-            sourceHash: calculateFileHash("m"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("m"),
-          },
-        ],
-      ]);
-
-      const build1 = await recordBuild(configPath, files1, configHash, true);
-      const build2 = await recordBuild(configPath, files2, configHash, true);
-
-      const comparison = await compareBuilds(configPath, build1.id, build2.id);
-
-      expect(comparison.added[0]).toBe("a-file.md");
-      expect(comparison.added[1]).toBe("m-file.md");
-      expect(comparison.added[2]).toBe("z-file.md");
-    });
-  });
-
-  describe("rollbackToBuild", () => {
-    test("should throw error for non-existent build", async () => {
+    test("should throw error when baseline build not found", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
 
-      await expect(rollbackToBuild(configPath, "2024-01-01T00:00:00.000Z")).rejects.toThrow(
-        "not found",
+      await expect(compareBuildHistory("non-existent", "build-2", configPath)).rejects.toThrow(
+        /baseline build.*not found/i,
       );
     });
 
-    test("should throw error for failed build", async () => {
+    test("should throw error when target build not found", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
 
-      const build = await recordBuild(configPath, files, configHash, false, {
-        error: "Build failed",
-      });
+      const build1: BuildHistoryEntry = {
+        id: "build-1",
+        timestamp: "2024-01-01T12:00:00Z",
+        duration: 1000,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 0,
+        totalPatchesApplied: 0,
+        files: [],
+        errors: [],
+        warnings: [],
+      };
 
-      await expect(rollbackToBuild(configPath, build.id)).rejects.toThrow(
-        "Cannot rollback to failed build",
+      await recordBuild(build1, configPath);
+
+      await expect(compareBuildHistory("build-1", "non-existent", configPath)).rejects.toThrow(
+        /target build.*not found/i,
+      );
+    });
+  });
+
+  describe("rollbackBuild", () => {
+    test("should rollback to a previous build", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+      const outputDir = join(TEST_DIR, "output");
+
+      mkdirSync(outputDir, { recursive: true });
+
+      const build1: BuildHistoryEntry = {
+        id: "build-rollback-1",
+        timestamp: "2024-01-01T12:00:00Z",
+        duration: 1000,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 2,
+        files: [
+          {
+            path: "readme.md",
+            sourceHash: "hash1",
+            outputHash: "hash2",
+            patchesApplied: 2,
+            sourceSize: 100,
+            outputSize: 120,
+            processedAt: "2024-01-01T12:00:01Z",
+          },
+        ],
+        errors: [],
+        warnings: [],
+      };
+
+      await recordBuild(build1, configPath);
+
+      // Save build output files
+      const historyDir = getHistoryDirectory(configPath);
+      const buildOutputDir = join(historyDir, "builds", build1.id, "output");
+      mkdirSync(buildOutputDir, { recursive: true });
+      writeFileSync(join(buildOutputDir, "readme.md"), "# Original content", "utf-8");
+
+      // Perform rollback
+      const result = await rollbackBuild("build-rollback-1", outputDir, configPath);
+
+      expect(result.success).toBe(true);
+      expect(result.filesRestored).toHaveLength(1);
+      expect(result.filesRestored).toContain("readme.md");
+      expect(existsSync(join(outputDir, "readme.md"))).toBe(true);
+      expect(readFileSync(join(outputDir, "readme.md"), "utf-8")).toBe("# Original content");
+    });
+
+    test("should throw error when rolling back to non-existent build", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+      const outputDir = join(TEST_DIR, "output");
+
+      await expect(rollbackBuild("non-existent", outputDir, configPath)).rejects.toThrow(
+        /build.*not found/i,
       );
     });
 
-    test("should return empty map for build with no files", async () => {
+    test("should handle rollback when output files don't exist", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
+      const outputDir = join(TEST_DIR, "output");
 
-      const build = await recordBuild(configPath, files, configHash, true);
-      const rolledBackFiles = await rollbackToBuild(configPath, build.id);
-
-      expect(rolledBackFiles.size).toBe(0);
-    });
-
-    test("should handle rollback to successful build", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map([
-        [
-          "file1.md",
+      const build1: BuildHistoryEntry = {
+        id: "build-no-output",
+        timestamp: "2024-01-01T12:00:00Z",
+        duration: 1000,
+        success: true,
+        configHash: "abc123",
+        version: "1.0.0",
+        fileCount: 1,
+        totalPatchesApplied: 2,
+        files: [
           {
-            content: "content1",
-            sourceHash: calculateFileHash("content1"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("content1"),
+            path: "missing.md",
+            sourceHash: "hash1",
+            outputHash: "hash2",
+            patchesApplied: 2,
+            sourceSize: 100,
+            outputSize: 120,
+            processedAt: "2024-01-01T12:00:01Z",
           },
         ],
-      ]);
-      const configHash = calculateFileHash("config");
+        errors: [],
+        warnings: [],
+      };
 
-      const build = await recordBuild(configPath, files, configHash, true);
+      await recordBuild(build1, configPath);
 
-      // Rollback should not throw
-      const rolledBackFiles = await rollbackToBuild(configPath, build.id);
+      const result = await rollbackBuild("build-no-output", outputDir, configPath);
 
-      // The function returns a map, but the actual files might not be in the directory
-      // since we don't actually store the file contents in a separate location
-      expect(rolledBackFiles).toBeInstanceOf(Map);
+      expect(result.success).toBe(false);
+      expect(result.filesRestored).toHaveLength(0);
     });
   });
 
   describe("pruneHistory", () => {
-    test("should return 0 when no history exists", async () => {
+    test("should prune old builds keeping only specified number", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const removed = await pruneHistory(configPath, { keep: 10 });
 
-      expect(removed).toBe(0);
-    });
+      // Create 10 builds
+      for (let i = 1; i <= 10; i++) {
+        await recordBuild(
+          {
+            id: `build-${i}`,
+            timestamp: new Date(Date.now() + i * 1000).toISOString(),
+            duration: 1000,
+            success: true,
+            configHash: "abc123",
+            version: "1.0.0",
+            fileCount: 1,
+            totalPatchesApplied: 1,
+            files: [],
+            errors: [],
+            warnings: [],
+          },
+          configPath,
+        );
+      }
 
-    test("should prune old builds keeping N most recent", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
+      // Prune to keep only 5 most recent
+      const result = await pruneHistory(configPath, 5);
 
-      // Create 5 builds
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-
-      const removed = await pruneHistory(configPath, { keep: 3 });
-
-      expect(removed).toBe(2);
-
-      const builds = await listBuilds(configPath);
-      expect(builds.length).toBe(3);
-    });
-
-    test("should prune builds before specific date", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const build1 = await recordBuild(configPath, files, configHash, true);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      const build2 = await recordBuild(configPath, files, configHash, true);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      const build3 = await recordBuild(configPath, files, configHash, true);
-
-      // Prune builds before build2's timestamp
-      const removed = await pruneHistory(configPath, { before: build2.timestamp });
-
-      expect(removed).toBeGreaterThanOrEqual(1);
-
-      const builds = await listBuilds(configPath);
-      expect(builds.every((b) => new Date(b.timestamp) >= new Date(build2.timestamp))).toBe(true);
-    });
-
-    test("should not prune when keep limit not exceeded", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-
-      const removed = await pruneHistory(configPath, { keep: 10 });
-
-      expect(removed).toBe(0);
-
-      const builds = await listBuilds(configPath);
-      expect(builds.length).toBe(2);
-    });
-
-    test("should combine keep and before filters", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      const midBuild = await recordBuild(configPath, files, configHash, true);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-
-      const removed = await pruneHistory(configPath, {
-        before: midBuild.timestamp,
-        keep: 2,
-      });
-
-      expect(removed).toBeGreaterThanOrEqual(1);
-    });
-
-    test("should update manifest after pruning", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-
-      await pruneHistory(configPath, { keep: 1 });
+      expect(result.buildsPruned).toBe(5);
+      expect(result.buildsRemaining).toBe(5);
 
       const manifest = await loadManifest(configPath);
-      expect(manifest?.totalBuilds).toBe(1);
-      expect(manifest?.builds.length).toBe(1);
+      expect(manifest?.totalBuilds).toBe(5);
+
+      // Verify oldest builds were removed
+      const build1 = await loadBuild("build-1", configPath);
+      expect(build1).toBeNull();
+
+      // Verify newest builds remain
+      const build10 = await loadBuild("build-10", configPath);
+      expect(build10).not.toBeNull();
+    });
+
+    test("should prune builds older than specified date", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+      const now = Date.now();
+
+      // Old build
+      await recordBuild(
+        {
+          id: "build-old",
+          timestamp: new Date(now - 86400000 * 7).toISOString(), // 7 days ago
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 1,
+          files: [],
+          errors: [],
+          warnings: [],
+        },
+        configPath,
+      );
+
+      // Recent build
+      await recordBuild(
+        {
+          id: "build-recent",
+          timestamp: new Date(now).toISOString(),
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 1,
+          files: [],
+          errors: [],
+          warnings: [],
+        },
+        configPath,
+      );
+
+      const cutoffDate = new Date(now - 86400000 * 3).toISOString(); // 3 days ago
+      const result = await pruneHistory(configPath, undefined, cutoffDate);
+
+      expect(result.buildsPruned).toBe(1);
+
+      const oldBuild = await loadBuild("build-old", configPath);
+      expect(oldBuild).toBeNull();
+
+      const recentBuild = await loadBuild("build-recent", configPath);
+      expect(recentBuild).not.toBeNull();
+    });
+
+    test("should not prune if all builds are within retention", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      for (let i = 1; i <= 3; i++) {
+        await recordBuild(
+          {
+            id: `build-${i}`,
+            timestamp: new Date(Date.now() + i * 1000).toISOString(),
+            duration: 1000,
+            success: true,
+            configHash: "abc123",
+            version: "1.0.0",
+            fileCount: 1,
+            totalPatchesApplied: 1,
+            files: [],
+            errors: [],
+            warnings: [],
+          },
+          configPath,
+        );
+      }
+
+      const result = await pruneHistory(configPath, 10);
+
+      expect(result.buildsPruned).toBe(0);
+      expect(result.buildsRemaining).toBe(3);
+    });
+
+    test("should handle empty history during pruning", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      const result = await pruneHistory(configPath, 5);
+
+      expect(result.buildsPruned).toBe(0);
+      expect(result.buildsRemaining).toBe(0);
     });
   });
 
   describe("clearHistory", () => {
-    test("should return 0 when no history exists", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const cleared = await clearHistory(configPath);
-
-      expect(cleared).toBe(0);
-    });
-
     test("should clear all build history", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
 
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
+      // Create some builds
+      for (let i = 1; i <= 5; i++) {
+        await recordBuild(
+          {
+            id: `build-${i}`,
+            timestamp: new Date(Date.now() + i * 1000).toISOString(),
+            duration: 1000,
+            success: true,
+            configHash: "abc123",
+            version: "1.0.0",
+            fileCount: 1,
+            totalPatchesApplied: 1,
+            files: [],
+            errors: [],
+            warnings: [],
+          },
+          configPath,
+        );
+      }
 
-      const cleared = await clearHistory(configPath);
+      const result = await clearHistory(configPath);
 
-      expect(cleared).toBe(3);
+      expect(result.buildsCleared).toBe(5);
 
-      const historyDir = getHistoryDirectory(configPath);
-      expect(existsSync(historyDir)).toBe(false);
+      const manifest = await loadManifest(configPath);
+      expect(manifest?.totalBuilds).toBe(0);
+      expect(manifest?.builds.size).toBe(0);
     });
 
-    test("should remove history directory", async () => {
+    test("should handle clearing empty history", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
 
-      await recordBuild(configPath, files, configHash, true);
+      const result = await clearHistory(configPath);
+
+      expect(result.buildsCleared).toBe(0);
+    });
+
+    test("should remove history directory after clearing", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      await recordBuild(
+        {
+          id: "build-1",
+          timestamp: new Date().toISOString(),
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 0,
+          totalPatchesApplied: 0,
+          files: [],
+          errors: [],
+          warnings: [],
+        },
+        configPath,
+      );
 
       const historyDir = getHistoryDirectory(configPath);
       expect(existsSync(historyDir)).toBe(true);
 
-      await clearHistory(configPath);
+      await clearHistory(configPath, { removeDirectory: true });
 
       expect(existsSync(historyDir)).toBe(false);
     });
-
-    test("should allow new builds after clearing", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-      await clearHistory(configPath);
-
-      // Should be able to create new builds
-      const newBuild = await recordBuild(configPath, files, configHash, true);
-      expect(newBuild).toBeDefined();
-
-      const builds = await listBuilds(configPath);
-      expect(builds.length).toBe(1);
-    });
   });
 
-  describe("getHistoryStats", () => {
-    test("should return zero stats when no history exists", async () => {
+  describe("getBuildById and getLatestBuild", () => {
+    test("should get build by ID", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const stats = await getHistoryStats(configPath);
 
-      expect(stats.totalBuilds).toBe(0);
-      expect(stats.successfulBuilds).toBe(0);
-      expect(stats.failedBuilds).toBe(0);
-      expect(stats.totalSize).toBe(0);
-      expect(stats.avgFileCount).toBe(0);
-      expect(stats.avgBuildSize).toBe(0);
+      await recordBuild(
+        {
+          id: "specific-build",
+          timestamp: new Date().toISOString(),
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 2,
+          files: [],
+          errors: [],
+          warnings: [],
+        },
+        configPath,
+      );
+
+      const build = await getBuildById("specific-build", configPath);
+
+      expect(build).not.toBeNull();
+      expect(build?.id).toBe("specific-build");
     });
 
-    test("should calculate stats for single build", async () => {
+    test("should get latest build", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const content = "test content";
-      const files = new Map([
-        [
-          "file1.md",
+
+      for (let i = 1; i <= 3; i++) {
+        await recordBuild(
           {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
+            id: `build-${i}`,
+            timestamp: new Date(Date.now() + i * 1000).toISOString(),
+            duration: 1000,
+            success: true,
+            configHash: "abc123",
+            version: "1.0.0",
+            fileCount: 1,
+            totalPatchesApplied: 1,
+            files: [],
+            errors: [],
+            warnings: [],
           },
-        ],
-      ]);
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-
-      const stats = await getHistoryStats(configPath);
-
-      expect(stats.totalBuilds).toBe(1);
-      expect(stats.successfulBuilds).toBe(1);
-      expect(stats.failedBuilds).toBe(0);
-      expect(stats.avgFileCount).toBe(1);
-      expect(stats.avgBuildSize).toBeGreaterThan(0);
-      expect(stats.oldestBuild).toBeDefined();
-      expect(stats.newestBuild).toBeDefined();
-      expect(stats.oldestBuild).toBe(stats.newestBuild);
-    });
-
-    test("should calculate stats for multiple builds", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const content = "test content";
-      const files = new Map([
-        [
-          "file1.md",
-          {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
-          },
-        ],
-      ]);
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, true);
-      await recordBuild(configPath, files, configHash, false, { error: "Failed" });
-
-      const stats = await getHistoryStats(configPath);
-
-      expect(stats.totalBuilds).toBe(3);
-      expect(stats.successfulBuilds).toBe(2);
-      expect(stats.failedBuilds).toBe(1);
-    });
-
-    test("should calculate average file counts", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const configHash = calculateFileHash("config");
-
-      const files1 = new Map([
-        [
-          "file1.md",
-          {
-            content: "a",
-            sourceHash: calculateFileHash("a"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("a"),
-          },
-        ],
-      ]);
-
-      const files2 = new Map([
-        [
-          "file1.md",
-          {
-            content: "a",
-            sourceHash: calculateFileHash("a"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("a"),
-          },
-        ],
-        [
-          "file2.md",
-          {
-            content: "b",
-            sourceHash: calculateFileHash("b"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("b"),
-          },
-        ],
-        [
-          "file3.md",
-          {
-            content: "c",
-            sourceHash: calculateFileHash("c"),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash("c"),
-          },
-        ],
-      ]);
-
-      await recordBuild(configPath, files1, configHash, true);
-      await recordBuild(configPath, files2, configHash, true);
-
-      const stats = await getHistoryStats(configPath);
-
-      expect(stats.avgFileCount).toBe(2); // (1 + 3) / 2
-    });
-
-    test("should track oldest and newest builds", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      const build1 = await recordBuild(configPath, files, configHash, true);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      await recordBuild(configPath, files, configHash, true);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      const build3 = await recordBuild(configPath, files, configHash, true);
-
-      const stats = await getHistoryStats(configPath);
-
-      expect(stats.oldestBuild).toBe(build1.timestamp);
-      expect(stats.newestBuild).toBe(build3.timestamp);
-    });
-
-    test("should calculate total size of history directory", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const content = "x".repeat(1000); // 1KB
-      const files = new Map([
-        [
-          "file1.md",
-          {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
-          },
-        ],
-      ]);
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-
-      const stats = await getHistoryStats(configPath);
-
-      expect(stats.totalSize).toBeGreaterThan(0);
-    });
-  });
-
-  describe("edge cases and error handling", () => {
-    test("should handle concurrent builds", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      // Start multiple builds concurrently
-      const builds = await Promise.all([
-        recordBuild(configPath, files, configHash, true),
-        recordBuild(configPath, files, configHash, true),
-        recordBuild(configPath, files, configHash, true),
-      ]);
-
-      expect(builds.length).toBe(3);
-
-      // All builds should have IDs (they might be the same if timing is very close)
-      const ids = builds.map((b) => b.id);
-      expect(ids.every((id) => id)).toBe(true);
-
-      const manifest = await loadManifest(configPath);
-      // Manifest should have at least one build, possibly up to 3 depending on timing
-      expect(manifest?.totalBuilds).toBeGreaterThanOrEqual(1);
-      expect(manifest?.totalBuilds).toBeLessThanOrEqual(3);
-    });
-
-    test("should handle very long file paths", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const longPath = "very/deep/nested/directory/structure/file.md";
-      const content = "content";
-      const files = new Map([
-        [
-          longPath,
-          {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
-          },
-        ],
-      ]);
-      const configHash = calculateFileHash("config");
-
-      const build = await recordBuild(configPath, files, configHash, true);
-
-      expect(build.files[longPath]).toBeDefined();
-    });
-
-    test("should handle empty strings in hashes", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map([
-        [
-          "file1.md",
-          {
-            content: "",
-            sourceHash: calculateFileHash(""),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(""),
-          },
-        ],
-      ]);
-      const configHash = calculateFileHash("");
-
-      const build = await recordBuild(configPath, files, configHash, true);
-
-      expect(build.files["file1.md"]).toBeDefined();
-    });
-
-    test("should handle builds with large file counts", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      // Create 100 files
-      for (let i = 0; i < 100; i++) {
-        files.set(`file${i}.md`, {
-          content: `content${i}`,
-          sourceHash: calculateFileHash(`content${i}`),
-          patchHash: calculateFileHash(""),
-          outputHash: calculateFileHash(`content${i}`),
-        });
+          configPath,
+        );
       }
 
-      const build = await recordBuild(configPath, files, configHash, true);
+      const latest = await getLatestBuild(configPath);
 
-      expect(build.fileCount).toBe(100);
-      expect(Object.keys(build.files).length).toBe(100);
+      expect(latest).not.toBeNull();
+      expect(latest?.id).toBe("build-3");
     });
 
-    test("should handle special characters in file names", async () => {
+    test("should return null when no builds exist", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const specialFileName = "file with spaces & special chars (1).md";
-      const content = "content";
-      const files = new Map([
-        [
-          specialFileName,
+
+      const latest = await getLatestBuild(configPath);
+
+      expect(latest).toBeNull();
+    });
+  });
+
+  describe("deleteBuild", () => {
+    test("should delete a specific build", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      await recordBuild(
+        {
+          id: "build-to-delete",
+          timestamp: new Date().toISOString(),
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 1,
+          files: [],
+          errors: [],
+          warnings: [],
+        },
+        configPath,
+      );
+
+      await recordBuild(
+        {
+          id: "build-to-keep",
+          timestamp: new Date().toISOString(),
+          duration: 1000,
+          success: true,
+          configHash: "abc123",
+          version: "1.0.0",
+          fileCount: 1,
+          totalPatchesApplied: 1,
+          files: [],
+          errors: [],
+          warnings: [],
+        },
+        configPath,
+      );
+
+      const result = await deleteBuild("build-to-delete", configPath);
+
+      expect(result.success).toBe(true);
+
+      const deletedBuild = await loadBuild("build-to-delete", configPath);
+      expect(deletedBuild).toBeNull();
+
+      const keptBuild = await loadBuild("build-to-keep", configPath);
+      expect(keptBuild).not.toBeNull();
+
+      const manifest = await loadManifest(configPath);
+      expect(manifest?.totalBuilds).toBe(1);
+    });
+
+    test("should handle deleting non-existent build", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      await expect(deleteBuild("non-existent", configPath)).rejects.toThrow(/build.*not found/i);
+    });
+  });
+
+  describe("complete workflow integration", () => {
+    test("should handle complete build history lifecycle", async () => {
+      const configPath = join(TEST_DIR, "kustomark.yaml");
+
+      // 1. Record multiple builds over time
+      const buildIds: string[] = [];
+      for (let i = 1; i <= 5; i++) {
+        const buildId = `integration-build-${i}`;
+        buildIds.push(buildId);
+
+        await recordBuild(
           {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
+            id: buildId,
+            timestamp: new Date(Date.now() + i * 1000).toISOString(),
+            duration: 1000 + i * 100,
+            success: i !== 3, // Build 3 fails
+            configHash: `config-hash-${i}`,
+            version: "1.0.0",
+            fileCount: i,
+            totalPatchesApplied: i * 2,
+            files: Array.from({ length: i }, (_, j) => ({
+              path: `file-${j + 1}.md`,
+              sourceHash: `src-${j}`,
+              outputHash: `out-${j}`,
+              patchesApplied: 2,
+              sourceSize: 100,
+              outputSize: 120,
+              processedAt: new Date(Date.now() + i * 1000 + j).toISOString(),
+            })),
+            errors: i === 3 ? [{ message: "Test error", path: "", line: 0, column: 0, severity: "error" }] : [],
+            warnings: [],
+            tags: i === 5 ? ["production"] : [],
           },
-        ],
-      ]);
-      const configHash = calculateFileHash("config");
+          configPath,
+        );
+      }
 
-      const build = await recordBuild(configPath, files, configHash, true);
+      // 2. Verify manifest reflects all builds
+      const manifest = await loadManifest(configPath);
+      expect(manifest?.totalBuilds).toBe(5);
+      expect(manifest?.latestBuildId).toBe("integration-build-5");
 
-      expect(build.files[specialFileName]).toBeDefined();
+      // 3. List and filter builds
+      const allBuilds = await listBuilds(configPath);
+      expect(allBuilds).toHaveLength(5);
+
+      const successfulBuilds = await listBuilds(configPath, { success: true });
+      expect(successfulBuilds).toHaveLength(4);
+
+      const productionBuilds = await listBuilds(configPath, { tags: ["production"] });
+      expect(productionBuilds).toHaveLength(1);
+
+      // 4. Compare builds
+      const comparison = await compareBuildHistory("integration-build-1", "integration-build-5", configPath);
+      expect(comparison.filesAdded).toHaveLength(4); // 5 files in build-5, 1 in build-1
+      expect(comparison.configChanged).toBe(true);
+      expect(comparison.summary.durationChange).toBe(400);
+
+      // 5. Load specific build
+      const build3 = await loadBuild("integration-build-3", configPath);
+      expect(build3?.success).toBe(false);
+      expect(build3?.errors).toHaveLength(1);
+
+      // 6. Prune old builds
+      const pruneResult = await pruneHistory(configPath, 3);
+      expect(pruneResult.buildsPruned).toBe(2);
+      expect(pruneResult.buildsRemaining).toBe(3);
+
+      // 7. Verify pruning worked
+      const build1 = await loadBuild("integration-build-1", configPath);
+      expect(build1).toBeNull();
+
+      const build5 = await loadBuild("integration-build-5", configPath);
+      expect(build5).not.toBeNull();
+
+      // 8. Get latest build
+      const latest = await getLatestBuild(configPath);
+      expect(latest?.id).toBe("integration-build-5");
+
+      // 9. Delete a specific build
+      await deleteBuild("integration-build-4", configPath);
+
+      const updatedManifest = await loadManifest(configPath);
+      expect(updatedManifest?.totalBuilds).toBe(2);
+
+      // 10. Clear all history
+      const clearResult = await clearHistory(configPath);
+      expect(clearResult.buildsCleared).toBe(2);
+
+      const finalManifest = await loadManifest(configPath);
+      expect(finalManifest?.totalBuilds).toBe(0);
     });
 
-    test("should handle builds with zero duration", async () => {
+    test("should handle concurrent build recordings", async () => {
       const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
 
-      const build = await recordBuild(configPath, files, configHash, true, {
-        duration: 0,
-      });
-
-      expect(build.duration).toBe(0);
-    });
-
-    test("should handle comparison of identical builds", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const content = "same content";
-      const files = new Map([
-        [
-          "file1.md",
+      // Record multiple builds concurrently
+      const buildPromises = Array.from({ length: 10 }, (_, i) =>
+        recordBuild(
           {
-            content,
-            sourceHash: calculateFileHash(content),
-            patchHash: calculateFileHash(""),
-            outputHash: calculateFileHash(content),
+            id: `concurrent-build-${i}`,
+            timestamp: new Date(Date.now() + i * 100).toISOString(),
+            duration: 1000,
+            success: true,
+            configHash: "abc123",
+            version: "1.0.0",
+            fileCount: 1,
+            totalPatchesApplied: 1,
+            files: [],
+            errors: [],
+            warnings: [],
           },
-        ],
-      ]);
-      const configHash = calculateFileHash("config");
+          configPath,
+        ),
+      );
 
-      const build1 = await recordBuild(configPath, files, configHash, true);
-      const build2 = await recordBuild(configPath, files, configHash, true);
+      await Promise.all(buildPromises);
 
-      const comparison = await compareBuilds(configPath, build1.id, build2.id);
-
-      expect(comparison.added.length).toBe(0);
-      expect(comparison.removed.length).toBe(0);
-      expect(comparison.modified.length).toBe(0);
-      expect(comparison.unchanged.length).toBe(1);
-    });
-
-    test("should handle pruning with no builds to remove", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-      const files = new Map();
-      const configHash = calculateFileHash("config");
-
-      await recordBuild(configPath, files, configHash, true);
-
-      const removed = await pruneHistory(configPath, { keep: 100 });
-
-      expect(removed).toBe(0);
-    });
-
-    test("should handle clearing already cleared history", async () => {
-      const configPath = join(TEST_DIR, "kustomark.yaml");
-
-      const cleared1 = await clearHistory(configPath);
-      const cleared2 = await clearHistory(configPath);
-
-      expect(cleared1).toBe(0);
-      expect(cleared2).toBe(0);
+      const manifest = await loadManifest(configPath);
+      expect(manifest?.totalBuilds).toBe(10);
     });
   });
 });

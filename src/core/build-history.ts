@@ -8,173 +8,30 @@
  * - Auditing and change tracking
  *
  * Build history is stored in .kustomark/history/ with the following structure:
- * - builds/{timestamp}.json - Individual build records
- * - manifest.json - Index of all builds with metadata
- * - current.json - Latest successful build (for quick access)
+ * - builds/{id}.json   - Individual BuildHistoryEntry records
+ * - manifest.json      - Lightweight index (latestBuildId, version)
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import type { BuildComparisonResult, BuildHistoryEntry, BuildHistoryManifest } from "./types.js";
 
-let _buildCounter = 0;
+// ─── Internal disk format ────────────────────────────────────────────────────
 
-/**
- * File record for a single built file
- */
-export interface BuildFileRecord {
-  /** File path relative to project root */
-  path: string;
-  /** SHA256 hash of source content */
-  sourceHash: string;
-  /** SHA256 hash of applied patches */
-  patchHash: string;
-  /** SHA256 hash of output content */
-  outputHash: string;
-  /** Size of output file in bytes */
-  size: number;
-}
-
-/**
- * Complete build record
- */
-export interface BuildRecord {
-  /** Unique build ID (ISO 8601 timestamp) */
-  id: string;
-  /** Build creation timestamp (ISO 8601) */
-  timestamp: string;
-  /** Kustomark version used for build */
-  version: string;
-  /** SHA256 hash of config file */
-  configHash: string;
-  /** Map of config paths to their hashes (for tracking base configs) */
-  configHashes?: Record<string, string>;
-  /** Build success status */
-  success: boolean;
-  /** Error message if build failed */
-  error?: string;
-  /** Map of file paths to build file records */
-  files: Record<string, BuildFileRecord>;
-  /** Total number of files built */
-  fileCount: number;
-  /** Total size of all output files in bytes */
-  totalSize: number;
-  /** Build duration in milliseconds */
-  duration?: number;
-  /** Group filters used during build */
-  groupFilters?: {
-    /** Enabled groups (whitelist mode) */
-    enabled?: string[];
-    /** Disabled groups (blacklist mode) */
-    disabled?: string[];
-  };
-}
-
-/**
- * Manifest entry with summary information
- */
-export interface BuildManifestEntry {
-  /** Build ID (ISO 8601 timestamp) */
-  id: string;
-  /** Build timestamp (ISO 8601) */
-  timestamp: string;
-  /** Kustomark version */
-  version: string;
-  /** Build success status */
-  success: boolean;
-  /** Number of files in build */
-  fileCount: number;
-  /** Total size in bytes */
-  totalSize: number;
-  /** Build duration in milliseconds */
-  duration?: number;
-}
-
-/**
- * Manifest index of all builds
- */
-export interface BuildManifest {
-  /** Manifest version for schema evolution */
+interface ManifestOnDisk {
   version: number;
-  /** List of all builds (sorted by timestamp, newest first) */
-  builds: BuildManifestEntry[];
-  /** Total number of builds */
-  totalBuilds: number;
-  /** Timestamp of last update (ISO 8601) */
-  lastUpdated: string;
+  latestBuildId?: string;
+  lastCleanup?: string;
 }
 
-/**
- * Build comparison result
- */
-export interface BuildComparison {
-  /** Build IDs being compared */
-  baseline: string;
-  current: string;
-  /** Files added in current build */
-  added: string[];
-  /** Files removed in current build */
-  removed: string[];
-  /** Files modified in current build */
-  modified: Array<{
-    file: string;
-    baselineHash: string;
-    currentHash: string;
-    sizeChange: number;
-  }>;
-  /** Files unchanged between builds */
-  unchanged: string[];
-  /** Overall statistics */
-  stats: {
-    addedCount: number;
-    removedCount: number;
-    modifiedCount: number;
-    unchangedCount: number;
-    totalSizeChange: number;
-  };
-}
+// ─── Utilities ───────────────────────────────────────────────────────────────
 
 /**
- * Filter options for listing builds
- */
-export interface BuildListFilter {
-  /** Filter by success status */
-  success?: boolean;
-  /** Filter by minimum timestamp (ISO 8601) */
-  since?: string;
-  /** Filter by maximum timestamp (ISO 8601) */
-  until?: string;
-  /** Maximum number of results to return */
-  limit?: number;
-}
-
-/**
- * History statistics
- */
-export interface HistoryStats {
-  /** Total number of builds */
-  totalBuilds: number;
-  /** Number of successful builds */
-  successfulBuilds: number;
-  /** Number of failed builds */
-  failedBuilds: number;
-  /** Total disk space used by history in bytes */
-  totalSize: number;
-  /** Timestamp of oldest build (ISO 8601) */
-  oldestBuild?: string;
-  /** Timestamp of newest build (ISO 8601) */
-  newestBuild?: string;
-  /** Average build file count */
-  avgFileCount: number;
-  /** Average build size in bytes */
-  avgBuildSize: number;
-}
-
-/**
- * Calculates SHA256 hash of content
+ * Calculates a SHA256 hash of the given string content.
  *
- * @param content - Content to hash (string or bytes)
- * @returns SHA256 hash in hex format (without prefix)
+ * @param content - Content to hash
+ * @returns SHA256 hex digest
  */
 export function calculateFileHash(content: string): string {
   const hasher = new Bun.CryptoHasher("sha256");
@@ -182,824 +39,596 @@ export function calculateFileHash(content: string): string {
   return hasher.digest("hex");
 }
 
-/**
- * Gets the history directory for a project
- *
- * History is stored at .kustomark/history/ relative to the config file's directory.
- *
- * @param configPath - Path to the kustomark config file
- * @returns Path to the history directory
- */
-export function getHistoryDirectory(configPath: string): string {
-  const configDir = dirname(resolve(configPath));
-  return join(configDir, ".kustomark", "history");
-}
+// ─── Path helpers ─────────────────────────────────────────────────────────────
 
 /**
- * Gets the builds subdirectory path
+ * Returns the history directory for a given config path.
  *
- * @param configPath - Path to the kustomark config file
- * @returns Path to the builds directory
+ * @param configPath - Absolute or relative path to kustomark.yaml
+ * @returns Path to .kustomark/history/ directory
  */
+export function getHistoryDirectory(configPath: string): string {
+  return join(dirname(resolve(configPath)), ".kustomark", "history");
+}
+
 function getBuildsDirectory(configPath: string): string {
   return join(getHistoryDirectory(configPath), "builds");
 }
 
-/**
- * Gets the current Kustomark version
- *
- * Reads the version from package.json. Returns "unknown" if the version
- * cannot be determined.
- *
- * @returns Kustomark version string
- * @internal
- */
-function getKustomarkVersion(): string {
+function getManifestPath(configPath: string): string {
+  return join(getHistoryDirectory(configPath), "manifest.json");
+}
+
+// ─── Low-level manifest I/O ───────────────────────────────────────────────────
+
+async function readManifestOnDisk(configPath: string): Promise<ManifestOnDisk | null> {
+  const path = getManifestPath(configPath);
+  if (!existsSync(path)) return null;
   try {
-    // Try multiple common locations for package.json
-    const possiblePaths = [
-      join(process.cwd(), "package.json"),
-      join(dirname(import.meta.dir ?? __dirname), "../../package.json"),
-      join(import.meta.dir ?? __dirname, "../../package.json"),
-    ];
-
-    for (const pkgPath of possiblePaths) {
-      if (existsSync(pkgPath)) {
-        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-        if (pkg.version && typeof pkg.version === "string") {
-          return pkg.version;
-        }
-      }
-    }
-
-    return "unknown";
+    const raw = await readFile(path, "utf-8");
+    if (!raw.trim()) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof parsed.version !== "number") return null;
+    return {
+      version: parsed.version as number,
+      latestBuildId: typeof parsed.latestBuildId === "string" ? parsed.latestBuildId : undefined,
+      lastCleanup: typeof parsed.lastCleanup === "string" ? parsed.lastCleanup : undefined,
+    };
   } catch {
-    return "unknown";
-  }
-}
-
-/**
- * Validates a build record object structure
- *
- * @param data - Data to validate
- * @throws Error if validation fails
- */
-function validateBuildRecord(data: unknown): asserts data is BuildRecord {
-  if (!data || typeof data !== "object") {
-    throw new Error("Build record must be an object");
-  }
-
-  const record = data as Record<string, unknown>;
-
-  // Validate required fields
-  if (typeof record.id !== "string") {
-    throw new Error("Build record must have a string 'id' field");
-  }
-
-  if (typeof record.timestamp !== "string") {
-    throw new Error("Build record must have a string 'timestamp' field");
-  }
-
-  const timestamp = new Date(record.timestamp);
-  if (Number.isNaN(timestamp.getTime())) {
-    throw new Error("Build record 'timestamp' must be a valid ISO 8601 date string");
-  }
-
-  if (typeof record.version !== "string") {
-    throw new Error("Build record must have a string 'version' field");
-  }
-
-  if (typeof record.configHash !== "string") {
-    throw new Error("Build record must have a string 'configHash' field");
-  }
-
-  if (typeof record.success !== "boolean") {
-    throw new Error("Build record must have a boolean 'success' field");
-  }
-
-  if (!record.files || typeof record.files !== "object") {
-    throw new Error("Build record must have a 'files' object");
-  }
-
-  if (typeof record.fileCount !== "number") {
-    throw new Error("Build record must have a number 'fileCount' field");
-  }
-
-  if (typeof record.totalSize !== "number") {
-    throw new Error("Build record must have a number 'totalSize' field");
-  }
-
-  // Validate optional fields
-  if (record.error !== undefined && typeof record.error !== "string") {
-    throw new Error("Build record 'error' must be a string if present");
-  }
-
-  if (record.duration !== undefined && typeof record.duration !== "number") {
-    throw new Error("Build record 'duration' must be a number if present");
-  }
-
-  // Validate file records
-  const files = record.files as Record<string, unknown>;
-  for (const [filePath, fileRecord] of Object.entries(files)) {
-    if (!fileRecord || typeof fileRecord !== "object") {
-      throw new Error(`Build file record for '${filePath}' must be an object`);
-    }
-
-    const file = fileRecord as Record<string, unknown>;
-    if (
-      typeof file.path !== "string" ||
-      typeof file.sourceHash !== "string" ||
-      typeof file.patchHash !== "string" ||
-      typeof file.outputHash !== "string" ||
-      typeof file.size !== "number"
-    ) {
-      throw new Error(
-        `Build file record for '${filePath}' must have path, sourceHash, patchHash, outputHash, and size fields`,
-      );
-    }
-  }
-}
-
-/**
- * Validates a build manifest object structure
- *
- * @param data - Data to validate
- * @throws Error if validation fails
- */
-function validateBuildManifest(data: unknown): asserts data is BuildManifest {
-  if (!data || typeof data !== "object") {
-    throw new Error("Build manifest must be an object");
-  }
-
-  const manifest = data as Record<string, unknown>;
-
-  if (typeof manifest.version !== "number") {
-    throw new Error("Build manifest must have a number 'version' field");
-  }
-
-  if (!Array.isArray(manifest.builds)) {
-    throw new Error("Build manifest must have a 'builds' array");
-  }
-
-  if (typeof manifest.totalBuilds !== "number") {
-    throw new Error("Build manifest must have a number 'totalBuilds' field");
-  }
-
-  if (typeof manifest.lastUpdated !== "string") {
-    throw new Error("Build manifest must have a string 'lastUpdated' field");
-  }
-
-  // Validate each manifest entry
-  for (const [index, entry] of manifest.builds.entries()) {
-    if (!entry || typeof entry !== "object") {
-      throw new Error(`Build manifest entry at index ${index} must be an object`);
-    }
-
-    const e = entry as Record<string, unknown>;
-    if (
-      typeof e.id !== "string" ||
-      typeof e.timestamp !== "string" ||
-      typeof e.version !== "string" ||
-      typeof e.success !== "boolean" ||
-      typeof e.fileCount !== "number" ||
-      typeof e.totalSize !== "number"
-    ) {
-      throw new Error(
-        `Build manifest entry at index ${index} must have id, timestamp, version, success, fileCount, and totalSize fields`,
-      );
-    }
-  }
-}
-
-/**
- * Loads the build manifest from disk
- *
- * @param configPath - Path to the kustomark config file
- * @returns Parsed manifest or null if not found/invalid
- */
-export async function loadManifest(configPath: string): Promise<BuildManifest | null> {
-  const historyDir = getHistoryDirectory(configPath);
-  const manifestPath = join(historyDir, "manifest.json");
-
-  if (!existsSync(manifestPath)) {
-    return null;
-  }
-
-  try {
-    const content = await readFile(manifestPath, "utf-8");
-    const parsed = JSON.parse(content);
-    validateBuildManifest(parsed);
-    return parsed;
-  } catch (error) {
-    console.warn(
-      `Warning: Invalid build manifest at ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`,
-    );
     return null;
   }
 }
 
-/**
- * Saves the build manifest to disk
- *
- * @param configPath - Path to the kustomark config file
- * @param manifest - Manifest to save
- */
-async function saveManifest(configPath: string, manifest: BuildManifest): Promise<void> {
+async function writeManifestOnDisk(configPath: string, manifest: ManifestOnDisk): Promise<void> {
   const historyDir = getHistoryDirectory(configPath);
-  const manifestPath = join(historyDir, "manifest.json");
-
-  // Ensure history directory exists
   await mkdir(historyDir, { recursive: true });
-
-  const content = JSON.stringify(manifest, null, 2);
-  await writeFile(manifestPath, content, "utf-8");
+  await writeFile(getManifestPath(configPath), JSON.stringify(manifest, null, 2), "utf-8");
 }
 
-/**
- * Creates an empty build manifest
- *
- * @returns Empty BuildManifest object
- */
-function createEmptyManifest(): BuildManifest {
-  return {
-    version: 1,
-    builds: [],
-    totalBuilds: 0,
-    lastUpdated: new Date().toISOString(),
-  };
-}
+// ─── Build file I/O ───────────────────────────────────────────────────────────
 
-/**
- * Loads a specific build record from disk
- *
- * @param configPath - Path to the kustomark config file
- * @param buildId - Build ID (ISO 8601 timestamp)
- * @returns Parsed build record or null if not found/invalid
- *
- * @example
- * ```typescript
- * const build = await loadBuild(configPath, '2024-01-15T10:30:00.000Z');
- * if (build) {
- *   console.log(`Build has ${build.fileCount} files`);
- * }
- * ```
- */
-export async function loadBuild(configPath: string, buildId: string): Promise<BuildRecord | null> {
-  const buildsDir = getBuildsDirectory(configPath);
-  const buildPath = join(buildsDir, `${buildId}.json`);
-
-  if (!existsSync(buildPath)) {
-    return null;
-  }
-
+function parseBuildEntry(raw: string): BuildHistoryEntry | null {
   try {
-    const content = await readFile(buildPath, "utf-8");
-    const parsed = JSON.parse(content);
-    validateBuildRecord(parsed);
-    return parsed;
-  } catch (error) {
-    console.warn(
-      `Warning: Invalid build record at ${buildPath}: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    if (!raw.trim()) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (
+      typeof parsed.id !== "string" ||
+      typeof parsed.timestamp !== "string" ||
+      typeof parsed.success !== "boolean"
+    ) {
+      return null;
+    }
+    // Normalise files to array (handles legacy records)
+    if (!Array.isArray(parsed.files)) {
+      parsed.files = [];
+    }
+    if (!Array.isArray(parsed.errors)) parsed.errors = [];
+    if (!Array.isArray(parsed.warnings)) parsed.warnings = [];
+    return parsed as unknown as BuildHistoryEntry;
+  } catch {
     return null;
   }
 }
 
-/**
- * Saves a build record to disk
- *
- * @param configPath - Path to the kustomark config file
- * @param buildId - Build ID (ISO 8601 timestamp)
- * @param record - Build record to save
- */
-async function saveBuild(configPath: string, buildId: string, record: BuildRecord): Promise<void> {
-  const buildsDir = getBuildsDirectory(configPath);
-  const buildPath = join(buildsDir, `${buildId}.json`);
+// ─── Public API ───────────────────────────────────────────────────────────────
 
-  // Ensure builds directory exists
+/**
+ * Records a build entry in the history.
+ *
+ * Creates the history directory if it does not exist, saves the entry as an
+ * individual JSON file, and updates the lightweight manifest.
+ *
+ * @param entry      - Complete build entry to record
+ * @param configPath - Path to the kustomark config file
+ */
+export async function recordBuild(entry: BuildHistoryEntry, configPath: string): Promise<void> {
+  const buildsDir = getBuildsDirectory(configPath);
   await mkdir(buildsDir, { recursive: true });
 
-  const content = JSON.stringify(record, null, 2);
-  await writeFile(buildPath, content, "utf-8");
-}
+  // Persist the build entry
+  const buildPath = join(buildsDir, `${entry.id}.json`);
+  await writeFile(buildPath, JSON.stringify(entry, null, 2), "utf-8");
 
-/**
- * Records a new build in the history
- *
- * Saves the build record, updates the manifest, and updates current.json
- * for successful builds.
- *
- * @param configPath - Path to the kustomark config file
- * @param files - Map of file paths to their content and hashes
- * @param configHash - SHA256 hash of config file
- * @param success - Whether the build succeeded
- * @param options - Optional build metadata
- * @returns Created build record
- *
- * @example
- * ```typescript
- * const files = new Map([
- *   ['docs/readme.md', {
- *     content: '# README\n\nHello',
- *     sourceHash: 'abc123...',
- *     patchHash: 'def456...',
- *     outputHash: 'ghi789...'
- *   }]
- * ]);
- *
- * const record = await recordBuild(
- *   configPath,
- *   files,
- *   'config-hash',
- *   true,
- *   { duration: 1500, configHashes: { 'base.yaml': 'base-hash' } }
- * );
- * ```
- */
-export async function recordBuild(
-  configPath: string,
-  files: Map<
-    string,
-    {
-      content: string;
-      sourceHash: string;
-      patchHash: string;
-      outputHash: string;
+  // Update the lightweight manifest
+  const disk = await readManifestOnDisk(configPath);
+  let newLatestId = disk?.latestBuildId;
+
+  if (!newLatestId) {
+    newLatestId = entry.id;
+  } else {
+    // Update latestBuildId if the new entry is newer
+    const latestEntry = await loadBuild(newLatestId, configPath);
+    if (
+      !latestEntry ||
+      new Date(entry.timestamp).getTime() >= new Date(latestEntry.timestamp).getTime()
+    ) {
+      newLatestId = entry.id;
     }
-  >,
-  configHash: string,
-  success: boolean,
-  options?: {
-    error?: string;
-    duration?: number;
-    configHashes?: Record<string, string>;
-    groupFilters?: {
-      enabled?: string[];
-      disabled?: string[];
-    };
-  },
-): Promise<BuildRecord> {
-  const timestamp = new Date().toISOString();
-  const buildId = `${timestamp}-${++_buildCounter}`;
-
-  // Create file records
-  const fileRecords: Record<string, BuildFileRecord> = {};
-  let totalSize = 0;
-
-  for (const [filePath, fileData] of files.entries()) {
-    const size = Buffer.byteLength(fileData.content, "utf-8");
-    totalSize += size;
-
-    fileRecords[filePath] = {
-      path: filePath,
-      sourceHash: fileData.sourceHash,
-      patchHash: fileData.patchHash,
-      outputHash: fileData.outputHash,
-      size,
-    };
   }
 
-  // Create build record
-  const record: BuildRecord = {
-    id: buildId,
-    timestamp,
-    version: getKustomarkVersion(),
-    configHash,
-    success,
-    files: fileRecords,
-    fileCount: files.size,
-    totalSize,
-  };
+  await writeManifestOnDisk(configPath, {
+    version: disk?.version ?? 1,
+    latestBuildId: newLatestId,
+    lastCleanup: disk?.lastCleanup,
+  });
+}
 
-  // Add optional fields
-  if (options?.error) {
-    record.error = options.error;
+/** Alias for {@link recordBuild}. */
+export const saveBuildToHistory = recordBuild;
+
+/**
+ * Loads a single build entry by ID.
+ *
+ * @param buildId    - The unique build identifier
+ * @param configPath - Path to the kustomark config file
+ * @returns The build entry, or null if not found / corrupted
+ */
+export async function loadBuild(
+  buildId: string,
+  configPath: string,
+): Promise<BuildHistoryEntry | null> {
+  const buildPath = join(getBuildsDirectory(configPath), `${buildId}.json`);
+  if (!existsSync(buildPath)) return null;
+  try {
+    const raw = await readFile(buildPath, "utf-8");
+    return parseBuildEntry(raw);
+  } catch {
+    console.warn(`Warning: Could not read build '${buildId}'`);
+    return null;
   }
-  if (options?.duration !== undefined) {
-    record.duration = options.duration;
-  }
-  if (options?.configHashes) {
-    record.configHashes = options.configHashes;
-  }
-  if (options?.groupFilters) {
-    record.groupFilters = options.groupFilters;
-  }
+}
 
-  // Save build record
-  await saveBuild(configPath, buildId, record);
+/** Alias for {@link loadBuild}. */
+export const getBuildById = loadBuild;
 
-  // Update manifest
-  let manifest = await loadManifest(configPath);
-  if (!manifest) {
-    manifest = createEmptyManifest();
-  }
-
-  // Add new build to manifest
-  const manifestEntry: BuildManifestEntry = {
-    id: buildId,
-    timestamp,
-    version: record.version,
-    success,
-    fileCount: files.size,
-    totalSize,
-    duration: options?.duration,
-  };
-
-  manifest.builds.unshift(manifestEntry); // Add to beginning (newest first)
-  manifest.totalBuilds += 1;
-  manifest.lastUpdated = new Date().toISOString();
-
-  await saveManifest(configPath, manifest);
-
-  // Update current.json if build was successful
-  if (success) {
-    const historyDir = getHistoryDirectory(configPath);
-    const currentPath = join(historyDir, "current.json");
-    await writeFile(currentPath, JSON.stringify(record, null, 2), "utf-8");
-  }
-
-  return record;
+/**
+ * Returns the most recent build entry.
+ *
+ * @param configPath - Path to the kustomark config file
+ * @returns Latest build entry, or null if no history exists
+ */
+export async function getLatestBuild(configPath: string): Promise<BuildHistoryEntry | null> {
+  const manifest = await loadManifest(configPath);
+  if (!manifest?.latestBuildId) return null;
+  return manifest.builds.get(manifest.latestBuildId) ?? null;
 }
 
 /**
- * Lists builds with optional filtering
+ * Loads the full build manifest.
+ *
+ * Scans the builds directory for all recorded entries and assembles a
+ * {@link BuildHistoryManifest} with a Map of id → entry.
  *
  * @param configPath - Path to the kustomark config file
- * @param filter - Optional filter criteria
- * @returns Array of build manifest entries matching the filter
+ * @returns Full manifest, or null if history has never been initialised
+ */
+export async function loadManifest(configPath: string): Promise<BuildHistoryManifest | null> {
+  const manifestPath = getManifestPath(configPath);
+  // Only return non-null when the history has been explicitly initialised
+  if (!existsSync(manifestPath)) return null;
+
+  const disk = await readManifestOnDisk(configPath);
+  // Corrupted or empty manifest — treat as if history doesn't exist
+  if (!disk) return null;
+
+  const buildsDir = getBuildsDirectory(configPath);
+  const builds = new Map<string, BuildHistoryEntry>();
+
+  if (existsSync(buildsDir)) {
+    try {
+      const files = await readdir(buildsDir);
+      for (const file of files) {
+        if (!file.endsWith(".json")) continue;
+        const id = file.slice(0, -5);
+        const entry = await loadBuild(id, configPath);
+        if (entry) builds.set(id, entry);
+      }
+    } catch {
+      // Builds directory unreadable; treat as empty
+    }
+  }
+
+  // Resolve latestBuildId: trust the manifest if the build still exists,
+  // otherwise fall back to the entry with the highest timestamp.
+  let latestBuildId = disk?.latestBuildId;
+  if (latestBuildId && !builds.has(latestBuildId)) {
+    latestBuildId = undefined;
+    let bestTime = -1;
+    for (const [id, entry] of builds) {
+      const t = new Date(entry.timestamp).getTime();
+      if (t > bestTime) {
+        bestTime = t;
+        latestBuildId = id;
+      }
+    }
+  }
+
+  return {
+    version: disk?.version ?? 1,
+    totalBuilds: builds.size,
+    latestBuildId,
+    builds,
+    lastCleanup: disk?.lastCleanup,
+  };
+}
+
+/**
+ * Lists build entries with optional filtering.
  *
- * @example
- * ```typescript
- * // Get last 10 successful builds
- * const builds = await listBuilds(configPath, {
- *   success: true,
- *   limit: 10
- * });
+ * Results are sorted newest-first.
  *
- * // Get builds since a specific date
- * const recentBuilds = await listBuilds(configPath, {
- *   since: '2024-01-01T00:00:00.000Z'
- * });
- * ```
+ * @param configPath - Path to the kustomark config file
+ * @param filter     - Optional filter criteria
+ * @returns Array of matching build entries
  */
 export async function listBuilds(
   configPath: string,
-  filter?: BuildListFilter,
-): Promise<BuildManifestEntry[]> {
-  const manifest = await loadManifest(configPath);
-  if (!manifest) {
+  filter?: {
+    /** Keep only successful (true) or failed (false) builds */
+    success?: boolean;
+    /** Keep only builds tagged with at least one of these tags */
+    tags?: string[];
+    /** Keep only builds recorded after this ISO timestamp */
+    after?: string;
+    /** Maximum number of results */
+    limit?: number;
+  },
+): Promise<BuildHistoryEntry[]> {
+  const buildsDir = getBuildsDirectory(configPath);
+  if (!existsSync(buildsDir)) return [];
+
+  let entries: BuildHistoryEntry[] = [];
+  try {
+    const files = await readdir(buildsDir);
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const id = file.slice(0, -5);
+      const entry = await loadBuild(id, configPath);
+      if (entry) entries.push(entry);
+    }
+  } catch {
     return [];
   }
 
-  let builds = manifest.builds;
+  // Sort newest-first
+  entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  // Apply filters
   if (filter?.success !== undefined) {
-    builds = builds.filter((b) => b.success === filter.success);
+    entries = entries.filter((e) => e.success === filter.success);
   }
 
-  if (filter?.since) {
-    const sinceTime = new Date(filter.since).getTime();
-    builds = builds.filter((b) => new Date(b.timestamp).getTime() >= sinceTime);
+  if (filter?.tags && filter.tags.length > 0) {
+    const wanted = filter.tags;
+    entries = entries.filter(
+      (e) => Array.isArray(e.tags) && wanted.some((t) => (e.tags ?? []).includes(t)),
+    );
   }
 
-  if (filter?.until) {
-    const untilTime = new Date(filter.until).getTime();
-    builds = builds.filter((b) => new Date(b.timestamp).getTime() <= untilTime);
+  if (filter?.after) {
+    const afterTime = new Date(filter.after).getTime();
+    entries = entries.filter((e) => new Date(e.timestamp).getTime() > afterTime);
   }
 
-  // Apply limit
   if (filter?.limit !== undefined && filter.limit > 0) {
-    builds = builds.slice(0, filter.limit);
+    entries = entries.slice(0, filter.limit);
   }
 
-  return builds;
+  return entries;
 }
 
 /**
- * Compares two builds and returns the differences
+ * Compares two builds and returns the differences.
  *
+ * @param baselineId - ID of the baseline (earlier) build
+ * @param targetId   - ID of the target (later) build
  * @param configPath - Path to the kustomark config file
- * @param baselineId - Baseline build ID
- * @param currentId - Current build ID
- * @returns Build comparison result
- * @throws Error if either build doesn't exist
- *
- * @example
- * ```typescript
- * const comparison = await compareBuilds(
- *   configPath,
- *   '2024-01-15T10:00:00.000Z',
- *   '2024-01-15T11:00:00.000Z'
- * );
- *
- * console.log(`Added: ${comparison.stats.addedCount} files`);
- * console.log(`Modified: ${comparison.stats.modifiedCount} files`);
- * console.log(`Removed: ${comparison.stats.removedCount} files`);
- * ```
+ * @returns Detailed comparison result
+ * @throws Error if either build is not found
  */
-export async function compareBuilds(
-  configPath: string,
+export async function compareBuildHistory(
   baselineId: string,
-  currentId: string,
-): Promise<BuildComparison> {
-  const baseline = await loadBuild(configPath, baselineId);
-  const current = await loadBuild(configPath, currentId);
+  targetId: string,
+  configPath: string,
+): Promise<BuildComparisonResult> {
+  const baseline = await loadBuild(baselineId, configPath);
+  const target = await loadBuild(targetId, configPath);
 
-  if (!baseline) {
-    throw new Error(`Baseline build '${baselineId}' not found`);
-  }
+  if (!baseline) throw new Error(`Baseline build '${baselineId}' not found`);
+  if (!target) throw new Error(`Target build '${targetId}' not found`);
 
-  if (!current) {
-    throw new Error(`Current build '${currentId}' not found`);
-  }
+  const baselineMap = new Map((baseline.files ?? []).map((f) => [f.path, f]));
+  const targetMap = new Map((target.files ?? []).map((f) => [f.path, f]));
 
-  const added: string[] = [];
-  const removed: string[] = [];
-  const modified: Array<{
-    file: string;
-    baselineHash: string;
-    currentHash: string;
-    sizeChange: number;
-  }> = [];
-  const unchanged: string[] = [];
+  const filesAdded: string[] = [];
+  const filesRemoved: string[] = [];
+  const filesModified: BuildComparisonResult["filesModified"] = [];
 
-  const baselineFiles = new Set(Object.keys(baseline.files));
-  const currentFiles = new Set(Object.keys(current.files));
-
-  // Find added and modified files
-  for (const filePath of currentFiles) {
-    if (!baselineFiles.has(filePath)) {
-      added.push(filePath);
-    } else {
-      const baselineFile = baseline.files[filePath];
-      const currentFile = current.files[filePath];
-
-      if (baselineFile && currentFile) {
-        if (baselineFile.outputHash !== currentFile.outputHash) {
-          modified.push({
-            file: filePath,
-            baselineHash: baselineFile.outputHash,
-            currentHash: currentFile.outputHash,
-            sizeChange: currentFile.size - baselineFile.size,
-          });
-        } else {
-          unchanged.push(filePath);
-        }
-      }
+  for (const [path, tFile] of targetMap) {
+    const bFile = baselineMap.get(path);
+    if (!bFile) {
+      filesAdded.push(path);
+    } else if (bFile.outputHash !== tFile.outputHash) {
+      filesModified.push({
+        path,
+        baselineHash: bFile.outputHash,
+        targetHash: tFile.outputHash,
+        sizeChange: tFile.outputSize - bFile.outputSize,
+        patchCountChange: tFile.patchesApplied - bFile.patchesApplied,
+      });
     }
   }
 
-  // Find removed files
-  for (const filePath of baselineFiles) {
-    if (!currentFiles.has(filePath)) {
-      removed.push(filePath);
-    }
+  for (const path of baselineMap.keys()) {
+    if (!targetMap.has(path)) filesRemoved.push(path);
   }
 
-  // Sort for consistent output
-  added.sort();
-  removed.sort();
-  modified.sort((a, b) => a.file.localeCompare(b.file));
-  unchanged.sort();
+  filesAdded.sort();
+  filesRemoved.sort();
+  filesModified.sort((a, b) => a.path.localeCompare(b.path));
 
-  // Calculate statistics
-  const totalSizeChange = modified.reduce((sum, m) => sum + m.sizeChange, 0);
+  const configChanged = baseline.configHash !== target.configHash;
+  const patchesChanged = baseline.totalPatchesApplied !== target.totalPatchesApplied;
+  const differenceCount = filesAdded.length + filesRemoved.length + filesModified.length;
 
   return {
-    baseline: baselineId,
-    current: currentId,
-    added,
-    removed,
-    modified,
-    unchanged,
-    stats: {
-      addedCount: added.length,
-      removedCount: removed.length,
-      modifiedCount: modified.length,
-      unchangedCount: unchanged.length,
-      totalSizeChange,
+    baselineBuildId: baselineId,
+    targetBuildId: targetId,
+    baselineTimestamp: baseline.timestamp,
+    targetTimestamp: target.timestamp,
+    filesAdded,
+    filesRemoved,
+    filesModified,
+    differenceCount,
+    configChanged,
+    patchesChanged,
+    summary: {
+      baselineFileCount: baseline.fileCount,
+      targetFileCount: target.fileCount,
+      baselinePatchCount: baseline.totalPatchesApplied,
+      targetPatchCount: target.totalPatchesApplied,
+      durationChange: target.duration - baseline.duration,
     },
   };
 }
 
 /**
- * Restores files from a previous build
+ * Rolls back output files to a previous build state.
  *
- * Loads the specified build and returns its file contents for restoration.
- * This function doesn't write files directly - it returns the data so the
- * caller can decide how to restore them.
+ * Looks for saved output files in `.kustomark/history/builds/{buildId}/output/`
+ * and copies them into `outputDir`.
  *
+ * @param buildId    - ID of the build to restore
+ * @param outputDir  - Destination directory to write restored files
  * @param configPath - Path to the kustomark config file
- * @param buildId - Build ID to restore from
- * @returns Map of file paths to their content from the specified build
- * @throws Error if build doesn't exist or failed
- *
- * @example
- * ```typescript
- * const files = await rollbackToBuild(configPath, '2024-01-15T10:00:00.000Z');
- *
- * // Write restored files
- * for (const [filePath, content] of files.entries()) {
- *   await writeFile(filePath, content, 'utf-8');
- * }
- * ```
+ * @returns Success flag and list of restored file paths
+ * @throws Error if the build is not found
  */
-export async function rollbackToBuild(
-  configPath: string,
+export async function rollbackBuild(
   buildId: string,
-): Promise<Map<string, string>> {
-  const build = await loadBuild(configPath, buildId);
+  outputDir: string,
+  configPath: string,
+): Promise<{ success: boolean; filesRestored: string[] }> {
+  const build = await loadBuild(buildId, configPath);
+  if (!build) throw new Error(`Build '${buildId}' not found`);
 
-  if (!build) {
-    throw new Error(`Build '${buildId}' not found`);
-  }
+  const buildOutputDir = join(getBuildsDirectory(configPath), buildId, "output");
+  if (!existsSync(buildOutputDir)) return { success: false, filesRestored: [] };
 
-  if (!build.success) {
-    throw new Error(`Cannot rollback to failed build '${buildId}'`);
-  }
-
-  // Load file contents from the builds directory
-  const buildsDir = getBuildsDirectory(configPath);
-  const files = new Map<string, string>();
-
-  // Note: The build record only stores hashes, not content.
-  // In a real implementation, you'd need to either:
-  // 1. Store the actual file contents in the build record
-  // 2. Store files in a separate content-addressable store
-  // 3. Rely on git or another VCS for the actual content
-  //
-  // For this implementation, we'll assume the build directory structure
-  // mirrors the output structure and load files from there
-  const buildDir = join(buildsDir, buildId);
-
-  for (const filePath of Object.keys(build.files)) {
-    const fullPath = join(buildDir, filePath);
-    if (existsSync(fullPath)) {
-      try {
-        const content = await readFile(fullPath, "utf-8");
-        files.set(filePath, content);
-      } catch (error) {
-        console.warn(
-          `Warning: Could not read file '${filePath}' from build '${buildId}': ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+  const filesRestored: string[] = [];
+  for (const fileEntry of build.files ?? []) {
+    const src = join(buildOutputDir, fileEntry.path);
+    if (!existsSync(src)) continue;
+    const dest = join(outputDir, fileEntry.path);
+    try {
+      await mkdir(dirname(dest), { recursive: true });
+      await copyFile(src, dest);
+      filesRestored.push(fileEntry.path);
+    } catch {
+      // Skip unreadable files
     }
   }
 
-  return files;
+  return { success: filesRestored.length > 0, filesRestored };
 }
 
 /**
- * Prunes old build history based on criteria
- *
- * Removes build records older than the specified date or keeps only the
- * most recent N builds. Always preserves the current (latest successful) build.
+ * Prunes build history based on retention criteria.
  *
  * @param configPath - Path to the kustomark config file
- * @param options - Pruning criteria
- * @returns Number of builds removed
- *
- * @example
- * ```typescript
- * // Keep only last 50 builds
- * const removed = await pruneHistory(configPath, { keep: 50 });
- *
- * // Remove builds older than 30 days
- * const thirtyDaysAgo = new Date();
- * thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
- * const removed = await pruneHistory(configPath, {
- *   before: thirtyDaysAgo.toISOString()
- * });
- * ```
+ * @param keep       - Retain at most this many recent builds
+ * @param before     - Remove builds whose timestamp is before this ISO string
+ * @returns Counts of pruned and remaining builds
  */
 export async function pruneHistory(
   configPath: string,
-  options: {
-    /** Keep only this many most recent builds */
-    keep?: number;
-    /** Remove builds before this timestamp (ISO 8601) */
-    before?: string;
-  },
-): Promise<number> {
-  const manifest = await loadManifest(configPath);
-  if (!manifest || manifest.builds.length === 0) {
-    return 0;
-  }
-
-  const buildsToRemove: string[] = [];
-  let buildsToKeep = manifest.builds;
-
-  // Apply "before" filter
-  if (options.before) {
-    const beforeTime = new Date(options.before).getTime();
-    const filtered = buildsToKeep.filter((b) => {
-      const buildTime = new Date(b.timestamp).getTime();
-      if (buildTime < beforeTime) {
-        buildsToRemove.push(b.id);
-        return false;
-      }
-      return true;
-    });
-    buildsToKeep = filtered;
-  }
-
-  // Apply "keep" limit
-  if (options.keep !== undefined && options.keep > 0) {
-    if (buildsToKeep.length > options.keep) {
-      const toRemove = buildsToKeep.slice(options.keep);
-      buildsToRemove.push(...toRemove.map((b) => b.id));
-      buildsToKeep = buildsToKeep.slice(0, options.keep);
-    }
-  }
-
-  // Remove build files
+  keep?: number,
+  before?: string,
+): Promise<{ buildsPruned: number; buildsRemaining: number }> {
   const buildsDir = getBuildsDirectory(configPath);
-  for (const buildId of buildsToRemove) {
-    const buildPath = join(buildsDir, `${buildId}.json`);
-    try {
-      if (existsSync(buildPath)) {
-        await rm(buildPath, { force: true });
-      }
+  if (!existsSync(buildsDir)) return { buildsPruned: 0, buildsRemaining: 0 };
 
-      // Also remove build directory if it exists
-      const buildDir = join(buildsDir, buildId);
-      if (existsSync(buildDir)) {
-        await rm(buildDir, { recursive: true, force: true });
-      }
-    } catch (error) {
-      console.warn(
-        `Warning: Could not remove build '${buildId}': ${error instanceof Error ? error.message : String(error)}`,
-      );
+  // Load all entries sorted newest-first
+  const entries: BuildHistoryEntry[] = [];
+  try {
+    const files = await readdir(buildsDir);
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const entry = await loadBuild(file.slice(0, -5), configPath);
+      if (entry) entries.push(entry);
+    }
+  } catch {
+    return { buildsPruned: 0, buildsRemaining: 0 };
+  }
+
+  entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const toRemove = new Set<string>();
+
+  // Apply "before" date filter
+  if (before) {
+    const cutoff = new Date(before).getTime();
+    for (const e of entries) {
+      if (new Date(e.timestamp).getTime() < cutoff) toRemove.add(e.id);
     }
   }
 
-  // Update manifest
-  const updatedManifest: BuildManifest = {
-    version: manifest.version,
-    builds: buildsToKeep,
-    totalBuilds: buildsToKeep.length,
-    lastUpdated: new Date().toISOString(),
-  };
+  // Apply "keep" limit (oldest builds beyond the limit)
+  if (keep !== undefined && keep >= 0) {
+    const survivors = entries.filter((e) => !toRemove.has(e.id));
+    if (survivors.length > keep) {
+      for (const e of survivors.slice(keep)) toRemove.add(e.id);
+    }
+  }
 
-  await saveManifest(configPath, updatedManifest);
+  // Delete pruned build files
+  for (const id of toRemove) {
+    const buildPath = join(buildsDir, `${id}.json`);
+    const buildDir = join(buildsDir, id);
+    try {
+      if (existsSync(buildPath)) await rm(buildPath, { force: true });
+      if (existsSync(buildDir)) await rm(buildDir, { recursive: true, force: true });
+    } catch {
+      // Ignore removal errors
+    }
+  }
 
-  return buildsToRemove.length;
+  const remaining = entries.filter((e) => !toRemove.has(e.id));
+
+  // Update manifest latestBuildId if needed
+  const disk = await readManifestOnDisk(configPath);
+  const newLatestId = remaining[0]?.id;
+  if (disk) {
+    await writeManifestOnDisk(configPath, {
+      ...disk,
+      latestBuildId: newLatestId,
+      lastCleanup: new Date().toISOString(),
+    });
+  }
+
+  return { buildsPruned: toRemove.size, buildsRemaining: remaining.length };
 }
 
 /**
- * Clears all build history
+ * Clears all build history.
  *
- * Removes all build records and the manifest. This cannot be undone.
+ * By default keeps the history directory but removes all build files and resets
+ * the manifest to empty. Pass `{ removeDirectory: true }` to delete the entire
+ * `.kustomark/history/` tree.
  *
  * @param configPath - Path to the kustomark config file
+ * @param options    - Optional removal options
  * @returns Number of builds cleared
- *
- * @example
- * ```typescript
- * const cleared = await clearHistory(configPath);
- * console.log(`Cleared ${cleared} builds from history`);
- * ```
  */
-export async function clearHistory(configPath: string): Promise<number> {
-  const manifest = await loadManifest(configPath);
-  const buildCount = manifest?.totalBuilds ?? 0;
-
+export async function clearHistory(
+  configPath: string,
+  options?: { removeDirectory?: boolean },
+): Promise<{ buildsCleared: number }> {
   const historyDir = getHistoryDirectory(configPath);
+  if (!existsSync(historyDir)) return { buildsCleared: 0 };
 
-  if (!existsSync(historyDir)) {
-    return 0;
+  // Count current builds
+  const buildsDir = getBuildsDirectory(configPath);
+  let count = 0;
+  if (existsSync(buildsDir)) {
+    try {
+      const files = await readdir(buildsDir);
+      count = files.filter((f) => f.endsWith(".json")).length;
+    } catch {
+      // ignore
+    }
   }
 
-  try {
+  if (options?.removeDirectory) {
     await rm(historyDir, { recursive: true, force: true });
-  } catch (error) {
-    throw new Error(
-      `Failed to clear history: ${error instanceof Error ? error.message : String(error)}`,
-    );
+  } else {
+    // Remove all build files but keep directory with an empty manifest
+    if (existsSync(buildsDir)) {
+      await rm(buildsDir, { recursive: true, force: true });
+    }
+    // Re-create empty manifest so loadManifest returns non-null
+    await writeManifestOnDisk(configPath, { version: 1 });
   }
 
-  return buildCount;
+  return { buildsCleared: count };
 }
 
 /**
- * Gets statistics about the build history
+ * Deletes a specific build from the history.
+ *
+ * @param buildId    - ID of the build to delete
+ * @param configPath - Path to the kustomark config file
+ * @returns `{ success: true }` on success
+ * @throws Error if the build is not found
+ */
+export async function deleteBuild(
+  buildId: string,
+  configPath: string,
+): Promise<{ success: boolean }> {
+  const buildPath = join(getBuildsDirectory(configPath), `${buildId}.json`);
+  if (!existsSync(buildPath)) {
+    throw new Error(`Build '${buildId}' not found`);
+  }
+
+  await rm(buildPath, { force: true });
+
+  // Also remove any associated output directory
+  const buildDir = join(getBuildsDirectory(configPath), buildId);
+  if (existsSync(buildDir)) {
+    await rm(buildDir, { recursive: true, force: true });
+  }
+
+  // Update manifest latestBuildId if we deleted the latest
+  const disk = await readManifestOnDisk(configPath);
+  if (disk?.latestBuildId === buildId) {
+    // Scan remaining builds to find new latest
+    const buildsDir = getBuildsDirectory(configPath);
+    let newLatest: string | undefined;
+    let bestTime = -1;
+    try {
+      const files = await readdir(buildsDir);
+      for (const file of files) {
+        if (!file.endsWith(".json")) continue;
+        const id = file.slice(0, -5);
+        const entry = await loadBuild(id, configPath);
+        if (entry) {
+          const t = new Date(entry.timestamp).getTime();
+          if (t > bestTime) {
+            bestTime = t;
+            newLatest = id;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    await writeManifestOnDisk(configPath, { ...disk, latestBuildId: newLatest });
+  }
+
+  return { success: true };
+}
+
+// ─── Statistics (backward-compat utility) ────────────────────────────────────
+
+/** Statistics about the build history. */
+export interface HistoryStats {
+  totalBuilds: number;
+  successfulBuilds: number;
+  failedBuilds: number;
+  totalSize: number;
+  oldestBuild?: string;
+  newestBuild?: string;
+  avgFileCount: number;
+  avgBuildSize: number;
+}
+
+/**
+ * Returns aggregate statistics for the build history.
  *
  * @param configPath - Path to the kustomark config file
- * @returns History statistics
- *
- * @example
- * ```typescript
- * const stats = await getHistoryStats(configPath);
- * console.log(`Total builds: ${stats.totalBuilds}`);
- * console.log(`Success rate: ${(stats.successfulBuilds / stats.totalBuilds * 100).toFixed(1)}%`);
- * console.log(`Total size: ${(stats.totalSize / 1024 / 1024).toFixed(2)} MB`);
- * ```
  */
 export async function getHistoryStats(configPath: string): Promise<HistoryStats> {
-  const manifest = await loadManifest(configPath);
-
-  if (!manifest || manifest.builds.length === 0) {
+  const entries = await listBuilds(configPath);
+  if (entries.length === 0) {
     return {
       totalBuilds: 0,
       successfulBuilds: 0,
@@ -1010,74 +639,26 @@ export async function getHistoryStats(configPath: string): Promise<HistoryStats>
     };
   }
 
-  const successfulBuilds = manifest.builds.filter((b) => b.success).length;
-  const failedBuilds = manifest.builds.length - successfulBuilds;
-
-  // Calculate total size of history directory
-  const historyDir = getHistoryDirectory(configPath);
-  let totalSize = 0;
-
-  try {
-    totalSize = await calculateDirectorySize(historyDir);
-  } catch (error) {
-    console.warn(
-      `Warning: Could not calculate history size: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  // Calculate averages
-  const totalFileCount = manifest.builds.reduce((sum, b) => sum + b.fileCount, 0);
-  const totalBuildSize = manifest.builds.reduce((sum, b) => sum + b.totalSize, 0);
-  const avgFileCount = manifest.builds.length > 0 ? totalFileCount / manifest.builds.length : 0;
-  const avgBuildSize = manifest.builds.length > 0 ? totalBuildSize / manifest.builds.length : 0;
-
-  // Get oldest and newest build timestamps
-  const sortedByTime = [...manifest.builds].sort(
+  const successfulBuilds = entries.filter((e) => e.success).length;
+  const sorted = [...entries].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
-  const oldestBuild = sortedByTime[0]?.timestamp;
-  const newestBuild = sortedByTime[sortedByTime.length - 1]?.timestamp;
 
-  return {
-    totalBuilds: manifest.totalBuilds,
-    successfulBuilds,
-    failedBuilds,
-    totalSize,
-    oldestBuild,
-    newestBuild,
-    avgFileCount,
-    avgBuildSize,
-  };
-}
-
-/**
- * Recursively calculates the total size of a directory
- *
- * @param dirPath - Path to directory
- * @returns Total size in bytes
- * @internal
- */
-async function calculateDirectorySize(dirPath: string): Promise<number> {
   let totalSize = 0;
-
-  try {
-    const entries = await readdir(dirPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = join(dirPath, entry.name);
-
-      if (entry.isDirectory()) {
-        totalSize += await calculateDirectorySize(fullPath);
-      } else if (entry.isFile()) {
-        const stats = await stat(fullPath);
-        totalSize += stats.size;
-      }
-    }
-  } catch (error) {
-    console.warn(
-      `Warning: Could not calculate size of ${dirPath}: ${error instanceof Error ? error.message : String(error)}`,
-    );
+  let totalFileCount = 0;
+  for (const e of entries) {
+    totalFileCount += e.fileCount;
+    for (const f of e.files ?? []) totalSize += f.outputSize;
   }
 
-  return totalSize;
+  return {
+    totalBuilds: entries.length,
+    successfulBuilds,
+    failedBuilds: entries.length - successfulBuilds,
+    totalSize,
+    oldestBuild: sorted[0]?.timestamp,
+    newestBuild: sorted[sorted.length - 1]?.timestamp,
+    avgFileCount: totalFileCount / entries.length,
+    avgBuildSize: totalSize / entries.length,
+  };
 }

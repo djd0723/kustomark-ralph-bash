@@ -53,14 +53,20 @@ export {
 // Export build history functions and types
 export {
   clearHistory,
-  compareBuilds,
+  compareBuildHistory,
+  deleteBuild,
+  getBuildById,
+  getHistoryDirectory,
   getHistoryStats,
+  getLatestBuild,
+  type HistoryStats,
   listBuilds,
   loadBuild,
   loadManifest,
   pruneHistory,
   recordBuild,
-  rollbackToBuild,
+  rollbackBuild,
+  saveBuildToHistory,
 } from "./build-history.js";
 // Export condition evaluator functions
 export {
