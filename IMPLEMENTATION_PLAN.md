@@ -1,8 +1,55 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-09 (sort-list Operation - COMPLETE!):**
+
+* ✅ **`sort-list`**: Sort markdown list items by their text content
+* ✅ **STRING SORT**: Locale-aware alphabetical sorting (default)
+* ✅ **NUMBER SORT**: Numeric comparison via `type: "number"` (handles decimal values)
+* ✅ **DIRECTION CONTROL**: `direction: "asc"` (default) or `direction: "desc"`
+* ✅ **SECTION ID LOOKUP**: Lists can be identified by section heading (same pattern as other list ops)
+* ✅ **SUB-ITEM PRESERVATION**: Sort reorders top-level items while keeping sub-items attached to their parent
+* ✅ **BULLET PRESERVATION**: Original bullet style (`-`, `*`, `+`, `1.`) is preserved after sort
+* ✅ **12 NEW TESTS PASSING**: Added to `src/core/list-parser.test.ts`
+* ✅ **3,662 TESTS PASSING**: All tests pass with 0 failures
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # Sort a list alphabetically
+   patches:
+     - op: sort-list
+       list: 0              # zero-based list index or section ID
+
+   # Sort numerically descending
+     - op: sort-list
+       list: "scores"       # section heading containing the list
+       type: number
+       direction: desc
+   ```
+
+2. **Format Details**
+   - `type: "string"` (default) — locale-aware alphabetical sort
+   - `type: "number"` — numeric sort; non-numeric values treated as 0
+   - `direction: "asc"` (default) or `"desc"`
+   - List not found → count 0, content unchanged (onNoMatch applies)
+   - Items with sub-items (indented lines) are reordered as a unit
+
+3. **Implementation Files**
+   * `src/core/types.ts` — Added `SortListPatch` interface; added to `PatchOperation` union
+   * `src/core/patch-engine.ts` — Added `applySortList()`; wired into `applySinglePatch()` and `getPatchDescription()`
+   * `src/core/schema.ts` — Added JSON schema definition for `sort-list`
+   * `src/core/list-parser.test.ts` — 12 tests covering string/number sort, asc/desc, section ID lookup, sub-item preservation, bullet preservation, single-item lists, content boundary preservation
+
+**Status:** sort-list Operation COMPLETE! ✅
+
+---
 
 ## Recent Enhancements
 

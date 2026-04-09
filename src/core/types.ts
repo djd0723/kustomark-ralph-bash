@@ -550,6 +550,19 @@ export interface SetListItemPatch extends PatchCommonFields {
 }
 
 /**
+ * Sort list items operation - sorts items in a markdown list
+ */
+export interface SortListPatch extends PatchCommonFields {
+  op: "sort-list";
+  /** List identifier (zero-based index or section ID containing the list) */
+  list: number | string;
+  /** Sort direction (default: "asc") */
+  direction?: "asc" | "desc";
+  /** Comparison type for sorting (default: "string") */
+  type?: "string" | "number";
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -588,7 +601,8 @@ export type PatchOperation =
   | JsonMergePatch
   | AddListItemPatch
   | RemoveListItemPatch
-  | SetListItemPatch;
+  | SetListItemPatch
+  | SortListPatch;
 
 /**
  * Global validator configuration

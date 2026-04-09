@@ -11,7 +11,12 @@
 
 import { describe, expect, test } from "bun:test";
 import { findList, parseLists } from "./list-parser.js";
-import { applyAddListItem, applyRemoveListItem, applySetListItem } from "./patch-engine.js";
+import {
+  applyAddListItem,
+  applyRemoveListItem,
+  applySetListItem,
+  applySortList,
+} from "./patch-engine.js";
 
 // ─── parseLists ──────────────────────────────────────────────────────────────
 
@@ -377,5 +382,124 @@ describe("applySetListItem", () => {
     expect(result).toContain("  - Child one");
     expect(result).toContain("  - Child two");
     expect(result).toContain("- Other");
+  });
+});
+
+// ─── applySortList ────────────────────────────────────────────────────────────
+
+describe("applySortList", () => {
+  const baseContent = `- Gamma\n- Alpha\n- Beta`;
+
+  test("sorts list alphabetically ascending (default)", () => {
+    const { content, count } = applySortList(baseContent, 0);
+    expect(count).toBe(1);
+    const lists = parseLists(content);
+    expect(lists[0]?.items[0]?.text).toBe("Alpha");
+    expect(lists[0]?.items[1]?.text).toBe("Beta");
+    expect(lists[0]?.items[2]?.text).toBe("Gamma");
+  });
+
+  test("sorts list alphabetically descending", () => {
+    const { content, count } = applySortList(baseContent, 0, "desc");
+    expect(count).toBe(1);
+    const lists = parseLists(content);
+    expect(lists[0]?.items[0]?.text).toBe("Gamma");
+    expect(lists[0]?.items[1]?.text).toBe("Beta");
+    expect(lists[0]?.items[2]?.text).toBe("Alpha");
+  });
+
+  test("sorts list numerically ascending", () => {
+    const content = `- 30\n- 5\n- 100\n- 20`;
+    const { content: result, count } = applySortList(content, 0, "asc", "number");
+    expect(count).toBe(1);
+    const lists = parseLists(result);
+    expect(lists[0]?.items[0]?.text).toBe("5");
+    expect(lists[0]?.items[1]?.text).toBe("20");
+    expect(lists[0]?.items[2]?.text).toBe("30");
+    expect(lists[0]?.items[3]?.text).toBe("100");
+  });
+
+  test("sorts list numerically descending", () => {
+    const content = `- 30\n- 5\n- 100\n- 20`;
+    const { content: result, count } = applySortList(content, 0, "desc", "number");
+    expect(count).toBe(1);
+    const lists = parseLists(result);
+    expect(lists[0]?.items[0]?.text).toBe("100");
+    expect(lists[0]?.items[1]?.text).toBe("30");
+    expect(lists[0]?.items[2]?.text).toBe("20");
+    expect(lists[0]?.items[3]?.text).toBe("5");
+  });
+
+  test("returns count 0 for non-existent list index", () => {
+    const { count } = applySortList(baseContent, 99);
+    expect(count).toBe(0);
+  });
+
+  test("returns count 0 for empty content with non-existent section", () => {
+    const { count } = applySortList("# Heading\n\nSome text.", "nonexistent");
+    expect(count).toBe(0);
+  });
+
+  test("finds list by section ID", () => {
+    const content = `## Shopping {#shopping}\n\n- Bananas\n- Apples\n- Cherries`;
+    const { content: result, count } = applySortList(content, "shopping");
+    expect(count).toBe(1);
+    const lists = parseLists(result);
+    expect(lists[0]?.items[0]?.text).toBe("Apples");
+    expect(lists[0]?.items[1]?.text).toBe("Bananas");
+    expect(lists[0]?.items[2]?.text).toBe("Cherries");
+  });
+
+  test("preserves sub-items with parent when sorting", () => {
+    const content = `- Zebra\n  - sub-z1\n  - sub-z2\n- Apple\n  - sub-a1\n- Mango`;
+    const { content: result, count } = applySortList(content, 0);
+    expect(count).toBe(1);
+    const lines = result.split("\n");
+    // Apple (with sub-item) should come first, then Mango, then Zebra (with sub-items)
+    const appleIdx = lines.indexOf("- Apple");
+    const subA1Idx = lines.indexOf("  - sub-a1");
+    const mangoIdx = lines.indexOf("- Mango");
+    const zebraIdx = lines.indexOf("- Zebra");
+    const subZ1Idx = lines.indexOf("  - sub-z1");
+    const subZ2Idx = lines.indexOf("  - sub-z2");
+    expect(appleIdx).toBeLessThan(mangoIdx);
+    expect(subA1Idx).toBe(appleIdx + 1);
+    expect(mangoIdx).toBeLessThan(zebraIdx);
+    expect(subZ1Idx).toBe(zebraIdx + 1);
+    expect(subZ2Idx).toBe(zebraIdx + 2);
+  });
+
+  test("preserves bullet style after sort", () => {
+    const content = `* Charlie\n* Alice\n* Bob`;
+    const { content: result } = applySortList(content, 0);
+    expect(result).toBe("* Alice\n* Bob\n* Charlie");
+  });
+
+  test("sorts ordered list items alphabetically", () => {
+    const content = `1. Zebra\n2. Apple\n3. Mango`;
+    const { content: result, count } = applySortList(content, 0);
+    expect(count).toBe(1);
+    // Markers stay as-is (not renumbered), but content is reordered
+    expect(result).toContain("Apple");
+    const lines = result.split("\n");
+    expect(lines[0]).toContain("Apple");
+    expect(lines[1]).toContain("Mango");
+    expect(lines[2]).toContain("Zebra");
+  });
+
+  test("handles list with single item (returns count 1, no change)", () => {
+    const content = `- Solo item`;
+    const { content: result, count } = applySortList(content, 0);
+    expect(count).toBe(1);
+    expect(result).toBe(content);
+  });
+
+  test("does not affect content before and after the list", () => {
+    const content = `# Header\n\n- Gamma\n- Alpha\n- Beta\n\nSome trailing text.`;
+    const { content: result } = applySortList(content, 0);
+    expect(result).toContain("# Header");
+    expect(result).toContain("Some trailing text.");
+    const lists = parseLists(result);
+    expect(lists[0]?.items[0]?.text).toBe("Alpha");
   });
 });

@@ -1566,6 +1566,59 @@ export function applySetListItem(
 }
 
 /**
+ * Apply a sort-list patch operation
+ *
+ * @param content - The content to patch
+ * @param listIdentifier - List index (number) or section ID (string) containing the list
+ * @param direction - Sort direction: "asc" (default) or "desc"
+ * @param type - Comparison type: "string" (default) or "number"
+ * @returns Object with patched content and count (1 if sorted, 0 if list not found)
+ */
+export function applySortList(
+  content: string,
+  listIdentifier: number | string,
+  direction: "asc" | "desc" = "asc",
+  type: "string" | "number" = "string",
+): { content: string; count: number } {
+  const list = findList(content, listIdentifier);
+  if (!list || list.items.length === 0) {
+    return { content, count: 0 };
+  }
+
+  // Build sorted index array based on item text
+  const sortedIndices = list.items
+    .map((_, i) => i)
+    .sort((a, b) => {
+      const aText = list.items[a]?.text ?? "";
+      const bText = list.items[b]?.text ?? "";
+
+      let cmp: number;
+      if (type === "number") {
+        const aNum = Number.parseFloat(aText) || 0;
+        const bNum = Number.parseFloat(bText) || 0;
+        cmp = aNum - bNum;
+      } else {
+        cmp = aText.localeCompare(bText);
+      }
+
+      return direction === "desc" ? -cmp : cmp;
+    });
+
+  const lines = content.split("\n");
+
+  // Extract the line block for each item (top-level line + any sub-item lines)
+  const blocks = list.itemRanges.map((range) => lines.slice(range.startLine, range.endLine + 1));
+
+  // Reorder blocks according to sorted indices
+  const reorderedLines = sortedIndices.flatMap((i) => blocks[i] ?? []);
+
+  // Replace the original list lines with the reordered lines
+  lines.splice(list.startLine, list.endLine - list.startLine + 1, ...reorderedLines);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply an exec patch operation - runs a shell command to transform content
  *
  * This function executes a shell command with the markdown content piped to stdin,
@@ -2568,6 +2621,10 @@ export async function applySinglePatch(
       result = applySetListItem(content, patch.list, patch.item, patch.new);
       break;
 
+    case "sort-list":
+      result = applySortList(content, patch.list, patch.direction, patch.type);
+      break;
+
     case "plugin":
       // Plugin operation requires a registry to be passed
       // This will be handled by applyPatchesWithPlugins
@@ -2712,6 +2769,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `remove-list-item ${typeof patch.item === "number" ? patch.item : `'${patch.item}'`} from list '${patch.list}'`;
     case "set-list-item":
       return `set-list-item ${typeof patch.item === "number" ? patch.item : `'${patch.item}'`} in list '${patch.list}' to '${patch.new}'`;
+    case "sort-list":
+      return `sort-list '${patch.list}' ${patch.direction ?? "asc"} (${patch.type ?? "string"})`;
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":
