@@ -1,0 +1,27 @@
+src/core/patch-engine.ts
+  f735b21b4aec1142 14,1431,1433-1438,1469,1477-1478,1481-1483,1489,1491,1498-1499,1502-1503,1513,1527,1545,1557,1578,1592
+tests/core/json-patch.test.ts
+  f735b21b4aec1142 160-267
+specs/out-of-scope.md
+  f735b21b4aec1142 182,184-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "16b8540200e15e188007e65cb7dbd1aeb0c1552f",
+  "prompts": {
+    "f735b21b4aec1142": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e2243f6-2ae8-47ea-9c79-b99b0c7fc6c8",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 138,
+      "total_deletions": 16,
+      "accepted_lines": 138,
+      "overriden_lines": 0
+    }
+  }
+}
