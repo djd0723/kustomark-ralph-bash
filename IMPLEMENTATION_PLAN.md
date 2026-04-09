@@ -1,10 +1,61 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (.env and .properties File Support - COMPLETE!):**
+
+* ✅ **`.env` FILES**: `json-set`, `json-delete`, `json-merge` now work on `.env` files (flat `KEY=VALUE` format)
+* ✅ **`.properties` FILES**: Same operations work on Java-style `.properties` files with dotted key namespacing
+* ✅ **DOTTED KEY SUPPORT**: `.properties` dotted keys (e.g. `app.port`) are parsed into nested objects so dot-notation paths work naturally
+* ✅ **QUOTING**: `.env` serializer quotes values containing whitespace or special characters
+* ✅ **COMMENT HANDLING**: Lines starting with `#` or `!` are skipped during parse
+* ✅ **25 NEW TESTS PASSING**: Added to `tests/core/json-patch.test.ts`
+* ✅ **3,594 TESTS PASSING**: All tests pass with 0 failures
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # .env file: flat KEY=VALUE
+   patches:
+     - op: json-set
+       path: "APP_PORT"
+       value: "8080"
+     - op: json-delete
+       path: "DEBUG"
+     - op: json-merge
+       value:
+         NODE_ENV: production
+         LOG_LEVEL: info
+
+   # .properties file: dotted keys map to nested paths
+   patches:
+     - op: json-set
+       path: "app.port"
+       value: "8080"
+     - op: json-merge
+       path: "spring.datasource"
+       value:
+         url: "jdbc:postgresql://prod/db"
+         username: "app"
+   ```
+
+2. **Format Details**
+   - `.env`: flat `KEY=VALUE` (uppercase convention); values with spaces/`#` are double-quoted on write
+   - `.properties`: dotted keys like `app.name` are parsed as nested objects; flattened back on serialize
+
+3. **Implementation Files**
+   * `src/core/patch-engine.ts` — Added `parseEnvLike()`, `parseProperties()`, `flattenToProperties()`, `serializeEnv()`, `serializeProperties()`; extended `isStructuredDataFile()`, `parseContent()`, `serializeContent()`
+   * `src/core/schema.ts` — Updated descriptions for `json-set`, `json-delete`, `json-merge` to list new formats
+   * `tests/core/json-patch.test.ts` — 25 new tests covering `.env` and `.properties` for all three operations
+
+**Status:** .env/.properties File Support COMPLETE! ✅
+
+---
 
 **2026-04-09 (Environment Variable Templating - COMPLETE!):**
 

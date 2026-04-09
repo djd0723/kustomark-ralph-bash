@@ -300,3 +300,190 @@ describe("applySinglePatch JSON/YAML integration", () => {
     expect(result.content).toBe(content);
   });
 });
+
+// *** .env tests ***
+
+const simpleEnv = `APP_NAME=myapp\nAPP_PORT=3000\nDEBUG=false\n`;
+const quotedEnv = `DB_URL="postgres://localhost/db"\nAPI_KEY=abc123\n`;
+
+describe("applyJsonSet with .env", () => {
+  test("sets an existing key in .env", () => {
+    const result = applyJsonSet(simpleEnv, "APP_PORT", "8080", "config.env");
+    expect(result.content).toContain("APP_PORT=8080");
+    expect(result.count).toBe(1);
+  });
+
+  test("adds a new key to .env", () => {
+    const result = applyJsonSet(simpleEnv, "NODE_ENV", "production", "config.env");
+    expect(result.content).toContain("NODE_ENV=production");
+    expect(result.count).toBe(1);
+  });
+
+  test("quotes values with spaces in .env", () => {
+    const result = applyJsonSet(simpleEnv, "APP_NAME", "my app", "config.env");
+    expect(result.content).toContain('APP_NAME="my app"');
+    expect(result.count).toBe(1);
+  });
+
+  test("sets key in quoted value .env", () => {
+    const result = applyJsonSet(quotedEnv, "API_KEY", "newkey", "config.env");
+    expect(result.content).toContain("API_KEY=newkey");
+    expect(result.count).toBe(1);
+  });
+
+  test("returns count=0 for non-.env file", () => {
+    const result = applyJsonSet(simpleEnv, "APP_PORT", "8080", "config.md");
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(simpleEnv);
+  });
+});
+
+describe("applyJsonDelete with .env", () => {
+  test("deletes an existing key from .env", () => {
+    const result = applyJsonDelete(simpleEnv, "DEBUG", "config.env");
+    expect(result.content).not.toContain("DEBUG=");
+    expect(result.content).toContain("APP_NAME=myapp");
+    expect(result.count).toBe(1);
+  });
+
+  test("returns count=0 when key not found in .env", () => {
+    const result = applyJsonDelete(simpleEnv, "NONEXISTENT", "config.env");
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(simpleEnv);
+  });
+
+  test("deletes key from quoted .env", () => {
+    const result = applyJsonDelete(quotedEnv, "DB_URL", "config.env");
+    expect(result.content).not.toContain("DB_URL=");
+    expect(result.count).toBe(1);
+  });
+});
+
+describe("applyJsonMerge with .env", () => {
+  test("merges new keys into .env", () => {
+    const result = applyJsonMerge(simpleEnv, { LOG_LEVEL: "info", TIMEOUT: "30" }, "config.env");
+    expect(result.content).toContain("LOG_LEVEL=info");
+    expect(result.content).toContain("TIMEOUT=30");
+    expect(result.count).toBe(1);
+  });
+
+  test("overrides existing keys via merge in .env", () => {
+    const result = applyJsonMerge(simpleEnv, { APP_PORT: "9000" }, "config.env");
+    expect(result.content).toContain("APP_PORT=9000");
+    expect(result.content).not.toContain("APP_PORT=3000");
+    expect(result.count).toBe(1);
+  });
+
+  test("returns count=0 for non-.env file", () => {
+    const result = applyJsonMerge(simpleEnv, { NEW_KEY: "val" }, "config.md");
+    expect(result.count).toBe(0);
+  });
+});
+
+describe("applySinglePatch .env integration", () => {
+  test("json-set patch on .env file via applySinglePatch", async () => {
+    const patch: JsonSetPatch = { op: "json-set", path: "APP_PORT", value: "8080" };
+    const result = await applySinglePatch(simpleEnv, patch, "warn", false, "config.env");
+    expect(result.content).toContain("APP_PORT=8080");
+    expect(result.count).toBe(1);
+  });
+
+  test("json-delete patch on .env file via applySinglePatch", async () => {
+    const patch: JsonDeletePatch = { op: "json-delete", path: "DEBUG" };
+    const result = await applySinglePatch(simpleEnv, patch, "warn", false, "config.env");
+    expect(result.content).not.toContain("DEBUG=");
+    expect(result.count).toBe(1);
+  });
+
+  test("json-merge patch on .env file via applySinglePatch", async () => {
+    const patch: JsonMergePatch = { op: "json-merge", value: { ENVIRONMENT: "staging" } };
+    const result = await applySinglePatch(simpleEnv, patch, "warn", false, "config.env");
+    expect(result.content).toContain("ENVIRONMENT=staging");
+    expect(result.count).toBe(1);
+  });
+});
+
+// *** .properties tests ***
+
+const simpleProperties = `app.name=myapp\napp.port=3000\ndebug=false\n`;
+const commentedProperties = `# Application config\napp.name=myapp\n! legacy comment\napp.version=1.0\n`;
+
+describe("applyJsonSet with .properties", () => {
+  test("sets an existing key in .properties", () => {
+    const result = applyJsonSet(simpleProperties, "app.port", "8080", "app.properties");
+    expect(result.content).toContain("app.port=8080");
+    expect(result.count).toBe(1);
+  });
+
+  test("adds a new key to .properties", () => {
+    const result = applyJsonSet(simpleProperties, "app.env", "production", "app.properties");
+    expect(result.content).toContain("app.env=production");
+    expect(result.count).toBe(1);
+  });
+
+  test("skips comments in .properties", () => {
+    const result = applyJsonSet(commentedProperties, "app.name", "newapp", "app.properties");
+    expect(result.content).toContain("app.name=newapp");
+    expect(result.content).not.toContain("app.name=myapp");
+    expect(result.count).toBe(1);
+  });
+
+  test("returns count=0 for non-.properties file", () => {
+    const result = applyJsonSet(simpleProperties, "app.port", "8080", "config.txt");
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(simpleProperties);
+  });
+});
+
+describe("applyJsonDelete with .properties", () => {
+  test("deletes an existing key from .properties", () => {
+    const result = applyJsonDelete(simpleProperties, "debug", "app.properties");
+    expect(result.content).not.toContain("debug=");
+    expect(result.content).toContain("app.name=myapp");
+    expect(result.count).toBe(1);
+  });
+
+  test("returns count=0 when key not found in .properties", () => {
+    const result = applyJsonDelete(simpleProperties, "nonexistent", "app.properties");
+    expect(result.count).toBe(0);
+  });
+});
+
+describe("applyJsonMerge with .properties", () => {
+  test("merges new keys into .properties", () => {
+    const result = applyJsonMerge(simpleProperties, { "log.level": "info" }, "app.properties");
+    expect(result.content).toContain("log.level=info");
+    expect(result.count).toBe(1);
+  });
+
+  test("overrides existing key via merge in .properties", () => {
+    // .properties parses dotted keys as nested objects, so merge with nested structure
+    const result = applyJsonMerge(simpleProperties, { app: { port: "9000" } }, "app.properties");
+    expect(result.content).toContain("app.port=9000");
+    expect(result.content).not.toContain("app.port=3000");
+    expect(result.count).toBe(1);
+  });
+});
+
+describe("applySinglePatch .properties integration", () => {
+  test("json-set patch on .properties file via applySinglePatch", async () => {
+    const patch: JsonSetPatch = { op: "json-set", path: "app.port", value: "9090" };
+    const result = await applySinglePatch(simpleProperties, patch, "warn", false, "app.properties");
+    expect(result.content).toContain("app.port=9090");
+    expect(result.count).toBe(1);
+  });
+
+  test("json-delete patch on .properties file via applySinglePatch", async () => {
+    const patch: JsonDeletePatch = { op: "json-delete", path: "debug" };
+    const result = await applySinglePatch(simpleProperties, patch, "warn", false, "app.properties");
+    expect(result.content).not.toContain("debug=");
+    expect(result.count).toBe(1);
+  });
+
+  test("json-merge patch on .properties file via applySinglePatch", async () => {
+    const patch: JsonMergePatch = { op: "json-merge", value: { "feature.flag": "true" } };
+    const result = await applySinglePatch(simpleProperties, patch, "warn", false, "app.properties");
+    expect(result.content).toContain("feature.flag=true");
+    expect(result.count).toBe(1);
+  });
+});

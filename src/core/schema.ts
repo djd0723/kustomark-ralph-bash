@@ -2700,7 +2700,8 @@ export function generateSchema(): object {
                 op: {
                   type: "string",
                   const: "json-set",
-                  description: "Set a value at a dot-notation path in a JSON or YAML file",
+                  description:
+                    "Set a value at a dot-notation path in a JSON, YAML, TOML, .env, or .properties file",
                 },
                 path: {
                   type: "string",
@@ -2762,7 +2763,8 @@ export function generateSchema(): object {
                 op: {
                   type: "string",
                   const: "json-delete",
-                  description: "Delete a key at a dot-notation path in a JSON or YAML file",
+                  description:
+                    "Delete a key at a dot-notation path in a JSON, YAML, TOML, .env, or .properties file",
                 },
                 path: {
                   type: "string",
@@ -2822,7 +2824,7 @@ export function generateSchema(): object {
                   type: "string",
                   const: "json-merge",
                   description:
-                    "Deep merge an object into a JSON or YAML file at root or at a given path",
+                    "Deep merge an object into a JSON, YAML, TOML, .env, or .properties file at root or at a given path",
                 },
                 value: {
                   type: "object",

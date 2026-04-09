@@ -1461,7 +1461,7 @@ export async function applyExec(
  * Check whether a file path is a JSON or YAML file based on its extension.
  *
  * @param filePath - Absolute or relative file path to check
- * @returns true if the extension is .json, .yaml, or .yml
+ * @returns true if the extension is .json, .yaml, .yml, .toml, .env, or .properties
  */
 function isStructuredDataFile(filePath: string): boolean {
   const lower = filePath.toLowerCase();
@@ -1469,8 +1469,114 @@ function isStructuredDataFile(filePath: string): boolean {
     lower.endsWith(".json") ||
     lower.endsWith(".yaml") ||
     lower.endsWith(".yml") ||
-    lower.endsWith(".toml")
+    lower.endsWith(".toml") ||
+    lower.endsWith(".env") ||
+    lower.endsWith(".properties")
   );
+}
+
+/**
+ * Parse a .env or .properties file into a flat key→value object.
+ *
+ * Handles:
+ * - `KEY=VALUE` (.env style)
+ * - `key=value` and `key: value` (.properties style)
+ * - Comments starting with `#` or `!`
+ * - Double- or single-quoted values (quotes are stripped)
+ * - Empty lines are skipped
+ *
+ * @param content - Raw file content
+ * @returns Flat object with string values
+ */
+function parseEnvLike(content: string): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("!")) continue;
+    const sepIdx = trimmed.search(/[=:]/);
+    if (sepIdx === -1) continue;
+    const key = trimmed.slice(0, sepIdx).trim();
+    let value = trimmed.slice(sepIdx + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (key) result[key] = value;
+  }
+  return result;
+}
+
+/**
+ * Serialize a flat object back to .env format (`KEY=VALUE` per line).
+ * Values containing whitespace or `#` are double-quoted.
+ *
+ * @param obj - Flat object with string-coercible values
+ * @returns Serialized .env string (ends with newline when non-empty)
+ */
+function serializeEnv(obj: Record<string, unknown>): string {
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(obj)) {
+    const str = String(value ?? "");
+    const needsQuotes = /[\s"'#\\]/.test(str);
+    lines.push(
+      needsQuotes ? `${key}="${str.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"` : `${key}=${str}`,
+    );
+  }
+  return lines.length > 0 ? `${lines.join("\n")}\n` : "";
+}
+
+/**
+ * Parse a .properties file into a nested object by splitting dotted keys.
+ *
+ * `app.port=3000` becomes `{ app: { port: "3000" } }` so that dot-notation
+ * paths in json-set/json-delete work as expected with Java-style property names.
+ *
+ * @param content - Raw .properties file content
+ * @returns Nested object built from dotted key names
+ */
+function parseProperties(content: string): Record<string, unknown> {
+  const flat = parseEnvLike(content);
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(flat)) {
+    setNestedValue(result, key, value);
+  }
+  return result;
+}
+
+/**
+ * Flatten a nested object to dotted key=value lines for .properties output.
+ *
+ * `{ app: { port: "8080" } }` becomes `app.port=8080`.
+ *
+ * @param obj - Potentially nested object
+ * @param prefix - Key prefix accumulated during recursion
+ * @returns Array of `key=value` strings
+ */
+function flattenToProperties(obj: Record<string, unknown>, prefix = ""): string[] {
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      lines.push(...flattenToProperties(value as Record<string, unknown>, fullKey));
+    } else {
+      lines.push(`${fullKey}=${String(value ?? "")}`);
+    }
+  }
+  return lines;
+}
+
+/**
+ * Serialize a (potentially nested) object back to .properties format.
+ * Nested keys are flattened using dot notation (`app.port=8080`).
+ *
+ * @param obj - Object with string-coercible leaf values
+ * @returns Serialized .properties string (ends with newline when non-empty)
+ */
+function serializeProperties(obj: Record<string, unknown>): string {
+  const lines = flattenToProperties(obj);
+  return lines.length > 0 ? `${lines.join("\n")}\n` : "";
 }
 
 /**
@@ -1501,7 +1607,7 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
 }
 
 /**
- * Parse content as JSON, YAML, or TOML depending on file extension.
+ * Parse content as JSON, YAML, TOML, .env, or .properties depending on file extension.
  *
  * @param content - Raw file content
  * @param filePath - File path (used to choose parser)
@@ -1516,14 +1622,22 @@ function parseContent(content: string, filePath: string): Record<string, unknown
   if (lower.endsWith(".toml")) {
     return smolToml.parse(content) as Record<string, unknown>;
   }
+  if (lower.endsWith(".env")) {
+    return parseEnvLike(content);
+  }
+  if (lower.endsWith(".properties")) {
+    return parseProperties(content);
+  }
   // .yaml / .yml
   return yaml.load(content) as Record<string, unknown>;
 }
 
 /**
- * Serialize an object back to JSON, YAML, or TOML depending on file extension.
+ * Serialize an object back to JSON, YAML, TOML, .env, or .properties depending on file extension.
  *
  * JSON is indented with 2 spaces. YAML uses js-yaml defaults. TOML uses smol-toml.
+ * .env uses KEY=VALUE (values with whitespace/special chars are double-quoted).
+ * .properties uses key=value (no quoting).
  *
  * @param obj - Object to serialize
  * @param filePath - File path (used to choose serializer)
@@ -1536,6 +1650,12 @@ function serializeContent(obj: Record<string, unknown>, filePath: string): strin
   }
   if (lower.endsWith(".toml")) {
     return smolToml.stringify(obj);
+  }
+  if (lower.endsWith(".env")) {
+    return serializeEnv(obj);
+  }
+  if (lower.endsWith(".properties")) {
+    return serializeProperties(obj);
   }
   // .yaml / .yml
   return yaml.dump(obj);
