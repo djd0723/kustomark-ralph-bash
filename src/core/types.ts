@@ -458,6 +458,17 @@ export interface RenameTableColumnPatch extends PatchCommonFields {
 }
 
 /**
+ * Reorder table columns operation
+ */
+export interface ReorderTableColumnsPatch extends PatchCommonFields {
+  op: "reorder-table-columns";
+  /** Table identifier (index 0-based or heading text) */
+  table: number | string;
+  /** New column order as array of header names or 0-based indices */
+  columns: (number | string)[];
+}
+
+/**
  * Sort table rows by a column
  */
 export interface SortTablePatch extends PatchCommonFields {
@@ -663,6 +674,7 @@ export type PatchOperation =
   | AddTableColumnPatch
   | RemoveTableColumnPatch
   | RenameTableColumnPatch
+  | ReorderTableColumnsPatch
   | SortTablePatch
   | FilterTableRowsPatch
   | DeduplicateTableRowsPatch

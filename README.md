@@ -3660,6 +3660,54 @@ Output:
 - Column alignment (`:---`, `:---:`, `---:`) is preserved
 - Use a numeric index to rename a column when the header name contains special characters
 
+### `reorder-table-columns` - Reorder Table Columns
+
+Reorder all columns in a table by specifying the new column order. Headers, alignments, and all cell data move together.
+
+```yaml
+- op: reorder-table-columns
+  table: 0                          # zero-based table index or section ID
+  columns: ["Name", "City", "Age"]  # new column order (header names or 0-based indices)
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `table` | number \| string | Yes | Zero-based table index or section ID containing the table |
+| `columns` | array | Yes | New column order as an array of header names or 0-based indices — must include every column exactly once |
+
+**Example:**
+
+Input:
+```markdown
+| Name  | Score | Grade |
+|-------|-------|-------|
+| Alice | 95    | A     |
+| Bob   | 82    | B     |
+```
+
+Config:
+```yaml
+- op: reorder-table-columns
+  table: 0
+  columns: ["Grade", "Name", "Score"]
+```
+
+Output:
+```markdown
+| Grade | Name  | Score |
+|-------|-------|-------|
+| A     | Alice | 95    |
+| B     | Bob   | 82    |
+```
+
+**Notes:**
+- The `columns` array must contain every column exactly once — missing or duplicate columns return no change
+- Column identifiers can be mixed: `["Grade", 0, 2]` is valid
+- Alignments (`:---`, `:---:`, `---:`) travel with their column
+- Use numeric indices when header names contain special characters
+
 ### `sort-table` - Sort Table Rows
 
 Sort the data rows of a table by any column, in ascending or descending order, using string, numeric, or date comparison.

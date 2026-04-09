@@ -1416,6 +1416,53 @@ export function applyRenameTableColumn(
 }
 
 /**
+ * Apply a reorder-table-columns patch operation
+ *
+ * @param content - The content to patch
+ * @param tableIdentifier - Table index (number) or section ID (string) containing the table
+ * @param columns - New column order as array of header names or 0-based indices
+ * @returns Object with patched content and count (1 if reordered, 0 if table not found or columns invalid)
+ */
+export function applyReorderTableColumns(
+  content: string,
+  tableIdentifier: number | string,
+  columns: (number | string)[],
+): { content: string; count: number } {
+  const table = findTable(content, tableIdentifier);
+  if (!table) {
+    return { content, count: 0 };
+  }
+
+  if (columns.length !== table.headers.length) {
+    return { content, count: 0 };
+  }
+
+  const newIndices: number[] = [];
+  for (const col of columns) {
+    const idx = getColumnIndex(table, col);
+    if (idx === -1) {
+      return { content, count: 0 };
+    }
+    newIndices.push(idx);
+  }
+
+  // Ensure all indices are distinct (no duplicates)
+  if (new Set(newIndices).size !== newIndices.length) {
+    return { content, count: 0 };
+  }
+
+  table.headers = newIndices.map((i) => table.headers[i] ?? "");
+  table.alignments = newIndices.map((i) => table.alignments[i] ?? "none");
+  table.rows = table.rows.map((row) => newIndices.map((i) => row[i] ?? ""));
+
+  const newTableContent = serializeTable(table);
+  const lines = content.split("\n");
+  lines.splice(table.startLine, table.endLine - table.startLine + 1, newTableContent);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply a sort-table patch operation
  *
  * @param content - The content to patch
@@ -2848,6 +2895,10 @@ export async function applySinglePatch(
       result = applyRenameTableColumn(content, patch.table, patch.column, patch.new);
       break;
 
+    case "reorder-table-columns":
+      result = applyReorderTableColumns(content, patch.table, patch.columns);
+      break;
+
     case "sort-table":
       result = applySortTable(content, patch.table, patch.column, patch.direction, patch.type);
       break;
@@ -3035,6 +3086,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `remove-table-column '${patch.column}' from table '${patch.table}'`;
     case "rename-table-column":
       return `rename-table-column '${patch.column}' to '${patch.new}' in table '${patch.table}'`;
+    case "reorder-table-columns":
+      return `reorder-table-columns in table '${patch.table}' to [${patch.columns.join(", ")}]`;
     case "sort-table":
       return `sort-table '${patch.table}' by column '${patch.column}' ${patch.direction ?? "asc"} (${patch.type ?? "string"})`;
     case "filter-table-rows": {

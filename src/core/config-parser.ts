@@ -620,6 +620,7 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "remove-table-column",
     "sort-table",
     "rename-table-column",
+    "reorder-table-columns",
     "filter-table-rows",
     "exec",
     "plugin",
@@ -1162,6 +1163,47 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
           field: `${prefix}.keep`,
           message: '\'keep\' must be "first" or "last"',
         });
+      }
+      break;
+
+    case "reorder-table-columns":
+      if (p.table === undefined) {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "reorder-table-columns operation requires 'table' field",
+        });
+      } else if (typeof p.table !== "number" && typeof p.table !== "string") {
+        errors.push({
+          field: `${prefix}.table`,
+          message: "'table' must be a number or string",
+        });
+      }
+
+      if (p.columns === undefined) {
+        errors.push({
+          field: `${prefix}.columns`,
+          message: "reorder-table-columns operation requires 'columns' field",
+        });
+      } else if (!Array.isArray(p.columns)) {
+        errors.push({
+          field: `${prefix}.columns`,
+          message: "'columns' must be an array",
+        });
+      } else if (p.columns.length === 0) {
+        errors.push({
+          field: `${prefix}.columns`,
+          message: "'columns' must not be empty",
+        });
+      } else {
+        for (const col of p.columns) {
+          if (typeof col !== "number" && typeof col !== "string") {
+            errors.push({
+              field: `${prefix}.columns`,
+              message: "'columns' entries must be numbers or strings",
+            });
+            break;
+          }
+        }
       }
       break;
 

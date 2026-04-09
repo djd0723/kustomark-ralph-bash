@@ -182,6 +182,7 @@ export {
   applyRemoveSection,
   applyRenameFrontmatter,
   applyRenameTableColumn,
+  applyReorderTableColumns,
   applyReplace,
   applyReplaceRegex,
   applyReplaceSection,

@@ -1,10 +1,50 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (reorder-table-columns - COMPLETE!):**
+
+* ✅ **`reorder-table-columns`**: New operation to reorder all columns in a markdown table
+* ✅ **NAME OR INDEX**: `columns` array accepts header names, 0-based indices, or a mix of both
+* ✅ **ALIGNMENT PRESERVED**: Column alignments travel with their column during reorder
+* ✅ **VALIDATION**: Returns count=0 for wrong column count, unknown names, or duplicate entries
+* ✅ **SECTION ID SUPPORT**: Tables identified by section heading (same pattern as all other table ops)
+* ✅ **README DOCS**: Full documentation with field table, example input/output, and notes
+* ✅ **11 NEW TESTS PASSING**: Unit + integration tests covering name reorder, index reorder, alignment, section ID, error cases, and content preservation
+* ✅ **3,748 TESTS PASSING**: All tests pass with 0 failures
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # Reorder by column names
+   patches:
+     - op: reorder-table-columns
+       table: 0
+       columns: ["Grade", "Name", "Score"]
+
+   # Reorder by index
+     - op: reorder-table-columns
+       table: "releases"
+       columns: [2, 0, 1]
+   ```
+
+2. **Implementation Files**
+   * `src/core/types.ts` — Added `ReorderTableColumnsPatch` interface; added to `PatchOperation` union
+   * `src/core/patch-engine.ts` — Added `applyReorderTableColumns()`; wired into `applySinglePatch()` and `getPatchDescription()`
+   * `src/core/schema.ts` — Added JSON schema definition for `reorder-table-columns`
+   * `src/core/config-parser.ts` — Added `reorder-table-columns` to `validOps`; added field validation
+   * `src/core/index.ts` — Exported `applyReorderTableColumns` and `ReorderTableColumnsPatch`
+   * `tests/core/table-operations-integration.test.ts` — 11 tests covering all scenarios
+   * `README.md` — Full documentation for `reorder-table-columns`
+
+**Status:** reorder-table-columns COMPLETE! ✅
+
+---
 
 **2026-04-09 (deduplicate-table-rows + deduplicate-list-items - COMPLETE!):**
 

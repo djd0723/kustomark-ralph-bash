@@ -2259,3 +2259,231 @@ Conclusion text.`;
     });
   });
 });
+
+describe("Table Operations Integration - reorder-table-columns", () => {
+  describe("reorder by column names", () => {
+    test("reorders three columns by name", async () => {
+      const content = `| Name | Age | City |
+| :--- | ---: | :--- |
+| Alice | 30 | NYC |
+| Bob | 25 | LA |`;
+
+      const patches: PatchOperation[] = [
+        { op: "reorder-table-columns", table: 0, columns: ["City", "Name", "Age"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(1);
+      const lines = result.content.split("\n");
+      expect(lines[0]).toContain("City");
+      expect(lines[0]).toContain("Name");
+      expect(lines[0]).toContain("Age");
+      // City comes before Name which comes before Age
+      expect(lines[0].indexOf("City")).toBeLessThan(lines[0].indexOf("Name"));
+      expect(lines[0].indexOf("Name")).toBeLessThan(lines[0].indexOf("Age"));
+      // Data rows preserved
+      expect(result.content).toContain("Alice");
+      expect(result.content).toContain("Bob");
+    });
+
+    test("reorders two columns by name (swap)", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |
+| Bob | 25 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "reorder-table-columns", table: 0, columns: ["Age", "Name"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(1);
+      const lines = result.content.split("\n");
+      expect(lines[0].indexOf("Age")).toBeLessThan(lines[0].indexOf("Name"));
+      // Data values moved with their column
+      expect(lines[2]).toMatch(/30.*Alice/);
+      expect(lines[3]).toMatch(/25.*Bob/);
+    });
+  });
+
+  describe("reorder by column indices", () => {
+    test("reorders columns by 0-based index", async () => {
+      const content = `| A | B | C |
+| :--- | :--- | :--- |
+| 1 | 2 | 3 |
+| 4 | 5 | 6 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "reorder-table-columns", table: 0, columns: [2, 0, 1] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(1);
+      const lines = result.content.split("\n");
+      // C, A, B order
+      expect(lines[0].indexOf("C")).toBeLessThan(lines[0].indexOf("A"));
+      expect(lines[0].indexOf("A")).toBeLessThan(lines[0].indexOf("B"));
+      // Data: row 1 was [1,2,3] → now [3,1,2]
+      expect(lines[2]).toContain("3");
+      expect(lines[2]).toContain("1");
+      expect(lines[2]).toContain("2");
+      const dataLine = lines[2];
+      expect(dataLine.indexOf("3")).toBeLessThan(dataLine.indexOf("1"));
+    });
+  });
+
+  describe("alignment preservation", () => {
+    test("column alignments move with their columns", async () => {
+      const content = `| Name | Value | Flag |
+| :--- | ---: | :---: |
+| Alice | 42 | true |`;
+
+      const patches: PatchOperation[] = [
+        { op: "reorder-table-columns", table: 0, columns: ["Value", "Flag", "Name"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(1);
+      const lines = result.content.split("\n");
+      // Second line is alignment row: Value is right-aligned (---:), Flag is centered (:---:), Name is left (:---)
+      const alignLine = lines[1];
+      const valuePos = alignLine.indexOf("---:");
+      const flagPos = alignLine.indexOf(":---:");
+      const namePos = alignLine.lastIndexOf(":---");
+      expect(valuePos).toBeLessThan(flagPos);
+      expect(flagPos).toBeLessThan(namePos);
+    });
+  });
+
+  describe("section ID support", () => {
+    test("finds table by section heading slug", async () => {
+      const content = `## Team Members
+
+| Name | Role | Level |
+| :--- | :--- | :--- |
+| Alice | Manager | Senior |
+| Bob | Developer | Junior |`;
+
+      const patches: PatchOperation[] = [
+        { op: "reorder-table-columns", table: "team-members", columns: ["Level", "Role", "Name"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(1);
+      const lines = result.content.split("\n");
+      const headerLine = lines[2];
+      expect(headerLine.indexOf("Level")).toBeLessThan(headerLine.indexOf("Role"));
+      expect(headerLine.indexOf("Role")).toBeLessThan(headerLine.indexOf("Name"));
+    });
+  });
+
+  describe("error handling", () => {
+    test("returns count 0 when table not found", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "reorder-table-columns", table: 99, columns: ["Age", "Name"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test("returns count 0 when column count mismatches", async () => {
+      const content = `| Name | Age | City |
+| :--- | ---: | :--- |
+| Alice | 30 | NYC |`;
+
+      const patches: PatchOperation[] = [
+        // Only 2 columns specified for a 3-column table
+        { op: "reorder-table-columns", table: 0, columns: ["Name", "Age"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test("returns count 0 when column name not found", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "reorder-table-columns", table: 0, columns: ["Name", "Unknown"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+
+    test("returns count 0 when duplicate columns specified", async () => {
+      const content = `| Name | Age |
+| :--- | ---: |
+| Alice | 30 |`;
+
+      const patches: PatchOperation[] = [
+        { op: "reorder-table-columns", table: 0, columns: ["Name", "Name"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(0);
+      expect(result.content).toBe(content);
+    });
+  });
+
+  describe("content preservation", () => {
+    test("surrounding text is unchanged", async () => {
+      const content = `# Report
+
+Introduction text.
+
+| Name | Age |
+| :--- | ---: |
+| Alice | 30 |
+
+Conclusion text.`;
+
+      const patches: PatchOperation[] = [
+        // Table starts at line 4 (after "# Report", "", "Introduction text.", "")
+        { op: "reorder-table-columns", table: 4, columns: ["Age", "Name"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain("# Report");
+      expect(result.content).toContain("Introduction text.");
+      expect(result.content).toContain("Conclusion text.");
+      expect(result.content).toContain("Alice");
+      expect(result.content).toContain("30");
+    });
+
+    test("all cell data is preserved after reorder", async () => {
+      const content = `| Name | Score | Grade |
+| :--- | ---: | :---: |
+| Alice | 95 | A |
+| Bob | 82 | B |
+| Charlie | 71 | C |`;
+
+      const patches: PatchOperation[] = [
+        { op: "reorder-table-columns", table: 0, columns: ["Grade", "Name", "Score"] },
+      ];
+
+      const result = await applyPatches(content, patches);
+      expect(result.applied).toBe(1);
+      expect(result.content).toContain("Alice");
+      expect(result.content).toContain("95");
+      expect(result.content).toContain("A");
+      expect(result.content).toContain("Bob");
+      expect(result.content).toContain("82");
+      expect(result.content).toContain("B");
+      expect(result.content).toContain("Charlie");
+      expect(result.content).toContain("71");
+      expect(result.content).toContain("C");
+    });
+  });
+});
