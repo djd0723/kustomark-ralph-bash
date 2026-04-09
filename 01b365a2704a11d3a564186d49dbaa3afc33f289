@@ -1,0 +1,39 @@
+tests/core/build-history.test.ts
+  bde208e6f9769c6e 168
+src/core/schema.ts
+  bde208e6f9769c6e 2682-2692,2694-2698,2700-2702,2704-2726,2728-2754,2756-2757,2759-2761,2763-2785,2787-2822,2824-2826,2828-2850,2852-2854
+specs/out-of-scope.md
+  bde208e6f9769c6e 182,184-187
+src/core/http-fetcher.ts
+  bde208e6f9769c6e 244-247
+src/core/types.ts
+  bde208e6f9769c6e 470-499,532-535
+src/core/patch-engine.ts
+  bde208e6f9769c6e 1425-1443,1445-1454,1456-1607,1970,2183-2194,2323-2328,2608
+tests/core/json-patch.test.ts
+  bde208e6f9769c6e 1-194
+tests/web/file-viewer.test.tsx
+  bde208e6f9769c6e 507-510
+IMPLEMENTATION_PLAN.md
+  bde208e6f9769c6e 3,9-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "01b365a2704a11d3a564186d49dbaa3afc33f289",
+  "prompts": {
+    "bde208e6f9769c6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84ec4e7f-eaf7-4ee9-8adb-c50079b14d1d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 743,
+      "total_deletions": 16,
+      "accepted_lines": 693,
+      "overriden_lines": 13
+    }
+  }
+}
