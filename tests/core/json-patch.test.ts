@@ -157,6 +157,114 @@ describe("applyJsonMerge", () => {
   });
 });
 
+// *** TOML tests ***
+
+const simpleToml = `name = "alice"\nage = 30\nactive = true\n`;
+const nestedToml = `[server]\nhost = "localhost"\nport = 3000\n\n[database]\nenabled = false\n`;
+
+describe("applyJsonSet with TOML", () => {
+  test("sets a root-level string value in TOML", () => {
+    const result = applyJsonSet(simpleToml, "name", "bob", "config.toml");
+    expect(result.content).toContain("bob");
+    expect(result.content).not.toContain('"alice"');
+    expect(result.count).toBe(1);
+  });
+
+  test("sets a root-level number value in TOML", () => {
+    const result = applyJsonSet(simpleToml, "age", 99, "config.toml");
+    expect(result.content).toContain("99");
+    expect(result.count).toBe(1);
+  });
+
+  test("sets a root-level boolean in TOML", () => {
+    const result = applyJsonSet(simpleToml, "active", false, "config.toml");
+    expect(result.content).toContain("false");
+    expect(result.count).toBe(1);
+  });
+
+  test("sets a nested value in TOML", () => {
+    const result = applyJsonSet(nestedToml, "server.port", 8080, "app.toml");
+    expect(result.content).toContain("8080");
+    expect(result.count).toBe(1);
+  });
+
+  test("creates a new key in TOML", () => {
+    const result = applyJsonSet(simpleToml, "version", "1.0.0", "config.toml");
+    expect(result.content).toContain("1.0.0");
+    expect(result.count).toBe(1);
+  });
+
+  test("returns count=0 for non-TOML file", () => {
+    const result = applyJsonSet(simpleToml, "name", "bob", "README.md");
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(simpleToml);
+  });
+});
+
+describe("applyJsonDelete with TOML", () => {
+  test("deletes a root-level key in TOML", () => {
+    const result = applyJsonDelete(simpleToml, "active", "config.toml");
+    expect(result.content).not.toContain("active");
+    expect(result.count).toBe(1);
+  });
+
+  test("deletes a nested key in TOML", () => {
+    const result = applyJsonDelete(nestedToml, "server.host", "app.toml");
+    expect(result.content).not.toContain('"localhost"');
+    expect(result.content).toContain("3000"); // port still present
+    expect(result.count).toBe(1);
+  });
+
+  test("returns count=0 when path not found in TOML", () => {
+    const result = applyJsonDelete(simpleToml, "nonexistent", "config.toml");
+    expect(result.count).toBe(0);
+  });
+});
+
+describe("applyJsonMerge with TOML", () => {
+  test("merges new keys at root in TOML", () => {
+    const result = applyJsonMerge(simpleToml, { city: "NYC" }, "config.toml");
+    expect(result.content).toContain("NYC");
+    expect(result.content).toContain("alice"); // original preserved
+    expect(result.count).toBe(1);
+  });
+
+  test("merges into existing nested section in TOML", () => {
+    const result = applyJsonMerge(nestedToml, { ssl: true }, "app.toml", "server");
+    expect(result.content).toContain("ssl");
+    expect(result.content).toContain("localhost"); // original preserved
+    expect(result.count).toBe(1);
+  });
+
+  test("returns count=0 for non-TOML file", () => {
+    const result = applyJsonMerge("# Hello", { key: "val" }, "README.md");
+    expect(result.count).toBe(0);
+  });
+});
+
+describe("applySinglePatch TOML integration", () => {
+  test("json-set patch on .toml file via applySinglePatch", async () => {
+    const patch: JsonSetPatch = { op: "json-set", path: "age", value: 42 };
+    const result = await applySinglePatch(simpleToml, patch, "warn", false, "config.toml");
+    expect(result.content).toContain("42");
+    expect(result.count).toBe(1);
+  });
+
+  test("json-delete patch on .toml file via applySinglePatch", async () => {
+    const patch: JsonDeletePatch = { op: "json-delete", path: "active" };
+    const result = await applySinglePatch(simpleToml, patch, "warn", false, "config.toml");
+    expect(result.content).not.toContain("active");
+    expect(result.count).toBe(1);
+  });
+
+  test("json-merge patch on .toml file via applySinglePatch", async () => {
+    const patch: JsonMergePatch = { op: "json-merge", value: { env: "production" } };
+    const result = await applySinglePatch(simpleToml, patch, "warn", false, "config.toml");
+    expect(result.content).toContain("production");
+    expect(result.count).toBe(1);
+  });
+});
+
 // *** Integration via applySinglePatch ***
 
 describe("applySinglePatch JSON/YAML integration", () => {

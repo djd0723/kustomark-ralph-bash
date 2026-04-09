@@ -6832,3 +6832,30 @@ patches:
 **Status:** Exec Patch Operation COMPLETE! ✅
 
 This high-value feature enables users to leverage shell commands and custom scripts for markdown transformations while maintaining kustomark's core principles of determinism and reproducibility. The feature integrates seamlessly with the existing patch system and opens up unlimited extensibility through the Unix ecosystem.
+
+---
+
+**2026-04-09 (TOML Support - Multi-Format Complete!):**
+
+- ✅ **TOML PATCH OPERATIONS**: Extended `json-set`, `json-delete`, and `json-merge` to support `.toml` files
+
+**Implementation Details:**
+
+- Added `smol-toml` dependency for TOML serialization
+- Renamed internal `isJsonOrYamlFile()` to `isStructuredDataFile()` to include `.toml`
+- Updated `parseContent()` to use `Bun.TOML.parse()` (built-in) for `.toml` files
+- Updated `serializeContent()` to use `smol-toml.stringify()` for `.toml` files
+- Added 21 new tests covering `json-set`, `json-delete`, `json-merge`, and `applySinglePatch` on `.toml` files
+
+**Files Modified:**
+- `src/core/patch-engine.ts` — Added TOML branch to `isStructuredDataFile`, `parseContent`, `serializeContent`
+- `tests/core/json-patch.test.ts` — Added 21 TOML test cases
+- `package.json` / `bun.lock` — Added `smol-toml@1.6.1`
+- `specs/out-of-scope.md` — Updated Multi-Format Support status to fully implemented
+
+**Testing Results:**
+- ✅ All 3,548 tests passing (21 new TOML tests added)
+- ✅ All linting checks passing (`bun check`)
+- ✅ TypeScript compilation clean
+
+**Status:** TOML Support COMPLETE! ✅ Multi-Format Support is now fully implemented for JSON, YAML, and TOML.

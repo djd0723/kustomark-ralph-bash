@@ -179,10 +179,10 @@ Push changes back to upstream.
 
 ### Multi-Format Support
 
-**Status**: Partially Implemented (JSON/YAML only)
+**Status**: Fully Implemented (JSON/YAML/TOML)
 
-`json-set`, `json-delete`, and `json-merge` operations now work on `.json`, `.yaml`, and `.yml` files.
-TOML remains unimplemented (tools like `taplo` exist for TOML).
+`json-set`, `json-delete`, and `json-merge` operations work on `.json`, `.yaml`, `.yml`, and `.toml` files.
+TOML support uses `Bun.TOML.parse()` (built-in) for parsing and `smol-toml` for serialization.
 
 See `src/core/patch-engine.ts` (`applyJsonSet`, `applyJsonDelete`, `applyJsonMerge`).
 

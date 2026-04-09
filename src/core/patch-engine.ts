@@ -11,6 +11,7 @@
  */
 
 import * as yaml from "js-yaml";
+import * as smolToml from "smol-toml";
 import { evaluateCondition } from "./condition-evaluator.js";
 import { extractSnippet, findFailurePosition, findSimilarContent, PatchError } from "./errors.js";
 import { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
@@ -1427,9 +1428,14 @@ export async function applyExec(
  * @param filePath - Absolute or relative file path to check
  * @returns true if the extension is .json, .yaml, or .yml
  */
-function isJsonOrYamlFile(filePath: string): boolean {
+function isStructuredDataFile(filePath: string): boolean {
   const lower = filePath.toLowerCase();
-  return lower.endsWith(".json") || lower.endsWith(".yaml") || lower.endsWith(".yml");
+  return (
+    lower.endsWith(".json") ||
+    lower.endsWith(".yaml") ||
+    lower.endsWith(".yml") ||
+    lower.endsWith(".toml")
+  );
 }
 
 /**
@@ -1460,7 +1466,7 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
 }
 
 /**
- * Parse content as JSON or YAML depending on file extension.
+ * Parse content as JSON, YAML, or TOML depending on file extension.
  *
  * @param content - Raw file content
  * @param filePath - File path (used to choose parser)
@@ -1468,25 +1474,33 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
  * @throws If content cannot be parsed
  */
 function parseContent(content: string, filePath: string): Record<string, unknown> {
-  if (filePath.toLowerCase().endsWith(".json")) {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith(".json")) {
     return JSON.parse(content) as Record<string, unknown>;
+  }
+  if (lower.endsWith(".toml")) {
+    return smolToml.parse(content) as Record<string, unknown>;
   }
   // .yaml / .yml
   return yaml.load(content) as Record<string, unknown>;
 }
 
 /**
- * Serialize an object back to JSON or YAML depending on file extension.
+ * Serialize an object back to JSON, YAML, or TOML depending on file extension.
  *
- * JSON is indented with 2 spaces. YAML uses js-yaml defaults.
+ * JSON is indented with 2 spaces. YAML uses js-yaml defaults. TOML uses smol-toml.
  *
  * @param obj - Object to serialize
  * @param filePath - File path (used to choose serializer)
  * @returns Serialized string
  */
 function serializeContent(obj: Record<string, unknown>, filePath: string): string {
-  if (filePath.toLowerCase().endsWith(".json")) {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith(".json")) {
     return JSON.stringify(obj, null, 2);
+  }
+  if (lower.endsWith(".toml")) {
+    return smolToml.stringify(obj);
   }
   // .yaml / .yml
   return yaml.dump(obj);
@@ -1496,7 +1510,7 @@ function serializeContent(obj: Record<string, unknown>, filePath: string): strin
  * Apply a json-set patch operation.
  *
  * Parses the file content, sets the value at the given dot-notation path,
- * then serializes back. Returns count=0 for non-JSON/YAML files.
+ * then serializes back. Returns count=0 for non-JSON/YAML/TOML files.
  *
  * @param content - File content
  * @param path - Dot-notation path (e.g. "server.port")
@@ -1510,7 +1524,7 @@ export function applyJsonSet(
   value: unknown,
   filePath: string,
 ): { content: string; count: number } {
-  if (!isJsonOrYamlFile(filePath)) {
+  if (!isStructuredDataFile(filePath)) {
     return { content, count: 0 };
   }
   try {
@@ -1528,7 +1542,7 @@ export function applyJsonSet(
  * Apply a json-delete patch operation.
  *
  * Parses the file content, deletes the key at the given dot-notation path,
- * then serializes back. Returns count=0 when path not found or non-JSON/YAML.
+ * then serializes back. Returns count=0 when path not found or non-JSON/YAML/TOML.
  *
  * @param content - File content
  * @param path - Dot-notation path to delete
@@ -1540,7 +1554,7 @@ export function applyJsonDelete(
   path: string,
   filePath: string,
 ): { content: string; count: number } {
-  if (!isJsonOrYamlFile(filePath)) {
+  if (!isStructuredDataFile(filePath)) {
     return { content, count: 0 };
   }
   try {
@@ -1561,7 +1575,7 @@ export function applyJsonDelete(
  * Apply a json-merge patch operation.
  *
  * Parses the file content, deep-merges the given object at the root or at
- * the optional path, then serializes back. Returns count=0 for non-JSON/YAML.
+ * the optional path, then serializes back. Returns count=0 for non-JSON/YAML/TOML.
  *
  * @param content - File content
  * @param value - Object to deep merge
@@ -1575,7 +1589,7 @@ export function applyJsonMerge(
   filePath: string,
   path?: string,
 ): { content: string; count: number } {
-  if (!isJsonOrYamlFile(filePath)) {
+  if (!isStructuredDataFile(filePath)) {
     return { content, count: 0 };
   }
   try {
