@@ -1210,4 +1210,228 @@ Upgrade to 2.0.0 today`;
       expect(replacePatches.length).toBe(1);
     });
   });
+
+  // ============================================================================
+  // List change detection
+  // ============================================================================
+
+  describe("list change detection", () => {
+    test("detects item added to list", () => {
+      const source = "# Title\n\n- Apple\n- Banana\n";
+      const target = "# Title\n\n- Apple\n- Banana\n- Cherry\n";
+
+      const analysis = analyzeDiff(source, target);
+
+      expect(analysis.listChanges.length).toBeGreaterThan(0);
+      const added = analysis.listChanges.find((c) => c.type === "item-added");
+      expect(added).toBeDefined();
+      expect(added?.type === "item-added" && added.newText).toBe("Cherry");
+    });
+
+    test("detects item removed from list", () => {
+      const source = "# Title\n\n- Apple\n- Banana\n- Cherry\n";
+      const target = "# Title\n\n- Apple\n- Cherry\n";
+
+      const analysis = analyzeDiff(source, target);
+
+      expect(analysis.listChanges.length).toBeGreaterThan(0);
+      const removed = analysis.listChanges.find((c) => c.type === "item-removed");
+      expect(removed).toBeDefined();
+      expect(removed?.type === "item-removed" && removed.oldText).toBe("Banana");
+    });
+
+    test("detects item modified in list", () => {
+      const source = "# Title\n\n- Apple\n- Banana\n- Cherry\n";
+      const target = "# Title\n\n- Apple\n- Mango\n- Cherry\n";
+
+      const analysis = analyzeDiff(source, target);
+
+      expect(analysis.listChanges.length).toBeGreaterThan(0);
+      const modified = analysis.listChanges.find((c) => c.type === "item-modified");
+      expect(modified).toBeDefined();
+      expect(modified?.type === "item-modified" && modified.oldText).toBe("Banana");
+      expect(modified?.type === "item-modified" && modified.newText).toBe("Mango");
+    });
+
+    test("suggests add-list-item patch for added item", () => {
+      const source = "- Alpha\n- Beta\n";
+      const target = "- Alpha\n- Beta\n- Gamma\n";
+
+      const patches = suggestPatches(source, target);
+
+      const addPatch = patches.find((p) => p.op === "add-list-item");
+      expect(addPatch).toBeDefined();
+      expect(addPatch?.op === "add-list-item" && addPatch.item).toBe("Gamma");
+      expect(addPatch?.op === "add-list-item" && addPatch.list).toBe(0);
+    });
+
+    test("suggests remove-list-item patch for removed item", () => {
+      const source = "- Alpha\n- Beta\n- Gamma\n";
+      const target = "- Alpha\n- Gamma\n";
+
+      const patches = suggestPatches(source, target);
+
+      const removePatch = patches.find((p) => p.op === "remove-list-item");
+      expect(removePatch).toBeDefined();
+      expect(removePatch?.op === "remove-list-item" && removePatch.item).toBe("Beta");
+      expect(removePatch?.op === "remove-list-item" && removePatch.list).toBe(0);
+    });
+
+    test("suggests set-list-item patch for modified item", () => {
+      const source = "- Alpha\n- Beta\n- Gamma\n";
+      const target = "- Alpha\n- Delta\n- Gamma\n";
+
+      const patches = suggestPatches(source, target);
+
+      const setPatch = patches.find((p) => p.op === "set-list-item");
+      expect(setPatch).toBeDefined();
+      expect(setPatch?.op === "set-list-item" && setPatch.item).toBe("Beta");
+      expect(setPatch?.op === "set-list-item" && setPatch.new).toBe("Delta");
+    });
+
+    test("no list changes for identical lists", () => {
+      const source = "- Alpha\n- Beta\n- Gamma\n";
+      const target = "- Alpha\n- Beta\n- Gamma\n";
+
+      const analysis = analyzeDiff(source, target);
+
+      expect(analysis.listChanges.length).toBe(0);
+    });
+
+    test("list changes scored as high confidence", () => {
+      const source = "- Alpha\n- Beta\n";
+      const target = "- Alpha\n- Gamma\n";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+
+      const listPatchScored = scored.find(
+        (s) => s.patch.op === "set-list-item" || s.patch.op === "add-list-item" || s.patch.op === "remove-list-item",
+      );
+      if (listPatchScored) {
+        expect(listPatchScored.score).toBeGreaterThanOrEqual(0.9);
+      }
+    });
+
+    test("handles multiple lists independently", () => {
+      const source = "- One\n- Two\n\nSome text.\n\n- A\n- B\n";
+      const target = "- One\n- Three\n\nSome text.\n\n- A\n- B\n- C\n";
+
+      const analysis = analyzeDiff(source, target);
+
+      // First list: item modified (Two → Three)
+      const list0Changes = analysis.listChanges.filter((c) => c.listIndex === 0);
+      expect(list0Changes.length).toBeGreaterThan(0);
+
+      // Second list: item added (C)
+      const list1Changes = analysis.listChanges.filter((c) => c.listIndex === 1);
+      expect(list1Changes.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ============================================================================
+  // Link change detection
+  // ============================================================================
+
+  describe("link change detection", () => {
+    test("detects URL change for same link text", () => {
+      const source = "See [docs](https://old.example.com/docs) for details.";
+      const target = "See [docs](https://new.example.com/docs) for details.";
+
+      const analysis = analyzeDiff(source, target);
+
+      expect(analysis.linkChanges.length).toBeGreaterThan(0);
+      const change = analysis.linkChanges.find((c) => c.urlChanged);
+      expect(change).toBeDefined();
+      expect(change?.oldUrl).toBe("https://old.example.com/docs");
+      expect(change?.urlChanged && change.newUrl).toBe("https://new.example.com/docs");
+    });
+
+    test("detects text change for same URL", () => {
+      const source = "Visit [Old Name](https://example.com) here.";
+      const target = "Visit [New Name](https://example.com) here.";
+
+      const analysis = analyzeDiff(source, target);
+
+      expect(analysis.linkChanges.length).toBeGreaterThan(0);
+      const change = analysis.linkChanges.find((c) => c.textChanged);
+      expect(change).toBeDefined();
+      expect(change?.oldText).toBe("Old Name");
+      expect(change?.textChanged && change.newText).toBe("New Name");
+    });
+
+    test("suggests modify-links patch for URL change", () => {
+      const source = "Check [guide](https://v1.example.com/guide) now.";
+      const target = "Check [guide](https://v2.example.com/guide) now.";
+
+      const patches = suggestPatches(source, target);
+
+      const linkPatch = patches.find((p) => p.op === "modify-links");
+      expect(linkPatch).toBeDefined();
+      expect(linkPatch?.op === "modify-links" && linkPatch.urlMatch).toBe("https://v1.example.com/guide");
+      expect(linkPatch?.op === "modify-links" && linkPatch.newUrl).toBe("https://v2.example.com/guide");
+    });
+
+    test("suggests modify-links patch for text change", () => {
+      const source = "See [old label](https://example.com/page).";
+      const target = "See [new label](https://example.com/page).";
+
+      const patches = suggestPatches(source, target);
+
+      const linkPatch = patches.find((p) => p.op === "modify-links");
+      expect(linkPatch).toBeDefined();
+      expect(linkPatch?.op === "modify-links" && linkPatch.textMatch).toBe("old label");
+      expect(linkPatch?.op === "modify-links" && linkPatch.newText).toBe("new label");
+    });
+
+    test("no link changes for identical links", () => {
+      const source = "See [docs](https://example.com) here.";
+      const target = "See [docs](https://example.com) here.";
+
+      const analysis = analyzeDiff(source, target);
+
+      expect(analysis.linkChanges.length).toBe(0);
+    });
+
+    test("link patches scored as high confidence", () => {
+      const source = "Read [guide](https://old.example.com).";
+      const target = "Read [guide](https://new.example.com).";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+
+      const linkPatchScored = scored.find((s) => s.patch.op === "modify-links");
+      if (linkPatchScored) {
+        expect(linkPatchScored.score).toBeGreaterThanOrEqual(0.9);
+      }
+    });
+
+    test("describePatch returns human-readable description for list ops", () => {
+      const source = "- Alpha\n- Beta\n";
+      const target = "- Alpha\n- Gamma\n";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+
+      const listPatchScored = scored.find(
+        (s) => s.patch.op === "set-list-item" || s.patch.op === "remove-list-item",
+      );
+      if (listPatchScored) {
+        expect(listPatchScored.description).toContain("list");
+      }
+    });
+
+    test("describePatch returns human-readable description for link ops", () => {
+      const source = "See [docs](https://old.example.com).";
+      const target = "See [docs](https://new.example.com).";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+
+      const linkPatchScored = scored.find((s) => s.patch.op === "modify-links");
+      if (linkPatchScored) {
+        expect(linkPatchScored.description).toContain("link");
+      }
+    });
+  });
 });

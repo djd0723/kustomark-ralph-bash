@@ -1,10 +1,26 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (Suggest List & Link Op Detection - COMPLETE!):**
+
+* ✅ **`suggest` command now detects list item changes**: When items are added, removed, or modified in a markdown list between source and target, the command generates `add-list-item`, `remove-list-item`, or `set-list-item` patches instead of falling back to generic `replace` ops
+* ✅ **`suggest` command now detects link changes**: When a link's URL or display text changes between source and target, the command generates a `modify-links` patch with `urlMatch`/`newUrl` or `textMatch`/`newText` as appropriate
+* ✅ **High confidence scoring**: List and link patches are scored at 0.9 (same as section and frontmatter ops) since they are structurally precise
+* ✅ **17 new tests**: Full coverage of `analyzeDiff` list/link fields, `suggestPatches` output, multi-list independence, identical content (no false positives), and `describePatch` descriptions
+* ✅ **3,971 tests passing**: Up from 3,954
+
+**Files modified:**
+* `src/core/patch-suggester.ts` — added `ListItemChange`/`LinkChange` discriminated union types; `analyzeListChanges`, `analyzeLinkChanges`, `diffStringArrays`, `extractLinks`, `suggestListPatches`, `suggestLinkPatches` functions; updated `DiffAnalysis`, `suggestPatches`, `calculatePatchScore`, `describePatch`
+* `tests/core/patch-suggester.test.ts` — 17 new tests in `list change detection` and `link change detection` suites
+
+**Status:** Suggest list & link op detection COMPLETE! ✅
+
+***
 
 **2026-04-09 (LSP Full Op Coverage - COMPLETE!):**
 

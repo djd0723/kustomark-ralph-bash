@@ -6,8 +6,49 @@
  */
 
 import * as Diff from "diff";
+import { parseLists } from "./list-parser.js";
 import { parseFrontmatter, parseSections } from "./patch-engine.js";
 import type { PatchOperation } from "./types.js";
+
+/** A list item that was added */
+type ListItemAdded = { listIndex: number; type: "item-added"; itemIndex: number; newText: string };
+/** A list item that was removed */
+type ListItemRemoved = {
+  listIndex: number;
+  type: "item-removed";
+  itemIndex: number;
+  oldText: string;
+};
+/** A list item that was modified */
+type ListItemModified = {
+  listIndex: number;
+  type: "item-modified";
+  itemIndex: number;
+  oldText: string;
+  newText: string;
+};
+/** A list change event */
+type ListItemChange = ListItemAdded | ListItemRemoved | ListItemModified;
+
+/** A link whose URL changed */
+type LinkUrlChanged = {
+  oldUrl: string;
+  newUrl: string;
+  oldText: string;
+  urlChanged: true;
+  textChanged: false;
+};
+/** A link whose text changed */
+type LinkTextChanged = {
+  oldUrl: string;
+  newUrl: undefined;
+  oldText: string;
+  newText: string;
+  urlChanged: false;
+  textChanged: true;
+};
+/** A link change event */
+type LinkChange = LinkUrlChanged | LinkTextChanged;
 
 /**
  * Analysis of differences between source and target content
@@ -41,6 +82,10 @@ export interface DiffAnalysis {
   }>;
   /** Whether the content has frontmatter */
   hasFrontmatter: boolean;
+  /** Changes detected in lists */
+  listChanges: Array<ListItemChange>;
+  /** Changes detected in markdown links */
+  linkChanges: Array<LinkChange>;
 }
 
 /**
@@ -74,6 +119,8 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
     },
     sectionChanges: [],
     hasFrontmatter: false,
+    listChanges: [],
+    linkChanges: [],
   };
 
   // Analyze frontmatter changes
@@ -94,6 +141,12 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
   const sourceSections = parseSections(source);
   const targetSections = parseSections(target);
   analysis.sectionChanges = analyzeSectionChanges(sourceSections, targetSections, source, target);
+
+  // Analyze list changes
+  analysis.listChanges = analyzeListChanges(source, target);
+
+  // Analyze link changes
+  analysis.linkChanges = analyzeLinkChanges(source, target);
 
   // Analyze line-by-line changes using the diff library
   const changes = Diff.diffLines(source, target);
@@ -379,6 +432,208 @@ function areSimilarLines(line1: string, line2: string): boolean {
 }
 
 /**
+ * Analyzes list-level changes between source and target
+ */
+function analyzeListChanges(source: string, target: string): DiffAnalysis["listChanges"] {
+  const changes: DiffAnalysis["listChanges"] = [];
+  const sourceLists = parseLists(source);
+  const targetLists = parseLists(target);
+
+  // Match lists by index
+  const matchCount = Math.min(sourceLists.length, targetLists.length);
+  for (let listIdx = 0; listIdx < matchCount; listIdx++) {
+    const srcList = sourceLists[listIdx];
+    const tgtList = targetLists[listIdx];
+    if (srcList === undefined || tgtList === undefined) continue;
+
+    const srcItems = srcList.items.map((i) => i.text);
+    const tgtItems = tgtList.items.map((i) => i.text);
+
+    for (const d of diffStringArrays(srcItems, tgtItems)) {
+      changes.push({ listIndex: listIdx, ...d });
+    }
+  }
+
+  return changes;
+}
+
+/**
+ * Diffs two string arrays and returns change descriptors.
+ * Uses a simple greedy approach: exact matches anchor the diff,
+ * then unmatched source items are "removed" and unmatched target
+ * items are "added". If counts are equal and items differ, they
+ * are treated as "modified".
+ */
+function diffStringArrays(
+  srcItems: string[],
+  tgtItems: string[],
+): Array<
+  | { type: "item-added"; itemIndex: number; newText: string }
+  | { type: "item-removed"; itemIndex: number; oldText: string }
+  | { type: "item-modified"; itemIndex: number; oldText: string; newText: string }
+> {
+  const results: Array<
+    | { type: "item-added"; itemIndex: number; newText: string }
+    | { type: "item-removed"; itemIndex: number; oldText: string }
+    | { type: "item-modified"; itemIndex: number; oldText: string; newText: string }
+  > = [];
+
+  const srcSet = new Set(srcItems);
+  const tgtSet = new Set(tgtItems);
+
+  const removed = srcItems.filter((item) => !tgtSet.has(item));
+  const added = tgtItems.filter((item) => !srcSet.has(item));
+
+  // Pair up removed+added as modifications when counts match
+  if (removed.length === added.length && removed.length > 0) {
+    for (let i = 0; i < removed.length; i++) {
+      const oldText = removed[i];
+      const newText = added[i];
+      if (oldText === undefined || newText === undefined) continue;
+      results.push({
+        type: "item-modified",
+        itemIndex: srcItems.indexOf(oldText),
+        oldText,
+        newText,
+      });
+    }
+    return results;
+  }
+
+  for (const item of added) {
+    results.push({ type: "item-added", itemIndex: tgtItems.indexOf(item), newText: item });
+  }
+
+  for (const item of removed) {
+    results.push({ type: "item-removed", itemIndex: srcItems.indexOf(item), oldText: item });
+  }
+
+  return results;
+}
+
+/**
+ * Analyzes link changes between source and target content
+ */
+function analyzeLinkChanges(source: string, target: string): DiffAnalysis["linkChanges"] {
+  const changes: DiffAnalysis["linkChanges"] = [];
+
+  const srcLinks = extractLinks(source);
+  const tgtLinks = extractLinks(target);
+
+  const srcByText = new Map(srcLinks.map((l) => [l.text, l.url]));
+  const tgtByText = new Map(tgtLinks.map((l) => [l.text, l.url]));
+  const srcByUrl = new Map(srcLinks.map((l) => [l.url, l.text]));
+  const tgtByUrl = new Map(tgtLinks.map((l) => [l.url, l.text]));
+
+  // URL changed for same link text
+  for (const [text, oldUrl] of srcByText) {
+    const newUrl = tgtByText.get(text);
+    if (newUrl !== undefined && newUrl !== oldUrl) {
+      changes.push({ oldUrl, newUrl, oldText: text, urlChanged: true, textChanged: false });
+    }
+  }
+
+  // Text changed for same URL
+  for (const [url, oldText] of srcByUrl) {
+    const newText = tgtByUrl.get(url);
+    if (newText !== undefined && newText !== oldText) {
+      // Avoid duplicate if already recorded as URL change
+      const alreadyRecorded = changes.some((c) => c.urlChanged && c.oldUrl === url);
+      if (!alreadyRecorded) {
+        changes.push({
+          oldUrl: url,
+          newUrl: undefined,
+          oldText,
+          newText,
+          urlChanged: false,
+          textChanged: true,
+        });
+      }
+    }
+  }
+
+  return changes;
+}
+
+/** A parsed markdown inline link */
+interface ParsedLink {
+  text: string;
+  url: string;
+}
+
+/** Extract all inline markdown links from content */
+function extractLinks(content: string): ParsedLink[] {
+  const links: ParsedLink[] = [];
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  for (const match of content.matchAll(linkRegex)) {
+    const text = match[1];
+    const url = match[2];
+    if (text !== undefined && url !== undefined) {
+      links.push({ text, url });
+    }
+  }
+  return links;
+}
+
+/**
+ * Suggests list-related patches
+ */
+function suggestListPatches(analysis: DiffAnalysis): PatchOperation[] {
+  const patches: PatchOperation[] = [];
+
+  for (const change of analysis.listChanges) {
+    if (change.type === "item-added") {
+      patches.push({
+        op: "add-list-item",
+        list: change.listIndex,
+        item: change.newText,
+        position: change.itemIndex,
+      });
+    } else if (change.type === "item-removed") {
+      patches.push({
+        op: "remove-list-item",
+        list: change.listIndex,
+        item: change.oldText,
+      });
+    } else {
+      patches.push({
+        op: "set-list-item",
+        list: change.listIndex,
+        item: change.oldText,
+        new: change.newText,
+      });
+    }
+  }
+
+  return patches;
+}
+
+/**
+ * Suggests link-related patches
+ */
+function suggestLinkPatches(analysis: DiffAnalysis): PatchOperation[] {
+  const patches: PatchOperation[] = [];
+
+  for (const change of analysis.linkChanges) {
+    if (change.urlChanged) {
+      patches.push({
+        op: "modify-links",
+        urlMatch: change.oldUrl,
+        newUrl: change.newUrl,
+      });
+    } else {
+      patches.push({
+        op: "modify-links",
+        textMatch: change.oldText,
+        newText: change.newText,
+      });
+    }
+  }
+
+  return patches;
+}
+
+/**
  * Suggests patch operations based on diff analysis
  *
  * @param source - Original content
@@ -394,6 +649,12 @@ export function suggestPatches(source: string, target: string): PatchOperation[]
 
   // Suggest section patches
   patches.push(...suggestSectionPatches(analysis));
+
+  // Suggest list patches
+  patches.push(...suggestListPatches(analysis));
+
+  // Suggest link patches
+  patches.push(...suggestLinkPatches(analysis));
 
   // Suggest line-based patches
   patches.push(...suggestLinePatches(analysis, source, target));
@@ -817,6 +1078,20 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     score = 0.75;
   }
 
+  // List operations are high confidence
+  if (
+    patch.op === "add-list-item" ||
+    patch.op === "remove-list-item" ||
+    patch.op === "set-list-item"
+  ) {
+    score = 0.9;
+  }
+
+  // Link operations are high confidence
+  if (patch.op === "modify-links") {
+    score = 0.9;
+  }
+
   // Line operations are lower confidence
   if (
     patch.op === "replace-line" ||
@@ -860,6 +1135,20 @@ function describePatch(patch: PatchOperation): string {
 
     case "replace-line":
       return `Replace line "${truncate(patch.match, 30)}"`;
+
+    case "add-list-item":
+      return `Add list item "${truncate(String(patch.item), 30)}" to list ${patch.list}`;
+
+    case "remove-list-item":
+      return `Remove list item "${truncate(String(patch.item), 30)}" from list ${patch.list}`;
+
+    case "set-list-item":
+      return `Update list item "${truncate(String(patch.item), 30)}" in list ${patch.list}`;
+
+    case "modify-links":
+      if (patch.urlMatch) return `Update link URL "${truncate(patch.urlMatch, 40)}"`;
+      if (patch.textMatch) return `Update link text "${truncate(patch.textMatch, 40)}"`;
+      return "Modify links";
 
     default:
       return `Apply ${patch.op} operation`;
