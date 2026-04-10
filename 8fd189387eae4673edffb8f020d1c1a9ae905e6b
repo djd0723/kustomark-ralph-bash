@@ -1,0 +1,29 @@
+src/core/patch-suggester.ts
+  91c0343490cbbdab 10,2683-2685
+tests/cli/suggest.test.ts
+  91c0343490cbbdab 1380-1553
+IMPLEMENTATION_PLAN.md
+  91c0343490cbbdab 3,9-30
+src/cli/suggest-command.ts
+  91c0343490cbbdab 58,346-348
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "8fd189387eae4673edffb8f020d1c1a9ae905e6b",
+  "prompts": {
+    "91c0343490cbbdab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef604f97-6bf8-48e8-8be3-29f72909884b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 206,
+      "total_deletions": 5,
+      "accepted_lines": 205,
+      "overriden_lines": 0
+    }
+  }
+}
