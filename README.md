@@ -2892,6 +2892,82 @@ More content.
 - `adjustChildren: true` adjusts all subsections by the same amount
 - Header levels are clamped to valid range (1-6)
 
+### `insert-section` - Insert a New Section
+
+Insert a brand-new section (header + optional body) before or after an existing section.
+
+```yaml
+- op: insert-section
+  id: installation          # reference section slug (required)
+  position: after           # "before" or "after" (default: "after")
+  header: "## Quick Start"  # new section header line (required)
+  content: |                # optional body content
+    Quick start content here.
+```
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | yes | Reference section ID (GitHub-style slug or `{#custom-id}`) |
+| `header` | yes | Full header line for the new section (e.g. `"## New Section"`) |
+| `position` | no | `"after"` (default) or `"before"` — where to insert relative to reference |
+| `content` | no | Body text for the new section |
+
+**Example — add a Quick Start after Installation:**
+
+Input:
+```markdown
+## Installation
+
+Install instructions.
+
+## Usage
+
+Usage instructions.
+```
+
+```yaml
+- op: insert-section
+  id: installation
+  header: "## Quick Start"
+  content: |
+    Run `npm install` then `npm start`.
+```
+
+Output:
+```markdown
+## Installation
+
+Install instructions.
+
+## Quick Start
+
+Run `npm install` then `npm start`.
+
+## Usage
+
+Usage instructions.
+```
+
+**Example — insert a License section before Contributing:**
+
+```yaml
+- op: insert-section
+  id: contributing
+  position: before
+  header: "## License"
+  content: |
+    MIT License. See [LICENSE](LICENSE) for details.
+```
+
+**Notes:**
+- Returns `count=0` (triggers `onNoMatch`) if the reference section is not found
+- The `header` field must be a valid markdown heading (e.g. `## Title`, `### Sub`)
+- Heading level in `header` is independent of the reference section's level
+- To insert at the start of a document, use `position: before` with the first section's ID
+- To append at the end, use `position: after` with the last section's ID
+
 ## Frontmatter Operations
 
 Frontmatter operations allow you to manipulate YAML frontmatter at the beginning of markdown files. These operations support dot notation for nested keys (e.g., `metadata.author`).

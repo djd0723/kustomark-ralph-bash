@@ -372,6 +372,21 @@ export interface ChangeSectionLevelPatch extends PatchCommonFields {
 }
 
 /**
+ * Insert section operation - inserts a new section before or after a reference section
+ */
+export interface InsertSectionPatch extends PatchCommonFields {
+  op: "insert-section";
+  /** Reference section ID (GitHub-style slug or explicit {#custom-id}) */
+  id: string;
+  /** Position relative to reference section: "before" or "after" (default: "after") */
+  position?: "before" | "after";
+  /** The new section header line (e.g. "## New Section") */
+  header: string;
+  /** Optional body content for the new section */
+  content?: string;
+}
+
+/**
  * Copy file operation - copies a file to a new location
  */
 export interface CopyFilePatch extends PatchCommonFields {
@@ -764,6 +779,7 @@ export type PatchOperation =
   | MoveSectionPatch
   | RenameHeaderPatch
   | ChangeSectionLevelPatch
+  | InsertSectionPatch
   | CopyFilePatch
   | RenameFilePatch
   | DeleteFilePatch

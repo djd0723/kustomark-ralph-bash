@@ -1535,6 +1535,73 @@ export function generateSchema(): object {
             },
             {
               type: "object",
+              required: ["op", "id", "header"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "insert-section",
+                  description: "Insert a new section before or after a reference section",
+                },
+                id: {
+                  type: "string",
+                  description: "Reference section ID (GitHub-style slug or explicit {#custom-id})",
+                },
+                position: {
+                  type: "string",
+                  enum: ["before", "after"],
+                  description:
+                    'Where to insert relative to the reference section (default: "after")',
+                },
+                header: {
+                  type: "string",
+                  description: 'The new section header line (e.g. "## New Section")',
+                },
+                content: {
+                  type: "string",
+                  description: "Optional body content for the new section",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
+                },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
               required: ["op", "id", "new"],
               properties: {
                 op: {

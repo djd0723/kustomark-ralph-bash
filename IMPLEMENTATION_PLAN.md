@@ -1,8 +1,59 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-09 (insert-section - COMPLETE!):**
+
+* ✅ **`insert-section`**: New patch operation — insert a brand-new section (header + optional body) before or after an existing reference section
+* ✅ **TWO POSITIONS**: `position: "after"` (default) and `position: "before"` relative to the reference section
+* ✅ **OPTIONAL CONTENT**: `header` is required; `content` is optional body text
+* ✅ **GRACEFUL MISS**: Returns `count=0` (triggers `onNoMatch`) when the reference section is not found
+* ✅ **CUSTOM IDs**: Works with both GitHub-style slugs and explicit `{#custom-id}` identifiers
+* ✅ **FULL INTEGRATION**: schema, validOps, config validation, LSP completions (op + field level)
+* ✅ **28 NEW TESTS PASSING**: Unit tests for all cases (after, before, not-found, custom ID, formatting), integration via `applyPatches`, and config validation
+* ✅ **3,932 TESTS PASSING**: All tests pass with 0 failures
+* ✅ **README UPDATED**: New `insert-section` section under Section Operations with field table, examples, and notes
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   patches:
+     # Insert a Quick Start section after Installation
+     - op: insert-section
+       id: installation
+       header: "## Quick Start"
+       content: |
+         Run `npm install` then `npm start`.
+
+     # Insert a License section before Contributing
+     - op: insert-section
+       id: contributing
+       position: before
+       header: "## License"
+       content: |
+         MIT License. See LICENSE for details.
+   ```
+
+2. **Rationale**: The section operation suite (`remove-section`, `replace-section`, `prepend-to-section`, `append-to-section`, `move-section`, `rename-header`, `change-section-level`, `replace-in-section`) all operate on *existing* sections. `insert-section` fills the gap by allowing users to *add* entirely new sections at specific positions — a fundamental authoring operation missing from the suite.
+
+3. **Implementation Files**
+   * `src/core/types.ts` — Added `InsertSectionPatch` interface; added to `PatchOperation` union
+   * `src/core/patch-engine.ts` — Added `applyInsertSection()` function; wired into `applySinglePatch()` and `getPatchDescription()`
+   * `src/core/schema.ts` — Added JSON Schema definition for `insert-section` with all common fields
+   * `src/core/config-parser.ts` — Added `insert-section` to `validOps`; added required field checks for `id`, `header`; added `position` and `content` validation; added to `sectionOps` arrays
+   * `src/core/index.ts` — Exported `applyInsertSection` and `InsertSectionPatch`
+   * `src/lsp/completion.ts` — Added op-level and field-level completions (`id`, `position`, `header`, `content`); bumped op count assertion 34 → 35
+   * `src/core/patch-engine.insert-section.test.ts` — 28 tests (unit: after/before/not-found/custom-id/formatting, integration via `applyPatches`, config validation)
+   * `README.md` — New `insert-section` section under Section Operations with field table, two examples, and notes
+
+**Status:** insert-section COMPLETE! ✅
+
+---
 
 ## Recent Enhancements
 

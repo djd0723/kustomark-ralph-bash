@@ -522,6 +522,13 @@ export class CompletionProvider {
         insertText: "move-section",
       },
       {
+        label: "insert-section",
+        kind: CompletionItemKind.Value,
+        detail: "Insert new section",
+        documentation: "Insert a new section before or after a reference section",
+        insertText: "insert-section",
+      },
+      {
         label: "rename-header",
         kind: CompletionItemKind.Value,
         detail: "Rename section header",
@@ -1041,6 +1048,36 @@ export class CompletionProvider {
           detail: "Target section",
           documentation: "The ID of the section to move after",
           insertText: "after: ",
+        },
+      ],
+      "insert-section": [
+        {
+          label: "id",
+          kind: CompletionItemKind.Field,
+          detail: "Reference section ID",
+          documentation: "The ID of the section to insert before/after",
+          insertText: "id: ",
+        },
+        {
+          label: "position",
+          kind: CompletionItemKind.Field,
+          detail: "Insert position",
+          documentation: 'Where to insert: "before" or "after" (default: "after")',
+          insertText: "position: after",
+        },
+        {
+          label: "header",
+          kind: CompletionItemKind.Field,
+          detail: "New section header",
+          documentation: 'The header line for the new section (e.g. "## New Section")',
+          insertText: "header: ",
+        },
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "Section body content",
+          documentation: "Optional body content for the new section",
+          insertText: "content: |\\n  ",
         },
       ],
       "rename-header": [

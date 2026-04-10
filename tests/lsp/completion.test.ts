@@ -310,7 +310,7 @@ patches:
       expect(labels).toContain('modify-links');
       expect(labels).toContain('update-toc');
 
-      expect(labels).toHaveLength(34);
+      expect(labels).toHaveLength(35);
     });
 
     test('provides operations with partial input', () => {
@@ -607,7 +607,7 @@ patches:
       const labels = getLabels(completions);
 
       expect(labels).toContain('replace');
-      expect(labels.length).toBe(34); // All operations (22 original + 7 list operations + 2 AST operations)
+      expect(labels.length).toBe(35); // All operations (22 original + 7 list operations + 2 AST operations)
     });
 
     test('handles position at end of line with onNoMatch field', () => {
@@ -689,7 +689,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide completions for client filtering
-      expect(completions.length).toBe(34);
+      expect(completions.length).toBe(35);
     });
 
     test('returns empty array for unknown context', () => {
@@ -729,7 +729,7 @@ resources:
 
       const completions = provider.provideCompletions(doc, position);
 
-      expect(completions.length).toBe(34);
+      expect(completions.length).toBe(35);
     });
 
     test('triggers completions mid-line with indentation', () => {
@@ -756,7 +756,7 @@ resources:
         const completions = provider.provideCompletions(doc, position);
 
         // Should get operation completions (29 total: 22 original + 7 list operations)
-        expect(completions.length).toBe(34);
+        expect(completions.length).toBe(35);
       }
     });
   });
@@ -1026,7 +1026,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide operation completions
-      expect(completions.length).toBe(34);
+      expect(completions.length).toBe(35);
     });
 
     test('handles cursor at document end', () => {

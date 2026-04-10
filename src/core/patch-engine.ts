@@ -1258,6 +1258,63 @@ export function applyChangeSectionLevel(
 }
 
 /**
+ * Apply an insert-section patch operation
+ *
+ * Inserts a new section (header + optional content) before or after a reference section.
+ *
+ * @param content - The markdown content
+ * @param id - Reference section ID (slug)
+ * @param header - New section header line (e.g. "## New Section")
+ * @param position - "before" or "after" (default: "after")
+ * @param sectionContent - Optional body content
+ * @returns Object with patched content and count (1 if inserted, 0 if reference not found)
+ */
+export function applyInsertSection(
+  content: string,
+  id: string,
+  header: string,
+  position: "before" | "after" = "after",
+  sectionContent?: string,
+): { content: string; count: number } {
+  const sections = parseSections(content);
+  const refSection = findSection(sections, id);
+
+  if (!refSection) {
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+
+  // Build new section lines
+  const newLines: string[] = [header];
+  if (sectionContent) {
+    // Add a blank line after header, then content
+    newLines.push("");
+    // Split content into lines, preserving trailing newline behavior
+    const contentLines = sectionContent.split("\n");
+    // Remove trailing empty line if present (will be re-added as separator)
+    if (contentLines[contentLines.length - 1] === "") {
+      contentLines.pop();
+    }
+    newLines.push(...contentLines);
+  }
+  // Add blank line after section for separation
+  newLines.push("");
+
+  let insertAt: number;
+  if (position === "before") {
+    insertAt = refSection.startLine;
+  } else {
+    // "after" — insert at the end of the reference section
+    insertAt = refSection.endLine;
+  }
+
+  lines.splice(insertAt, 0, ...newLines);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply a replace-table-cell patch operation
  *
  * @param content - The content to patch
@@ -3222,6 +3279,16 @@ export async function applySinglePatch(
       result = applyChangeSectionLevel(content, patch.id, patch.delta);
       break;
 
+    case "insert-section":
+      result = applyInsertSection(
+        content,
+        patch.id,
+        patch.header,
+        patch.position ?? "after",
+        patch.content,
+      );
+      break;
+
     case "replace-table-cell":
       result = applyReplaceTableCell(content, patch.table, patch.row, patch.column, patch.content);
       break;
@@ -3553,6 +3620,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `move-section '${patch.id}' after '${patch.after}'`;
     case "change-section-level":
       return `change-section-level '${patch.id}' by ${patch.delta}`;
+    case "insert-section":
+      return `Insert section "${patch.header}" ${patch.position ?? "after"} "${patch.id}"`;
     case "replace-table-cell":
       return `replace-table-cell in table '${patch.table}' at row ${typeof patch.row === "number" ? patch.row : JSON.stringify(patch.row)} column '${patch.column}'`;
     case "add-table-row":

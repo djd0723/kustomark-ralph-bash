@@ -725,6 +725,7 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "rename-header",
     "move-section",
     "change-section-level",
+    "insert-section",
     "copy-file",
     "rename-file",
     "delete-file",
@@ -1515,6 +1516,35 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
       }
       break;
 
+    case "insert-section": {
+      if (!p.id || typeof p.id !== "string") {
+        errors.push({
+          field: `${prefix}.id`,
+          message: "insert-section operation requires 'id' field (section slug)",
+        });
+      }
+      if (!p.header || typeof p.header !== "string") {
+        errors.push({
+          field: `${prefix}.header`,
+          message: "insert-section operation requires 'header' field (e.g. '## New Section')",
+        });
+      }
+      const pRec = p as Record<string, unknown>;
+      if (pRec.position !== undefined && pRec.position !== "before" && pRec.position !== "after") {
+        errors.push({
+          field: `${prefix}.position`,
+          message: '\'position\' must be "before" or "after"',
+        });
+      }
+      if (pRec.content !== undefined && typeof pRec.content !== "string") {
+        errors.push({
+          field: `${prefix}.content`,
+          message: "'content' must be a string",
+        });
+      }
+      break;
+    }
+
     case "modify-links": {
       const hasMatch =
         p.urlMatch !== undefined ||
@@ -1814,6 +1844,7 @@ function validatePatchIds(patches: unknown[]): ValidationError[] {
       "move-section",
       "rename-header",
       "change-section-level",
+      "insert-section",
     ];
     if (p.op && typeof p.op === "string" && sectionOps.includes(p.op)) {
       // For section operations, check patchId instead
@@ -1915,6 +1946,7 @@ function validateInheritanceReferences(patches: unknown[]): ValidationError[] {
     "move-section",
     "rename-header",
     "change-section-level",
+    "insert-section",
   ];
 
   patches.forEach((patch, index) => {
