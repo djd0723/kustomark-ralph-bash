@@ -1,10 +1,30 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest delete-file detection for source-only files - COMPLETE!):**
+
+* ✅ **`suggest` now detects deleted files**: When comparing directories, files that exist in the source but not in the target are now detected and suggested as `delete-file` patches (instead of being silently skipped).
+* ✅ **`matchFiles` returns source-only paths**: The internal `matchFiles` function now returns both matched `pairs` and `sourceOnlyPaths` (files in source with no corresponding target file).
+* ✅ **`delete-file` patches carry no `include` filter**: Unlike per-file content patches, `delete-file` patches target a specific file via `match` and do not need an `include` scoping pattern.
+* ✅ **High-confidence scoring**: `delete-file` patches are scored at 0.9 (explicit file operation — already handled by `calculatePatchScore`).
+* ✅ **`stats.filesDeleted` field**: The JSON output's `stats` object now includes `filesDeleted` reporting how many source-only files were detected.
+* ✅ **Handles all-deleted directories**: When all source files are absent from the target (zero matched pairs), the command now succeeds and reports only `delete-file` patches rather than throwing "No matching files found".
+* ✅ **3 new tests**: `suggests delete-file for files only in source` (patch shape, no include, filesDeleted count), `delete-file patch has high confidence score` (score=0.9, description contains filename), `suggest works with only source-only files` (zero pairs, two delete patches, correct match values).
+* ✅ **4,151 tests passing**: Up from 4,149.
+
+**Files modified:**
+
+* `src/cli/suggest-command.ts` — Added `MatchResult` interface; rewrote `matchFiles` to return `{ pairs, sourceOnlyPaths }`; updated `suggestCommand` to destructure, log, generate and score `delete-file` patches; added `filesDeleted` to `SuggestResult.stats`; updated `outputText` to print `filesDeleted` when > 0.
+* `tests/cli/suggest.test.ts` — Replaced "files only in one directory are skipped" test with `suggests delete-file for files only in source`; added `delete-file patch has high confidence score`; added `suggest works with only source-only files`.
+
+**Status:** suggest delete-file detection COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest update-toc detection + full describePatch/scorePatches coverage - COMPLETE!):**
 

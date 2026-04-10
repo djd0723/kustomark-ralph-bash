@@ -30,6 +30,7 @@ export interface SuggestResult {
   scoredPatches: ScoredPatch[];
   stats: {
     filesAnalyzed: number;
+    filesDeleted: number;
     patchesGenerated: number;
     confidence: "high" | "medium" | "low";
   };
@@ -80,11 +81,19 @@ function findMarkdownFiles(dir: string): string[] {
   return files;
 }
 
+interface MatchResult {
+  pairs: FilePair[];
+  sourceOnlyPaths: string[];
+}
+
 /**
- * Match files between source and target directories by relative path
+ * Match files between source and target directories by relative path.
+ * Returns matched pairs and paths of files that exist only in source
+ * (candidates for delete-file patches).
  */
-function matchFiles(sourcePath: string, targetPath: string): FilePair[] {
+function matchFiles(sourcePath: string, targetPath: string): MatchResult {
   const pairs: FilePair[] = [];
+  const sourceOnlyPaths: string[] = [];
 
   const sourceIsDir = statSync(sourcePath).isDirectory();
   const targetIsDir = statSync(targetPath).isDirectory();
@@ -108,7 +117,7 @@ function matchFiles(sourcePath: string, targetPath: string): FilePair[] {
       targetMap.set(relPath, targetFile);
     }
 
-    // Match source files with target files
+    // Match source files with target files; track source-only files
     for (const sourceFile of sourceFiles) {
       const relPath = relative(sourcePath, sourceFile);
       const matchingTarget = targetMap.get(relPath);
@@ -119,13 +128,15 @@ function matchFiles(sourcePath: string, targetPath: string): FilePair[] {
           sourcePath: sourceFile,
           targetPath: matchingTarget,
         });
+      } else {
+        sourceOnlyPaths.push(relPath);
       }
     }
   } else {
     throw new Error("Source and target must both be files or both be directories");
   }
 
-  return pairs;
+  return { pairs, sourceOnlyPaths };
 }
 
 // ============================================================================
@@ -297,6 +308,9 @@ function outputText(result: SuggestResult, options: CLIOptions): void {
   if (options.verbosity && options.verbosity >= 1) {
     console.log("\nStatistics:");
     console.log(`  Files analyzed: ${result.stats.filesAnalyzed}`);
+    if (result.stats.filesDeleted > 0) {
+      console.log(`  Files deleted (source-only): ${result.stats.filesDeleted}`);
+    }
     console.log(`  Patches generated: ${result.stats.patchesGenerated}`);
     console.log(`  Confidence: ${result.stats.confidence}`);
   }
@@ -374,18 +388,31 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       console.log("Matching files...\n");
     }
 
-    const filePairs = matchFiles(sourcePath, targetPath);
+    const { pairs: filePairs, sourceOnlyPaths } = matchFiles(sourcePath, targetPath);
 
-    if (filePairs.length === 0) {
+    if (filePairs.length === 0 && sourceOnlyPaths.length === 0) {
       throw new Error("No matching files found between source and target");
     }
 
     if (verbosity >= 2) {
       console.log(`Found ${filePairs.length} file pair(s) to analyze\n`);
+      if (sourceOnlyPaths.length > 0) {
+        console.log(
+          `Found ${sourceOnlyPaths.length} file(s) only in source (will suggest delete-file)\n`,
+        );
+      }
     }
 
     // Analyze files and generate patches
     const { patches, scoredPatches, filesAnalyzed } = analyzeFilePairs(filePairs, opts);
+
+    // Generate delete-file patches for files only in source (deleted in target)
+    for (const relPath of sourceOnlyPaths) {
+      const deletePatch = { op: "delete-file" as const, match: relPath };
+      patches.push(deletePatch);
+      const [scored] = scorePatches([deletePatch], "", "");
+      if (scored) scoredPatches.push(scored);
+    }
 
     // Generate configuration
     const config = generateConfig(sourcePath, patches);
@@ -398,6 +425,7 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       scoredPatches,
       stats: {
         filesAnalyzed,
+        filesDeleted: sourceOnlyPaths.length,
         patchesGenerated: patches.length,
         confidence,
       },

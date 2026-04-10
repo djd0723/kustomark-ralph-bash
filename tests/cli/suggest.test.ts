@@ -303,17 +303,17 @@ Maximum 1000 requests per hour.`;
     expect(nestedPatch).toBeDefined();
   });
 
-  test("handle files that don't exist in both directories", () => {
+  test("suggests delete-file for files only in source", () => {
     const sourceDir = join(testDir, "source");
     const targetDir = join(testDir, "target");
 
     mkdirSync(sourceDir, { recursive: true });
     mkdirSync(targetDir, { recursive: true });
 
-    // File only in source
+    // File only in source (deleted in target)
     writeFileSync(join(sourceDir, "only-source.md"), "# Only in source");
 
-    // File only in target
+    // File only in target (added in target — no suggestion possible)
     writeFileSync(join(targetDir, "only-target.md"), "# Only in target");
 
     // Files in both (need at least 2 for include patterns to be added)
@@ -330,14 +330,71 @@ Maximum 1000 requests per hour.`;
 
     expect(output.config.patches).toBeDefined();
     expect(output.stats.filesAnalyzed).toBe(2);
+    expect(output.stats.filesDeleted).toBe(1);
 
-    // Should only include patches for files that exist in both directories
+    // Should generate a delete-file patch for the source-only file
+    const deleteFilePatch = output.config.patches.find((p: any) => p.op === "delete-file");
+    expect(deleteFilePatch).toBeDefined();
+    expect(deleteFilePatch.match).toBe("only-source.md");
+
+    // delete-file patches should not carry an include filter
+    expect(deleteFilePatch.include).toBeUndefined();
+
+    // Content patches for matched files should still use include patterns
     const bothPatch = output.config.patches.find((p: any) => p.include && p.include.includes("both.md"));
     expect(bothPatch).toBeDefined();
+  });
 
-    // Files only in one directory are skipped (not included in patches)
-    const onlySourcePatch = output.config.patches.find((p: any) => p.include && p.include.includes("only-source.md"));
-    expect(onlySourcePatch).toBeUndefined();
+  test("delete-file patch has high confidence score", () => {
+    const sourceDir = join(testDir, "source-del-score");
+    const targetDir = join(testDir, "target-del-score");
+
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
+
+    // File only in source
+    writeFileSync(join(sourceDir, "removed.md"), "# Removed");
+    // At least one matching file so the command doesn't error
+    writeFileSync(join(sourceDir, "kept.md"), "# Kept\n\nSame.");
+    writeFileSync(join(targetDir, "kept.md"), "# Kept\n\nSame.");
+
+    const result = execSync(`${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`, {
+      encoding: "utf-8",
+    });
+
+    const output = JSON.parse(result);
+
+    const deleteScored = output.scoredPatches.find((sp: any) => sp.patch.op === "delete-file");
+    expect(deleteScored).toBeDefined();
+    expect(deleteScored.score).toBe(0.9);
+    expect(deleteScored.description).toContain("removed.md");
+  });
+
+  test("suggest works with only source-only files (no matched pairs)", () => {
+    const sourceDir = join(testDir, "source-only-dir");
+    const targetDir = join(testDir, "target-only-dir");
+
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
+
+    // Only source files — all deleted in target
+    writeFileSync(join(sourceDir, "deleted1.md"), "# Deleted 1");
+    writeFileSync(join(sourceDir, "deleted2.md"), "# Deleted 2");
+
+    const result = execSync(`${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`, {
+      encoding: "utf-8",
+    });
+
+    const output = JSON.parse(result);
+
+    expect(output.stats.filesAnalyzed).toBe(0);
+    expect(output.stats.filesDeleted).toBe(2);
+
+    const deletePatches = output.config.patches.filter((p: any) => p.op === "delete-file");
+    expect(deletePatches).toHaveLength(2);
+
+    const matchValues = deletePatches.map((p: any) => p.match).sort();
+    expect(matchValues).toEqual(["deleted1.md", "deleted2.md"]);
   });
 
   // ============================================================================
