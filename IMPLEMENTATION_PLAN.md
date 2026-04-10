@@ -1,6 +1,6 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
@@ -7745,3 +7745,62 @@ This high-value feature enables users to leverage shell commands and custom scri
 - ✅ TypeScript compilation clean
 
 **Status:** Build History API Migration COMPLETE! ✅
+
+---
+
+**2026-04-09 (Word Count & Line Count Validators - COMPLETE!):**
+
+* ✅ **Word count and line count validators**: New validator fields for both global validators and per-patch `validate` blocks
+
+**Implementation Details:**
+
+1. **Type System** (`src/core/types.ts`)
+   - Added `minWordCount?: number`, `maxWordCount?: number`, `minLineCount?: number`, `maxLineCount?: number` to `PatchValidation` interface
+   - Added same 4 fields to `Validator` interface
+
+2. **Validation Functions** (`src/core/validators.ts`)
+   - `validateMinWordCount(content, min)` — strips frontmatter, counts non-whitespace word tokens
+   - `validateMaxWordCount(content, max)` — same with upper bound
+   - `validateMinLineCount(content, min)` — counts `\n`-separated lines
+   - `validateMaxLineCount(content, max)` — same with upper bound
+   - All wired into `runValidator()` after existing checks
+
+3. **Per-Patch Validation** (`src/core/patch-engine.ts`)
+   - Imported and wired all 4 new functions into `runPatchValidation()`
+
+4. **Config Validation** (`src/core/config-parser.ts`)
+   - Added integer + non-negative checks for all 4 fields in both global validator and per-patch validate blocks
+
+5. **Schema** (`src/core/schema.ts`)
+   - Refactored 49 inline `validate` blocks to use `$ref: "#/$defs/patchValidate"` (eliminates 49× repetition)
+   - New `$defs/patchValidate` definition includes all 9 validator fields including 4 new ones
+   - Added 4 new fields to global `validators` array schema
+
+6. **Tests** (`tests/core/word-line-count-validators.test.ts`) — 46 new tests:
+   - Unit tests for each of the 4 validation functions (pass/fail, edge cases, empty content, frontmatter stripping)
+   - `runValidator` integration tests for each field
+   - Combined multi-field validator tests
+   - `runValidators` array tests
+   - Per-patch `applyPatches` integration tests for `minWordCount` and `maxLineCount`
+   - `validateConfig` tests for both global and per-patch new fields (valid values, non-integer rejection, negative rejection)
+
+**Files Modified:**
+- `src/core/types.ts` — Added 4 fields to `PatchValidation` and `Validator`
+- `src/core/validators.ts` — Added 4 validation functions + `runValidator` wiring
+- `src/core/patch-engine.ts` — Added imports + `runPatchValidation` wiring
+- `src/core/config-parser.ts` — Added type checking in global and per-patch validator blocks
+- `src/core/schema.ts` — Refactored to `$defs/patchValidate` + 4 new fields in global validators
+- `tests/core/word-line-count-validators.test.ts` — 46 new tests
+
+**Testing Results:**
+- ✅ All 3,904 tests passing (46 new word/line count validator tests added)
+- ✅ All linting checks passing (`bun check`)
+- ✅ TypeScript compilation clean
+
+**Status:** Word Count & Line Count Validators COMPLETE! ✅
+
+**Use Cases:**
+- Enforce minimum documentation depth: `minWordCount: 200` ensures pages have substantive content
+- Prevent bloated files: `maxLineCount: 500` keeps files scannable
+- CI quality gates: fail builds when changelogs are too short
+- Template compliance: ensure generated docs meet length requirements

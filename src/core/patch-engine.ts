@@ -35,6 +35,10 @@ import {
   validateContains,
   validateFrontmatterRequired,
   validateMatchesRegex,
+  validateMaxLineCount,
+  validateMaxWordCount,
+  validateMinLineCount,
+  validateMinWordCount,
   validateNotContains,
   validateNotMatchesRegex,
 } from "./validators.js";
@@ -3462,6 +3466,42 @@ function runPatchValidation(
     if (!result.valid) {
       errors.push({
         message: `Patch '${patchDesc}' validation failed: missing required frontmatter keys: ${result.missing.join(", ")}`,
+      });
+    }
+  }
+
+  if (validate.minWordCount !== undefined) {
+    const result = validateMinWordCount(content, validate.minWordCount);
+    if (!result.valid) {
+      errors.push({
+        message: `Patch '${patchDesc}' validation failed: content has ${result.count} word(s), requires at least ${validate.minWordCount}`,
+      });
+    }
+  }
+
+  if (validate.maxWordCount !== undefined) {
+    const result = validateMaxWordCount(content, validate.maxWordCount);
+    if (!result.valid) {
+      errors.push({
+        message: `Patch '${patchDesc}' validation failed: content has ${result.count} word(s), exceeds maximum of ${validate.maxWordCount}`,
+      });
+    }
+  }
+
+  if (validate.minLineCount !== undefined) {
+    const result = validateMinLineCount(content, validate.minLineCount);
+    if (!result.valid) {
+      errors.push({
+        message: `Patch '${patchDesc}' validation failed: content has ${result.count} line(s), requires at least ${validate.minLineCount}`,
+      });
+    }
+  }
+
+  if (validate.maxLineCount !== undefined) {
+    const result = validateMaxLineCount(content, validate.maxLineCount);
+    if (!result.valid) {
+      errors.push({
+        message: `Patch '${patchDesc}' validation failed: content has ${result.count} line(s), exceeds maximum of ${validate.maxLineCount}`,
       });
     }
   }

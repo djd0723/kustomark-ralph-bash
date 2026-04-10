@@ -327,6 +327,50 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
             message: "'frontmatterRequired' must be an array of strings",
           });
         }
+        if (
+          v.minWordCount !== undefined &&
+          (typeof v.minWordCount !== "number" ||
+            !Number.isInteger(v.minWordCount) ||
+            (v.minWordCount as number) < 0)
+        ) {
+          errors.push({
+            field: `${vprefix}.minWordCount`,
+            message: "'minWordCount' must be a non-negative integer",
+          });
+        }
+        if (
+          v.maxWordCount !== undefined &&
+          (typeof v.maxWordCount !== "number" ||
+            !Number.isInteger(v.maxWordCount) ||
+            (v.maxWordCount as number) < 0)
+        ) {
+          errors.push({
+            field: `${vprefix}.maxWordCount`,
+            message: "'maxWordCount' must be a non-negative integer",
+          });
+        }
+        if (
+          v.minLineCount !== undefined &&
+          (typeof v.minLineCount !== "number" ||
+            !Number.isInteger(v.minLineCount) ||
+            (v.minLineCount as number) < 0)
+        ) {
+          errors.push({
+            field: `${vprefix}.minLineCount`,
+            message: "'minLineCount' must be a non-negative integer",
+          });
+        }
+        if (
+          v.maxLineCount !== undefined &&
+          (typeof v.maxLineCount !== "number" ||
+            !Number.isInteger(v.maxLineCount) ||
+            (v.maxLineCount as number) < 0)
+        ) {
+          errors.push({
+            field: `${vprefix}.maxLineCount`,
+            message: "'maxLineCount' must be a non-negative integer",
+          });
+        }
       });
     }
   }
@@ -859,6 +903,50 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
             }
           });
         }
+      }
+      if (
+        v.minWordCount !== undefined &&
+        (typeof v.minWordCount !== "number" ||
+          !Number.isInteger(v.minWordCount) ||
+          (v.minWordCount as number) < 0)
+      ) {
+        errors.push({
+          field: `${prefix}.validate.minWordCount`,
+          message: "'minWordCount' must be a non-negative integer",
+        });
+      }
+      if (
+        v.maxWordCount !== undefined &&
+        (typeof v.maxWordCount !== "number" ||
+          !Number.isInteger(v.maxWordCount) ||
+          (v.maxWordCount as number) < 0)
+      ) {
+        errors.push({
+          field: `${prefix}.validate.maxWordCount`,
+          message: "'maxWordCount' must be a non-negative integer",
+        });
+      }
+      if (
+        v.minLineCount !== undefined &&
+        (typeof v.minLineCount !== "number" ||
+          !Number.isInteger(v.minLineCount) ||
+          (v.minLineCount as number) < 0)
+      ) {
+        errors.push({
+          field: `${prefix}.validate.minLineCount`,
+          message: "'minLineCount' must be a non-negative integer",
+        });
+      }
+      if (
+        v.maxLineCount !== undefined &&
+        (typeof v.maxLineCount !== "number" ||
+          !Number.isInteger(v.maxLineCount) ||
+          (v.maxLineCount as number) < 0)
+      ) {
+        errors.push({
+          field: `${prefix}.validate.maxLineCount`,
+          message: "'maxLineCount' must be a non-negative integer",
+        });
       }
     }
   }

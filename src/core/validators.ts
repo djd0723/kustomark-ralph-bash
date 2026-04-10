@@ -163,6 +163,72 @@ export function validateFrontmatterRequired(
   return { valid: missing.length === 0, missing };
 }
 
+/**
+ * Count words in content, stripping frontmatter first
+ *
+ * Words are non-empty sequences of non-whitespace characters.
+ */
+function countWords(content: string): number {
+  const stripped = content.replace(/^---[\s\S]*?^---\s*/m, "");
+  const words = stripped
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0);
+  return words.length;
+}
+
+/**
+ * Count lines in content (number of newline-separated lines)
+ */
+function countLines(content: string): number {
+  if (content.length === 0) return 0;
+  return content.split("\n").length;
+}
+
+/**
+ * Validate that content has at least minWordCount words
+ */
+export function validateMinWordCount(
+  content: string,
+  min: number,
+): { valid: boolean; count: number } {
+  const count = countWords(content);
+  return { valid: count >= min, count };
+}
+
+/**
+ * Validate that content has at most maxWordCount words
+ */
+export function validateMaxWordCount(
+  content: string,
+  max: number,
+): { valid: boolean; count: number } {
+  const count = countWords(content);
+  return { valid: count <= max, count };
+}
+
+/**
+ * Validate that content has at least minLineCount lines
+ */
+export function validateMinLineCount(
+  content: string,
+  min: number,
+): { valid: boolean; count: number } {
+  const count = countLines(content);
+  return { valid: count >= min, count };
+}
+
+/**
+ * Validate that content has at most maxLineCount lines
+ */
+export function validateMaxLineCount(
+  content: string,
+  max: number,
+): { valid: boolean; count: number } {
+  const count = countLines(content);
+  return { valid: count <= max, count };
+}
+
 // getNestedValue is now imported from nested-values.ts
 
 /**
@@ -271,6 +337,50 @@ export function runValidator(content: string, validator: Validator): ValidationE
       return {
         validator: validator.name,
         message: `Missing required frontmatter keys: ${result.missing.join(", ")}`,
+      };
+    }
+  }
+
+  // Check minWordCount validation
+  if (validator.minWordCount !== undefined) {
+    const result = validateMinWordCount(content, validator.minWordCount);
+    if (!result.valid) {
+      return {
+        validator: validator.name,
+        message: `Content has ${result.count} word(s), requires at least ${validator.minWordCount}`,
+      };
+    }
+  }
+
+  // Check maxWordCount validation
+  if (validator.maxWordCount !== undefined) {
+    const result = validateMaxWordCount(content, validator.maxWordCount);
+    if (!result.valid) {
+      return {
+        validator: validator.name,
+        message: `Content has ${result.count} word(s), exceeds maximum of ${validator.maxWordCount}`,
+      };
+    }
+  }
+
+  // Check minLineCount validation
+  if (validator.minLineCount !== undefined) {
+    const result = validateMinLineCount(content, validator.minLineCount);
+    if (!result.valid) {
+      return {
+        validator: validator.name,
+        message: `Content has ${result.count} line(s), requires at least ${validator.minLineCount}`,
+      };
+    }
+  }
+
+  // Check maxLineCount validation
+  if (validator.maxLineCount !== undefined) {
+    const result = validateMaxLineCount(content, validator.maxLineCount);
+    if (!result.valid) {
+      return {
+        validator: validator.name,
+        message: `Content has ${result.count} line(s), exceeds maximum of ${validator.maxLineCount}`,
       };
     }
   }

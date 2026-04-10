@@ -145,6 +145,56 @@ export function generateSchema(): object {
     required: ["apiVersion", "kind", "resources"],
     $defs: {
       condition: conditionSchema,
+      patchValidate: {
+        type: "object",
+        description: "Per-patch validation rules applied after the patch is applied",
+        properties: {
+          notContains: {
+            type: "string",
+            description: "Validate that the result does not contain this string",
+          },
+          contains: {
+            type: "string",
+            description: "Validate that the result contains this string",
+          },
+          matchesRegex: {
+            type: "string",
+            description: "Validate that the result matches this regex pattern",
+          },
+          notMatchesRegex: {
+            type: "string",
+            description: "Validate that the result does NOT match this regex pattern",
+          },
+          frontmatterRequired: {
+            type: "array",
+            description: "Validate that the result has these required frontmatter keys",
+            items: { type: "string" },
+          },
+          minWordCount: {
+            type: "integer",
+            minimum: 0,
+            description:
+              "Validate that the result has at least this many words (frontmatter excluded)",
+          },
+          maxWordCount: {
+            type: "integer",
+            minimum: 0,
+            description:
+              "Validate that the result has at most this many words (frontmatter excluded)",
+          },
+          minLineCount: {
+            type: "integer",
+            minimum: 0,
+            description: "Validate that the result has at least this many lines",
+          },
+          maxLineCount: {
+            type: "integer",
+            minimum: 0,
+            description: "Validate that the result has at most this many lines",
+          },
+        },
+        additionalProperties: false,
+      },
     },
     properties: {
       apiVersion: {
@@ -295,32 +345,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this specific patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -399,32 +425,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -500,32 +502,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 patchId: {
                   type: "string",
@@ -599,32 +577,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 patchId: {
                   type: "string",
@@ -698,32 +652,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 patchId: {
                   type: "string",
@@ -797,32 +727,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 patchId: {
                   type: "string",
@@ -895,32 +801,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -990,32 +872,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -1089,32 +947,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -1184,32 +1018,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -1288,32 +1098,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -1396,32 +1182,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -1495,32 +1257,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -1603,32 +1341,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -1711,32 +1425,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -1811,32 +1501,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 patchId: {
                   type: "string",
@@ -1910,32 +1576,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 patchId: {
                   type: "string",
@@ -2010,32 +1652,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 patchId: {
                   type: "string",
@@ -2109,32 +1727,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -2208,32 +1802,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -2303,32 +1873,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -2402,32 +1948,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -2527,32 +2049,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -2631,32 +2129,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -2748,32 +2222,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -2856,32 +2306,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -2955,32 +2381,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3059,32 +2461,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3163,32 +2541,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3273,32 +2627,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3374,32 +2704,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3462,32 +2768,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3559,32 +2841,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3661,32 +2919,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3759,32 +2993,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3861,32 +3071,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -3954,32 +3140,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4060,32 +3222,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4166,32 +3304,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4263,32 +3377,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4364,32 +3454,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this specific patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4451,32 +3517,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4529,32 +3571,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4612,32 +3630,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4718,32 +3712,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4820,32 +3790,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 id: {
                   type: "string",
@@ -4907,32 +3853,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 group: {
                   type: "string",
@@ -4984,32 +3906,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 group: {
                   type: "string",
@@ -5061,32 +3959,8 @@ export function generateSchema(): object {
                   description: "Override the default onNoMatch behavior for this patch",
                 },
                 validate: {
-                  type: "object",
-                  description: "Per-patch validation rules",
-                  properties: {
-                    notContains: {
-                      type: "string",
-                      description: "Validate that the result does not contain this string",
-                    },
-                    contains: {
-                      type: "string",
-                      description: "Validate that the result contains this string",
-                    },
-                    matchesRegex: {
-                      type: "string",
-                      description: "Validate that the result matches this regex pattern",
-                    },
-                    notMatchesRegex: {
-                      type: "string",
-                      description: "Validate that the result does NOT match this regex pattern",
-                    },
-                    frontmatterRequired: {
-                      type: "array",
-                      description: "Validate that the result has these required frontmatter keys",
-                      items: { type: "string" },
-                    },
-                  },
-                  additionalProperties: false,
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
                 },
                 group: {
                   type: "string",
@@ -5146,6 +4020,28 @@ export function generateSchema(): object {
               items: {
                 type: "string",
               },
+            },
+            minWordCount: {
+              type: "integer",
+              minimum: 0,
+              description:
+                "Validate that content has at least this many words (frontmatter excluded)",
+            },
+            maxWordCount: {
+              type: "integer",
+              minimum: 0,
+              description:
+                "Validate that content has at most this many words (frontmatter excluded)",
+            },
+            minLineCount: {
+              type: "integer",
+              minimum: 0,
+              description: "Validate that content has at least this many lines",
+            },
+            maxLineCount: {
+              type: "integer",
+              minimum: 0,
+              description: "Validate that content has at most this many lines",
             },
           },
           additionalProperties: false,

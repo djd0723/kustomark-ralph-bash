@@ -38,6 +38,14 @@ export interface PatchValidation {
   notMatchesRegex?: string;
   /** Validate that frontmatter has these required fields */
   frontmatterRequired?: string[];
+  /** Validate that the result has at least this many words */
+  minWordCount?: number;
+  /** Validate that the result has at most this many words */
+  maxWordCount?: number;
+  /** Validate that the result has at least this many lines */
+  minLineCount?: number;
+  /** Validate that the result has at most this many lines */
+  maxLineCount?: number;
 }
 
 /**
@@ -804,6 +812,14 @@ export interface Validator {
   notMatchesRegex?: string;
   /** Validate that frontmatter has these required fields */
   frontmatterRequired?: string[];
+  /** Validate that content has at least this many words */
+  minWordCount?: number;
+  /** Validate that content has at most this many words */
+  maxWordCount?: number;
+  /** Validate that content has at least this many lines */
+  minLineCount?: number;
+  /** Validate that content has at most this many lines */
+  maxLineCount?: number;
 }
 
 /**
