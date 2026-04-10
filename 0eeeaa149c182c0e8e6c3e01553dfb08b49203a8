@@ -1,0 +1,39 @@
+IMPLEMENTATION_PLAN.md
+  00a7e171b368bf54 3,9-37
+src/web/server/services/preview-service.ts
+  00a7e171b368bf54 1-172
+src/web/server/routes/preview.ts
+  00a7e171b368bf54 1-64
+src/web/client/src/types/config.ts
+  00a7e171b368bf54 213-237
+tests/web-server-preview.test.ts
+  00a7e171b368bf54 1-243
+src/web/client/src/services/api.ts
+  00a7e171b368bf54 5,102-121
+src/web/client/src/App.tsx
+  00a7e171b368bf54 16,32-33,146-158,305-308,356-399
+src/web/server/types.ts
+  00a7e171b368bf54 6,119-147
+src/web/server/server.ts
+  00a7e171b368bf54 17,57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "0eeeaa149c182c0e8e6c3e01553dfb08b49203a8",
+  "prompts": {
+    "00a7e171b368bf54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a5a6d14-17a1-49c3-b409-db683156d1b0",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 664,
+      "total_deletions": 24,
+      "accepted_lines": 653,
+      "overriden_lines": 0
+    }
+  }
+}
