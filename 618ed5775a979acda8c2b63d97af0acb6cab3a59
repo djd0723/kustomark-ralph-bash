@@ -1,0 +1,25 @@
+IMPLEMENTATION_PLAN.md
+  a6cf5434aaaa6656 3,9-28
+tests/cli/lint.test.ts
+  a6cf5434aaaa6656 1-715
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "618ed5775a979acda8c2b63d97af0acb6cab3a59",
+  "prompts": {
+    "a6cf5434aaaa6656": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9a77ed2-e05e-4979-a78e-2bd118d888fe",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 749,
+      "total_deletions": 14,
+      "accepted_lines": 736,
+      "overriden_lines": 0
+    }
+  }
+}
