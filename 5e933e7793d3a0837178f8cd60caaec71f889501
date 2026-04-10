@@ -1,0 +1,27 @@
+tests/core/patch-suggester.test.ts
+  333465cc7b253901 2159-2374
+IMPLEMENTATION_PLAN.md
+  333465cc7b253901 3,9-28
+src/core/patch-suggester.ts
+  333465cc7b253901 138-139,145,150-151,194,303,307,351-379,1190,1192-1201,1203-1208,1211-1223,1226-1242,1311-1320,1655-1656,1748-1750
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "5e933e7793d3a0837178f8cd60caaec71f889501",
+  "prompts": {
+    "333465cc7b253901": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28d709f7-8824-4704-89af-d18c23e18d49",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 345,
+      "total_deletions": 37,
+      "accepted_lines": 341,
+      "overriden_lines": 0
+    }
+  }
+}
