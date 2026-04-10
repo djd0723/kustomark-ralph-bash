@@ -1,0 +1,41 @@
+src/lsp/completion.ts
+  c80c145d31976f07 647-653,1392-1414
+tests/core/patch-suggester.test.ts
+  c80c145d31976f07 1751-1924
+src/core/patch-engine.ts
+  c80c145d31976f07 688-734,3470-3473,3742-3743
+src/lsp/hover.ts
+  c80c145d31976f07 629-648
+tests/core/replace-code-block.test.ts
+  c80c145d31976f07 1-154
+tests/lsp/completion.test.ts
+  c80c145d31976f07 1172
+src/core/patch-suggester.ts
+  c80c145d31976f07 99-118,157-158,197,230-232,834-893,975-977,1462-1466,1543-1545
+src/core/types.ts
+  c80c145d31976f07 761-772,826-827
+IMPLEMENTATION_PLAN.md
+  c80c145d31976f07 3,9-33
+src/core/config-parser.ts
+  c80c145d31976f07 760,1689-1712
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "4270d4952b7523503d830b9afe13098607e6eb8c",
+  "prompts": {
+    "c80c145d31976f07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e714bc93-f218-452b-af76-e659b7c746ac",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 614,
+      "total_deletions": 18,
+      "accepted_lines": 598,
+      "overriden_lines": 0
+    }
+  }
+}
