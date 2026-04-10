@@ -1,0 +1,31 @@
+tests/lsp/hover.test.ts
+  1c23ce74e8ce8042 513-539
+src/lsp/completion.ts
+  1c23ce74e8ce8042 769-776
+IMPLEMENTATION_PLAN.md
+  1c23ce74e8ce8042 3,9-32
+tests/lsp/completion.test.ts
+  1c23ce74e8ce8042 243-261,1211
+src/lsp/hover.ts
+  1c23ce74e8ce8042 694,696-702,707-708,710-712,716-785
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "60a32116f4a70c60eb00d75d6c1da526015ad0d4",
+  "prompts": {
+    "1c23ce74e8ce8042": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09372fc3-7b3b-4dfc-8c07-c4f081c45097",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 164,
+      "total_deletions": 5,
+      "accepted_lines": 164,
+      "overriden_lines": 0
+    }
+  }
+}
