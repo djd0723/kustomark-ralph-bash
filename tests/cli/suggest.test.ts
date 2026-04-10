@@ -2539,3 +2539,106 @@ describe("runInteractiveSession", () => {
     expect(result[0]).toEqual(patches[0]);
   });
 });
+
+// ============================================================================
+// --from-git: parseGitRange and fetchGitPairs unit tests
+// ============================================================================
+
+import { fetchGitPairs } from "../../src/cli/suggest-command.js";
+
+describe("--from-git: fetchGitPairs", () => {
+  const gitTestDir = "/tmp/kustomark-from-git-test";
+
+  // Create an isolated git repo with two commits for testing
+  beforeEach(() => {
+    if (existsSync(gitTestDir)) {
+      rmSync(gitTestDir, { recursive: true, force: true });
+    }
+    mkdirSync(gitTestDir, { recursive: true });
+
+    // Init repo with identity so commits work without global config
+    execSync("git init", { cwd: gitTestDir });
+    execSync('git config user.email "test@example.com"', { cwd: gitTestDir });
+    execSync('git config user.name "Test"', { cwd: gitTestDir });
+
+    // First commit: initial docs
+    writeFileSync(join(gitTestDir, "README.md"), "# Hello\n\nOriginal content.\n");
+    writeFileSync(join(gitTestDir, "notes.md"), "# Notes\n\nSome notes.\n");
+    execSync("git add -A && git commit -m 'initial'", { cwd: gitTestDir, shell: true as any });
+
+    // Second commit: modify README, delete notes, add new file
+    writeFileSync(join(gitTestDir, "README.md"), "# Hello\n\nUpdated content.\n");
+    rmSync(join(gitTestDir, "notes.md"));
+    writeFileSync(join(gitTestDir, "added.md"), "# Added\n\nNew file.\n");
+    execSync("git add -A && git commit -m 'changes'", { cwd: gitTestDir, shell: true as any });
+  });
+
+  afterEach(() => {
+    if (existsSync(gitTestDir)) {
+      rmSync(gitTestDir, { recursive: true, force: true });
+    }
+  });
+
+  test("returns FilePairs for modified files in range", async () => {
+    const { pairs } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
+
+    expect(pairs.length).toBe(1);
+    expect(pairs[0].relativePath).toBe("README.md");
+    expect(pairs[0].sourceContent).toContain("Original content");
+    expect(pairs[0].targetContent).toContain("Updated content");
+  });
+
+  test("returns deletedPaths for files removed in range", async () => {
+    const { deletedPaths } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
+
+    expect(deletedPaths).toContain("notes.md");
+  });
+
+  test("returns addedPaths for files added in range", async () => {
+    const { addedPaths } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
+
+    expect(addedPaths).toContain("added.md");
+  });
+
+  test("single ref without '..' defaults to <ref>..HEAD", async () => {
+    const { pairs } = await fetchGitPairs("HEAD~1", gitTestDir);
+
+    // Same as HEAD~1..HEAD
+    expect(pairs.length).toBe(1);
+    expect(pairs[0].relativePath).toBe("README.md");
+  });
+
+  test("filterPath restricts results to subdirectory", async () => {
+    // Add a commit that changes a file in a subdirectory
+    mkdirSync(join(gitTestDir, "docs"), { recursive: true });
+    writeFileSync(join(gitTestDir, "docs", "guide.md"), "# Guide\n\nOriginal guide.\n");
+    execSync("git add -A && git commit -m 'add docs'", { cwd: gitTestDir, shell: true as any });
+    writeFileSync(join(gitTestDir, "docs", "guide.md"), "# Guide\n\nUpdated guide.\n");
+    writeFileSync(join(gitTestDir, "README.md"), "# Hello\n\nAlso changed.\n");
+    execSync("git add -A && git commit -m 'update docs and readme'", { cwd: gitTestDir, shell: true as any });
+
+    const { pairs } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir, "docs");
+
+    // Only docs/guide.md should appear, not README.md
+    expect(pairs.length).toBe(1);
+    expect(pairs[0].relativePath).toBe("guide.md");
+  });
+
+  test("throws when range is invalid", async () => {
+    await expect(fetchGitPairs("nonexistent-branch..HEAD", gitTestDir)).rejects.toThrow();
+  });
+
+  test("returns empty pairs for range with no supported file changes", async () => {
+    // Add a commit that only changes a binary-like file (not supported extension)
+    writeFileSync(join(gitTestDir, "data.bin"), Buffer.from([0x00, 0x01, 0x02]));
+    execSync("git add -A && git commit -m 'add binary'", { cwd: gitTestDir, shell: true as any });
+    // The binary file is not in a supported extension set
+    const { pairs, deletedPaths, addedPaths } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
+
+    // Only added non-.md/.json/.yaml/.yml/.toml file — should not appear in pairs
+    expect(pairs.length).toBe(0);
+    expect(deletedPaths.length).toBe(0);
+    // addedPaths only collects supported files
+    expect(addedPaths.length).toBe(0);
+  });
+});

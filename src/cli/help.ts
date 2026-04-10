@@ -2241,6 +2241,7 @@ ${formatTitle("kustomark suggest - Generate patch configuration from file differ
 
 ${formatSection("SYNOPSIS")}
   ${formatCommand("kustomark suggest")} --source <path> --target <path> [options]
+  ${formatCommand("kustomark suggest")} --from-git <range> [--source <path>] [options]
 
 ${formatSection("DESCRIPTION")}
   Suggest analyzes the differences between source and target files and
@@ -2257,11 +2258,18 @@ ${formatSection("DESCRIPTION")}
   It assigns confidence scores to each suggestion and generates a complete
   kustomark.yaml configuration that you can review and use.
 
+  With --from-git, the command reads before/after content directly from
+  git objects — no extra files or directories needed.
+
 ${formatSection("ARGUMENTS")}
   ${formatFlag("--source")} <path>    Source file or directory (before state)
   ${formatFlag("--target")} <path>    Target file or directory (after state)
 
 ${formatSection("OPTIONS")}
+  ${formatFlag("--from-git")} <range>          Generate patches from a git commit range instead of --source/--target.
+                               Range formats: "HEAD~1..HEAD", "abc123..def456", "HEAD~3"
+                               (single ref defaults to "<ref>..HEAD")
+                               --source may be used as a path filter within the repo.
   ${formatFlag("--output")} <path>             Write generated config to file
   ${formatFlag("--write")} <path>              Write patches into a config file (creates or merges into existing patches: array)
   ${formatFlag("--apply")} <dir>              Apply suggested patches to source files and write results to <dir>
@@ -2333,6 +2341,15 @@ ${formatSection("EXAMPLES")}
 
   ${formatExample("# Apply and write config in one step")}
   ${formatCommand("kustomark suggest --source src/ --target dst/ --apply output/ --write kustomark.yaml")}
+
+  ${formatExample("# Generate patches from the last git commit")}
+  ${formatCommand("kustomark suggest --from-git HEAD~1..HEAD")}
+
+  ${formatExample("# Generate patches from git range, limited to docs/ subdirectory")}
+  ${formatCommand("kustomark suggest --from-git HEAD~3..HEAD --source docs/")}
+
+  ${formatExample("# Capture git changes as a reusable kustomark config")}
+  ${formatCommand("kustomark suggest --from-git main..feature-branch --write patches.yaml")}
 
 ${formatSection("TEXT OUTPUT")}
   Text format displays:

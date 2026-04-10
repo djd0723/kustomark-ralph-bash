@@ -31,6 +31,7 @@ interface CLIOptions {
   write?: string;
   apply?: string;
   interactive?: boolean;
+  fromGit?: string; // Git range like "HEAD~1..HEAD" or "HEAD~3"
 }
 
 export interface VerificationFileResult {
@@ -86,6 +87,9 @@ interface FilePair {
   relativePath: string;
   sourcePath: string;
   targetPath: string;
+  // In-memory content overrides (used by --from-git to avoid writing temp files)
+  sourceContent?: string;
+  targetContent?: string;
 }
 
 // Patch suggestion is provided by the imported suggestPatches function from patch-suggester.ts
@@ -495,6 +499,154 @@ export function consolidatePatches(
 }
 
 // ============================================================================
+// Git Diff Helpers
+// ============================================================================
+
+/**
+ * Run a git command in a directory and return stdout.
+ * Throws on non-zero exit.
+ */
+async function runGit(args: string[], cwd: string): Promise<string> {
+  const proc = Bun.spawn(["git", ...args], {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+
+  if (exitCode !== 0) {
+    throw new Error(`git ${args[0]} failed: ${stderr.trim()}`);
+  }
+  return stdout;
+}
+
+/**
+ * Parse a git range string into before/after refs.
+ *
+ * Accepts:
+ *   "HEAD~1..HEAD"  → { beforeRef: "HEAD~1", afterRef: "HEAD" }
+ *   "abc123..def456" → { beforeRef: "abc123", afterRef: "def456" }
+ *   "HEAD~3"        → { beforeRef: "HEAD~3", afterRef: "HEAD" }
+ */
+function parseGitRange(range: string): { beforeRef: string; afterRef: string } {
+  if (range.includes("..")) {
+    const dotIndex = range.indexOf("..");
+    const before = range.slice(0, dotIndex);
+    const after = range.slice(dotIndex + 2);
+    return {
+      beforeRef: before || "HEAD^",
+      afterRef: after || "HEAD",
+    };
+  }
+  return { beforeRef: range, afterRef: "HEAD" };
+}
+
+/**
+ * Fetch file pairs from a git range.
+ *
+ * Runs `git diff --name-status` on the range and retrieves before/after
+ * content for each modified supported file using `git show`.
+ *
+ * @param range    - Git range (e.g. "HEAD~1..HEAD", "HEAD~3", "abc..def")
+ * @param repoDir  - Directory of the git repository (or any sub-directory)
+ * @param filterPath - Optional relative path prefix to restrict results
+ * @returns Matched content pairs plus lists of added/deleted paths
+ */
+export async function fetchGitPairs(
+  range: string,
+  repoDir: string,
+  filterPath?: string,
+): Promise<{ pairs: FilePair[]; deletedPaths: string[]; addedPaths: string[] }> {
+  const { beforeRef, afterRef } = parseGitRange(range);
+
+  const nameStatus = await runGit(["diff", "--name-status", `${beforeRef}..${afterRef}`], repoDir);
+
+  const pairs: FilePair[] = [];
+  const deletedPaths: string[] = [];
+  const addedPaths: string[] = [];
+
+  const normalizedFilter = filterPath ? filterPath.replace(/\\/g, "/").replace(/\/$/, "") : null;
+
+  for (const line of nameStatus.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const parts = trimmed.split("\t");
+    const status = parts[0];
+    if (!status || parts.length < 2) continue;
+
+    // For renames: status is "R<similarity>", parts[1]=old, parts[2]=new
+    const isRename = status.startsWith("R");
+    const oldPath = parts[1] ?? "";
+    const newPath = isRename ? (parts[2] ?? oldPath) : oldPath;
+
+    // Apply path filter (compare against the "new" path for adds/renames, old for deletes)
+    const relevantPath = status === "D" ? oldPath : newPath;
+    if (normalizedFilter) {
+      const normalized = relevantPath.replace(/\\/g, "/");
+      if (!normalized.startsWith(`${normalizedFilter}/`) && normalized !== normalizedFilter) {
+        continue;
+      }
+    }
+
+    // Compute relative path within the filter (or keep as-is)
+    function toRelPath(p: string): string {
+      if (!normalizedFilter) return p;
+      const norm = p.replace(/\\/g, "/");
+      const prefix = `${normalizedFilter}/`;
+      return norm.startsWith(prefix) ? norm.slice(prefix.length) : norm;
+    }
+
+    if (status === "D") {
+      if (isSupportedFile(oldPath)) {
+        deletedPaths.push(toRelPath(oldPath));
+      }
+    } else if (status === "A") {
+      if (isSupportedFile(newPath)) {
+        addedPaths.push(toRelPath(newPath));
+      }
+    } else {
+      // M (modified), C (copied), R (renamed) — diff old→new content
+      const sourcePath = isRename ? oldPath : oldPath;
+      const targetPath = newPath;
+
+      if (!isSupportedFile(targetPath) && !isSupportedFile(sourcePath)) continue;
+
+      let beforeContent: string;
+      let afterContent: string;
+
+      try {
+        beforeContent = await runGit(["show", `${beforeRef}:${sourcePath}`], repoDir);
+        afterContent = await runGit(["show", `${afterRef}:${targetPath}`], repoDir);
+      } catch {
+        // Skip files that can't be read from git (e.g. binary or out-of-tree)
+        continue;
+      }
+
+      if (beforeContent === afterContent) continue;
+
+      // Use the new path as the canonical relative path
+      const relPath = toRelPath(targetPath);
+
+      pairs.push({
+        relativePath: relPath,
+        sourcePath: targetPath, // nominal path (used for extension detection)
+        targetPath: targetPath,
+        sourceContent: beforeContent,
+        targetContent: afterContent,
+      });
+    }
+  }
+
+  return { pairs, deletedPaths, addedPaths };
+}
+
+// ============================================================================
 // Patch Analysis Functions
 // ============================================================================
 
@@ -519,8 +671,8 @@ function analyzeFilePairs(
 
   for (const pair of pairs) {
     try {
-      const sourceContent = readFileSync(pair.sourcePath, "utf-8");
-      const targetContent = readFileSync(pair.targetPath, "utf-8");
+      const sourceContent = pair.sourceContent ?? readFileSync(pair.sourcePath, "utf-8");
+      const targetContent = pair.targetContent ?? readFileSync(pair.targetPath, "utf-8");
 
       // Skip if files are identical
       if (sourceContent === targetContent) {
@@ -780,13 +932,19 @@ export async function applyPatchesToDirectory(
   let filesWritten = 0;
 
   for (const pair of filePairs) {
-    const sourceContent = readFileSafe(pair.sourcePath);
+    const sourceContent = pair.sourceContent ?? readFileSafe(pair.sourcePath);
     if (sourceContent === null) continue;
 
     // Compute the relative path used for include/exclude matching and output placement.
+    // For in-memory pairs (--from-git), use relativePath directly.
     // For directory sources: relative path from sourcePath to the file.
     // For single-file sources: use the basename of the file.
-    const relPath = sourceIsDir ? relative(sourcePath, pair.sourcePath) : basename(pair.sourcePath);
+    const relPath =
+      pair.sourceContent !== undefined
+        ? pair.relativePath
+        : sourceIsDir
+          ? relative(sourcePath, pair.sourcePath)
+          : basename(pair.sourcePath);
 
     const applicablePatches = patches.filter((p) => shouldApplyPatch(p, relPath));
 
@@ -1016,25 +1174,12 @@ function outputError(error: string, options: CLIOptions): void {
 export async function suggestCommand(options: CLIOptions): Promise<number> {
   try {
     // Validate options
-    if (!options.source) {
-      throw new Error("Source path is required (--source)");
+    if (!options.fromGit && !options.source) {
+      throw new Error("Source path is required (--source) unless using --from-git");
     }
 
-    if (!options.target) {
-      throw new Error("Target path is required (--target)");
-    }
-
-    // Resolve paths
-    const sourcePath = resolve(options.source);
-    const targetPath = resolve(options.target);
-
-    // Verify paths exist
-    if (!existsSync(sourcePath)) {
-      throw new Error(`Source path does not exist: ${sourcePath}`);
-    }
-
-    if (!existsSync(targetPath)) {
-      throw new Error(`Target path does not exist: ${targetPath}`);
+    if (!options.fromGit && !options.target) {
+      throw new Error("Target path is required (--target) unless using --from-git");
     }
 
     // Set defaults
@@ -1046,6 +1191,139 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       format,
       verbosity,
     };
+
+    // --- Git diff path ---
+    if (options.fromGit) {
+      const repoDir = options.source ? resolve(options.source) : process.cwd();
+      const filterPath = options.source ? resolve(options.source) : undefined;
+
+      // Derive relative filter for git commands (git paths are repo-relative)
+      let gitFilter: string | undefined;
+      if (filterPath) {
+        // Get the repo root so we can make filterPath repo-relative
+        try {
+          const repoRoot = (await runGit(["rev-parse", "--show-toplevel"], repoDir)).trim();
+          gitFilter = relative(repoRoot, filterPath).replace(/\\/g, "/");
+          if (gitFilter === "" || gitFilter === ".") gitFilter = undefined;
+        } catch {
+          // If not in a git repo, let fetchGitPairs handle the error
+        }
+      }
+
+      if (verbosity >= 2) {
+        console.log(`Git range: ${options.fromGit}`);
+        if (gitFilter) console.log(`Filter path: ${gitFilter}`);
+        console.log("Fetching git diff...\n");
+      }
+
+      const { pairs: filePairs, deletedPaths } = await fetchGitPairs(
+        options.fromGit,
+        repoDir,
+        gitFilter,
+      );
+
+      if (filePairs.length === 0 && deletedPaths.length === 0) {
+        throw new Error(`No supported file changes found in git range: ${options.fromGit}`);
+      }
+
+      if (verbosity >= 2) {
+        console.log(`Found ${filePairs.length} modified file(s) in range\n`);
+        if (deletedPaths.length > 0) {
+          console.log(`Found ${deletedPaths.length} deleted file(s)\n`);
+        }
+      }
+
+      // Analyze modified file pairs
+      const { patches, scoredPatches, filesAnalyzed } = analyzeFilePairs(filePairs, opts);
+
+      // Add delete-file patches for files removed in the range
+      for (const relPath of deletedPaths) {
+        const deletePatch = { op: "delete-file" as const, match: relPath };
+        patches.push(deletePatch);
+        const [scored] = scorePatches([deletePatch], "", "");
+        if (scored) scoredPatches.push(scored);
+      }
+
+      // Consolidate
+      const {
+        patches: consolidatedPatches,
+        scoredPatches: consolidatedScored,
+        patchesConsolidated,
+      } = consolidatePatches(patches, scoredPatches);
+
+      // Interactive review
+      let finalPatches = consolidatedPatches;
+      let finalScored = consolidatedScored;
+      let patchesApproved: number | undefined;
+      if (options.interactive) {
+        const approvedScored = await runInteractiveSession(finalScored);
+        patchesApproved = approvedScored.length;
+        finalPatches = approvedScored.map((sp) => sp.patch);
+        finalScored = approvedScored;
+      }
+
+      // Use repoDir as the source path for config generation
+      const config = generateConfig(repoDir, finalPatches);
+      const confidence = calculateConfidence(finalPatches);
+
+      // Verification is not supported with --from-git (no disk source files)
+      const result: SuggestResult = {
+        config,
+        scoredPatches: finalScored,
+        stats: {
+          filesAnalyzed,
+          filesDeleted: deletedPaths.length,
+          filesRenamed: 0,
+          filesMoved: 0,
+          filesCopied: 0,
+          patchesGenerated: finalPatches.length,
+          patchesConsolidated,
+          confidence,
+          patchesApproved,
+        },
+      };
+
+      if (options.output) {
+        const configYaml = serializeConfig(config);
+        writeFileSync(options.output, configYaml, "utf-8");
+      }
+
+      if (options.write && options.write !== "-" && options.write !== "stdout") {
+        writePatches(options.write, config.patches ?? [], repoDir);
+      }
+
+      if (options.apply) {
+        const filesApplied = await applyPatchesToDirectory(
+          filePairs,
+          finalPatches,
+          repoDir,
+          options.apply,
+        );
+        result.stats.filesApplied = filesApplied;
+      }
+
+      if (format === "json") {
+        outputJson(result);
+      } else {
+        outputText(result, opts);
+      }
+
+      return 0;
+    }
+
+    // --- Normal source/target path ---
+    // Both options.source and options.target are guaranteed by the validation above
+    const sourcePath = resolve(options.source ?? "");
+    const targetPath = resolve(options.target ?? "");
+
+    // Verify paths exist
+    if (!existsSync(sourcePath)) {
+      throw new Error(`Source path does not exist: ${sourcePath}`);
+    }
+
+    if (!existsSync(targetPath)) {
+      throw new Error(`Target path does not exist: ${targetPath}`);
+    }
 
     // Match files between source and target
     if (verbosity >= 2) {

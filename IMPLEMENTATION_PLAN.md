@@ -1,10 +1,41 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest --from-git flag - COMPLETE!):**
+
+* ✅ **`kustomark suggest --from-git <range>`**: New flag that generates a kustomark.yaml patch config directly from a git commit range, with no need to maintain separate source/target directory pairs. Reads before/after file content from git objects using `git show`, so it works entirely from the repository history.
+* ✅ **Range formats supported**: `HEAD~1..HEAD`, `abc123..def456`, `HEAD~3` (single ref defaults to `<ref>..HEAD`).
+* ✅ **`--source` as path filter**: When combined with `--from-git`, `--source <path>` restricts analysis to files under that subdirectory (e.g. `--source docs/`). Path is made repo-relative automatically via `git rev-parse --show-toplevel`.
+* ✅ **Full file status coverage**: Modified files → content FilePairs fed to existing suggestion engine; deleted files → `delete-file` patches; added files → tracked in `addedPaths` (available for future `copy-file` generation).
+* ✅ **In-memory content fields on `FilePair`**: Added `sourceContent?` and `targetContent?` to the `FilePair` interface. When present, `analyzeFilePairs` and `applyPatchesToDirectory` use these instead of `readFileSync`, enabling `--apply` to work with git-sourced pairs.
+* ✅ **Exported `fetchGitPairs(range, repoDir, filterPath?)`**: Standalone exported function for unit testing. Returns `{ pairs, deletedPaths, addedPaths }`.
+* ✅ **All other `suggest` flags compose with `--from-git`**: `--write`, `--apply`, `--interactive`, `--min-confidence`, `--output`, `--format`, verbosity flags all work as before.
+* ✅ **Updated help text** in `src/cli/help.ts`: New `--from-git` entry in OPTIONS, updated SYNOPSIS line, three new examples.
+* ✅ **7 new tests** in `tests/cli/suggest.test.ts` (`--from-git: fetchGitPairs` suite):
+  * Returns FilePairs for modified files in range
+  * Returns deletedPaths for files removed in range
+  * Returns addedPaths for files added in range
+  * Single ref without `..` defaults to `<ref>..HEAD`
+  * filterPath restricts results to subdirectory
+  * Throws when range is invalid
+  * Returns empty pairs for range with no supported file changes
+* ✅ **4,301 tests passing**: Up from 4,294.
+
+**Files modified:**
+
+* `src/cli/suggest-command.ts` — Added `fromGit?` to `CLIOptions`; added `sourceContent?`/`targetContent?` to `FilePair`; updated `analyzeFilePairs` and `applyPatchesToDirectory` to use in-memory content fields; added `runGit`, `parseGitRange`, exported `fetchGitPairs`; added `--from-git` branch in `suggestCommand`.
+* `src/cli/index.ts` — Added `fromGit?: string` to exported `CLIOptions`; added `--from-git` / `--from-git=` arg parsing block.
+* `src/cli/help.ts` — Updated `getSuggestHelp()` SYNOPSIS, added `--from-git` entry to OPTIONS, added three examples.
+* `tests/cli/suggest.test.ts` — 7 new tests in `--from-git: fetchGitPairs` describe block.
+
+**Status:** suggest --from-git COMPLETE! ✅
+
+***
 
 **2026-04-10 (snapshot command test coverage - COMPLETE!):**
 

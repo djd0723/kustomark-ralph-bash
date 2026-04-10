@@ -188,6 +188,7 @@ export interface CLIOptions {
   noHistory?: boolean; // For --no-history flag (disable build history recording)
   write?: string; // For suggest --write option (write patches to config file, merging with existing)
   apply?: string; // For suggest --apply option (apply patches to output directory)
+  fromGit?: string; // For suggest --from-git option (generate patches from a git range)
 }
 
 interface RecoveryStats {
@@ -680,6 +681,17 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
         const nextArg = args[i + 1];
         if (nextArg !== undefined) {
           options.apply = nextArg;
+          i++;
+        }
+      }
+    } else if (arg === "--from-git" || arg.startsWith("--from-git=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.fromGit = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg !== undefined) {
+          options.fromGit = nextArg;
           i++;
         }
       }
