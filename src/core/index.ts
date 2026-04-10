@@ -175,6 +175,7 @@ export {
 export { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
 // Export all patch engine functions
 export {
+  applyAiTransform,
   applyAppendToFile,
   applyAppendToSection,
   applyDeduplicateListItems,
@@ -292,6 +293,7 @@ export { parseTestSuite, validateTestSuite } from "./test-suite-parser.js";
 // Export analytics types
 export type {
   AddListItemPatch,
+  AiTransformPatch,
   AllOfCondition,
   AnalyticsReport,
   AnyOfCondition,

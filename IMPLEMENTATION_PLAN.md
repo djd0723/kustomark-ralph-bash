@@ -1,10 +1,35 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (AI Transform patch operation - COMPLETE!):**
+
+* ✅ **`op: ai-transform`**: New patch operation that sends file content to an LLM API for transformation. Supports OpenAI-compatible endpoints and Anthropic's Messages API. Previously deferred as "Not Planned" in out-of-scope.md; now fully implemented.
+* ✅ **Provider-aware request shapes**: OpenAI uses `chat/completions` with system + user messages; Anthropic uses `/v1/messages` with the `x-api-key` / `anthropic-version` headers. Both formats extract the text response from provider-specific JSON shapes.
+* ✅ **Configurable per-patch**: `prompt` (required), `provider` (`openai`|`anthropic`|`custom`), `endpoint` (override URL), `apiKeyEnv` (env var name for API key, defaults to `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`), `model`, `timeout`, `maxTokens`, `temperature`.
+* ✅ **Silent failure on error**: Any failure (missing API key, HTTP error, timeout, unexpected response shape) returns original content with `count=0`, consistent with `exec` behavior. Never throws.
+* ✅ **Timeout via AbortController**: `timeout` (default 60s) uses `AbortController` to cancel in-flight fetch requests.
+* ✅ **Full pipeline integration**: Added to `validOps`, config field validation (prompt required, provider enum, numeric range checks for timeout/maxTokens/temperature), JSON Schema, `applySinglePatch` switch, `getPatchDescription`, `describePatch`, `calculatePatchScore` (score 0.5, medium confidence), and `index.ts` exports.
+* ✅ **16 new tests** in `tests/core/ai-transform.test.ts`: missing API key (OpenAI/Anthropic), successful transformation (both providers), 4xx/5xx errors, network throw, custom endpoint URL, custom `apiKeyEnv`, default models, `maxTokens`/`temperature` forwarding, unexpected response shapes.
+* ✅ **4,209 tests passing**: Up from 4,193.
+
+**Files modified:**
+
+* `src/core/types.ts` — Added `AiTransformPatch` interface; added to `PatchOperation` union.
+* `src/core/patch-engine.ts` — Added `applyAiTransform()` (exported); wired into `applySinglePatch` and `getPatchDescription`.
+* `src/core/config-parser.ts` — Added `"ai-transform"` to `validOps`; added field validation case.
+* `src/core/schema.ts` — Added full JSON Schema entry for `ai-transform` in the `oneOf` patches array.
+* `src/core/patch-suggester.ts` — Added `describePatch` case and `calculatePatchScore` block (score 0.5).
+* `src/core/index.ts` — Exported `applyAiTransform` and `AiTransformPatch`.
+* `tests/core/ai-transform.test.ts` — 16 new tests (new file).
+
+**Status:** AI Transform patch operation COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest insert-before-line detection - COMPLETE!):**
 

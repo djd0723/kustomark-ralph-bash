@@ -740,6 +740,7 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "reorder-table-columns",
     "filter-table-rows",
     "exec",
+    "ai-transform",
     "plugin",
     "json-set",
     "json-delete",
@@ -1707,6 +1708,70 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
           field: `${prefix}.language`,
           message: "'language' must be a string",
         });
+      }
+      break;
+    }
+
+    case "ai-transform": {
+      if (!p.prompt || typeof p.prompt !== "string") {
+        errors.push({
+          field: `${prefix}.prompt`,
+          message: "ai-transform operation requires 'prompt' field as a non-empty string",
+        });
+      }
+      const validProviders = ["openai", "anthropic", "custom"];
+      if (p.provider !== undefined && !validProviders.includes(p.provider as string)) {
+        errors.push({
+          field: `${prefix}.provider`,
+          message: `'provider' must be one of: ${validProviders.join(", ")}`,
+        });
+      }
+      if (p.endpoint !== undefined && typeof p.endpoint !== "string") {
+        errors.push({
+          field: `${prefix}.endpoint`,
+          message: "'endpoint' must be a string URL",
+        });
+      }
+      if (p.apiKeyEnv !== undefined && typeof p.apiKeyEnv !== "string") {
+        errors.push({
+          field: `${prefix}.apiKeyEnv`,
+          message: "'apiKeyEnv' must be a string",
+        });
+      }
+      if (p.model !== undefined && typeof p.model !== "string") {
+        errors.push({
+          field: `${prefix}.model`,
+          message: "'model' must be a string",
+        });
+      }
+      if (p.timeout !== undefined) {
+        if (
+          typeof p.timeout !== "number" ||
+          !Number.isFinite(p.timeout) ||
+          p.timeout < 100 ||
+          p.timeout > 300000
+        ) {
+          errors.push({
+            field: `${prefix}.timeout`,
+            message: "'timeout' must be a number between 100 and 300000",
+          });
+        }
+      }
+      if (p.maxTokens !== undefined) {
+        if (typeof p.maxTokens !== "number" || !Number.isInteger(p.maxTokens) || p.maxTokens < 1) {
+          errors.push({
+            field: `${prefix}.maxTokens`,
+            message: "'maxTokens' must be a positive integer",
+          });
+        }
+      }
+      if (p.temperature !== undefined) {
+        if (typeof p.temperature !== "number" || p.temperature < 0 || p.temperature > 2) {
+          errors.push({
+            field: `${prefix}.temperature`,
+            message: "'temperature' must be a number between 0 and 2",
+          });
+        }
       }
       break;
     }

@@ -2454,6 +2454,141 @@ export async function applyExec(
 }
 
 /**
+ * Apply an ai-transform patch operation - sends content to an LLM API for transformation
+ *
+ * Calls the configured AI provider with the file content as context and the prompt
+ * as an instruction. The provider's response replaces the file content.
+ * On any error (network failure, bad API key, timeout), returns the original content
+ * with count=0 rather than throwing, consistent with exec behavior.
+ *
+ * @param content - The file content to transform
+ * @param prompt - Instruction for the AI transformation
+ * @param provider - AI provider ("openai", "anthropic", or "custom")
+ * @param endpoint - Custom API endpoint URL
+ * @param apiKeyEnv - Environment variable name for the API key
+ * @param model - Model name to use
+ * @param timeout - Timeout in milliseconds
+ * @param maxTokens - Maximum tokens for the response
+ * @param temperature - Temperature for generation
+ * @returns Promise resolving to transformed content and count (1 if successful, 0 if failed)
+ */
+export async function applyAiTransform(
+  content: string,
+  prompt: string,
+  provider: "openai" | "anthropic" | "custom" = "openai",
+  endpoint?: string,
+  apiKeyEnv?: string,
+  model?: string,
+  timeout = 60000,
+  maxTokens = 4096,
+  temperature = 0,
+): Promise<{ content: string; count: number }> {
+  try {
+    // Resolve API key from environment
+    const defaultEnvKey = provider === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
+    const envKey = apiKeyEnv ?? defaultEnvKey;
+    const apiKey = process.env[envKey];
+    if (!apiKey) {
+      throw new Error(`API key not found in environment variable ${envKey}`);
+    }
+
+    // Resolve endpoint and build request
+    let url: string;
+    let headers: Record<string, string>;
+    let body: unknown;
+
+    if (provider === "anthropic") {
+      url = endpoint ?? "https://api.anthropic.com/v1/messages";
+      headers = {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      };
+      body = {
+        model: model ?? "claude-opus-4-5",
+        max_tokens: maxTokens,
+        temperature,
+        messages: [
+          {
+            role: "user",
+            content: `${prompt}\n\n<content>\n${content}\n</content>\n\nRespond with only the transformed content, no explanation.`,
+          },
+        ],
+      };
+    } else {
+      // openai-compatible (openai or custom)
+      url = endpoint ?? "https://api.openai.com/v1/chat/completions";
+      headers = {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      };
+      body = {
+        model: model ?? "gpt-4o",
+        max_tokens: maxTokens,
+        temperature,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a document transformation assistant. Apply the requested transformation to the provided content. Respond with only the transformed content, no explanation.",
+          },
+          {
+            role: "user",
+            content: `${prompt}\n\n${content}`,
+          },
+        ],
+      };
+    }
+
+    // Make request with timeout
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorBody}`);
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+
+    // Extract content from provider-specific response shape
+    let transformed: string;
+    if (provider === "anthropic") {
+      const contentArr = (data as { content?: Array<{ type?: string; text?: string }> }).content;
+      const textBlock = contentArr?.find((b) => b.type === "text");
+      if (!textBlock?.text) {
+        throw new Error("Unexpected Anthropic API response shape");
+      }
+      transformed = textBlock.text;
+    } else {
+      const choices = (data as { choices?: Array<{ message?: { content?: string } }> }).choices;
+      const text = choices?.[0]?.message?.content;
+      if (text === undefined || text === null) {
+        throw new Error("Unexpected OpenAI API response shape");
+      }
+      transformed = text;
+    }
+
+    return { content: transformed, count: 1 };
+  } catch (_err) {
+    // Return original content with count=0 on any failure (mirrors exec behavior)
+    return { content, count: 0 };
+  }
+}
+
+/**
  * Check whether a file path is a JSON or YAML file based on its extension.
  *
  * @param filePath - Absolute or relative file path to check
@@ -3394,6 +3529,20 @@ export async function applySinglePatch(
       result = await applyExec(content, patch.command, patch.timeout);
       break;
 
+    case "ai-transform":
+      result = await applyAiTransform(
+        content,
+        patch.prompt,
+        patch.provider,
+        patch.endpoint,
+        patch.apiKeyEnv,
+        patch.model,
+        patch.timeout,
+        patch.maxTokens,
+        patch.temperature,
+      );
+      break;
+
     case "json-set":
       result = applyJsonSet(content, patch.path, patch.value, filePath);
       break;
@@ -3702,6 +3851,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `deduplicate-table-rows in table '${patch.table}'${patch.column !== undefined ? ` by column '${patch.column}'` : ""}${patch.keep ? ` (keep=${patch.keep})` : ""}`;
     case "exec":
       return `exec '${patch.command}'`;
+    case "ai-transform":
+      return `ai-transform with prompt '${patch.prompt.slice(0, 60)}${patch.prompt.length > 60 ? "..." : ""}'`;
     case "json-set":
       return `json-set '${patch.path}'`;
     case "json-delete":

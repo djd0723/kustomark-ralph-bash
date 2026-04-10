@@ -2500,6 +2500,11 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     score = 0.9;
   }
 
+  // AI transform — medium confidence (external, non-deterministic)
+  if (patch.op === "ai-transform") {
+    score = 0.5;
+  }
+
   return score;
 }
 
@@ -2670,6 +2675,9 @@ function describePatch(patch: PatchOperation): string {
 
     case "plugin":
       return `Apply plugin operation "${patch.plugin}"`;
+
+    case "ai-transform":
+      return `Transform with AI: "${truncate(patch.prompt, 50)}"`;
   }
 }
 

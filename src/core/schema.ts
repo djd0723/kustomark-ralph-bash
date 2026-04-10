@@ -3478,6 +3478,118 @@ export function generateSchema(): object {
             },
             {
               type: "object",
+              required: ["op", "prompt"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "ai-transform",
+                  description: "Send content to an LLM API for AI-powered transformation",
+                },
+                prompt: {
+                  type: "string",
+                  description:
+                    "Instruction prompt for the AI transformation. The file content is sent as context.",
+                },
+                provider: {
+                  type: "string",
+                  enum: ["openai", "anthropic", "custom"],
+                  description: "AI provider to use (default: openai)",
+                  default: "openai",
+                },
+                endpoint: {
+                  type: "string",
+                  description: "Custom API endpoint URL. Overrides the provider default endpoint.",
+                },
+                apiKeyEnv: {
+                  type: "string",
+                  description:
+                    "Environment variable name containing the API key (defaults: OPENAI_API_KEY or ANTHROPIC_API_KEY)",
+                },
+                model: {
+                  type: "string",
+                  description:
+                    "Model name to use (defaults: gpt-4o for openai, claude-opus-4-5 for anthropic)",
+                },
+                timeout: {
+                  type: "number",
+                  description: "Timeout in milliseconds (default: 60000)",
+                  default: 60000,
+                  minimum: 100,
+                  maximum: 300000,
+                },
+                maxTokens: {
+                  type: "number",
+                  description: "Maximum tokens for the response (default: 4096)",
+                  default: 4096,
+                  minimum: 1,
+                },
+                temperature: {
+                  type: "number",
+                  description: "Temperature for generation (0-2, default: 0 for determinism)",
+                  default: 0,
+                  minimum: 0,
+                  maximum: 2,
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
               required: ["op", "plugin"],
               properties: {
                 op: {

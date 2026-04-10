@@ -574,6 +574,29 @@ export interface ExecPatch extends PatchCommonFields {
 }
 
 /**
+ * AI transform operation - sends content to an LLM API for transformation
+ */
+export interface AiTransformPatch extends PatchCommonFields {
+  op: "ai-transform";
+  /** Instruction prompt for the AI transformation */
+  prompt: string;
+  /** AI provider: "openai", "anthropic", or "custom" (default: "openai") */
+  provider?: "openai" | "anthropic" | "custom";
+  /** Custom API endpoint URL (overrides provider default) */
+  endpoint?: string;
+  /** Environment variable name containing the API key (defaults: OPENAI_API_KEY, ANTHROPIC_API_KEY) */
+  apiKeyEnv?: string;
+  /** Model name to use (defaults: gpt-4o for openai, claude-opus-4-5 for anthropic) */
+  model?: string;
+  /** Timeout in milliseconds (default: 60000) */
+  timeout?: number;
+  /** Maximum tokens for the response (default: 4096) */
+  maxTokens?: number;
+  /** Temperature for generation 0-2 (default: 0 for determinism) */
+  temperature?: number;
+}
+
+/**
  * Plugin operation - runs a custom plugin to transform content
  */
 export interface PluginPatch extends PatchCommonFields {
@@ -808,6 +831,7 @@ export type PatchOperation =
   | FilterTableRowsPatch
   | DeduplicateTableRowsPatch
   | ExecPatch
+  | AiTransformPatch
   | PluginPatch
   | JsonSetPatch
   | JsonDeletePatch
