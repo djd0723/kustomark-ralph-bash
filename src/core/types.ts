@@ -654,6 +654,48 @@ export interface ReorderListItemsPatch extends PatchCommonFields {
 }
 
 /**
+ * Modify links patch operation - finds inline links by URL or text and replaces them
+ */
+export interface ModifyLinksPatch extends PatchCommonFields {
+  op: "modify-links";
+  /** Exact URL to match */
+  urlMatch?: string;
+  /** Regex pattern to match URL */
+  urlPattern?: string;
+  /** Exact link text to match */
+  textMatch?: string;
+  /** Regex pattern to match link text */
+  textPattern?: string;
+  /** Replacement URL (used with urlMatch) */
+  newUrl?: string;
+  /** Regex replacement string for URL (used with urlPattern, supports $1 etc.) */
+  urlReplacement?: string;
+  /** Replacement link text */
+  newText?: string;
+  /** Regex replacement string for link text (used with textPattern) */
+  textReplacement?: string;
+}
+
+/**
+ * Update TOC patch operation - regenerates table of contents between HTML comment markers
+ */
+export interface UpdateTocPatch extends PatchCommonFields {
+  op: "update-toc";
+  /** Opening TOC marker (default: "<!-- TOC -->") */
+  marker?: string;
+  /** Closing TOC marker (default: "<!-- /TOC -->") */
+  endMarker?: string;
+  /** Minimum heading level to include (default: 2) */
+  minLevel?: number;
+  /** Maximum heading level to include (default: 4) */
+  maxLevel?: number;
+  /** Use ordered (numbered) list (default: false) */
+  ordered?: boolean;
+  /** Indentation string per level (default: "  ") */
+  indent?: string;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -700,7 +742,9 @@ export type PatchOperation =
   | SortListPatch
   | FilterListItemsPatch
   | DeduplicateListItemsPatch
-  | ReorderListItemsPatch;
+  | ReorderListItemsPatch
+  | ModifyLinksPatch
+  | UpdateTocPatch;
 
 /**
  * Global validator configuration

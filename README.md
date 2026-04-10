@@ -4301,6 +4301,133 @@ Put items in a markdown list into a specific order using 0-based indices or exac
 * Text matching is exact and case-sensitive
 * Returns count 1 if reordered, 0 if list not found or order is invalid
 
+---
+
+## Link Operations
+
+### `modify-links` - Modify Inline Links
+
+Find inline markdown links by URL and/or text pattern, then replace their URL, text, or both.
+
+**Requires at least one match criterion and at least one replacement.**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `urlMatch` | string | * | Exact URL to match |
+| `urlPattern` | string | * | Regex pattern to match URL |
+| `textMatch` | string | * | Exact link text to match |
+| `textPattern` | string | * | Regex pattern to match link text |
+| `newUrl` | string | * | Replacement URL |
+| `urlReplacement` | string | * | Regex replacement for URL (supports `$1`, `$2`) |
+| `newText` | string | * | Replacement link text |
+| `textReplacement` | string | * | Regex replacement for link text (supports `$1`, `$2`) |
+
+*At least one match field and one replacement field are required.*
+
+**Examples:**
+
+```yaml
+# Replace an exact URL across all files
+- op: modify-links
+  urlMatch: "https://old.example.com/docs"
+  newUrl: "https://new.example.com/docs"
+
+# Upgrade all v1 API links to v2 using regex
+- op: modify-links
+  urlPattern: "/api/v1/"
+  urlReplacement: "/api/v2/"
+
+# Fix link text casing
+- op: modify-links
+  textMatch: "Click Here"
+  newText: "Click here"
+
+# Replace both URL and text simultaneously
+- op: modify-links
+  urlMatch: "https://old.example.com"
+  textMatch: "old site"
+  newUrl: "https://new.example.com"
+  newText: "new site"
+```
+
+**Notes:**
+
+* Only standard inline links `[text](url)` are matched
+* Reference-style links (`[text][ref]`), autolinks (`<url>`), and image links are not modified
+* All matching links in the document are replaced (global)
+* When both `urlMatch`/`urlPattern` and `textMatch`/`textPattern` are specified, both must match for a link to be modified
+
+---
+
+## Table of Contents Operations
+
+### `update-toc` - Regenerate Table of Contents
+
+Regenerate a table of contents between HTML comment markers. The markers are preserved; only the content between them is replaced. This operation is **idempotent**.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `marker` | string | `<!-- TOC -->` | Opening marker line |
+| `endMarker` | string | `<!-- /TOC -->` | Closing marker line |
+| `minLevel` | integer (1-6) | `2` | Minimum heading level to include |
+| `maxLevel` | integer (1-6) | `4` | Maximum heading level to include |
+| `ordered` | boolean | `false` | Use numbered list instead of bullets |
+| `indent` | string | `"  "` (2 spaces) | Indentation per heading level |
+
+**Document setup:**
+
+Add the TOC markers where you want the table of contents to appear:
+
+```markdown
+# My Document
+
+<!-- TOC -->
+<!-- /TOC -->
+
+## Introduction
+
+Some content.
+
+## Reference
+
+### API
+
+### Configuration
+```
+
+**Config:**
+
+```yaml
+- op: update-toc
+```
+
+**Output (between markers):**
+
+```markdown
+<!-- TOC -->
+- [Introduction](#introduction)
+- [Reference](#reference)
+  - [API](#api)
+  - [Configuration](#configuration)
+<!-- /TOC -->
+```
+
+**With ordered list and custom depth:**
+
+```yaml
+- op: update-toc
+  minLevel: 2
+  maxLevel: 3
+  ordered: true
+```
+
+**Notes:**
+
+* Returns count 1 if markers are found, 0 if either marker is missing
+* Running `update-toc` twice produces identical output (idempotent)
+* H1 headings are excluded by default (`minLevel: 2`)
+* Custom IDs (`## Title {#custom-id}`) are respected — the anchor uses the custom ID
+
 ### Real-World Example
 
 ```yaml

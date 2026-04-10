@@ -1972,6 +1972,181 @@ export function applyReorderListItems(
 }
 
 /**
+ * Apply a modify-links patch operation - finds inline markdown links by URL or text
+ * and replaces their URL and/or text.
+ *
+ * Only standard inline links `[text](url)` are matched. Reference-style links
+ * (`[text][ref]`), autolinks (`<url>`), and image links are not modified.
+ *
+ * @param content - The markdown content to transform
+ * @param urlMatch - Exact URL to match
+ * @param urlPattern - Regex pattern to match URL
+ * @param textMatch - Exact link text to match
+ * @param textPattern - Regex pattern to match link text
+ * @param newUrl - Replacement URL (used with urlMatch or as a fixed replacement for urlPattern)
+ * @param urlReplacement - Regex replacement string for URL (supports $1 etc., used with urlPattern)
+ * @param newText - Replacement link text
+ * @param textReplacement - Regex replacement string for text (supports $1 etc., used with textPattern)
+ * @returns Object with transformed content and count of links modified
+ */
+export function applyModifyLinks(
+  content: string,
+  urlMatch: string | undefined,
+  urlPattern: string | undefined,
+  textMatch: string | undefined,
+  textPattern: string | undefined,
+  newUrl: string | undefined,
+  urlReplacement: string | undefined,
+  newText: string | undefined,
+  textReplacement: string | undefined,
+): { content: string; count: number } {
+  // Require at least one match criterion
+  if (
+    urlMatch === undefined &&
+    urlPattern === undefined &&
+    textMatch === undefined &&
+    textPattern === undefined
+  ) {
+    return { content, count: 0 };
+  }
+
+  const urlRegex = urlPattern !== undefined ? new RegExp(urlPattern) : undefined;
+  const textRegex = textPattern !== undefined ? new RegExp(textPattern) : undefined;
+
+  let count = 0;
+
+  // Match inline links: [text](url) - handles spaces in URL but not nested brackets
+  const result = content.replace(
+    /\[([^\]]*)\]\(([^)]*)\)/g,
+    (fullMatch, linkText: string, linkUrl: string) => {
+      // Test URL criterion
+      const urlMatched =
+        urlMatch !== undefined
+          ? linkUrl === urlMatch
+          : urlRegex !== undefined
+            ? urlRegex.test(linkUrl)
+            : true;
+
+      // Test text criterion
+      const textMatched =
+        textMatch !== undefined
+          ? linkText === textMatch
+          : textRegex !== undefined
+            ? textRegex.test(linkText)
+            : true;
+
+      if (!urlMatched || !textMatched) return fullMatch;
+
+      count++;
+
+      // Compute new URL
+      let resolvedUrl = linkUrl;
+      if (newUrl !== undefined) {
+        resolvedUrl = newUrl;
+      } else if (urlPattern !== undefined && urlReplacement !== undefined) {
+        resolvedUrl = linkUrl.replace(new RegExp(urlPattern), urlReplacement);
+      }
+
+      // Compute new text
+      let resolvedText = linkText;
+      if (newText !== undefined) {
+        resolvedText = newText;
+      } else if (textPattern !== undefined && textReplacement !== undefined) {
+        resolvedText = linkText.replace(new RegExp(textPattern), textReplacement);
+      }
+
+      return `[${resolvedText}](${resolvedUrl})`;
+    },
+  );
+
+  return { content: result, count };
+}
+
+/**
+ * Apply an update-toc patch operation - regenerates a table of contents between
+ * HTML comment markers.
+ *
+ * The markers themselves are preserved; only the content between them is replaced.
+ * This operation is idempotent: running it twice produces the same result.
+ *
+ * @param content - The markdown content to transform
+ * @param marker - Opening TOC marker (default: "<!-- TOC -->")
+ * @param endMarker - Closing TOC marker (default: "<!-- /TOC -->")
+ * @param minLevel - Minimum heading level to include (default: 2)
+ * @param maxLevel - Maximum heading level to include (default: 4)
+ * @param ordered - Use ordered (numbered) list (default: false)
+ * @param indent - Indentation string per level (default: "  ")
+ * @returns Object with updated content and count (1 if markers found, 0 if missing)
+ */
+export function applyUpdateToc(
+  content: string,
+  marker = "<!-- TOC -->",
+  endMarker = "<!-- /TOC -->",
+  minLevel = 2,
+  maxLevel = 4,
+  ordered = false,
+  indent = "  ",
+): { content: string; count: number } {
+  const lines = content.split("\n");
+
+  let startLine = -1;
+  let endLine = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    if (startLine === -1 && line.includes(marker)) {
+      startLine = i;
+    } else if (startLine !== -1 && line.includes(endMarker)) {
+      endLine = i;
+      break;
+    }
+  }
+
+  if (startLine === -1 || endLine === -1) return { content, count: 0 };
+
+  const sections = parseSections(content);
+  const eligible = sections.filter((s) => s.level >= minLevel && s.level <= maxLevel);
+
+  if (eligible.length === 0) {
+    // Keep markers, remove any interior content
+    lines.splice(startLine + 1, endLine - startLine - 1);
+    return { content: lines.join("\n"), count: 1 };
+  }
+
+  const baseLevel = Math.min(...eligible.map((s) => s.level));
+  const counters = new Map<number, number>();
+
+  const tocLines = eligible.map((section) => {
+    const indentDepth = section.level - baseLevel;
+    const indentStr = indent.repeat(indentDepth);
+
+    let bullet: string;
+    if (ordered) {
+      const current = (counters.get(section.level) ?? 0) + 1;
+      counters.set(section.level, current);
+      // Reset counters for deeper levels when level decreases
+      for (const lvl of counters.keys()) {
+        if (lvl > section.level) counters.delete(lvl);
+      }
+      bullet = `${current}.`;
+    } else {
+      bullet = "-";
+    }
+
+    // Strip the ## prefix and any custom ID from the display text
+    const cleanText = section.headerText
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/\s*\{#[a-zA-Z0-9_-]+\}\s*$/, "")
+      .trim();
+
+    return `${indentStr}${bullet} [${cleanText}](#${section.id})`;
+  });
+
+  lines.splice(startLine + 1, endLine - startLine - 1, ...tocLines);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply an exec patch operation - runs a shell command to transform content
  *
  * This function executes a shell command with the markdown content piped to stdin,
@@ -3013,6 +3188,32 @@ export async function applySinglePatch(
       result = applyReorderListItems(content, patch.list, patch.order);
       break;
 
+    case "modify-links":
+      result = applyModifyLinks(
+        content,
+        patch.urlMatch,
+        patch.urlPattern,
+        patch.textMatch,
+        patch.textPattern,
+        patch.newUrl,
+        patch.urlReplacement,
+        patch.newText,
+        patch.textReplacement,
+      );
+      break;
+
+    case "update-toc":
+      result = applyUpdateToc(
+        content,
+        patch.marker,
+        patch.endMarker,
+        patch.minLevel,
+        patch.maxLevel,
+        patch.ordered,
+        patch.indent,
+      );
+      break;
+
     case "plugin":
       // Plugin operation requires a registry to be passed
       // This will be handled by applyPatchesWithPlugins
@@ -3182,6 +3383,16 @@ function getPatchDescription(patch: PatchOperation): string {
       return `deduplicate-list-items '${patch.list}'${patch.keep ? ` (keep=${patch.keep})` : ""}`;
     case "reorder-list-items":
       return `reorder-list-items '${patch.list}' to [${patch.order.join(", ")}]`;
+    case "modify-links": {
+      const parts: string[] = [];
+      if (patch.urlMatch) parts.push(`url='${patch.urlMatch}'`);
+      if (patch.urlPattern) parts.push(`urlPattern='${patch.urlPattern}'`);
+      if (patch.textMatch) parts.push(`text='${patch.textMatch}'`);
+      if (patch.textPattern) parts.push(`textPattern='${patch.textPattern}'`);
+      return `modify-links ${parts.join(", ")}`;
+    }
+    case "update-toc":
+      return `update-toc (marker='${patch.marker ?? "<!-- TOC -->"}')`;
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":

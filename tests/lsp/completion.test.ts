@@ -307,8 +307,10 @@ patches:
       expect(labels).toContain('filter-list-items');
       expect(labels).toContain('deduplicate-list-items');
       expect(labels).toContain('reorder-list-items');
+      expect(labels).toContain('modify-links');
+      expect(labels).toContain('update-toc');
 
-      expect(labels).toHaveLength(29);
+      expect(labels).toHaveLength(31);
     });
 
     test('provides operations with partial input', () => {
@@ -605,7 +607,7 @@ patches:
       const labels = getLabels(completions);
 
       expect(labels).toContain('replace');
-      expect(labels.length).toBe(29); // All operations (22 original + 7 list operations)
+      expect(labels.length).toBe(31); // All operations (22 original + 7 list operations + 2 AST operations)
     });
 
     test('handles position at end of line with onNoMatch field', () => {
@@ -687,7 +689,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide completions for client filtering
-      expect(completions.length).toBe(29);
+      expect(completions.length).toBe(31);
     });
 
     test('returns empty array for unknown context', () => {
@@ -727,7 +729,7 @@ resources:
 
       const completions = provider.provideCompletions(doc, position);
 
-      expect(completions.length).toBe(29);
+      expect(completions.length).toBe(31);
     });
 
     test('triggers completions mid-line with indentation', () => {
@@ -754,7 +756,7 @@ resources:
         const completions = provider.provideCompletions(doc, position);
 
         // Should get operation completions (29 total: 22 original + 7 list operations)
-        expect(completions.length).toBe(29);
+        expect(completions.length).toBe(31);
       }
     });
   });
@@ -1024,7 +1026,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide operation completions
-      expect(completions.length).toBe(29);
+      expect(completions.length).toBe(31);
     });
 
     test('handles cursor at document end', () => {

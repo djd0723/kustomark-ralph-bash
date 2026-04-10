@@ -138,11 +138,15 @@ See [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) for complete plugin syst
 
 ### Full AST Parsing
 
+**Status**: Implemented (2026-04-09)
+
 Parse markdown into full AST for semantic manipulation.
 
-**Rationale**: Complexity, fragility, overkill for most patches.
+**Implementation**: Position-based string editing guided by parsed structure. Two new patch operations leverage this:
+- `modify-links` — find and modify inline links by URL/text pattern
+- `update-toc` — regenerate table of contents between HTML comment markers
 
-**Current approach**: Parse headers for sections; string ops for rest.
+See `src/core/patch-engine.ts` (`applyModifyLinks`, `applyUpdateToc`).
 
 ## Not Planned
 

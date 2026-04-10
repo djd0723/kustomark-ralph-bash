@@ -613,6 +613,21 @@ export class CompletionProvider {
           "Put list items into a specific order using 0-based indices or exact item text",
         insertText: "reorder-list-items",
       },
+      {
+        label: "modify-links",
+        kind: CompletionItemKind.Value,
+        detail: "Find and modify inline markdown links",
+        documentation: "Match links by URL or text pattern and replace their URL, text, or both",
+        insertText: "modify-links",
+      },
+      {
+        label: "update-toc",
+        kind: CompletionItemKind.Value,
+        detail: "Regenerate table of contents between markers",
+        documentation:
+          "Generate or update a TOC between <!-- TOC --> and <!-- /TOC --> comment markers",
+        insertText: "update-toc",
+      },
     ];
   }
 
@@ -1109,6 +1124,108 @@ export class CompletionProvider {
           documentation:
             "Array of 0-based indices or exact item text strings specifying the new order",
           insertText: "order:\n  - ",
+        },
+      ],
+      "modify-links": [
+        {
+          label: "urlMatch",
+          kind: CompletionItemKind.Field,
+          detail: "Exact URL to match",
+          documentation: "Match links whose URL equals this string exactly",
+          insertText: "urlMatch: ",
+        },
+        {
+          label: "urlPattern",
+          kind: CompletionItemKind.Field,
+          detail: "Regex pattern for URL",
+          documentation: "Match links whose URL matches this regex pattern",
+          insertText: "urlPattern: ",
+        },
+        {
+          label: "textMatch",
+          kind: CompletionItemKind.Field,
+          detail: "Exact link text to match",
+          documentation: "Match links whose display text equals this string exactly",
+          insertText: "textMatch: ",
+        },
+        {
+          label: "textPattern",
+          kind: CompletionItemKind.Field,
+          detail: "Regex pattern for link text",
+          documentation: "Match links whose display text matches this regex pattern",
+          insertText: "textPattern: ",
+        },
+        {
+          label: "newUrl",
+          kind: CompletionItemKind.Field,
+          detail: "Replacement URL",
+          documentation: "Replace the matched link URL with this value",
+          insertText: "newUrl: ",
+        },
+        {
+          label: "urlReplacement",
+          kind: CompletionItemKind.Field,
+          detail: "Regex replacement for URL",
+          documentation: "Regex replacement string for URL (supports $1, $2 capture groups)",
+          insertText: "urlReplacement: ",
+        },
+        {
+          label: "newText",
+          kind: CompletionItemKind.Field,
+          detail: "Replacement link text",
+          documentation: "Replace the matched link display text with this value",
+          insertText: "newText: ",
+        },
+        {
+          label: "textReplacement",
+          kind: CompletionItemKind.Field,
+          detail: "Regex replacement for link text",
+          documentation: "Regex replacement string for link text (supports $1, $2 capture groups)",
+          insertText: "textReplacement: ",
+        },
+      ],
+      "update-toc": [
+        {
+          label: "marker",
+          kind: CompletionItemKind.Field,
+          detail: "Opening TOC marker",
+          documentation: 'Opening HTML comment marker for TOC (default: "<!-- TOC -->")',
+          insertText: "marker: ",
+        },
+        {
+          label: "endMarker",
+          kind: CompletionItemKind.Field,
+          detail: "Closing TOC marker",
+          documentation: 'Closing HTML comment marker for TOC (default: "<!-- /TOC -->")',
+          insertText: "endMarker: ",
+        },
+        {
+          label: "minLevel",
+          kind: CompletionItemKind.Field,
+          detail: "Minimum heading level",
+          documentation: "Minimum heading level to include in TOC (default: 2)",
+          insertText: "minLevel: ",
+        },
+        {
+          label: "maxLevel",
+          kind: CompletionItemKind.Field,
+          detail: "Maximum heading level",
+          documentation: "Maximum heading level to include in TOC (default: 4)",
+          insertText: "maxLevel: ",
+        },
+        {
+          label: "ordered",
+          kind: CompletionItemKind.Field,
+          detail: "Use ordered list",
+          documentation: "Use numbered list instead of bullet list (default: false)",
+          insertText: "ordered: ",
+        },
+        {
+          label: "indent",
+          kind: CompletionItemKind.Field,
+          detail: "Indentation per level",
+          documentation: 'Indentation string per heading level (default: "  ")',
+          insertText: "indent: ",
         },
       ],
     };

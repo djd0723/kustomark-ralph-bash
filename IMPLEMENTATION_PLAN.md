@@ -1,10 +1,73 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (AST-based Link and TOC Operations - COMPLETE!):**
+
+* ✅ **`modify-links`**: New patch operation to find and modify inline markdown links
+* ✅ **`update-toc`**: New patch operation to regenerate a table of contents between HTML comment markers
+* ✅ **FULL AST PARSING**: Previously deferred feature from `specs/out-of-scope.md` — implemented using position-based string editing guided by parsed structure (no reformatting side effects)
+* ✅ **LSP COMPLETIONS**: Both new ops added to completion provider with field-level completions
+* ✅ **SCHEMA UPDATED**: JSON Schema includes both operations with full field definitions
+* ✅ **CONFIG VALIDATION**: Both ops added to `validOps` with field-level validation
+* ✅ **SUGGESTION ENGINE**: Intelligent failure hints for both ops (link count, missing markers)
+* ✅ **30 NEW TESTS PASSING**: Unit tests in `tests/core/ast-operations.test.ts`
+* ✅ **3,766 TESTS PASSING**: All tests pass with 0 failures
+* ✅ **README UPDATED**: Documented both operations with field tables and examples
+
+**Details:**
+
+1. **`modify-links`** — Matches inline links `[text](url)` by URL, text, or both (exact or regex), then replaces URL and/or text. All matching links in the document are modified (global). Reference-style links and autolinks are not affected.
+
+   ```yaml
+   # Exact URL replacement
+   - op: modify-links
+     urlMatch: "https://old.example.com/docs"
+     newUrl: "https://new.example.com/docs"
+
+   # Regex URL upgrade
+   - op: modify-links
+     urlPattern: "/api/v1/"
+     urlReplacement: "/api/v2/"
+
+   # Fix link text + URL simultaneously
+   - op: modify-links
+     urlMatch: "https://old.example.com"
+     textMatch: "old site"
+     newUrl: "https://new.example.com"
+     newText: "new site"
+   ```
+
+2. **`update-toc`** — Regenerates a table of contents between `<!-- TOC -->` / `<!-- /TOC -->` markers. Idempotent. Supports custom markers, heading level range, ordered lists, and custom indentation.
+
+   ```yaml
+   - op: update-toc
+     minLevel: 2
+     maxLevel: 3
+     ordered: false
+   ```
+
+**Implementation Files:**
+* `src/core/types.ts` — Added `ModifyLinksPatch` and `UpdateTocPatch` interfaces
+* `src/core/patch-engine.ts` — Added `applyModifyLinks()` and `applyUpdateToc()` functions, switch cases
+* `src/core/config-parser.ts` — Added both ops to `validOps`, added field validation cases
+* `src/core/schema.ts` — Added JSON Schema definitions for both operations
+* `src/core/suggestion-engine.ts` — Added intelligent failure suggestions for both ops
+* `src/lsp/completion.ts` — Added op completions and field-level completions for both ops
+* `src/core/index.ts` — Exported new functions and types
+* `tests/core/ast-operations.test.ts` — 30 new tests (15 per operation)
+* `README.md` — Added "Link Operations" and "Table of Contents Operations" sections
+* `specs/out-of-scope.md` — Updated Full AST Parsing status to implemented
+
+**Status:** AST-based Link and TOC Operations COMPLETE! ✅
+
+This completes the last remaining item from `specs/out-of-scope.md` (Full AST Parsing — previously "Deferred: Complexity"). The implementation uses a position-based approach consistent with the existing codebase, avoiding reformatting side effects that come with round-tripping through a full AST serializer.
+
+---
 
 **2026-04-09 (reorder-list-items - COMPLETE!):**
 

@@ -310,6 +310,36 @@ export function generatePatchSuggestions(
       break;
     }
 
+    case "modify-links": {
+      const linkCount = (content.match(/\[[^\]]*\]\([^)]*\)/g) ?? []).length;
+      if (linkCount === 0) {
+        suggestions.push("No inline links found in the document.");
+        suggestions.push(
+          "modify-links only matches inline links [text](url), not reference-style links.",
+        );
+      } else {
+        suggestions.push(
+          `Document contains ${linkCount} inline link(s). Check that your match criteria are correct.`,
+        );
+      }
+      break;
+    }
+
+    case "update-toc": {
+      const tocMarker = patch.marker ?? "<!-- TOC -->";
+      const tocEndMarker = patch.endMarker ?? "<!-- /TOC -->";
+      const hasStart = content.includes(tocMarker);
+      const hasEnd = content.includes(tocEndMarker);
+      if (!hasStart && !hasEnd) {
+        suggestions.push(`Neither '${tocMarker}' nor '${tocEndMarker}' markers were found.`);
+      } else if (!hasStart) {
+        suggestions.push(`Opening marker '${tocMarker}' was not found.`);
+      } else if (!hasEnd) {
+        suggestions.push(`Closing marker '${tocEndMarker}' was not found.`);
+      }
+      break;
+    }
+
     // Operations that always succeed or are handled elsewhere
     case "set-frontmatter":
     case "merge-frontmatter":

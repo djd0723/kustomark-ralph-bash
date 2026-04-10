@@ -635,6 +635,8 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "deduplicate-table-rows",
     "deduplicate-list-items",
     "reorder-list-items",
+    "modify-links",
+    "update-toc",
   ];
 
   if (!validOps.includes(p.op as string)) {
@@ -1277,6 +1279,111 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         });
       }
       break;
+
+    case "modify-links": {
+      const hasMatch =
+        p.urlMatch !== undefined ||
+        p.urlPattern !== undefined ||
+        p.textMatch !== undefined ||
+        p.textPattern !== undefined;
+      if (!hasMatch) {
+        errors.push({
+          field: prefix,
+          message:
+            "modify-links requires at least one of: urlMatch, urlPattern, textMatch, textPattern",
+        });
+      }
+
+      const hasReplacement =
+        p.newUrl !== undefined ||
+        p.urlReplacement !== undefined ||
+        p.newText !== undefined ||
+        p.textReplacement !== undefined;
+      if (!hasReplacement) {
+        errors.push({
+          field: prefix,
+          message:
+            "modify-links requires at least one of: newUrl, urlReplacement, newText, textReplacement",
+        });
+      }
+
+      for (const field of ["urlPattern", "textPattern"] as const) {
+        const val = (p as Record<string, unknown>)[field];
+        if (val !== undefined) {
+          if (typeof val !== "string") {
+            errors.push({ field: `${prefix}.${field}`, message: `'${field}' must be a string` });
+          } else {
+            try {
+              new RegExp(val);
+            } catch (e) {
+              errors.push({
+                field: `${prefix}.${field}`,
+                message: `Invalid regex in '${field}': ${e instanceof Error ? e.message : String(e)}`,
+              });
+            }
+          }
+        }
+      }
+
+      for (const field of [
+        "urlMatch",
+        "textMatch",
+        "newUrl",
+        "urlReplacement",
+        "newText",
+        "textReplacement",
+      ] as const) {
+        const val = (p as Record<string, unknown>)[field];
+        if (val !== undefined && typeof val !== "string") {
+          errors.push({ field: `${prefix}.${field}`, message: `'${field}' must be a string` });
+        }
+      }
+      break;
+    }
+
+    case "update-toc": {
+      for (const field of ["minLevel", "maxLevel"] as const) {
+        const val = (p as Record<string, unknown>)[field];
+        if (val !== undefined) {
+          if (
+            typeof val !== "number" ||
+            !Number.isInteger(val) ||
+            (val as number) < 1 ||
+            (val as number) > 6
+          ) {
+            errors.push({
+              field: `${prefix}.${field}`,
+              message: `'${field}' must be an integer between 1 and 6`,
+            });
+          }
+        }
+      }
+
+      const pRec = p as Record<string, unknown>;
+      const min = typeof pRec.minLevel === "number" ? (pRec.minLevel as number) : undefined;
+      const max = typeof pRec.maxLevel === "number" ? (pRec.maxLevel as number) : undefined;
+      if (min !== undefined && max !== undefined && min > max) {
+        errors.push({
+          field: `${prefix}.minLevel`,
+          message: "'minLevel' must be less than or equal to 'maxLevel'",
+        });
+      }
+
+      for (const field of ["marker", "endMarker", "indent"] as const) {
+        const val = (p as Record<string, unknown>)[field];
+        if (val !== undefined && typeof val !== "string") {
+          errors.push({ field: `${prefix}.${field}`, message: `'${field}' must be a string` });
+        }
+      }
+
+      if (pRec.ordered !== undefined && typeof pRec.ordered !== "boolean") {
+        errors.push({
+          field: `${prefix}.ordered`,
+          message: "'ordered' must be a boolean",
+        });
+      }
+      break;
+    }
   }
 
   return errors;
