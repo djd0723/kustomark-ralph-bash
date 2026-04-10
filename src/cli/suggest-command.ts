@@ -6,6 +6,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import * as yaml from "js-yaml";
+import { applyPatches } from "../core/patch-engine.js";
 import type { ScoredPatch } from "../core/patch-suggester.js";
 import { scorePatches, suggestJsonPatches, suggestPatches } from "../core/patch-suggester.js";
 import type { KustomarkConfig, PatchOperation } from "../core/types.js";
@@ -23,6 +24,31 @@ interface CLIOptions {
   verbosity?: number;
   output?: string;
   minConfidence?: number;
+  verify?: boolean;
+}
+
+export interface VerificationFileResult {
+  /** Relative path of the file */
+  file: string;
+  /** Whether the patches reproduced the target exactly */
+  reproduced: boolean;
+  /** Similarity score (0–1): fraction of target lines that match */
+  similarity: number;
+  /** Lines in the target not present in the patched output */
+  unmatchedLines: number;
+}
+
+export interface VerificationSummary {
+  /** Total file pairs checked */
+  filesChecked: number;
+  /** Files where patches exactly reproduced the target */
+  exactMatches: number;
+  /** Files where patches partially reproduced the target (similarity > 0 but < 1) */
+  partialMatches: number;
+  /** Files where patches produced no useful change toward the target */
+  notReproduced: number;
+  /** Per-file results */
+  results: VerificationFileResult[];
 }
 
 export interface SuggestResult {
@@ -37,6 +63,8 @@ export interface SuggestResult {
     patchesGenerated: number;
     confidence: "high" | "medium" | "low";
   };
+  /** Present when --verify flag is used */
+  verification?: VerificationSummary;
 }
 
 export interface SuggestError {
@@ -420,6 +448,102 @@ function calculateConfidence(patches: PatchOperation[]): "high" | "medium" | "lo
 }
 
 // ============================================================================
+// Verification Functions
+// ============================================================================
+
+const FILE_OP_OPS = new Set(["copy-file", "rename-file", "delete-file", "move-file"]);
+
+/**
+ * Compute line-level similarity between two strings.
+ * Returns a value in [0, 1] where 1 = identical.
+ */
+function computeSimilarity(actual: string, expected: string): number {
+  if (actual === expected) return 1;
+  const actualLines = actual.split("\n");
+  const expectedLines = expected.split("\n");
+  if (expectedLines.length === 0) return actual.length === 0 ? 1 : 0;
+
+  const actualSet = new Set(actualLines);
+  let matched = 0;
+  for (const line of expectedLines) {
+    if (actualSet.has(line)) matched++;
+  }
+  return matched / expectedLines.length;
+}
+
+/**
+ * Apply content patches to source files and compare results with target files.
+ * File-operation patches (rename, move, copy, delete) are excluded since they
+ * operate on the file system rather than file content.
+ */
+export async function verifyPatches(
+  pairs: FilePair[],
+  patches: PatchOperation[],
+): Promise<VerificationSummary> {
+  const contentPatches = patches.filter((p) => !FILE_OP_OPS.has(p.op));
+
+  const results: VerificationFileResult[] = [];
+  let exactMatches = 0;
+  let partialMatches = 0;
+  let notReproduced = 0;
+
+  for (const pair of pairs) {
+    let sourceContent: string;
+    let targetContent: string;
+    try {
+      sourceContent = readFileSync(pair.sourcePath, "utf-8");
+      targetContent = readFileSync(pair.targetPath, "utf-8");
+    } catch {
+      continue;
+    }
+
+    // Select patches that apply to this file (respecting include patterns)
+    const applicablePatches = contentPatches.filter((p) => {
+      if (!p.include) return true;
+      const patterns = Array.isArray(p.include) ? p.include : [p.include];
+      return patterns.some((pat) => pair.relativePath === pat || pair.relativePath === ".");
+    });
+
+    // Apply patches to source content
+    let patched: string;
+    try {
+      const patchResult = await applyPatches(sourceContent, applicablePatches);
+      patched = patchResult.content;
+    } catch {
+      patched = sourceContent;
+    }
+
+    const reproduced = patched === targetContent;
+    const similarity = reproduced ? 1 : computeSimilarity(patched, targetContent);
+    const targetLines = targetContent.split("\n").length;
+    const unmatchedLines = Math.round((1 - similarity) * targetLines);
+
+    if (reproduced) {
+      exactMatches++;
+    } else if (similarity > 0) {
+      partialMatches++;
+    } else {
+      notReproduced++;
+    }
+
+    results.push({
+      file: pair.relativePath,
+      reproduced,
+      similarity,
+      unmatchedLines,
+    });
+  }
+
+  return {
+    filesChecked: results.length,
+    exactMatches,
+    partialMatches,
+    notReproduced,
+    results,
+  };
+}
+
+// ============================================================================
 // Config Generation Functions
 // ============================================================================
 
@@ -495,6 +619,26 @@ function outputText(result: SuggestResult, options: CLIOptions): void {
     }
     console.log(`  Patches generated: ${result.stats.patchesGenerated}`);
     console.log(`  Confidence: ${result.stats.confidence}`);
+  }
+
+  if (result.verification) {
+    const v = result.verification;
+    console.log("\nVerification:");
+    console.log(`  Files checked: ${v.filesChecked}`);
+    console.log(`  Exact matches: ${v.exactMatches}/${v.filesChecked}`);
+    if (v.partialMatches > 0) {
+      console.log(`  Partial matches: ${v.partialMatches}`);
+    }
+    if (v.notReproduced > 0) {
+      console.log(`  Not reproduced: ${v.notReproduced}`);
+    }
+    if (options.verbosity && options.verbosity >= 2) {
+      for (const r of v.results) {
+        const pct = Math.round(r.similarity * 100);
+        const status = r.reproduced ? "✓ exact" : `~${pct}%`;
+        console.log(`  [${status}] ${r.file}`);
+      }
+    }
   }
 
   if (options.output) {
@@ -620,6 +764,15 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
     // Calculate confidence
     const confidence = calculateConfidence(patches);
 
+    // Run verification if requested: apply patches to source and compare with target
+    let verification: VerificationSummary | undefined;
+    if (options.verify && filePairs.length > 0) {
+      if (verbosity >= 2) {
+        console.log("\nVerifying patches against target files...");
+      }
+      verification = await verifyPatches(filePairs, patches);
+    }
+
     const result: SuggestResult = {
       config,
       scoredPatches,
@@ -632,6 +785,7 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
         patchesGenerated: patches.length,
         confidence,
       },
+      verification,
     };
 
     // Write to output file if specified

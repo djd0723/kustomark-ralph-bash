@@ -1,10 +1,35 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest --verify flag - COMPLETE!):**
+
+* ✅ **`kustomark suggest --verify`**: New flag that closes the suggest→build feedback loop. After generating patches, applies them to each source file and compares the result against the target, reporting how accurately the suggested patches reproduce the desired transformation.
+* ✅ **`VerificationFileResult`**: Per-file result with `reproduced` (exact match boolean), `similarity` (0–1 line-level score), and `unmatchedLines` (count of target lines not present in patched output).
+* ✅ **`VerificationSummary`**: Aggregate over all file pairs: `filesChecked`, `exactMatches`, `partialMatches`, `notReproduced`, `results[]`.
+* ✅ **`SuggestResult.verification`**: Optional field added to the existing `SuggestResult`; present only when `--verify` is passed.
+* ✅ **File-op patches excluded**: `copy-file`, `rename-file`, `move-file`, `delete-file` operate on the filesystem and are excluded from content verification — only content-modifying patches are applied.
+* ✅ **`include` pattern respected**: When multiple files are analyzed, each patch's `include` pattern is honored so only relevant patches are applied to each file during verification.
+* ✅ **Text output**: Verification summary printed after the patch config under "Verification:" heading; per-file detail shown at verbosity ≥ 2 (`-v`).
+* ✅ **JSON output**: `verification` object included in the top-level `SuggestResult` JSON.
+* ✅ **`--verify` flag in help text**: Added to `kustomark suggest --help` OPTIONS section.
+* ✅ **9 new tests** in `tests/cli/suggest.test.ts` (`verifyPatches` unit tests): exact match, partial match, no progress, empty patch list, include-pattern filtering, file-op exclusion, empty pairs, `unmatchedLines=0` for exact, `unmatchedLines>0` for non-exact.
+* ✅ **4,218 tests passing**: Up from 4,209.
+
+**Files modified:**
+
+* `src/cli/suggest-command.ts` — Added `verify?: boolean` to `CLIOptions`; added `VerificationFileResult`, `VerificationSummary` interfaces; added `verification?` to `SuggestResult`; added `FILE_OP_OPS` set, `computeSimilarity()`, exported `verifyPatches()`; wired verification call in `suggestCommand`; updated `outputText` to print verification block.
+* `src/cli/index.ts` — Added `verify?: boolean` comment to `CLIOptions` (field already existed); `--verify` flag already parsed at line 396 — no new parsing needed.
+* `src/cli/help.ts` — Added `--verify` flag entry to `suggest` OPTIONS section.
+* `tests/cli/suggest.test.ts` — 9 new unit tests in `verifyPatches` suite (imported directly from source).
+
+**Status:** suggest --verify COMPLETE! ✅
+
+***
 
 **2026-04-10 (AI Transform patch operation - COMPLETE!):**
 

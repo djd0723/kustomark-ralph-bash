@@ -2264,6 +2264,7 @@ ${formatSection("ARGUMENTS")}
 ${formatSection("OPTIONS")}
   ${formatFlag("--output")} <path>             Write generated config to file
   ${formatFlag("--min-confidence")} <0.0-1.0>  Filter patches below confidence threshold (0.0-1.0)
+  ${formatFlag("--verify")}                   Apply patches to source and compare with target to confirm accuracy
   ${formatFlag("--format")} <text|json>        Output format (default: text)
   ${formatFlag("-v, -vv, -vvv")}              Increase verbosity for more details
   ${formatFlag("-q")}                         Quiet mode (errors only)

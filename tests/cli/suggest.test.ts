@@ -1552,3 +1552,177 @@ More updated content.`;
     });
   });
 });
+
+// ============================================================================
+// Unit tests for verifyPatches (no CLI build needed)
+// ============================================================================
+
+import { verifyPatches } from "../../src/cli/suggest-command.js";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join as joinPath } from "node:path";
+
+describe("verifyPatches", () => {
+  const tmpDir = "/tmp/kustomark-verify-test";
+
+  beforeEach(() => {
+    if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true, force: true });
+    mkdirSync(tmpDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("reports exact match when patch perfectly reproduces target", async () => {
+    const sourceFile = joinPath(tmpDir, "source.md");
+    const targetFile = joinPath(tmpDir, "target.md");
+    writeFileSync(sourceFile, "Hello world\n");
+    writeFileSync(targetFile, "Hello universe\n");
+
+    const pairs = [{ relativePath: "source.md", sourcePath: sourceFile, targetPath: targetFile }];
+    const patches = [{ op: "replace" as const, old: "world", new: "universe" }];
+
+    const result = await verifyPatches(pairs, patches);
+
+    expect(result.filesChecked).toBe(1);
+    expect(result.exactMatches).toBe(1);
+    expect(result.partialMatches).toBe(0);
+    expect(result.notReproduced).toBe(0);
+    expect(result.results[0]?.reproduced).toBe(true);
+    expect(result.results[0]?.similarity).toBe(1);
+  });
+
+  test("reports partial match when patches partially reproduce target", async () => {
+    const sourceFile = joinPath(tmpDir, "source.md");
+    const targetFile = joinPath(tmpDir, "target.md");
+    writeFileSync(sourceFile, "Line one\nLine two\nLine three\n");
+    // Target differs significantly — patches won't reproduce it
+    writeFileSync(targetFile, "Completely different content\nNothing matches\n");
+
+    const pairs = [{ relativePath: "source.md", sourcePath: sourceFile, targetPath: targetFile }];
+    // A patch that changes only one word — won't reproduce the completely different target
+    const patches = [{ op: "replace" as const, old: "one", new: "ONE" }];
+
+    const result = await verifyPatches(pairs, patches);
+
+    expect(result.filesChecked).toBe(1);
+    expect(result.exactMatches).toBe(0);
+    expect(result.results[0]?.reproduced).toBe(false);
+    expect(result.results[0]?.similarity).toBeGreaterThanOrEqual(0);
+    expect(result.results[0]?.similarity).toBeLessThan(1);
+  });
+
+  test("reports not-reproduced when patches make no progress toward target", async () => {
+    const sourceFile = joinPath(tmpDir, "source.md");
+    const targetFile = joinPath(tmpDir, "target.md");
+    writeFileSync(sourceFile, "alpha beta gamma\n");
+    writeFileSync(targetFile, "completely different file content here\n");
+
+    const pairs = [{ relativePath: "source.md", sourcePath: sourceFile, targetPath: targetFile }];
+    // Patch that doesn't match anything — source is returned unchanged
+    const patches = [{ op: "replace" as const, old: "notfound", new: "something" }];
+
+    const result = await verifyPatches(pairs, patches);
+
+    expect(result.filesChecked).toBe(1);
+    expect(result.exactMatches).toBe(0);
+    expect(result.results[0]?.reproduced).toBe(false);
+  });
+
+  test("handles empty patch list: source unchanged, similarity vs target", async () => {
+    const sourceFile = joinPath(tmpDir, "source.md");
+    const targetFile = joinPath(tmpDir, "target.md");
+    writeFileSync(sourceFile, "unchanged\n");
+    writeFileSync(targetFile, "unchanged\n");
+
+    const pairs = [{ relativePath: "source.md", sourcePath: sourceFile, targetPath: targetFile }];
+    const result = await verifyPatches(pairs, []);
+
+    expect(result.exactMatches).toBe(1);
+    expect(result.results[0]?.reproduced).toBe(true);
+    expect(result.results[0]?.similarity).toBe(1);
+  });
+
+  test("filters patches by include pattern for multi-file pairs", async () => {
+    const aSource = joinPath(tmpDir, "a.md");
+    const aTarget = joinPath(tmpDir, "a-target.md");
+    const bSource = joinPath(tmpDir, "b.md");
+    const bTarget = joinPath(tmpDir, "b-target.md");
+    writeFileSync(aSource, "foo bar\n");
+    writeFileSync(aTarget, "foo baz\n");
+    writeFileSync(bSource, "hello world\n");
+    writeFileSync(bTarget, "hello world\n");
+
+    const pairs = [
+      { relativePath: "a.md", sourcePath: aSource, targetPath: aTarget },
+      { relativePath: "b.md", sourcePath: bSource, targetPath: bTarget },
+    ];
+    // Patch scoped to a.md only
+    const patches = [{ op: "replace" as const, old: "bar", new: "baz", include: "a.md" }];
+
+    const result = await verifyPatches(pairs, patches);
+
+    expect(result.filesChecked).toBe(2);
+    const aResult = result.results.find((r) => r.file === "a.md");
+    const bResult = result.results.find((r) => r.file === "b.md");
+    expect(aResult?.reproduced).toBe(true);
+    // b.md source === target, so it's also exact
+    expect(bResult?.reproduced).toBe(true);
+  });
+
+  test("excludes file-op patches from content verification", async () => {
+    const sourceFile = joinPath(tmpDir, "source.md");
+    const targetFile = joinPath(tmpDir, "target.md");
+    writeFileSync(sourceFile, "Hello world\n");
+    writeFileSync(targetFile, "Hello universe\n");
+
+    const pairs = [{ relativePath: "source.md", sourcePath: sourceFile, targetPath: targetFile }];
+    // Mix of file-op (excluded) and content patch (included)
+    const patches = [
+      { op: "delete-file" as const, match: "other.md" },
+      { op: "rename-file" as const, match: "old.md", rename: "new.md" },
+      { op: "replace" as const, old: "world", new: "universe" },
+    ];
+
+    const result = await verifyPatches(pairs, patches);
+
+    expect(result.exactMatches).toBe(1);
+    expect(result.results[0]?.reproduced).toBe(true);
+  });
+
+  test("returns empty summary for empty pairs list", async () => {
+    const result = await verifyPatches([], []);
+
+    expect(result.filesChecked).toBe(0);
+    expect(result.exactMatches).toBe(0);
+    expect(result.partialMatches).toBe(0);
+    expect(result.notReproduced).toBe(0);
+    expect(result.results).toHaveLength(0);
+  });
+
+  test("unmatchedLines is 0 for exact match", async () => {
+    const sourceFile = joinPath(tmpDir, "source.md");
+    const targetFile = joinPath(tmpDir, "target.md");
+    writeFileSync(sourceFile, "foo\n");
+    writeFileSync(targetFile, "bar\n");
+
+    const pairs = [{ relativePath: "source.md", sourcePath: sourceFile, targetPath: targetFile }];
+    const patches = [{ op: "replace" as const, old: "foo", new: "bar" }];
+
+    const result = await verifyPatches(pairs, patches);
+
+    expect(result.results[0]?.unmatchedLines).toBe(0);
+  });
+
+  test("unmatchedLines is positive for non-exact match", async () => {
+    const sourceFile = joinPath(tmpDir, "source.md");
+    const targetFile = joinPath(tmpDir, "target.md");
+    writeFileSync(sourceFile, "line one\nline two\nline three\n");
+    writeFileSync(targetFile, "alpha\nbeta\ngamma\n");
+
+    const pairs = [{ relativePath: "source.md", sourcePath: sourceFile, targetPath: targetFile }];
+    const result = await verifyPatches(pairs, []);
+
+    expect(result.results[0]?.unmatchedLines).toBeGreaterThan(0);
+  });
+});
