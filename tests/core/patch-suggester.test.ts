@@ -1434,4 +1434,232 @@ Upgrade to 2.0.0 today`;
       }
     });
   });
+
+  // ============================================================================
+  // Table change detection
+  // ============================================================================
+
+  describe("table change detection", () => {
+    const TABLE_SOURCE = [
+      "| Name | Age | City |",
+      "|------|-----|------|",
+      "| Alice | 30 | NYC |",
+      "| Bob | 25 | LA |",
+    ].join("\n");
+
+    test("detects cell value change", () => {
+      const target = [
+        "| Name | Age | City |",
+        "|------|-----|------|",
+        "| Alice | 30 | NYC |",
+        "| Bob | 26 | LA |",
+      ].join("\n");
+
+      const analysis = analyzeDiff(TABLE_SOURCE, target);
+
+      expect(analysis.tableChanges.length).toBeGreaterThan(0);
+      const cellChange = analysis.tableChanges.find((c) => c.type === "cell-changed");
+      expect(cellChange).toBeDefined();
+      expect(cellChange?.type === "cell-changed" && cellChange.oldValue).toBe("25");
+      expect(cellChange?.type === "cell-changed" && cellChange.newValue).toBe("26");
+    });
+
+    test("detects row added to table", () => {
+      const target = [
+        "| Name | Age | City |",
+        "|------|-----|------|",
+        "| Alice | 30 | NYC |",
+        "| Bob | 25 | LA |",
+        "| Carol | 28 | SF |",
+      ].join("\n");
+
+      const analysis = analyzeDiff(TABLE_SOURCE, target);
+
+      expect(analysis.tableChanges.length).toBeGreaterThan(0);
+      const rowAdded = analysis.tableChanges.find((c) => c.type === "row-added");
+      expect(rowAdded).toBeDefined();
+      expect(rowAdded?.type === "row-added" && rowAdded.values[0]).toBe("Carol");
+    });
+
+    test("detects row removed from table", () => {
+      const target = [
+        "| Name | Age | City |",
+        "|------|-----|------|",
+        "| Alice | 30 | NYC |",
+      ].join("\n");
+
+      const analysis = analyzeDiff(TABLE_SOURCE, target);
+
+      expect(analysis.tableChanges.length).toBeGreaterThan(0);
+      const rowRemoved = analysis.tableChanges.find((c) => c.type === "row-removed");
+      expect(rowRemoved).toBeDefined();
+      expect(rowRemoved?.type === "row-removed" && rowRemoved.values[0]).toBe("Bob");
+    });
+
+    test("detects column removed from table", () => {
+      const target = [
+        "| Name | Age |",
+        "|------|-----|",
+        "| Alice | 30 |",
+        "| Bob | 25 |",
+      ].join("\n");
+
+      const analysis = analyzeDiff(TABLE_SOURCE, target);
+
+      expect(analysis.tableChanges.length).toBeGreaterThan(0);
+      const colRemoved = analysis.tableChanges.find((c) => c.type === "column-removed");
+      expect(colRemoved).toBeDefined();
+      expect(colRemoved?.type === "column-removed" && colRemoved.header).toBe("City");
+    });
+
+    test("detects column added to table", () => {
+      const target = [
+        "| Name | Age | City | Country |",
+        "|------|-----|------|---------|",
+        "| Alice | 30 | NYC | USA |",
+        "| Bob | 25 | LA | USA |",
+      ].join("\n");
+
+      const analysis = analyzeDiff(TABLE_SOURCE, target);
+
+      expect(analysis.tableChanges.length).toBeGreaterThan(0);
+      const colAdded = analysis.tableChanges.find((c) => c.type === "column-added");
+      expect(colAdded).toBeDefined();
+      expect(colAdded?.type === "column-added" && colAdded.header).toBe("Country");
+    });
+
+    test("suggests replace-table-cell for changed cell", () => {
+      const source = [
+        "| Name | Score |",
+        "|------|-------|",
+        "| Alice | 100 |",
+        "| Bob | 90 |",
+      ].join("\n");
+      const target = [
+        "| Name | Score |",
+        "|------|-------|",
+        "| Alice | 100 |",
+        "| Bob | 95 |",
+      ].join("\n");
+
+      const patches = suggestPatches(source, target);
+
+      const cellPatch = patches.find((p) => p.op === "replace-table-cell");
+      expect(cellPatch).toBeDefined();
+      expect(cellPatch?.op === "replace-table-cell" && cellPatch.content).toBe("95");
+    });
+
+    test("suggests add-table-row for new row", () => {
+      const source = "| X | Y |\n|---|---|\n| 1 | A |\n";
+      const target = "| X | Y |\n|---|---|\n| 1 | A |\n| 2 | B |\n";
+
+      const patches = suggestPatches(source, target);
+
+      const addRowPatch = patches.find((p) => p.op === "add-table-row");
+      expect(addRowPatch).toBeDefined();
+      expect(addRowPatch?.op === "add-table-row" && addRowPatch.values).toContain("2");
+    });
+
+    test("suggests remove-table-row for deleted row", () => {
+      const source = "| X | Y |\n|---|---|\n| 1 | A |\n| 2 | B |\n";
+      const target = "| X | Y |\n|---|---|\n| 1 | A |\n";
+
+      const patches = suggestPatches(source, target);
+
+      const removeRowPatch = patches.find((p) => p.op === "remove-table-row");
+      expect(removeRowPatch).toBeDefined();
+    });
+
+    test("suggests add-table-column for new column", () => {
+      const source = "| Name | Score |\n|------|-------|\n| Alice | 100 |\n";
+      const target = "| Name | Score | Grade |\n|------|-------|-------|\n| Alice | 100 | A |\n";
+
+      const patches = suggestPatches(source, target);
+
+      const addColPatch = patches.find((p) => p.op === "add-table-column");
+      expect(addColPatch).toBeDefined();
+      expect(addColPatch?.op === "add-table-column" && addColPatch.header).toBe("Grade");
+    });
+
+    test("suggests remove-table-column for deleted column", () => {
+      const source = "| Name | Score | Grade |\n|------|-------|-------|\n| Alice | 100 | A |\n";
+      const target = "| Name | Score |\n|------|-------|\n| Alice | 100 |\n";
+
+      const patches = suggestPatches(source, target);
+
+      const removeColPatch = patches.find((p) => p.op === "remove-table-column");
+      expect(removeColPatch).toBeDefined();
+      expect(removeColPatch?.op === "remove-table-column" && removeColPatch.column).toBe("Grade");
+    });
+
+    test("no table changes for identical tables", () => {
+      const analysis = analyzeDiff(TABLE_SOURCE, TABLE_SOURCE);
+
+      expect(analysis.tableChanges.length).toBe(0);
+    });
+
+    test("table patches scored as high confidence", () => {
+      const source = "| X | Y |\n|---|---|\n| 1 | A |\n";
+      const target = "| X | Y |\n|---|---|\n| 1 | B |\n";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+
+      const tablePatchScored = scored.find(
+        (s) =>
+          s.patch.op === "replace-table-cell" ||
+          s.patch.op === "add-table-row" ||
+          s.patch.op === "remove-table-row" ||
+          s.patch.op === "add-table-column" ||
+          s.patch.op === "remove-table-column",
+      );
+      if (tablePatchScored) {
+        expect(tablePatchScored.score).toBeGreaterThanOrEqual(0.9);
+      }
+    });
+
+    test("handles multiple tables independently", () => {
+      const source = [
+        "| A | B |",
+        "|---|---|",
+        "| 1 | 2 |",
+        "",
+        "| X | Y |",
+        "|---|---|",
+        "| p | q |",
+      ].join("\n");
+      const target = [
+        "| A | B |",
+        "|---|---|",
+        "| 1 | 9 |",
+        "",
+        "| X | Y |",
+        "|---|---|",
+        "| p | q |",
+        "| r | s |",
+      ].join("\n");
+
+      const analysis = analyzeDiff(source, target);
+
+      const table0Changes = analysis.tableChanges.filter((c) => c.tableIndex === 0);
+      const table1Changes = analysis.tableChanges.filter((c) => c.tableIndex === 1);
+
+      expect(table0Changes.some((c) => c.type === "cell-changed")).toBe(true);
+      expect(table1Changes.some((c) => c.type === "row-added")).toBe(true);
+    });
+
+    test("describePatch returns human-readable description for table ops", () => {
+      const source = "| X | Y |\n|---|---|\n| 1 | A |\n";
+      const target = "| X | Y |\n|---|---|\n| 1 | B |\n";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+
+      const tablePatchScored = scored.find((s) => s.patch.op === "replace-table-cell");
+      if (tablePatchScored) {
+        expect(tablePatchScored.description).toContain("table");
+      }
+    });
+  });
 });
+

@@ -8,6 +8,7 @@
 import * as Diff from "diff";
 import { parseLists } from "./list-parser.js";
 import { parseFrontmatter, parseSections } from "./patch-engine.js";
+import { parseTables } from "./table-parser.js";
 import type { PatchOperation } from "./types.js";
 
 /** A list item that was added */
@@ -50,6 +51,51 @@ type LinkTextChanged = {
 /** A link change event */
 type LinkChange = LinkUrlChanged | LinkTextChanged;
 
+/** A table cell value that changed */
+type TableCellChanged = {
+  tableIndex: number;
+  type: "cell-changed";
+  rowIndex: number;
+  columnIndex: number;
+  oldValue: string;
+  newValue: string;
+};
+/** A table row that was added */
+type TableRowAdded = {
+  tableIndex: number;
+  type: "row-added";
+  rowIndex: number;
+  values: string[];
+};
+/** A table row that was removed */
+type TableRowRemoved = {
+  tableIndex: number;
+  type: "row-removed";
+  rowIndex: number;
+  values: string[];
+};
+/** A table column that was added */
+type TableColumnAdded = {
+  tableIndex: number;
+  type: "column-added";
+  header: string;
+  columnIndex: number;
+};
+/** A table column that was removed */
+type TableColumnRemoved = {
+  tableIndex: number;
+  type: "column-removed";
+  header: string;
+  columnIndex: number;
+};
+/** A table change event */
+type TableChange =
+  | TableCellChanged
+  | TableRowAdded
+  | TableRowRemoved
+  | TableColumnAdded
+  | TableColumnRemoved;
+
 /**
  * Analysis of differences between source and target content
  */
@@ -86,6 +132,8 @@ export interface DiffAnalysis {
   listChanges: Array<ListItemChange>;
   /** Changes detected in markdown links */
   linkChanges: Array<LinkChange>;
+  /** Changes detected in markdown tables */
+  tableChanges: Array<TableChange>;
 }
 
 /**
@@ -121,6 +169,7 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
     hasFrontmatter: false,
     listChanges: [],
     linkChanges: [],
+    tableChanges: [],
   };
 
   // Analyze frontmatter changes
@@ -147,6 +196,9 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
 
   // Analyze link changes
   analysis.linkChanges = analyzeLinkChanges(source, target);
+
+  // Analyze table changes
+  analysis.tableChanges = analyzeTableChanges(source, target);
 
   // Analyze line-by-line changes using the diff library
   const changes = Diff.diffLines(source, target);
@@ -634,6 +686,176 @@ function suggestLinkPatches(analysis: DiffAnalysis): PatchOperation[] {
 }
 
 /**
+ * Analyzes table-level changes between source and target content
+ */
+function analyzeTableChanges(source: string, target: string): TableChange[] {
+  const changes: TableChange[] = [];
+  const sourceTables = parseTables(source);
+  const targetTables = parseTables(target);
+
+  const tableCount = Math.min(sourceTables.length, targetTables.length);
+
+  for (let tableIndex = 0; tableIndex < tableCount; tableIndex++) {
+    const src = sourceTables[tableIndex];
+    const tgt = targetTables[tableIndex];
+    if (!src || !tgt) continue;
+
+    // Detect removed columns (present in source, absent in target)
+    for (let ci = 0; ci < src.headers.length; ci++) {
+      const header = src.headers[ci];
+      if (!header) continue;
+      if (!tgt.headers.includes(header)) {
+        changes.push({ tableIndex, type: "column-removed", header, columnIndex: ci });
+      }
+    }
+
+    // Detect added columns (present in target, absent in source)
+    for (let ci = 0; ci < tgt.headers.length; ci++) {
+      const header = tgt.headers[ci];
+      if (!header) continue;
+      if (!src.headers.includes(header)) {
+        changes.push({ tableIndex, type: "column-added", header, columnIndex: ci });
+      }
+    }
+
+    // Build sets of serialized rows for efficient comparison
+    const srcRowStrings = src.rows.map((r) => JSON.stringify(r));
+    const tgtRowStrings = tgt.rows.map((r) => JSON.stringify(r));
+
+    // Detect removed rows
+    for (let ri = 0; ri < src.rows.length; ri++) {
+      const srcRowStr = srcRowStrings[ri];
+      const srcRow = src.rows[ri];
+      if (!srcRowStr || !srcRow) continue;
+      if (!tgtRowStrings.includes(srcRowStr)) {
+        // Check if a row with the same first-column value exists (modified vs removed)
+        const firstCell = srcRow[0];
+        const matchedInTarget = tgt.rows.some((r) => r[0] === firstCell);
+        if (!matchedInTarget) {
+          changes.push({ tableIndex, type: "row-removed", rowIndex: ri, values: srcRow });
+        }
+      }
+    }
+
+    // Detect added rows
+    for (let ri = 0; ri < tgt.rows.length; ri++) {
+      const tgtRowStr = tgtRowStrings[ri];
+      const tgtRow = tgt.rows[ri];
+      if (!tgtRowStr || !tgtRow) continue;
+      if (!srcRowStrings.includes(tgtRowStr)) {
+        const firstCell = tgtRow[0];
+        const matchedInSource = src.rows.some((r) => r[0] === firstCell);
+        if (!matchedInSource) {
+          changes.push({ tableIndex, type: "row-added", rowIndex: ri, values: tgtRow });
+        }
+      }
+    }
+
+    // Detect cell-level changes for rows that exist in both tables (matched by first column)
+    for (const srcRow of src.rows) {
+      const firstCell = srcRow[0];
+      const tgtRow = tgt.rows.find((r) => r[0] === firstCell);
+      if (!tgtRow) continue;
+
+      // Only compare columns present in both tables
+      for (const header of src.headers) {
+        const srcColIdx = src.headers.indexOf(header);
+        const tgtColIdx = tgt.headers.indexOf(header);
+        if (srcColIdx === -1 || tgtColIdx === -1) continue;
+
+        const srcCell = srcRow[srcColIdx] ?? "";
+        const tgtCell = tgtRow[tgtColIdx] ?? "";
+
+        if (srcCell !== tgtCell) {
+          const srcRowIdx = src.rows.indexOf(srcRow);
+          changes.push({
+            tableIndex,
+            type: "cell-changed",
+            rowIndex: srcRowIdx,
+            columnIndex: srcColIdx,
+            oldValue: srcCell,
+            newValue: tgtCell,
+          });
+        }
+      }
+    }
+  }
+
+  // Detect entirely new tables added at the end
+  for (let tableIndex = sourceTables.length; tableIndex < targetTables.length; tableIndex++) {
+    const tgt = targetTables[tableIndex];
+    if (!tgt) continue;
+    for (let ri = 0; ri < tgt.rows.length; ri++) {
+      const row = tgt.rows[ri];
+      if (!row) continue;
+      changes.push({ tableIndex, type: "row-added", rowIndex: ri, values: row });
+    }
+    for (let ci = 0; ci < tgt.headers.length; ci++) {
+      const header = tgt.headers[ci];
+      if (!header) continue;
+      changes.push({ tableIndex, type: "column-added", header, columnIndex: ci });
+    }
+  }
+
+  return changes;
+}
+
+/**
+ * Suggests table-related patches
+ */
+function suggestTablePatches(analysis: DiffAnalysis): PatchOperation[] {
+  const patches: PatchOperation[] = [];
+
+  for (const change of analysis.tableChanges) {
+    switch (change.type) {
+      case "cell-changed":
+        patches.push({
+          op: "replace-table-cell",
+          table: change.tableIndex,
+          row: change.rowIndex,
+          column: change.columnIndex,
+          content: change.newValue,
+        });
+        break;
+
+      case "row-added":
+        patches.push({
+          op: "add-table-row",
+          table: change.tableIndex,
+          values: change.values,
+        });
+        break;
+
+      case "row-removed":
+        patches.push({
+          op: "remove-table-row",
+          table: change.tableIndex,
+          row: change.rowIndex,
+        });
+        break;
+
+      case "column-added":
+        patches.push({
+          op: "add-table-column",
+          table: change.tableIndex,
+          header: change.header,
+        });
+        break;
+
+      case "column-removed":
+        patches.push({
+          op: "remove-table-column",
+          table: change.tableIndex,
+          column: change.header,
+        });
+        break;
+    }
+  }
+
+  return patches;
+}
+
+/**
  * Suggests patch operations based on diff analysis
  *
  * @param source - Original content
@@ -655,6 +877,9 @@ export function suggestPatches(source: string, target: string): PatchOperation[]
 
   // Suggest link patches
   patches.push(...suggestLinkPatches(analysis));
+
+  // Suggest table patches
+  patches.push(...suggestTablePatches(analysis));
 
   // Suggest line-based patches
   patches.push(...suggestLinePatches(analysis, source, target));
@@ -1092,6 +1317,17 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     score = 0.9;
   }
 
+  // Table operations are high confidence
+  if (
+    patch.op === "replace-table-cell" ||
+    patch.op === "add-table-row" ||
+    patch.op === "remove-table-row" ||
+    patch.op === "add-table-column" ||
+    patch.op === "remove-table-column"
+  ) {
+    score = 0.9;
+  }
+
   // Line operations are lower confidence
   if (
     patch.op === "replace-line" ||
@@ -1149,6 +1385,21 @@ function describePatch(patch: PatchOperation): string {
       if (patch.urlMatch) return `Update link URL "${truncate(patch.urlMatch, 40)}"`;
       if (patch.textMatch) return `Update link text "${truncate(patch.textMatch, 40)}"`;
       return "Modify links";
+
+    case "replace-table-cell":
+      return `Update table cell in table ${patch.table}, column "${patch.column}"`;
+
+    case "add-table-row":
+      return `Add row to table ${patch.table}`;
+
+    case "remove-table-row":
+      return `Remove row from table ${patch.table}`;
+
+    case "add-table-column":
+      return `Add column "${patch.header}" to table ${patch.table}`;
+
+    case "remove-table-column":
+      return `Remove column "${patch.column}" from table ${patch.table}`;
 
     default:
       return `Apply ${patch.op} operation`;

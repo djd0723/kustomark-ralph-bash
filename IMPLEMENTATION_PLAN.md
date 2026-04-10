@@ -1,10 +1,29 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (Suggest Table Op Detection - COMPLETE!):**
+
+* ✅ **`suggest` command now detects table cell changes**: When a cell value changes between source and target, generates a `replace-table-cell` patch targeting the row by index and column by index
+* ✅ **`suggest` command detects added rows**: New rows (identified by first-column value absent in source) generate `add-table-row` patches with all cell values
+* ✅ **`suggest` command detects removed rows**: Rows present in source but not target (matched by first-column value) generate `remove-table-row` patches
+* ✅ **`suggest` command detects added columns**: Headers present in target but not source generate `add-table-column` patches
+* ✅ **`suggest` command detects removed columns**: Headers present in source but not target generate `remove-table-column` patches
+* ✅ **High confidence scoring**: Table patches scored at 0.9 (same as section, list, and link ops)
+* ✅ **14 new tests**: Coverage of all five change types (`analyzeDiff` output, `suggestPatches` output, identical-table no-op, confidence scoring, multi-table independence, `describePatch` descriptions)
+* ✅ **3,985 tests passing**: Up from 3,971
+
+**Files modified:**
+* `src/core/patch-suggester.ts` — added `TableCellChanged`/`TableRowAdded`/`TableRowRemoved`/`TableColumnAdded`/`TableColumnRemoved` discriminated union types; `analyzeTableChanges`, `suggestTablePatches` functions; updated `DiffAnalysis`, `analyzeDiff`, `suggestPatches`, `calculatePatchScore`, `describePatch`; added `parseTables` import
+* `tests/core/patch-suggester.test.ts` — 14 new tests in `table change detection` suite
+
+**Status:** Suggest table op detection COMPLETE! ✅
+
+***
 
 **2026-04-09 (Suggest List & Link Op Detection - COMPLETE!):**
 
