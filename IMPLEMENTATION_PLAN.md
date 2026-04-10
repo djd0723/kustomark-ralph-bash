@@ -1,8 +1,27 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-09 (suggest line-insertion & between-marker ops - COMPLETE!):**
+
+* ✅ **`suggest` now detects pure line insertions**: When lines are inserted between existing content (not part of a section, list, table, or code block change), the command generates `insert-after-line` (or `insert-before-line` for insertions at the start of the file). Walks back past empty lines to find the nearest non-empty anchor line.
+* ✅ **`suggest` now detects marker-bounded content changes**: When HTML comment marker pairs (e.g. `<!-- BEGIN -->` / `<!-- END -->`, `<!-- TOC -->` / `<!-- END TOC -->`, `<!-- SECTION -->` / `<!-- /SECTION -->`) are present in both source and target but their enclosed content differs, generates `replace-between` or `delete-between` patches.
+* ✅ **Confidence scoring**: `insert-after-line`/`insert-before-line` score 0.6 (lower than structural ops); `delete-between`/`replace-between` score 0.85 (high — requires matching both markers).
+* ✅ **`describePatch` coverage**: Added human-readable descriptions for all 4 operations (`insert-after-line`, `insert-before-line`, `delete-between`, `replace-between`). Previously these fell through to the generic `Apply ${op} operation` default.
+* ✅ **16 new tests**: 8 tests for line insertion detection (single line, multi-line, start-of-file, non-generation for modifications and large blocks, scoring, describe), 8 tests for between-marker detection (replace-between, delete-between, no-op when unchanged, END variant, scoring, describe).
+* ✅ **4,031 tests passing**: Up from 4,015.
+
+**Files modified:**
+* `src/core/patch-suggester.ts` — Added `suggestLineInsertionPatches` and `suggestBetweenPatches` functions; wired both into `suggestPatches`; added `describePatch` cases for 4 ops; added `delete-between`/`replace-between` scoring at 0.85
+* `tests/core/patch-suggester.test.ts` — 16 new tests in `line insertion detection` and `between-marker change detection` suites
+
+**Status:** suggest line-insertion & between-marker ops COMPLETE! ✅
+
+***
 
 ## Recent Enhancements
 

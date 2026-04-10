@@ -975,8 +975,180 @@ export function suggestPatches(source: string, target: string): PatchOperation[]
   // Suggest code block patches
   patches.push(...suggestCodeBlockPatches(analysis));
 
+  // Suggest line insertion patches
+  patches.push(...suggestLineInsertionPatches(source, target));
+
+  // Suggest between-marker patches
+  patches.push(...suggestBetweenPatches(source, target));
+
   // Suggest line-based patches
   patches.push(...suggestLinePatches(analysis, source, target));
+
+  return patches;
+}
+
+/**
+ * Suggests insert-after-line and insert-before-line patches for pure line insertions.
+ *
+ * Only generates suggestions for small, targeted insertions (≤5 lines) that are
+ * not part of a modification (i.e., not immediately preceded by removed lines).
+ */
+function suggestLineInsertionPatches(source: string, target: string): PatchOperation[] {
+  const patches: PatchOperation[] = [];
+  const MAX_INSERT_LINES = 5;
+
+  const sourceLines = source.split("\n");
+  const changes = Diff.diffLines(source, target);
+
+  let sourceLineIdx = 0;
+
+  for (let i = 0; i < changes.length; i++) {
+    const change = changes[i];
+    if (!change) continue;
+    const rawValue = change.value || "";
+    const lines = rawValue.split("\n").filter((l, idx, arr) => idx < arr.length - 1 || l !== "");
+
+    if (change.removed) {
+      sourceLineIdx += lines.length;
+    } else if (change.added) {
+      const precedingChange = i > 0 ? changes[i - 1] : null;
+      const isPureInsertion = !precedingChange?.removed;
+
+      if (isPureInsertion && lines.length >= 1 && lines.length <= MAX_INSERT_LINES) {
+        const addedContent = lines.join("\n");
+
+        if (sourceLineIdx > 0) {
+          // Walk back past empty lines to find a non-empty anchor
+          let lookback = sourceLineIdx - 1;
+          while (lookback >= 0 && (sourceLines[lookback] ?? "").trim().length === 0) {
+            lookback--;
+          }
+          const precedingLine = lookback >= 0 ? sourceLines[lookback] : undefined;
+          if (precedingLine !== undefined) {
+            patches.push({
+              op: "insert-after-line",
+              match: precedingLine,
+              content: addedContent,
+            });
+          }
+        } else {
+          // Walk forward past empty lines to find a non-empty anchor
+          let lookahead = sourceLineIdx;
+          while (
+            lookahead < sourceLines.length &&
+            (sourceLines[lookahead] ?? "").trim().length === 0
+          ) {
+            lookahead++;
+          }
+          const firstSourceLine = sourceLines[lookahead];
+          if (firstSourceLine !== undefined) {
+            patches.push({
+              op: "insert-before-line",
+              match: firstSourceLine,
+              content: addedContent,
+            });
+          }
+        }
+      }
+    } else {
+      sourceLineIdx += lines.length;
+    }
+  }
+
+  return patches;
+}
+
+/** A detected HTML comment marker line */
+interface MarkerLine {
+  lineNum: number;
+  full: string;
+  label: string;
+}
+
+/**
+ * Suggests delete-between and replace-between patches when marker-bounded content changes.
+ *
+ * Detects HTML comment marker pairs (e.g. <!-- BEGIN --> ... <!-- END -->) present in
+ * both source and target, and generates the appropriate patch when the content between
+ * them differs.
+ */
+function suggestBetweenPatches(source: string, target: string): PatchOperation[] {
+  const patches: PatchOperation[] = [];
+
+  const sourceLines = source.split("\n");
+  const targetLines = target.split("\n");
+
+  const HTML_COMMENT = /<!--\s*(.+?)\s*-->/;
+  const markerLines: MarkerLine[] = [];
+
+  for (let i = 0; i < sourceLines.length; i++) {
+    const line = sourceLines[i] ?? "";
+    const match = line.match(HTML_COMMENT);
+    if (match) {
+      markerLines.push({ lineNum: i, full: line, label: (match[1] ?? "").trim() });
+    }
+  }
+
+  for (let i = 0; i < markerLines.length; i++) {
+    const open = markerLines[i];
+    if (!open) continue;
+
+    const openLabel = open.label.toLowerCase();
+    // Skip lines that look like closing markers
+    if (openLabel.startsWith("/") || openLabel.startsWith("end ") || openLabel === "end") {
+      continue;
+    }
+
+    for (let j = i + 1; j < markerLines.length; j++) {
+      const close = markerLines[j];
+      if (!close) continue;
+
+      const closeLabel = close.label.toLowerCase();
+      const isMatchingClose =
+        closeLabel === `/${openLabel}` ||
+        closeLabel === `end ${openLabel}` ||
+        closeLabel === `end-${openLabel}` ||
+        closeLabel === "end";
+
+      if (!isMatchingClose) continue;
+
+      const sourceBetween = sourceLines.slice(open.lineNum + 1, close.lineNum).join("\n");
+
+      const startMarker = open.full.trim();
+      const endMarker = close.full.trim();
+
+      const targetOpenIdx = targetLines.findIndex((l) => (l ?? "").includes(startMarker));
+      if (targetOpenIdx === -1) break;
+
+      const targetCloseIdx = targetLines.findIndex(
+        (l, idx) => idx > targetOpenIdx && (l ?? "").includes(endMarker),
+      );
+      if (targetCloseIdx === -1) break;
+
+      const targetBetween = targetLines.slice(targetOpenIdx + 1, targetCloseIdx).join("\n");
+
+      if (sourceBetween === targetBetween) break;
+
+      if (targetBetween.trim() === "") {
+        patches.push({
+          op: "delete-between",
+          start: startMarker,
+          end: endMarker,
+          inclusive: false,
+        });
+      } else {
+        patches.push({
+          op: "replace-between",
+          start: startMarker,
+          end: endMarker,
+          content: targetBetween,
+          inclusive: false,
+        });
+      }
+
+      break;
+    }
+  }
 
   return patches;
 }
@@ -1473,6 +1645,11 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     score = 0.6;
   }
 
+  // Between-marker operations are high confidence when markers are present
+  if (patch.op === "delete-between" || patch.op === "replace-between") {
+    score = 0.85;
+  }
+
   return score;
 }
 
@@ -1542,6 +1719,18 @@ function describePatch(patch: PatchOperation): string {
 
     case "replace-code-block":
       return `Replace code block ${patch.index}${patch.language ? ` (language: ${patch.language})` : ""}`;
+
+    case "insert-after-line":
+      return `Insert content after line "${truncate(patch.match ?? patch.pattern ?? "", 40)}"`;
+
+    case "insert-before-line":
+      return `Insert content before line "${truncate(patch.match ?? patch.pattern ?? "", 40)}"`;
+
+    case "delete-between":
+      return `Delete content between "${truncate(patch.start, 30)}" and "${truncate(patch.end, 30)}"`;
+
+    case "replace-between":
+      return `Replace content between "${truncate(patch.start, 30)}" and "${truncate(patch.end, 30)}"`;
 
     default:
       return `Apply ${patch.op} operation`;

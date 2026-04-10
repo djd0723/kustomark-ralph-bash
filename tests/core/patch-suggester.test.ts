@@ -1922,5 +1922,239 @@ Upgrade to 2.0.0 today`;
       expect(analysis.codeBlockChanges[0]?.type).toBe("content-changed");
     });
   });
+
+  describe("line insertion detection", () => {
+    test("suggestPatches generates insert-after-line for single line addition", () => {
+      const source = "# Title\n\nSome content.";
+      const target = "# Title\n\nNew line added.\n\nSome content.";
+
+      const patches = suggestPatches(source, target);
+      const insertPatch = patches.find((p) => p.op === "insert-after-line");
+
+      expect(insertPatch).toBeDefined();
+      if (insertPatch?.op === "insert-after-line") {
+        expect(insertPatch.match).toBe("# Title");
+        expect(insertPatch.content).toContain("New line added.");
+      }
+    });
+
+    test("suggestPatches generates insert-after-line for multi-line addition", () => {
+      const source = "First line.\nLast line.";
+      const target = "First line.\nMiddle A.\nMiddle B.\nLast line.";
+
+      const patches = suggestPatches(source, target);
+      const insertPatch = patches.find((p) => p.op === "insert-after-line");
+
+      expect(insertPatch).toBeDefined();
+      if (insertPatch?.op === "insert-after-line") {
+        expect(insertPatch.match).toBe("First line.");
+        expect(insertPatch.content).toBe("Middle A.\nMiddle B.");
+      }
+    });
+
+    test("suggestPatches generates insert-before-line when adding at start", () => {
+      const source = "Existing first line.";
+      const target = "New preamble.\nExisting first line.";
+
+      const patches = suggestPatches(source, target);
+      const insertPatch = patches.find((p) => p.op === "insert-before-line");
+
+      expect(insertPatch).toBeDefined();
+      if (insertPatch?.op === "insert-before-line") {
+        expect(insertPatch.match).toBe("Existing first line.");
+        expect(insertPatch.content).toBe("New preamble.");
+      }
+    });
+
+    test("does not generate insert-after-line for modifications (remove+add)", () => {
+      const source = "Line 1.\nOld line.\nLine 3.";
+      const target = "Line 1.\nNew line.\nLine 3.";
+
+      const patches = suggestPatches(source, target);
+      // Should NOT generate insert-after-line since this is a modification
+      const insertAfter = patches.filter((p) => p.op === "insert-after-line");
+      expect(insertAfter.length).toBe(0);
+    });
+
+    test("does not generate insert-after-line for large insertions (>5 lines)", () => {
+      const source = "Line 1.\nLine 2.";
+      const inserted = Array.from({ length: 6 }, (_, i) => `Inserted ${i + 1}.`).join("\n");
+      const target = `Line 1.\n${inserted}\nLine 2.`;
+
+      const patches = suggestPatches(source, target);
+      const insertPatch = patches.find((p) => p.op === "insert-after-line");
+      expect(insertPatch).toBeUndefined();
+    });
+
+    test("scorePatches gives score 0.6 to insert-after-line", () => {
+      const source = "Header line.\nBody content.";
+      const target = "Header line.\nInserted note.\nBody content.";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const insertScored = scored.find((s) => s.patch.op === "insert-after-line");
+
+      expect(insertScored).toBeDefined();
+      expect(insertScored?.score).toBe(0.6);
+    });
+
+    test("describePatch returns human-readable description for insert-after-line", () => {
+      const source = "Header line.\nBody content.";
+      const target = "Header line.\nInserted note.\nBody content.";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const insertScored = scored.find((s) => s.patch.op === "insert-after-line");
+
+      expect(insertScored).toBeDefined();
+      expect(insertScored?.description).toContain("Insert content after line");
+      expect(insertScored?.description).toContain("Header line.");
+    });
+
+    test("describePatch returns human-readable description for insert-before-line", () => {
+      const source = "Existing line.";
+      const target = "New preamble.\nExisting line.";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const insertScored = scored.find((s) => s.patch.op === "insert-before-line");
+
+      expect(insertScored).toBeDefined();
+      expect(insertScored?.description).toContain("Insert content before line");
+      expect(insertScored?.description).toContain("Existing line.");
+    });
+  });
+
+  describe("between-marker change detection", () => {
+    test("suggestPatches generates replace-between for changed marker content", () => {
+      const source = [
+        "<!-- BEGIN -->",
+        "Old content here.",
+        "<!-- END -->",
+      ].join("\n");
+      const target = [
+        "<!-- BEGIN -->",
+        "New content here.",
+        "<!-- END -->",
+      ].join("\n");
+
+      const patches = suggestPatches(source, target);
+      const betweenPatch = patches.find((p) => p.op === "replace-between");
+
+      expect(betweenPatch).toBeDefined();
+      if (betweenPatch?.op === "replace-between") {
+        expect(betweenPatch.start).toBe("<!-- BEGIN -->");
+        expect(betweenPatch.end).toBe("<!-- END -->");
+        expect(betweenPatch.content).toContain("New content here.");
+        expect(betweenPatch.inclusive).toBe(false);
+      }
+    });
+
+    test("suggestPatches generates delete-between when content is removed", () => {
+      const source = [
+        "Before.",
+        "<!-- SECTION -->",
+        "Content to delete.",
+        "<!-- /SECTION -->",
+        "After.",
+      ].join("\n");
+      const target = [
+        "Before.",
+        "<!-- SECTION -->",
+        "<!-- /SECTION -->",
+        "After.",
+      ].join("\n");
+
+      const patches = suggestPatches(source, target);
+      const deletePatch = patches.find((p) => p.op === "delete-between");
+
+      expect(deletePatch).toBeDefined();
+      if (deletePatch?.op === "delete-between") {
+        expect(deletePatch.start).toBe("<!-- SECTION -->");
+        expect(deletePatch.end).toBe("<!-- /SECTION -->");
+        expect(deletePatch.inclusive).toBe(false);
+      }
+    });
+
+    test("does not generate between patches when markers are unchanged", () => {
+      const source = "<!-- BEGIN -->\nContent.\n<!-- END -->\n\nOther text changed.";
+      const target = "<!-- BEGIN -->\nContent.\n<!-- END -->\n\nDifferent text.";
+
+      const patches = suggestPatches(source, target);
+      expect(patches.find((p) => p.op === "replace-between")).toBeUndefined();
+      expect(patches.find((p) => p.op === "delete-between")).toBeUndefined();
+    });
+
+    test("handles END marker variant", () => {
+      const source = [
+        "<!-- TOC -->",
+        "- Old item",
+        "<!-- END TOC -->",
+      ].join("\n");
+      const target = [
+        "<!-- TOC -->",
+        "- New item",
+        "<!-- END TOC -->",
+      ].join("\n");
+
+      const patches = suggestPatches(source, target);
+      const betweenPatch = patches.find((p) => p.op === "replace-between");
+
+      expect(betweenPatch).toBeDefined();
+      if (betweenPatch?.op === "replace-between") {
+        expect(betweenPatch.start).toBe("<!-- TOC -->");
+        expect(betweenPatch.end).toBe("<!-- END TOC -->");
+      }
+    });
+
+    test("scorePatches gives score 0.85 to replace-between", () => {
+      const source = "<!-- BEGIN -->\nOld.\n<!-- END -->";
+      const target = "<!-- BEGIN -->\nNew.\n<!-- END -->";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const betweenScored = scored.find((s) => s.patch.op === "replace-between");
+
+      expect(betweenScored).toBeDefined();
+      expect(betweenScored?.score).toBe(0.85);
+    });
+
+    test("scorePatches gives score 0.85 to delete-between", () => {
+      const source = "<!-- BEGIN -->\nOld content.\n<!-- END -->";
+      const target = "<!-- BEGIN -->\n<!-- END -->";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const deleteScored = scored.find((s) => s.patch.op === "delete-between");
+
+      expect(deleteScored).toBeDefined();
+      expect(deleteScored?.score).toBe(0.85);
+    });
+
+    test("describePatch returns human-readable description for replace-between", () => {
+      const source = "<!-- BEGIN -->\nOld.\n<!-- END -->";
+      const target = "<!-- BEGIN -->\nNew.\n<!-- END -->";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const betweenScored = scored.find((s) => s.patch.op === "replace-between");
+
+      expect(betweenScored).toBeDefined();
+      expect(betweenScored?.description).toContain("Replace content between");
+      expect(betweenScored?.description).toContain("<!-- BEGIN -->");
+    });
+
+    test("describePatch returns human-readable description for delete-between", () => {
+      const source = "<!-- BEGIN -->\nContent.\n<!-- END -->";
+      const target = "<!-- BEGIN -->\n<!-- END -->";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const deleteScored = scored.find((s) => s.patch.op === "delete-between");
+
+      expect(deleteScored).toBeDefined();
+      expect(deleteScored?.description).toContain("Delete content between");
+    });
+  });
 });
 
