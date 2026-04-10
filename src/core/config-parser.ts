@@ -637,6 +637,7 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "reorder-list-items",
     "modify-links",
     "update-toc",
+    "replace-in-section",
   ];
 
   if (!validOps.includes(p.op as string)) {
@@ -1380,6 +1381,31 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         errors.push({
           field: `${prefix}.ordered`,
           message: "'ordered' must be a boolean",
+        });
+      }
+      break;
+    }
+
+    case "replace-in-section": {
+      if (
+        typeof (p as Record<string, unknown>).id !== "string" ||
+        !(p as Record<string, unknown>).id
+      ) {
+        errors.push({
+          field: `${prefix}.id`,
+          message: "'id' is required and must be a non-empty string (section slug)",
+        });
+      }
+      if (typeof (p as Record<string, unknown>).old !== "string") {
+        errors.push({
+          field: `${prefix}.old`,
+          message: "'old' is required and must be a string",
+        });
+      }
+      if (typeof (p as Record<string, unknown>).new !== "string") {
+        errors.push({
+          field: `${prefix}.new`,
+          message: "'new' is required and must be a string",
         });
       }
       break;

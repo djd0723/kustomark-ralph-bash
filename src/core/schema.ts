@@ -4042,6 +4042,74 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            // replace-in-section
+            {
+              type: "object",
+              required: ["op", "id", "old", "new"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "replace-in-section",
+                  description:
+                    "Replace text within a specific section only, leaving other sections unchanged",
+                },
+                id: {
+                  type: "string",
+                  description: "Section ID (slug or custom ID) to scope the replacement to",
+                },
+                old: {
+                  type: "string",
+                  description: "Exact text to find within the section",
+                },
+                new: {
+                  type: "string",
+                  description: "Replacement text",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
           ],
         },
       },

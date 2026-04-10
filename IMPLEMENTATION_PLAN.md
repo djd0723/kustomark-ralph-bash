@@ -1,10 +1,51 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (replace-in-section - COMPLETE!):**
+
+* ✅ **`replace-in-section`**: New patch operation — scoped text replacement within a specific section
+* ✅ **SECTION SCOPING**: Applies `replace` logic only to the body of the named section; other sections are untouched
+* ✅ **GLOBAL WITHIN SECTION**: All occurrences of `old` within the section are replaced
+* ✅ **SECTION NOT FOUND**: Returns count=0 (triggers `onNoMatch`) when section slug is not found
+* ✅ **TEXT NOT IN SECTION**: Returns count=0 when `old` text is absent from the section body
+* ✅ **LSP COMPLETIONS**: Added `replace-in-section` to op list and field-level completions (`id`, `old`, `new`)
+* ✅ **SCHEMA UPDATED**: JSON Schema includes `replace-in-section` with all common fields
+* ✅ **CONFIG VALIDATION**: Added to `validOps` with required field checks for `id`, `old`, `new`
+* ✅ **SUGGESTION ENGINE**: Failure hints show similar section IDs or note text not found in section
+* ✅ **18 NEW TESTS PASSING**: Unit tests for scoping, global replace, empty section, custom IDs, siblings; integration tests via `applyPatches` and `validateConfig`
+* ✅ **3,784 TESTS PASSING**: All tests pass with 0 failures
+* ✅ **README UPDATED**: Documented `replace-in-section` with field table, example, and notes
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # Replace only within the "installation" section
+   - op: replace-in-section
+     id: installation
+     old: "npm install"
+     new: "bun install"
+   ```
+
+2. **Implementation Files**
+   * `src/core/types.ts` — Added `ReplaceInSectionPatch` interface; added to `PatchOperation` union
+   * `src/core/patch-engine.ts` — Added `applyReplaceInSection()`; wired into `applySinglePatch()` and `getPatchDescription()`
+   * `src/core/schema.ts` — Added JSON Schema definition for `replace-in-section` with all common fields
+   * `src/core/config-parser.ts` — Added `replace-in-section` to `validOps`; added required field validation
+   * `src/core/index.ts` — Exported `applyReplaceInSection` and `ReplaceInSectionPatch`
+   * `src/lsp/completion.ts` — Added op completion entry and field completions for `id`, `old`, `new`
+   * `src/core/suggestion-engine.ts` — Added failure suggestions for section-not-found and text-not-in-section cases
+   * `tests/core/replace-in-section.test.ts` — 18 tests (11 unit + 3 integration + 4 config validation)
+   * `README.md` — Added `replace-in-section` section under Section Operations
+
+**Status:** replace-in-section COMPLETE! ✅
+
+---
 
 **2026-04-09 (AST-based Link and TOC Operations - COMPLETE!):**
 

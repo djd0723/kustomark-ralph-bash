@@ -220,6 +220,20 @@ export function generatePatchSuggestions(
       break;
     }
 
+    case "replace-in-section": {
+      // First check if the section exists
+      const sectionSuggestions = generateSectionSuggestions(patch.id, content);
+      if (sectionSuggestions.length > 0) {
+        suggestions.push(...sectionSuggestions);
+      } else {
+        // Section found but old text not present in it — suggest the old text may not be in this section
+        suggestions.push(
+          `Section '${patch.id}' exists but the text '${patch.old.slice(0, 40)}' was not found within it. Verify the text is inside this section, or use 'replace' to search the whole file.`,
+        );
+      }
+      break;
+    }
+
     case "remove-frontmatter":
     case "rename-frontmatter": {
       // Frontmatter operations - suggest similar keys

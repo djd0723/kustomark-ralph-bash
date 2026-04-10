@@ -566,6 +566,61 @@ export function applyAppendToSection(
 }
 
 /**
+ * Apply a replace-in-section patch operation.
+ *
+ * Finds all occurrences of a string within the content of a specific section and replaces
+ * them, without affecting text in other sections. The section header line is preserved.
+ *
+ * @param content - The markdown content to patch
+ * @param id - The section ID (slug or custom ID) to scope the replacement to
+ * @param old - The exact text to find within the section
+ * @param newStr - The replacement text
+ * @returns Object with patched content and count of replacements made (0 if section not found)
+ *
+ * @example
+ * ```typescript
+ * const markdown = `# Installation\nRun npm install.\n\n# Usage\nRun npm start.`;
+ * const result = applyReplaceInSection(markdown, 'installation', 'npm', 'bun');
+ * // Result: `# Installation\nRun bun install.\n\n# Usage\nRun npm start.`
+ * // count: 1  (only the occurrence within "Installation" section is replaced)
+ * ```
+ */
+export function applyReplaceInSection(
+  content: string,
+  id: string,
+  old: string,
+  newStr: string,
+): { content: string; count: number } {
+  const sections = parseSections(content);
+  const section = findSection(sections, id);
+
+  if (!section) {
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+
+  // Section body is from the line after the header up to (not including) endLine
+  const bodyLines = lines.slice(section.startLine + 1, section.endLine);
+  const bodyContent = bodyLines.join("\n");
+
+  const { content: replacedBody, count } = applyReplace(bodyContent, old, newStr);
+
+  if (count === 0) {
+    return { content, count: 0 };
+  }
+
+  const replacedLines = replacedBody.split("\n");
+  const result = [
+    ...lines.slice(0, section.startLine + 1),
+    ...replacedLines,
+    ...lines.slice(section.endLine),
+  ].join("\n");
+
+  return { content: result, count };
+}
+
+/**
  * Parse frontmatter from markdown content
  *
  * @param content - The markdown content
@@ -2995,6 +3050,10 @@ export async function applySinglePatch(
       }
       break;
 
+    case "replace-in-section":
+      result = applyReplaceInSection(content, patch.id, patch.old, patch.new);
+      break;
+
     case "set-frontmatter":
       if (onNoMatch === "error") {
         result = applyFrontmatterPatch(
@@ -3393,6 +3452,8 @@ function getPatchDescription(patch: PatchOperation): string {
     }
     case "update-toc":
       return `update-toc (marker='${patch.marker ?? "<!-- TOC -->"}')`;
+    case "replace-in-section":
+      return `replace-in-section id='${patch.id}' '${patch.old}' → '${patch.new}'`;
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":

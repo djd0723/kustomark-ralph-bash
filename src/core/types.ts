@@ -696,6 +696,19 @@ export interface UpdateTocPatch extends PatchCommonFields {
 }
 
 /**
+ * Replace-in-section patch operation - applies a text replacement scoped to a specific section
+ */
+export interface ReplaceInSectionPatch extends PatchCommonFields {
+  op: "replace-in-section";
+  /** Section ID (slug or custom ID) to scope the replacement to */
+  id: string;
+  /** Exact text to find within the section */
+  old: string;
+  /** Replacement text */
+  new: string;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -744,7 +757,8 @@ export type PatchOperation =
   | DeduplicateListItemsPatch
   | ReorderListItemsPatch
   | ModifyLinksPatch
-  | UpdateTocPatch;
+  | UpdateTocPatch
+  | ReplaceInSectionPatch;
 
 /**
  * Global validator configuration

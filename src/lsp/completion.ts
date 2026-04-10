@@ -628,6 +628,14 @@ export class CompletionProvider {
           "Generate or update a TOC between <!-- TOC --> and <!-- /TOC --> comment markers",
         insertText: "update-toc",
       },
+      {
+        label: "replace-in-section",
+        kind: CompletionItemKind.Value,
+        detail: "Replace text within a specific section",
+        documentation:
+          "Like 'replace', but scoped to the content of one section — other sections are untouched",
+        insertText: "replace-in-section",
+      },
     ];
   }
 
@@ -1182,6 +1190,29 @@ export class CompletionProvider {
           detail: "Regex replacement for link text",
           documentation: "Regex replacement string for link text (supports $1, $2 capture groups)",
           insertText: "textReplacement: ",
+        },
+      ],
+      "replace-in-section": [
+        {
+          label: "id",
+          kind: CompletionItemKind.Field,
+          detail: "Section ID",
+          documentation: "Section slug or custom ID to scope the replacement to",
+          insertText: "id: ",
+        },
+        {
+          label: "old",
+          kind: CompletionItemKind.Field,
+          detail: "Text to find",
+          documentation: "Exact text to find within the section",
+          insertText: "old: ",
+        },
+        {
+          label: "new",
+          kind: CompletionItemKind.Field,
+          detail: "Replacement text",
+          documentation: "Text to replace with",
+          insertText: "new: ",
         },
       ],
       "update-toc": [

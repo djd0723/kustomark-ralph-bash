@@ -2604,6 +2604,62 @@ npm install awesome-project
 Usage instructions.
 ```
 
+### `replace-in-section` - Scoped Text Replacement
+
+Replace text within a specific section only, leaving all other sections unchanged. Like `replace`, but scoped — useful when the same text appears in multiple sections and you only want to change it in one.
+
+```yaml
+- op: replace-in-section
+  id: installation       # section slug or custom ID
+  old: "npm install"
+  new: "bun install"
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | yes | Section slug or custom `{#id}` to scope to |
+| `old` | yes | Exact text to find within the section |
+| `new` | yes | Replacement text (all occurrences within the section are replaced) |
+
+**Example:**
+
+Input:
+```markdown
+## Installation
+
+Run npm install to set up.
+
+## Usage
+
+Run npm start. See also npm run build.
+```
+
+Config:
+```yaml
+- op: replace-in-section
+  id: installation
+  old: npm
+  new: bun
+```
+
+Output:
+```markdown
+## Installation
+
+Run bun install to set up.
+
+## Usage
+
+Run npm start. See also npm run build.
+```
+
+Only the `## Installation` section is affected. The `## Usage` section retains the original `npm` references.
+
+**Notes:**
+- All occurrences of `old` within the section are replaced (global)
+- Returns count=0 (triggers `onNoMatch`) if the section is not found, or if `old` is not present within the section
+- Use `replace` for document-wide replacement, `replace-in-section` for section-scoped replacement
+
 ### `prepend-to-section` - Add Content to Section Start
 
 Add content immediately after the section header.
