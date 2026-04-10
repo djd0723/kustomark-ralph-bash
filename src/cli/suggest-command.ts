@@ -6,6 +6,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import * as yaml from "js-yaml";
+import type { ScoredPatch } from "../core/patch-suggester.js";
 import { scorePatches, suggestPatches } from "../core/patch-suggester.js";
 import type { KustomarkConfig, PatchOperation } from "../core/types.js";
 import { createProgressReporter } from "./progress.js";
@@ -26,6 +27,7 @@ interface CLIOptions {
 
 export interface SuggestResult {
   config: KustomarkConfig;
+  scoredPatches: ScoredPatch[];
   stats: {
     filesAnalyzed: number;
     patchesGenerated: number;
@@ -131,13 +133,14 @@ function matchFiles(sourcePath: string, targetPath: string): FilePair[] {
 // ============================================================================
 
 /**
- * Analyze file pairs and generate suggested patches
+ * Analyze file pairs and generate suggested patches with confidence scores
  */
 function analyzeFilePairs(
   pairs: FilePair[],
   options: CLIOptions,
-): { patches: PatchOperation[]; filesAnalyzed: number } {
+): { patches: PatchOperation[]; scoredPatches: ScoredPatch[]; filesAnalyzed: number } {
   const allPatches: PatchOperation[] = [];
+  const allScored: ScoredPatch[] = [];
   let filesAnalyzed = 0;
 
   const reporter = createProgressReporter({
@@ -160,18 +163,16 @@ function analyzeFilePairs(
       }
 
       // Suggest patches for this file pair
-      let patches = suggestPatches(sourceContent, targetContent);
+      const rawPatches = suggestPatches(sourceContent, targetContent);
+
+      // Always score patches for confidence tracking
+      let scored = scorePatches(rawPatches, sourceContent, targetContent);
 
       // Filter by minimum confidence if specified
       if (options.minConfidence !== undefined && options.minConfidence > 0) {
-        const minConf = options.minConfidence; // Store in const to satisfy TypeScript
-        const scoredPatches = scorePatches(patches, sourceContent, targetContent);
-        const filteredPatches = scoredPatches
-          .filter((sp) => sp.score >= minConf)
-          .map((sp) => sp.patch);
-
-        const filteredCount = patches.length - filteredPatches.length;
-        patches = filteredPatches;
+        const minConf = options.minConfidence;
+        const filteredCount = scored.filter((sp) => sp.score < minConf).length;
+        scored = scored.filter((sp) => sp.score >= minConf);
 
         if (options.verbosity && options.verbosity >= 2 && filteredCount > 0) {
           console.error(
@@ -179,6 +180,8 @@ function analyzeFilePairs(
           );
         }
       }
+
+      const patches = scored.map((sp) => sp.patch);
 
       // Add include pattern if we have multiple files
       if (pairs.length > 1 && pair.relativePath !== ".") {
@@ -188,6 +191,7 @@ function analyzeFilePairs(
       }
 
       allPatches.push(...patches);
+      allScored.push(...scored);
       filesAnalyzed++;
 
       reporter.increment(1, `Analyzed: ${pair.relativePath} (${patches.length} patches)`);
@@ -201,7 +205,7 @@ function analyzeFilePairs(
 
   reporter.finish("Analysis complete");
 
-  return { patches: allPatches, filesAnalyzed };
+  return { patches: allPatches, scoredPatches: allScored, filesAnalyzed };
 }
 
 /**
@@ -281,6 +285,14 @@ function outputText(result: SuggestResult, options: CLIOptions): void {
   console.log(`Found ${result.stats.patchesGenerated} suggested patches:\n`);
   console.log("# Suggested kustomark.yaml\n");
   console.log(configYaml);
+
+  if (options.verbosity && options.verbosity >= 2 && result.scoredPatches.length > 0) {
+    console.log("\nPatch confidence scores:");
+    for (const sp of result.scoredPatches) {
+      const pct = Math.round(sp.score * 100);
+      console.log(`  [${pct}%] ${sp.description}`);
+    }
+  }
 
   if (options.verbosity && options.verbosity >= 1) {
     console.log("\nStatistics:");
@@ -373,7 +385,7 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
     }
 
     // Analyze files and generate patches
-    const { patches, filesAnalyzed } = analyzeFilePairs(filePairs, opts);
+    const { patches, scoredPatches, filesAnalyzed } = analyzeFilePairs(filePairs, opts);
 
     // Generate configuration
     const config = generateConfig(sourcePath, patches);
@@ -383,6 +395,7 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
 
     const result: SuggestResult = {
       config,
+      scoredPatches,
       stats: {
         filesAnalyzed,
         patchesGenerated: patches.length,

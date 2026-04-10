@@ -633,4 +633,209 @@ New section added.`;
     // High confidence threshold may filter out some patches
     expect(output.config.patches.length).toBeGreaterThanOrEqual(0);
   });
+
+  // ============================================================================
+  // Per-patch confidence scores
+  // ============================================================================
+
+  test("JSON output includes scoredPatches array", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+
+    writeFileSync(sourceFile, "# Title\n\nOld content here.");
+    writeFileSync(targetFile, "# Title\n\nNew content here.");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    const output = JSON.parse(result);
+
+    expect(output.scoredPatches).toBeDefined();
+    expect(Array.isArray(output.scoredPatches)).toBe(true);
+  });
+
+  test("scoredPatches contains score and description for each patch", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+
+    writeFileSync(sourceFile, "# Title\n\nOld content here.");
+    writeFileSync(targetFile, "# Title\n\nNew content here.");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    const output = JSON.parse(result);
+
+    expect(output.scoredPatches.length).toBeGreaterThan(0);
+    for (const sp of output.scoredPatches) {
+      expect(typeof sp.score).toBe("number");
+      expect(sp.score).toBeGreaterThanOrEqual(0);
+      expect(sp.score).toBeLessThanOrEqual(1);
+      expect(typeof sp.description).toBe("string");
+      expect(sp.description.length).toBeGreaterThan(0);
+      expect(sp.patch).toBeDefined();
+      expect(typeof sp.patch.op).toBe("string");
+    }
+  });
+
+  test("scoredPatches length matches config.patches length", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+
+    const sourceContent = `---
+title: Draft
+author: Alice
+---
+
+# Guide
+
+## Installation
+Run npm install.
+
+## Usage
+See docs.`;
+
+    const targetContent = `---
+title: Published
+author: Bob
+---
+
+# Guide
+
+## Installation
+Run npm install then configure.
+
+## Usage
+See updated docs.
+
+## Troubleshooting
+Check logs.`;
+
+    writeFileSync(sourceFile, sourceContent);
+    writeFileSync(targetFile, targetContent);
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    const output = JSON.parse(result);
+
+    expect(output.scoredPatches.length).toBe(output.config.patches.length);
+  });
+
+  test("scoredPatches is empty for identical files", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+
+    const content = "# Same\n\nIdentical content.";
+    writeFileSync(sourceFile, content);
+    writeFileSync(targetFile, content);
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    const output = JSON.parse(result);
+
+    expect(output.scoredPatches).toBeDefined();
+    expect(output.scoredPatches.length).toBe(0);
+  });
+
+  test("scoredPatches respects --min-confidence filter", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+
+    // Rich content with many change types (mix of high and low confidence)
+    const sourceContent = `---
+title: Old Title
+status: draft
+---
+
+# Document
+
+## Section One
+Original content.
+
+## Section Two
+More content.`;
+
+    const targetContent = `---
+title: New Title
+status: published
+---
+
+# Document
+
+## Section One
+Updated content.
+
+## Section Two
+More updated content.`;
+
+    writeFileSync(sourceFile, sourceContent);
+    writeFileSync(targetFile, targetContent);
+
+    const lowThreshold = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json --min-confidence=0.0`,
+      { encoding: "utf-8" },
+    );
+    const highThreshold = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json --min-confidence=0.9`,
+      { encoding: "utf-8" },
+    );
+
+    const lowOutput = JSON.parse(lowThreshold);
+    const highOutput = JSON.parse(highThreshold);
+
+    // High threshold should produce fewer or equal patches
+    expect(highOutput.scoredPatches.length).toBeLessThanOrEqual(lowOutput.scoredPatches.length);
+
+    // All scoredPatches from high-threshold output should have score >= 0.9
+    for (const sp of highOutput.scoredPatches) {
+      expect(sp.score).toBeGreaterThanOrEqual(0.9);
+    }
+  });
+
+  test("scoredPatches patches match config.patches operations", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+
+    writeFileSync(sourceFile, "# Heading\n\nOld word in text.");
+    writeFileSync(targetFile, "# Heading\n\nNew word in text.");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    const output = JSON.parse(result);
+
+    // Every op in scoredPatches should match the corresponding config.patches entry
+    const scoredOps = output.scoredPatches.map((sp: any) => sp.patch.op);
+    const configOps = output.config.patches.map((p: any) => p.op);
+    expect(scoredOps).toEqual(configOps);
+  });
+
+  test("text output with verbosity shows patch confidence scores", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+
+    writeFileSync(sourceFile, "# Title\n\nOld text here.");
+    writeFileSync(targetFile, "# Title\n\nNew text here.");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} -vv`,
+      { encoding: "utf-8" },
+    );
+
+    // Verbose text output should include per-patch confidence percentages
+    expect(result).toMatch(/\[\d+%\]/);
+    expect(result).toContain("Patch confidence scores:");
+  });
 });

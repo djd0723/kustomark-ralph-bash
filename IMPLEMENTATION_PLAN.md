@@ -1,10 +1,28 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest scored output - COMPLETE!):**
+
+* ✅ **`suggest` JSON output now includes `scoredPatches`**: Every patch in the `config.patches` array has a corresponding entry in `scoredPatches` with a `score` (0–1), `description` (human-readable summary), and `patch` (the operation object). Users can now inspect confidence per-suggestion without re-running `scorePatches` themselves.
+* ✅ **`scorePatches` always runs**: Previously scores were computed only when `--min-confidence` was set; now they're computed for every analysis. The confidence filter still works — it drops low-scoring entries from both `config.patches` and `scoredPatches` in tandem.
+* ✅ **Verbose text mode shows scores**: When verbosity ≥ 2 (`-v` flag), the text output appends a "Patch confidence scores:" block listing each patch as `[N%] description`.
+* ✅ **`scoredPatches.length === config.patches.length`**: The two arrays are kept in sync — after filtering, every patch in the config has a scored counterpart at the same index.
+* ✅ **7 new tests**: JSON output has `scoredPatches`, each entry has `score`/`description`/`patch`, lengths match, empty for identical files, filter respected, ops match, verbose text shows percentages.
+* ✅ **4,066 tests passing**: Up from 4,059.
+
+**Files modified:**
+
+* `src/cli/suggest-command.ts` — Added `ScoredPatch` import; added `scoredPatches: ScoredPatch[]` to `SuggestResult`; refactored `analyzeFilePairs` to always call `scorePatches` and return scored patches; updated `outputText` to print score block at verbosity ≥ 2; wired `scoredPatches` through `suggestCommand`
+* `tests/cli/suggest.test.ts` — 7 new tests in "Per-patch confidence scores" suite
+
+**Status:** suggest scored output COMPLETE! ✅
+
+***
 
 **2026-04-09 (suggest move-section - COMPLETE!):**
 
