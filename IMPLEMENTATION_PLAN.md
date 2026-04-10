@@ -1,10 +1,27 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest update-toc detection + full describePatch/scorePatches coverage - COMPLETE!):**
+
+* ✅ **`suggest` now detects `update-toc`**: When a `<!-- TOC -->` / `<!-- /TOC -->` marker pair's content changes, the command generates an `update-toc` patch instead of a generic `replace-between`. Marker label matching is case-insensitive (`toc`). Custom close-marker variants (`<!-- END TOC -->`) are supported via the `endMarker` field. Non-standard open markers are included via the `marker` field. Default markers are omitted from the patch.
+* ✅ **`describePatch` now exhaustively covers all 51 ops**: Added human-readable descriptions for `merge-frontmatter`, `update-toc`, `copy-file`, `rename-file`, `delete-file`, `move-file`, `json-set`, `json-delete`, `json-merge`, `exec`, and `plugin`. The `default` branch has been removed — TypeScript now verifies the switch is exhaustive at compile time.
+* ✅ **`scorePatches` now covers all remaining ops**: `update-toc` scores 0.9 (deterministic TOC regeneration); `copy-file`, `rename-file`, `delete-file`, `move-file` score 0.9 (explicit file operations); `json-set`, `json-delete`, `json-merge` score 0.9 (structured data operations).
+* ✅ **20 new tests**: 7 tests for `update-toc` detection (default markers, custom `endMarker`, no-op when unchanged, non-TOC markers still use `replace-between`, scoring at 0.9, `describePatch`, custom marker in description); 13 tests for `describePatch`/`scorePatches` coverage of the remaining ops (merge-frontmatter, copy-file, rename-file, delete-file, move-file, json-set, json-delete, json-merge, exec, plugin, plus scoring tests).
+* ✅ **4,149 tests passing**: Up from 4,129.
+
+**Files modified:**
+
+* `src/core/patch-suggester.ts` — Added TOC marker check in `suggestBetweenPatches` before `replace-between`/`delete-between` push; added `update-toc`, file-op, and JSON-op scoring blocks in `calculatePatchScore`; added 11 new `describePatch` cases; removed exhausted `default` branch.
+* `tests/core/patch-suggester.test.ts` — Updated "handles END marker variant" test to use non-TOC markers (it previously tested `<!-- TOC -->` / `<!-- END TOC -->` expecting `replace-between`, which now correctly generates `update-toc`); added `update-toc detection` suite (7 tests); added `describePatch coverage for remaining ops` suite (13 tests).
+
+**Status:** suggest update-toc detection + full describePatch/scorePatches coverage COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest prepend/append-to-file, prepend/append-to-section, replace-in-section detection - COMPLETE!):**
 

@@ -1733,6 +1733,18 @@ function suggestBetweenPatches(source: string, target: string): PatchOperation[]
 
       if (sourceBetween === targetBetween) break;
 
+      // Check for TOC marker pattern — suggest update-toc instead of replace-between
+      if (openLabel.toLowerCase() === "toc") {
+        const DEFAULT_MARKER = "<!-- TOC -->";
+        const DEFAULT_END_MARKER = "<!-- /TOC -->";
+        const tocPatch: PatchOperation = { op: "update-toc" };
+        if (startMarker !== DEFAULT_MARKER) (tocPatch as { marker?: string }).marker = startMarker;
+        if (endMarker !== DEFAULT_END_MARKER)
+          (tocPatch as { endMarker?: string }).endMarker = endMarker;
+        patches.push(tocPatch);
+        break;
+      }
+
       if (targetBetween.trim() === "") {
         patches.push({
           op: "delete-between",
@@ -2437,6 +2449,26 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     score = 0.85;
   }
 
+  // TOC regeneration is deterministic and high confidence
+  if (patch.op === "update-toc") {
+    score = 0.9;
+  }
+
+  // File operations are high confidence (explicit file system actions)
+  if (
+    patch.op === "copy-file" ||
+    patch.op === "rename-file" ||
+    patch.op === "delete-file" ||
+    patch.op === "move-file"
+  ) {
+    score = 0.9;
+  }
+
+  // JSON/YAML structured data operations are high confidence
+  if (patch.op === "json-set" || patch.op === "json-delete" || patch.op === "json-merge") {
+    score = 0.9;
+  }
+
   return score;
 }
 
@@ -2575,8 +2607,38 @@ function describePatch(patch: PatchOperation): string {
       return `Filter table ${patch.table} rows on column "${patch.column}" by ${tableFilterDesc}${patch.invert ? " (keep non-matching)" : ""}`;
     }
 
-    default:
-      return `Apply ${patch.op} operation`;
+    case "merge-frontmatter":
+      return `Merge ${Object.keys(patch.values).length} frontmatter field(s)`;
+
+    case "update-toc":
+      return `Regenerate table of contents (marker: "${patch.marker ?? "<!-- TOC -->"}") `;
+
+    case "copy-file":
+      return `Copy file "${patch.src}" to "${patch.dest}"`;
+
+    case "rename-file":
+      return `Rename file matching "${patch.match}" to "${patch.rename}"`;
+
+    case "delete-file":
+      return `Delete file matching "${patch.match}"`;
+
+    case "move-file":
+      return `Move file matching "${patch.match}" to "${patch.dest}"`;
+
+    case "json-set":
+      return `Set JSON/YAML path "${patch.path}" to ${JSON.stringify(patch.value).slice(0, 30)}`;
+
+    case "json-delete":
+      return `Delete JSON/YAML path "${patch.path}"`;
+
+    case "json-merge":
+      return `Merge ${Object.keys(patch.value).length} JSON/YAML field(s)`;
+
+    case "exec":
+      return `Execute command: ${truncate(patch.command, 40)}`;
+
+    case "plugin":
+      return `Apply plugin operation "${patch.plugin}"`;
   }
 }
 

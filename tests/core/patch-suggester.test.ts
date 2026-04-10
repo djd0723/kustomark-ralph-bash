@@ -2086,16 +2086,16 @@ Upgrade to 2.0.0 today`;
       expect(patches.find((p) => p.op === "delete-between")).toBeUndefined();
     });
 
-    test("handles END marker variant", () => {
+    test("handles END marker variant for non-TOC markers", () => {
       const source = [
-        "<!-- TOC -->",
-        "- Old item",
-        "<!-- END TOC -->",
+        "<!-- SECTION -->",
+        "Old item",
+        "<!-- END SECTION -->",
       ].join("\n");
       const target = [
-        "<!-- TOC -->",
-        "- New item",
-        "<!-- END TOC -->",
+        "<!-- SECTION -->",
+        "New item",
+        "<!-- END SECTION -->",
       ].join("\n");
 
       const patches = suggestPatches(source, target);
@@ -2103,8 +2103,8 @@ Upgrade to 2.0.0 today`;
 
       expect(betweenPatch).toBeDefined();
       if (betweenPatch?.op === "replace-between") {
-        expect(betweenPatch.start).toBe("<!-- TOC -->");
-        expect(betweenPatch.end).toBe("<!-- END TOC -->");
+        expect(betweenPatch.start).toBe("<!-- SECTION -->");
+        expect(betweenPatch.end).toBe("<!-- END SECTION -->");
       }
     });
 
@@ -2155,6 +2155,214 @@ Upgrade to 2.0.0 today`;
 
       expect(deleteScored).toBeDefined();
       expect(deleteScored?.description).toContain("Delete content between");
+    });
+  });
+
+  describe("update-toc detection", () => {
+    test("suggests update-toc when <!-- TOC --> / <!-- /TOC --> content changes", () => {
+      const source = [
+        "# Doc",
+        "",
+        "<!-- TOC -->",
+        "- [Old](#old)",
+        "<!-- /TOC -->",
+        "",
+        "## Old",
+        "Body.",
+      ].join("\n");
+      const target = [
+        "# Doc",
+        "",
+        "<!-- TOC -->",
+        "- [New](#new)",
+        "<!-- /TOC -->",
+        "",
+        "## New",
+        "Body.",
+      ].join("\n");
+
+      const patches = suggestPatches(source, target);
+      const tocPatch = patches.find((p) => p.op === "update-toc");
+
+      expect(tocPatch).toBeDefined();
+      // Default markers should not be included in the patch
+      expect((tocPatch as { marker?: string })?.marker).toBeUndefined();
+      expect((tocPatch as { endMarker?: string })?.endMarker).toBeUndefined();
+      // Should NOT generate replace-between for TOC markers
+      expect(patches.find((p) => p.op === "replace-between")).toBeUndefined();
+    });
+
+    test("suggests update-toc with custom endMarker when <!-- END TOC --> is used", () => {
+      const source = [
+        "<!-- TOC -->",
+        "- [Old](#old)",
+        "<!-- END TOC -->",
+      ].join("\n");
+      const target = [
+        "<!-- TOC -->",
+        "- [New](#new)",
+        "<!-- END TOC -->",
+      ].join("\n");
+
+      const patches = suggestPatches(source, target);
+      const tocPatch = patches.find((p) => p.op === "update-toc");
+
+      expect(tocPatch).toBeDefined();
+      expect((tocPatch as { endMarker?: string })?.endMarker).toBe("<!-- END TOC -->");
+      expect((tocPatch as { marker?: string })?.marker).toBeUndefined();
+    });
+
+    test("does not suggest update-toc when TOC content is unchanged", () => {
+      const source = "<!-- TOC -->\n- [Same](#same)\n<!-- /TOC -->\n\nOther text changed.";
+      const target = "<!-- TOC -->\n- [Same](#same)\n<!-- /TOC -->\n\nDifferent text.";
+
+      const patches = suggestPatches(source, target);
+      expect(patches.find((p) => p.op === "update-toc")).toBeUndefined();
+    });
+
+    test("non-TOC marker pair still generates replace-between", () => {
+      const source = "<!-- BEGIN -->\nOld.\n<!-- END -->";
+      const target = "<!-- BEGIN -->\nNew.\n<!-- END -->";
+
+      const patches = suggestPatches(source, target);
+      expect(patches.find((p) => p.op === "replace-between")).toBeDefined();
+      expect(patches.find((p) => p.op === "update-toc")).toBeUndefined();
+    });
+
+    test("scores update-toc at 0.9", () => {
+      const source = "<!-- TOC -->\n- [Old](#old)\n<!-- /TOC -->";
+      const target = "<!-- TOC -->\n- [New](#new)\n<!-- /TOC -->";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const tocScored = scored.find((s) => s.patch.op === "update-toc");
+
+      expect(tocScored).toBeDefined();
+      expect(tocScored?.score).toBe(0.9);
+    });
+
+    test("describePatch returns human-readable description for update-toc", () => {
+      const source = "<!-- TOC -->\n- [Old](#old)\n<!-- /TOC -->";
+      const target = "<!-- TOC -->\n- [New](#new)\n<!-- /TOC -->";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const tocScored = scored.find((s) => s.patch.op === "update-toc");
+
+      expect(tocScored).toBeDefined();
+      expect(tocScored?.description).toContain("Regenerate table of contents");
+    });
+
+    test("describePatch includes custom marker in description", () => {
+      const source = "<!-- TOC -->\n- [Old](#old)\n<!-- END TOC -->";
+      const target = "<!-- TOC -->\n- [New](#new)\n<!-- END TOC -->";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const tocScored = scored.find((s) => s.patch.op === "update-toc");
+
+      expect(tocScored?.description).toContain("<!-- TOC -->");
+    });
+  });
+
+  describe("describePatch coverage for remaining ops", () => {
+    test("describePatch for merge-frontmatter", () => {
+      const scored = scorePatches(
+        [{ op: "merge-frontmatter", values: { a: 1, b: 2 } }],
+        "",
+        "",
+      );
+      expect(scored[0]?.description).toContain("Merge");
+      expect(scored[0]?.description).toContain("frontmatter");
+    });
+
+    test("describePatch for copy-file", () => {
+      const scored = scorePatches(
+        [{ op: "copy-file", src: "src/a.md", dest: "dst/a.md" }],
+        "",
+        "",
+      );
+      expect(scored[0]?.description).toContain("Copy file");
+      expect(scored[0]?.description).toContain("src/a.md");
+    });
+
+    test("describePatch for rename-file", () => {
+      const scored = scorePatches(
+        [{ op: "rename-file", match: "*.md", rename: "old.md" }],
+        "",
+        "",
+      );
+      expect(scored[0]?.description).toContain("Rename file");
+      expect(scored[0]?.description).toContain("*.md");
+    });
+
+    test("describePatch for delete-file", () => {
+      const scored = scorePatches([{ op: "delete-file", match: "unwanted.md" }], "", "");
+      expect(scored[0]?.description).toContain("Delete file");
+      expect(scored[0]?.description).toContain("unwanted.md");
+    });
+
+    test("describePatch for move-file", () => {
+      const scored = scorePatches(
+        [{ op: "move-file", match: "*.md", dest: "archive/" }],
+        "",
+        "",
+      );
+      expect(scored[0]?.description).toContain("Move file");
+      expect(scored[0]?.description).toContain("*.md");
+    });
+
+    test("describePatch for json-set", () => {
+      const scored = scorePatches([{ op: "json-set", path: "version", value: "2.0" }], "", "");
+      expect(scored[0]?.description).toContain("Set JSON");
+      expect(scored[0]?.description).toContain("version");
+    });
+
+    test("describePatch for json-delete", () => {
+      const scored = scorePatches([{ op: "json-delete", path: "deprecated" }], "", "");
+      expect(scored[0]?.description).toContain("Delete JSON");
+      expect(scored[0]?.description).toContain("deprecated");
+    });
+
+    test("describePatch for json-merge", () => {
+      const scored = scorePatches(
+        [{ op: "json-merge", value: { a: 1, b: 2 } }],
+        "",
+        "",
+      );
+      expect(scored[0]?.description).toContain("Merge");
+      expect(scored[0]?.description).toContain("JSON");
+    });
+
+    test("describePatch for exec", () => {
+      const scored = scorePatches([{ op: "exec", command: "./transform.sh" }], "", "");
+      expect(scored[0]?.description).toContain("Execute command");
+      expect(scored[0]?.description).toContain("transform.sh");
+    });
+
+    test("describePatch for plugin", () => {
+      const scored = scorePatches([{ op: "plugin", plugin: "my-plugin" }], "", "");
+      expect(scored[0]?.description).toContain("plugin");
+      expect(scored[0]?.description).toContain("my-plugin");
+    });
+
+    test("scorePatches gives 0.9 to copy-file", () => {
+      const scored = scorePatches(
+        [{ op: "copy-file", src: "a.md", dest: "b.md" }],
+        "",
+        "",
+      );
+      expect(scored[0]?.score).toBe(0.9);
+    });
+
+    test("scorePatches gives 0.9 to json-set", () => {
+      const scored = scorePatches([{ op: "json-set", path: "x", value: 1 }], "", "");
+      expect(scored[0]?.score).toBe(0.9);
+    });
+
+    test("scorePatches gives 0.95 to merge-frontmatter", () => {
+      const scored = scorePatches([{ op: "merge-frontmatter", values: { x: 1 } }], "", "");
+      expect(scored[0]?.score).toBe(0.95);
     });
   });
 
