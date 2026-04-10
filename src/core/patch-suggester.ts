@@ -1404,6 +1404,9 @@ export function suggestPatches(source: string, target: string): PatchOperation[]
   // Suggest code block patches
   patches.push(...suggestCodeBlockPatches(analysis));
 
+  // Suggest file-level prepend/append patches
+  patches.push(...suggestFileLevelPatches(source, target));
+
   // Suggest line insertion patches
   patches.push(...suggestLineInsertionPatches(source, target));
 
@@ -1592,45 +1595,68 @@ function suggestLineInsertionPatches(source: string, target: string): PatchOpera
       const precedingChange = i > 0 ? changes[i - 1] : null;
       const isPureInsertion = !precedingChange?.removed;
 
-      if (isPureInsertion && lines.length >= 1 && lines.length <= MAX_INSERT_LINES) {
+      // Skip file-boundary insertions — suggestFileLevelPatches handles those
+      const isFileStart = sourceLineIdx === 0;
+      const isFileEnd = sourceLineIdx >= sourceLines.length;
+
+      if (
+        isPureInsertion &&
+        !isFileStart &&
+        !isFileEnd &&
+        lines.length >= 1 &&
+        lines.length <= MAX_INSERT_LINES
+      ) {
         const addedContent = lines.join("\n");
 
-        if (sourceLineIdx > 0) {
-          // Walk back past empty lines to find a non-empty anchor
-          let lookback = sourceLineIdx - 1;
-          while (lookback >= 0 && (sourceLines[lookback] ?? "").trim().length === 0) {
-            lookback--;
-          }
-          const precedingLine = lookback >= 0 ? sourceLines[lookback] : undefined;
-          if (precedingLine !== undefined) {
-            patches.push({
-              op: "insert-after-line",
-              match: precedingLine,
-              content: addedContent,
-            });
-          }
-        } else {
-          // Walk forward past empty lines to find a non-empty anchor
-          let lookahead = sourceLineIdx;
-          while (
-            lookahead < sourceLines.length &&
-            (sourceLines[lookahead] ?? "").trim().length === 0
-          ) {
-            lookahead++;
-          }
-          const firstSourceLine = sourceLines[lookahead];
-          if (firstSourceLine !== undefined) {
-            patches.push({
-              op: "insert-before-line",
-              match: firstSourceLine,
-              content: addedContent,
-            });
-          }
+        // Walk back past empty lines to find a non-empty anchor
+        let lookback = sourceLineIdx - 1;
+        while (lookback >= 0 && (sourceLines[lookback] ?? "").trim().length === 0) {
+          lookback--;
+        }
+        const precedingLine = lookback >= 0 ? sourceLines[lookback] : undefined;
+        if (precedingLine !== undefined) {
+          patches.push({
+            op: "insert-after-line",
+            match: precedingLine,
+            content: addedContent,
+          });
         }
       }
     } else {
       sourceLineIdx += lines.length;
     }
+  }
+
+  return patches;
+}
+
+/**
+ * Suggests prepend-to-file and append-to-file patches when content is added
+ * at the very start or end of the file.
+ *
+ * Uses string-level contains check: if the entire source appears as a substring
+ * of the target (exactly once), the text before it is a prepend and the text
+ * after it is an append.
+ */
+function suggestFileLevelPatches(source: string, target: string): PatchOperation[] {
+  if (source === target || source.length === 0) return [];
+
+  const idx = target.indexOf(source);
+  // source must appear exactly once in target for unambiguous detection
+  if (idx < 0 || target.lastIndexOf(source) !== idx) return [];
+
+  const patches: PatchOperation[] = [];
+
+  const rawPrefix = target.slice(0, idx);
+  const prependContent = rawPrefix.trim();
+  if (prependContent.length > 0) {
+    patches.push({ op: "prepend-to-file", content: prependContent });
+  }
+
+  const rawSuffix = target.slice(idx + source.length);
+  const appendContent = rawSuffix.trim();
+  if (appendContent.length > 0) {
+    patches.push({ op: "append-to-file", content: appendContent });
   }
 
   return patches;
@@ -1797,6 +1823,86 @@ function suggestFrontmatterPatches(analysis: DiffAnalysis): PatchOperation[] {
 /**
  * Suggests section-related patches
  */
+/**
+ * Detects whether newBody is oldBody with content prepended.
+ * Returns the prepended content string, or null if not detected.
+ *
+ * Section bodies start with "\n" (the blank line after the header), so we compare
+ * the exact strings rather than trimmed variants.
+ */
+function detectSectionPrepend(oldBody: string, newBody: string): string | null {
+  if (oldBody.length === 0) return null;
+  // newBody must end with oldBody exactly
+  if (!newBody.endsWith(oldBody)) return null;
+  // Ensure something was actually prepended
+  if (newBody === oldBody) return null;
+
+  const rawPrefix = newBody.slice(0, newBody.length - oldBody.length);
+  // Strip the leading "\n" that separates the header from the body, then trim whitespace
+  const trimmedPrefix = rawPrefix.replace(/^\n/, "").trim();
+  if (trimmedPrefix.length === 0) return null;
+  // Avoid false positives where the prefix contains the original body text
+  if (trimmedPrefix.includes(oldBody.trim())) return null;
+
+  return trimmedPrefix;
+}
+
+/**
+ * Detects whether newBody is oldBody with content appended.
+ * Returns the appended content string, or null if not detected.
+ *
+ * Section bodies start with "\n" (the blank line after the header), so we compare
+ * the exact strings rather than trimmed variants.
+ */
+function detectSectionAppend(oldBody: string, newBody: string): string | null {
+  if (oldBody.length === 0) return null;
+  // newBody must start with oldBody exactly
+  if (!newBody.startsWith(oldBody)) return null;
+  // Ensure something was actually appended
+  if (newBody === oldBody) return null;
+
+  const rawSuffix = newBody.slice(oldBody.length);
+  const trimmedSuffix = rawSuffix.trimStart();
+  if (trimmedSuffix.length === 0) return null;
+  // Avoid false positives where the suffix contains the original body text
+  if (trimmedSuffix.includes(oldBody.trim())) return null;
+
+  return trimmedSuffix;
+}
+
+/**
+ * Detects a single text substitution within a section body.
+ * Returns { old, new } strings if a clean replacement is detected, otherwise null.
+ * Only triggers when oldBody and newBody have the same line count (substitution, not insertion/deletion).
+ */
+function detectReplaceInSection(
+  oldBody: string,
+  newBody: string,
+): { old: string; new: string } | null {
+  const oldLines = oldBody.split("\n");
+  const newLines = newBody.split("\n");
+  // Only attempt detection when line count is identical (pure substitution)
+  if (oldLines.length !== newLines.length) return null;
+
+  const changedPairs: Array<{ old: string; new: string }> = [];
+  for (let i = 0; i < oldLines.length; i++) {
+    if (oldLines[i] !== newLines[i]) {
+      changedPairs.push({ old: oldLines[i] ?? "", new: newLines[i] ?? "" });
+    }
+  }
+
+  // Only suggest when exactly one line changed (unambiguous replacement)
+  if (changedPairs.length !== 1) return null;
+
+  const pair = changedPairs[0];
+  if (!pair) return null;
+
+  // Require both sides to be non-empty
+  if (pair.old.trim().length === 0 || pair.new.trim().length === 0) return null;
+
+  return { old: pair.old, new: pair.new };
+}
+
 function suggestSectionPatches(analysis: DiffAnalysis): PatchOperation[] {
   const patches: PatchOperation[] = [];
 
@@ -1821,39 +1927,68 @@ function suggestSectionPatches(analysis: DiffAnalysis): PatchOperation[] {
 
       case "modified":
         if (change.newContent && change.oldContent) {
-          // Only suggest replace-section for substantial content changes
-          // For minor changes, let line-based suggestions handle it
+          // Extract body (everything after the header line)
+          const oldBody = change.oldContent.split("\n").slice(1).join("\n");
+          const newBody = change.newContent.split("\n").slice(1).join("\n");
+
+          // Check for prepend-to-section: newBody = addedPrefix + oldBody
+          const prependCandidate = detectSectionPrepend(oldBody, newBody);
+          if (prependCandidate !== null) {
+            patches.push({
+              op: "prepend-to-section",
+              id: change.sectionId,
+              content: prependCandidate,
+            });
+            break;
+          }
+
+          // Check for append-to-section: newBody = oldBody + addedSuffix
+          const appendCandidate = detectSectionAppend(oldBody, newBody);
+          if (appendCandidate !== null) {
+            patches.push({
+              op: "append-to-section",
+              id: change.sectionId,
+              content: appendCandidate,
+            });
+            break;
+          }
+
+          // Use full content (including header) for the change-ratio threshold — keeps the
+          // same semantics as before for the replace-section decision.
           const oldLines = change.oldContent.split("\n");
           const newLines = change.newContent.split("\n");
 
-          // Calculate how much changed
           const totalLines = Math.max(oldLines.length, newLines.length);
           let changedLines = 0;
-
-          // Simple line-by-line comparison
           for (let i = 0; i < totalLines; i++) {
             if (oldLines[i] !== newLines[i]) {
               changedLines++;
             }
           }
 
-          // Only suggest replace-section if more than 50% of lines changed
-          // or if the structure changed significantly (line count changed by >30%)
           const changeRatio = changedLines / totalLines;
           const lineDeltaRatio = Math.abs(oldLines.length - newLines.length) / totalLines;
 
           if (changeRatio > 0.5 || lineDeltaRatio > 0.3) {
-            // Extract just the content without the header
             const contentLines = change.newContent.split("\n").slice(1);
-            const content = contentLines.join("\n");
-
             patches.push({
               op: "replace-section",
               id: change.sectionId,
-              content,
+              content: contentLines.join("\n"),
             });
+          } else {
+            // Check for replace-in-section: a single-line substitution within the body
+            const replaceInSection = detectReplaceInSection(oldBody, newBody);
+            if (replaceInSection !== null) {
+              patches.push({
+                op: "replace-in-section",
+                id: change.sectionId,
+                old: replaceInSection.old,
+                new: replaceInSection.new,
+              });
+            }
+            // Otherwise let line-based patches handle it
           }
-          // Otherwise, skip and let line-based patches handle it
         }
         break;
 
@@ -2203,9 +2338,21 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     patch.op === "rename-header" ||
     patch.op === "insert-section" ||
     patch.op === "change-section-level" ||
-    patch.op === "move-section"
+    patch.op === "move-section" ||
+    patch.op === "prepend-to-section" ||
+    patch.op === "append-to-section"
   ) {
     score = 0.9;
+  }
+
+  // File-level prepend/append are high confidence (structurally precise)
+  if (patch.op === "prepend-to-file" || patch.op === "append-to-file") {
+    score = 0.9;
+  }
+
+  // Replace-in-section is moderately high confidence (single-line match within section)
+  if (patch.op === "replace-in-section") {
+    score = 0.85;
   }
 
   // Replace operations - score based on frequency
@@ -2321,6 +2468,21 @@ function describePatch(patch: PatchOperation): string {
 
     case "move-section":
       return `Move section "${patch.id}" after section "${patch.after}"`;
+
+    case "prepend-to-section":
+      return `Prepend content to section "${patch.id}"`;
+
+    case "append-to-section":
+      return `Append content to section "${patch.id}"`;
+
+    case "replace-in-section":
+      return `Replace "${truncate(patch.old, 30)}" in section "${patch.id}"`;
+
+    case "prepend-to-file":
+      return `Prepend content to file`;
+
+    case "append-to-file":
+      return `Append content to file`;
 
     case "set-frontmatter":
       return `Set frontmatter field "${patch.key}"`;

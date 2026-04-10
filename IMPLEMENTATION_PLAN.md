@@ -1,10 +1,34 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest prepend/append-to-file, prepend/append-to-section, replace-in-section detection - COMPLETE!):**
+
+* ✅ **`suggest` now detects `prepend-to-file`**: When the entire source content appears as a suffix of the target (exactly once), the leading text is suggested as a `prepend-to-file` patch. Uses string-level substring detection for robustness against diff-library line-ending quirks.
+* ✅ **`suggest` now detects `append-to-file`**: When the entire source content appears as a prefix of the target (exactly once), the trailing text is suggested as an `append-to-file` patch.
+* ✅ **Both file-level ops in one diff**: When source appears in the middle of the target, both `prepend-to-file` and `append-to-file` are generated simultaneously.
+* ✅ **`suggest` now detects `prepend-to-section`**: When a section's body grows at the beginning (new body ends with the old body exactly), generates `prepend-to-section` with the added prefix as content.
+* ✅ **`suggest` now detects `append-to-section`**: When a section's body grows at the end (new body starts with the old body exactly), generates `append-to-section` with the added suffix as content.
+* ✅ **Both section ops take priority over `replace-section`**: Prepend/append detection runs before the change-ratio threshold check, so small targeted additions never trigger a full section replacement.
+* ✅ **`suggest` now detects `replace-in-section`**: When a section is modified but the line count is identical and exactly one line changed, generates `replace-in-section` with the old and new line as values. Only fires when the change ratio is below the `replace-section` threshold (≤50% lines changed).
+* ✅ **`insert-before-line` replaced by `prepend-to-file` at file start**: The file-start insertion case that previously generated `insert-before-line` now correctly generates `prepend-to-file`, which is the semantically precise operation.
+* ✅ **Scoring**: `prepend-to-file`, `append-to-file`, `prepend-to-section`, `append-to-section` score 0.9 (same as other structural section ops); `replace-in-section` scores 0.85 (one tier below, reflecting the matched-line uncertainty).
+* ✅ **`describePatch` coverage**: All 5 new ops have human-readable descriptions (`"Prepend content to file"`, `"Append content to file"`, `"Prepend content to section \"X\""`, `"Append content to section \"X\""`, `"Replace \"old\" in section \"X\""`).
+* ✅ **21 new tests**: 8 tests for `prepend-to-file`/`append-to-file` (single-end, both-ends, identical no-op, middle-insert no-op, no duplicate `insert-after-line`, scoring, describePatch), 8 tests for `prepend-to-section`/`append-to-section` (single-end each, content value, false-positive guard, scoring, describePatch), 5 tests for `replace-in-section` (detection, old/new values, multi-line guard, line-count guard, scoring, describePatch).
+* ✅ **4,129 tests passing**: Up from 4,108.
+
+**Files modified:**
+
+* `src/core/patch-suggester.ts` — Added `detectSectionPrepend`, `detectSectionAppend`, `detectReplaceInSection` helpers; added `suggestFileLevelPatches` function; wired into `suggestPatches`; modified `suggestSectionPatches` `"modified"` case to try prepend/append/replace-in-section before falling back to `replace-section`; modified `suggestLineInsertionPatches` to skip file-boundary insertions; added scoring and `describePatch` cases for all 5 new ops.
+* `tests/core/patch-suggester.test.ts` — 21 new tests in `prepend-to-file / append-to-file detection`, `prepend-to-section / append-to-section detection`, and `replace-in-section detection` suites; updated 2 existing tests that now correctly expect `prepend-to-file` instead of `insert-before-line` for file-start insertions.
+
+**Status:** suggest prepend/append-to-file, prepend/append-to-section, replace-in-section detection COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest filter-list-items & filter-table-rows detection - COMPLETE!):**
 
