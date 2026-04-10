@@ -1,0 +1,43 @@
+src/core/schema.ts
+  8361bf3b1c98df2f 3873-4007
+tests/lsp/completion.test.ts
+  8361bf3b1c98df2f 310-311,313,610,692,732,759,1029
+IMPLEMENTATION_PLAN.md
+  8361bf3b1c98df2f 3,9-71
+src/core/config-parser.ts
+  8361bf3b1c98df2f 638-639,1282-1386
+src/lsp/completion.ts
+  8361bf3b1c98df2f 616-630,1129-1230
+src/core/suggestion-engine.ts
+  8361bf3b1c98df2f 313-317,319-333,335-342
+README.md
+  8361bf3b1c98df2f 4304-4430
+src/core/patch-engine.ts
+  8361bf3b1c98df2f 1975-2028,2030-2036,2038,2040,2042-2048,2050-2056,2058,2060-2148,3191-3216,3386-3395
+specs/out-of-scope.md
+  8361bf3b1c98df2f 141-142,145-147,149
+tests/core/ast-operations.test.ts
+  8361bf3b1c98df2f 1-426
+src/core/types.ts
+  8361bf3b1c98df2f 657-697,745-747
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "05b9c33a89946b50f2c065c0fad48b178164c649",
+  "prompts": {
+    "8361bf3b1c98df2f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f75fa6a-b0b2-4848-9513-c4028ffd3d00",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 1318,
+      "total_deletions": 16,
+      "accepted_lines": 1304,
+      "overriden_lines": 3
+    }
+  }
+}
