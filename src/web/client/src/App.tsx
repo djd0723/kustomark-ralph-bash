@@ -13,6 +13,7 @@ import type {
   BuildResult,
   KustomarkConfig,
   PatchOperation,
+  PreviewResult,
   ValidationResult,
 } from "./types/config";
 
@@ -27,9 +28,9 @@ export const App: React.FC = () => {
   const [buildResult, setBuildResult] = useState<BuildResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [originalContent, setOriginalContent] = useState("");
-  const [_previewContent, _setPreviewContent] = useState("");
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const loadConfig = useCallback(async () => {
     try {
@@ -39,7 +40,6 @@ export const App: React.FC = () => {
       const parsed = YAML.parse(response.content) as KustomarkConfig;
       setConfig(parsed);
       setPatches(parsed.patches || []);
-      setOriginalContent(response.content);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load config");
       // Initialize with default config
@@ -81,7 +81,6 @@ export const App: React.FC = () => {
       }
 
       await api.config.save(configPath, content);
-      setOriginalContent(content);
       toast.success("Config saved successfully!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save config");
@@ -143,6 +142,19 @@ export const App: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const loadPreview = useCallback(async () => {
+    if (!config) return;
+    try {
+      setPreviewLoading(true);
+      const result = await api.preview.run({ configPath });
+      setPreviewData(result);
+    } catch {
+      // Preview errors are non-fatal; leave existing data in place
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [config, configPath]);
 
   const getCurrentContent = () => {
     if (!config) return "";
@@ -290,7 +302,10 @@ export const App: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setViewMode("diff")}
+                onClick={() => {
+                  setViewMode("diff");
+                  loadPreview();
+                }}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   viewMode === "diff"
                     ? "bg-white text-primary-600 shadow-sm"
@@ -338,12 +353,50 @@ export const App: React.FC = () => {
             )}
 
             {viewMode === "diff" && (
-              <DiffViewer
-                oldValue={originalContent}
-                newValue={getCurrentContent()}
-                title="Config Changes"
-                splitView={false}
-              />
+              <div className="h-full flex flex-col overflow-hidden">
+                {previewLoading && (
+                  <div className="flex items-center justify-center flex-1">
+                    <p className="text-sm text-gray-500">Loading preview...</p>
+                  </div>
+                )}
+                {!previewLoading && previewData && previewData.filesChanged === 0 && (
+                  <div className="flex items-center justify-center flex-1">
+                    <p className="text-sm text-gray-500">No changes — all patches are no-ops.</p>
+                  </div>
+                )}
+                {!previewLoading && previewData && previewData.filesChanged > 0 && (
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
+                      {previewData.filesChanged} file{previewData.filesChanged !== 1 ? "s" : ""}
+                      {"·"}
+                      changed{" · "}
+                      <span className="text-green-600">+{previewData.totalLinesAdded}</span>
+                      {"·"}
+                      <span className="text-red-600">-{previewData.totalLinesDeleted}</span>
+                      {"·"}
+                      <span className="text-yellow-600">~{previewData.totalLinesModified}</span>
+                    </div>
+                    {previewData.files
+                      .filter((f) => f.hasChanges)
+                      .map((file) => (
+                        <DiffViewer
+                          key={file.path}
+                          oldValue={file.before}
+                          newValue={file.after}
+                          title={file.path}
+                          splitView={false}
+                        />
+                      ))}
+                  </div>
+                )}
+                {!previewLoading && !previewData && (
+                  <div className="flex items-center justify-center flex-1">
+                    <p className="text-sm text-gray-500">
+                      Click "Diff View" to preview what patches would change.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
 
             {viewMode === "preview" && (

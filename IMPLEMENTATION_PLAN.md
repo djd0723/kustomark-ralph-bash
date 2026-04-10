@@ -1,10 +1,39 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (web UI preview API - COMPLETE!):**
+
+* ✅ **`/api/preview` endpoint**: New Express route on the web server performs a dry-run build — resolves resources, applies patches, but writes nothing to disk — and returns per-file before/after diff data
+* ✅ **`executePreview` service** (`src/web/server/services/preview-service.ts`): Scans config directory into a `fileMap`, resolves resources, applies patches with group/include/exclude filtering, calls `generatePreview` from core
+* ✅ **`PreviewRequest`/`PreviewResponse` types** added to `src/web/server/types.ts` (imports `FilePreview` from core `preview-generator.ts`)
+* ✅ **`FilePreview`/`PreviewResult` types** added to web client `src/web/client/src/types/config.ts`
+* ✅ **`api.preview.run()`** added to `src/web/client/src/services/api.ts`
+* ✅ **Web UI Diff view** now shows actual output-file diffs (before/after per file, with +/-/~ summary header) instead of the useless config-YAML diff; clicking "Diff View" tab triggers the preview API automatically
+* ✅ **8 new tests** in `tests/web-server-preview.test.ts` covering: empty resources, no-match patches, replace detection, no file writes, multiple files, include-pattern filtering, group filtering, duration field
+* ✅ **4,402 tests passing**: Up from 4,394. `bun check` clean.
+
+**Files created:**
+
+* `src/web/server/services/preview-service.ts`
+* `src/web/server/routes/preview.ts`
+* `tests/web-server-preview.test.ts`
+
+**Files modified:**
+
+* `src/web/server/types.ts` — `PreviewRequest`, `PreviewResponse` types
+* `src/web/server/server.ts` — register `/api/preview` route
+* `src/web/client/src/types/config.ts` — `FilePreview`, `PreviewResult` types
+* `src/web/client/src/services/api.ts` — `api.preview.run()`
+* `src/web/client/src/App.tsx` — Diff view uses preview API
+
+**Status:** web UI preview API COMPLETE! ✅
+
+***
 
 **2026-04-10 (lint command test coverage - COMPLETE!):**
 

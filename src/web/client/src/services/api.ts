@@ -2,7 +2,7 @@
  * API client for communicating with the Kustomark web server
  */
 
-import type { BuildResult, FileNode, ValidationResult } from "../types/config";
+import type { BuildResult, FileNode, PreviewResult, ValidationResult } from "../types/config";
 
 const API_BASE = "/api";
 
@@ -90,6 +90,27 @@ export const api = {
       disableGroups?: string[];
     }): Promise<BuildResult> {
       const response = await fetch(`${API_BASE}/build`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      });
+      return handleResponse(response);
+    },
+  },
+
+  /**
+   * Preview API — dry-run build returning per-file diffs
+   */
+  preview: {
+    /**
+     * Run a dry-run build and return per-file before/after diffs
+     */
+    async run(params: {
+      configPath: string;
+      enableGroups?: string[];
+      disableGroups?: string[];
+    }): Promise<PreviewResult> {
+      const response = await fetch(`${API_BASE}/preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),

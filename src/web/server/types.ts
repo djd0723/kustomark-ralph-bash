@@ -3,6 +3,7 @@
  */
 
 import type { Request } from "express";
+import type { FilePreview } from "../../core/preview-generator.js";
 import type { ValidationError, ValidationWarning } from "../../core/types.js";
 
 /**
@@ -112,6 +113,36 @@ export interface ValidateResponse {
     field?: string;
     message: string;
   }>;
+}
+
+/**
+ * Preview request payload
+ */
+export interface PreviewRequest {
+  /** Path to config file (relative to base directory) */
+  configPath: string;
+  /** Enable specific patch groups (optional) */
+  enableGroups?: string[];
+  /** Disable specific patch groups (optional) */
+  disableGroups?: string[];
+}
+
+/**
+ * Preview response payload — dry-run diff for each resolved file
+ */
+export interface PreviewResponse {
+  /** Per-file before/after diff data */
+  files: FilePreview[];
+  /** Number of files with changes */
+  filesChanged: number;
+  /** Total lines added across all files */
+  totalLinesAdded: number;
+  /** Total lines deleted across all files */
+  totalLinesDeleted: number;
+  /** Total lines modified across all files */
+  totalLinesModified: number;
+  /** Preview duration in milliseconds */
+  duration: number;
 }
 
 /**

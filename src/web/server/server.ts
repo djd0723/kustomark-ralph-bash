@@ -14,6 +14,7 @@ import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { createBuildRoutes } from "./routes/build.js";
 import { createConfigRoutes } from "./routes/config.js";
 import { createFileRoutes } from "./routes/files.js";
+import { createPreviewRoutes } from "./routes/preview.js";
 import type { ServerConfig, WebSocketMessage } from "./types.js";
 
 /**
@@ -53,6 +54,7 @@ export function createApp(config: ServerConfig): express.Application {
   app.use("/api/build", createBuildRoutes(config));
   app.use("/api/config", createConfigRoutes(config));
   app.use("/api/files", createFileRoutes(config));
+  app.use("/api/preview", createPreviewRoutes(config));
 
   // 404 handler
   app.use(notFoundHandler);

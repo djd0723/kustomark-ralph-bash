@@ -210,3 +210,28 @@ export interface FileNode {
   type: "file" | "directory";
   children?: FileNode[];
 }
+
+/**
+ * Per-file diff data returned by the preview API
+ */
+export interface FilePreview {
+  path: string;
+  before: string;
+  after: string;
+  hasChanges: boolean;
+  linesAdded: number;
+  linesDeleted: number;
+  linesModified: number;
+}
+
+/**
+ * Result from the /api/preview dry-run endpoint
+ */
+export interface PreviewResult {
+  files: FilePreview[];
+  filesChanged: number;
+  totalLinesAdded: number;
+  totalLinesDeleted: number;
+  totalLinesModified: number;
+  duration: number;
+}
