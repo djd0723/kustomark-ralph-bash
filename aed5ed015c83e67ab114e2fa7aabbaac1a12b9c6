@@ -1,0 +1,27 @@
+tests/core/patch-suggester.test.ts
+  4d74c8cfa3e570ed 1955,1960,1962-1964,2014-2018,2022-2025,3058-3287
+src/core/patch-suggester.ts
+  4d74c8cfa3e570ed 1407-1409,1598-1608,1611-1614,1616-1622,1633-1659,1826-1905,1930-1957,1977,1979-1990,2341-2343,2348-2355,2472-2486
+IMPLEMENTATION_PLAN.md
+  4d74c8cfa3e570ed 3,9-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "aed5ed015c83e67ab114e2fa7aabbaac1a12b9c6",
+  "prompts": {
+    "4d74c8cfa3e570ed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4ea8b9c0-683d-4ef0-b54b-d9300c800f61",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 527,
+      "total_deletions": 110,
+      "accepted_lines": 479,
+      "overriden_lines": 0
+    }
+  }
+}
