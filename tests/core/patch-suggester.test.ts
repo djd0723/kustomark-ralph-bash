@@ -218,6 +218,17 @@ describe("patch-suggester", () => {
         expect(added?.sectionId).toBe("header-2");
       });
 
+      test("populates targetSections for anchor resolution", () => {
+        const source = "## Section A\nContent A";
+        const target = "## Section A\nContent A\n\n## Section B\nContent B";
+
+        const analysis = analyzeDiff(source, target);
+
+        expect(analysis.targetSections.length).toBe(2);
+        expect(analysis.targetSections[0]?.id).toBe("section-a");
+        expect(analysis.targetSections[1]?.id).toBe("section-b");
+      });
+
       test("detects header rename", () => {
         const source = "# Old Header\nContent";
         const target = "# New Header\nContent";
@@ -535,6 +546,68 @@ New content`;
           (p) => p.op === "rename-header" || p.op === "remove-section" || p.op === "replace-section",
         );
         expect(hasSectionPatches).toBe(true);
+      });
+
+      test("suggests insert-section when a new section is appended after existing", () => {
+        const source = "## Introduction\nHello world";
+        const target = "## Introduction\nHello world\n\n## New Section\nNew content here";
+
+        const patches = suggestPatches(source, target);
+
+        const insertPatch = patches.find((p) => p.op === "insert-section");
+        expect(insertPatch).toBeDefined();
+        if (insertPatch?.op === "insert-section") {
+          expect(insertPatch.id).toBe("introduction");
+          expect(insertPatch.position).toBe("after");
+          expect(insertPatch.header).toBe("## New Section");
+          expect(insertPatch.content).toBe("New content here");
+        }
+      });
+
+      test("suggests insert-section with position before when added as first section", () => {
+        const source = "## Existing Section\nSome content";
+        const target = "## New First Section\nNew content\n\n## Existing Section\nSome content";
+
+        const patches = suggestPatches(source, target);
+
+        const insertPatch = patches.find((p) => p.op === "insert-section");
+        expect(insertPatch).toBeDefined();
+        if (insertPatch?.op === "insert-section") {
+          expect(insertPatch.id).toBe("existing-section");
+          expect(insertPatch.position).toBe("before");
+          expect(insertPatch.header).toBe("## New First Section");
+        }
+      });
+
+      test("suggests insert-section without content when section has no body", () => {
+        const source = "## Intro\nText";
+        const target = "## Intro\nText\n\n## Empty Section";
+
+        const patches = suggestPatches(source, target);
+
+        const insertPatch = patches.find((p) => p.op === "insert-section");
+        expect(insertPatch).toBeDefined();
+        if (insertPatch?.op === "insert-section") {
+          expect(insertPatch.header).toBe("## Empty Section");
+          expect(insertPatch.content).toBeUndefined();
+        }
+      });
+
+      test("suggests insert-section between existing sections", () => {
+        const source = "## First\nContent A\n\n## Last\nContent B";
+        const target = "## First\nContent A\n\n## Middle\nNew middle content\n\n## Last\nContent B";
+
+        const patches = suggestPatches(source, target);
+
+        const insertPatch = patches.find((p) => p.op === "insert-section");
+        expect(insertPatch).toBeDefined();
+        if (insertPatch?.op === "insert-section") {
+          expect(insertPatch.header).toBe("## Middle");
+          expect(insertPatch.content).toBe("New middle content");
+          // Anchors on the preceding "First" section
+          expect(insertPatch.id).toBe("first");
+          expect(insertPatch.position).toBe("after");
+        }
       });
     });
 
@@ -946,6 +1019,20 @@ Different content here`;
         expect(removeFmPatch?.description).toContain("draft");
         expect(renameHeaderPatch?.description).toContain("New Title");
         expect(replaceSectionPatch?.description).toContain("intro");
+      });
+
+      test("describes insert-section patch with anchor and position", () => {
+        const patches: PatchOperation[] = [
+          { op: "insert-section", id: "introduction", position: "after", header: "## New Section" },
+        ];
+
+        const scored = scorePatches(patches, "", "");
+
+        const insertPatch = scored.find((s) => s.patch.op === "insert-section");
+        expect(insertPatch?.description).toContain("## New Section");
+        expect(insertPatch?.description).toContain("introduction");
+        expect(insertPatch?.description).toContain("after");
+        expect(insertPatch?.score).toBe(0.9);
       });
     });
 

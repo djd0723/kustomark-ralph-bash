@@ -9,7 +9,7 @@ import * as Diff from "diff";
 import { parseLists } from "./list-parser.js";
 import { parseFrontmatter, parseSections } from "./patch-engine.js";
 import { parseTables } from "./table-parser.js";
-import type { PatchOperation } from "./types.js";
+import type { MarkdownSection, PatchOperation } from "./types.js";
 
 /** A list item that was added */
 type ListItemAdded = { listIndex: number; type: "item-added"; itemIndex: number; newText: string };
@@ -134,6 +134,8 @@ export interface DiffAnalysis {
   linkChanges: Array<LinkChange>;
   /** Changes detected in markdown tables */
   tableChanges: Array<TableChange>;
+  /** Parsed sections from the target document (for anchor resolution) */
+  targetSections: MarkdownSection[];
 }
 
 /**
@@ -170,6 +172,7 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
     listChanges: [],
     linkChanges: [],
     tableChanges: [],
+    targetSections: [],
   };
 
   // Analyze frontmatter changes
@@ -190,6 +193,7 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
   const sourceSections = parseSections(source);
   const targetSections = parseSections(target);
   analysis.sectionChanges = analyzeSectionChanges(sourceSections, targetSections, source, target);
+  analysis.targetSections = targetSections;
 
   // Analyze list changes
   analysis.listChanges = analyzeListChanges(source, target);
@@ -984,7 +988,43 @@ function suggestSectionPatches(analysis: DiffAnalysis): PatchOperation[] {
         }
         break;
 
-      // Added sections are harder to suggest as patches - skip for now
+      case "added":
+        if (change.newContent) {
+          // Find anchor section: the section immediately before this one in the target,
+          // or immediately after if it's the first section.
+          const targetIdx = analysis.targetSections.findIndex((s) => s.id === change.sectionId);
+          if (targetIdx >= 0) {
+            const lines = change.newContent.split("\n");
+            const headerLine = lines[0] ?? "";
+            const bodyContent = lines.slice(1).join("\n").trim();
+
+            if (targetIdx > 0) {
+              const anchor = analysis.targetSections[targetIdx - 1];
+              if (anchor) {
+                patches.push({
+                  op: "insert-section",
+                  id: anchor.id,
+                  position: "after",
+                  header: headerLine,
+                  ...(bodyContent ? { content: bodyContent } : {}),
+                });
+              }
+            } else if (targetIdx < analysis.targetSections.length - 1) {
+              const anchor = analysis.targetSections[targetIdx + 1];
+              if (anchor) {
+                patches.push({
+                  op: "insert-section",
+                  id: anchor.id,
+                  position: "before",
+                  header: headerLine,
+                  ...(bodyContent ? { content: bodyContent } : {}),
+                });
+              }
+            }
+            // No other sections to anchor against — skip
+          }
+        }
+        break;
     }
   }
 
@@ -1281,7 +1321,8 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
   if (
     patch.op === "remove-section" ||
     patch.op === "replace-section" ||
-    patch.op === "rename-header"
+    patch.op === "rename-header" ||
+    patch.op === "insert-section"
   ) {
     score = 0.9;
   }
@@ -1359,6 +1400,9 @@ function describePatch(patch: PatchOperation): string {
 
     case "rename-header":
       return `Rename section "${patch.id}" to "${patch.new}"`;
+
+    case "insert-section":
+      return `Insert section "${patch.header}" ${patch.position ?? "after"} section "${patch.id}"`;
 
     case "set-frontmatter":
       return `Set frontmatter field "${patch.key}"`;

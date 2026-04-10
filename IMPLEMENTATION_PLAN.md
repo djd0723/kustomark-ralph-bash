@@ -1,6 +1,6 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
@@ -100,6 +100,30 @@ This document tracks the implementation of kustomark based on the spec milestone
 
 
 ## Recent Enhancements
+
+**2026-04-09 (suggest insert-section - COMPLETE!):**
+
+* ✅ **`insert-section` suggestion**: `suggestPatches()` now generates `insert-section` patches when a new section is detected in the target
+* ✅ **Anchor resolution**: Uses the preceding section as the anchor with `position: "after"`; falls back to the following section with `position: "before"` when the new section is first
+* ✅ **Header + content extraction**: Splits `newContent` into the header line and optional body; omits `content` field when the added section has no body
+* ✅ **`targetSections` in `DiffAnalysis`**: Added field to the interface so `suggestSectionPatches` can resolve anchors without re-parsing
+* ✅ **Scoring**: `insert-section` scores 0.9 (same as other deterministic section ops)
+* ✅ **Description**: `describePatch` produces human-readable text: `Insert section "## X" after section "anchor-id"`
+* ✅ **6 NEW TESTS**: `suggestPatches` tests for after/before/no-body/between-sections cases, `analyzeDiff` test for `targetSections` population, `scorePatches` test for description and score
+* ✅ **3,991 TESTS PASSING**: All tests pass with 0 failures
+* ✅ **Linting clean**: `bun check` passes with no errors
+
+**Details:**
+
+1. **Gap addressed**: The `suggestSectionPatches` helper had a `// Added sections are harder to suggest as patches - skip for now` comment. The analysis already tracked added sections with full `newContent`; only the patch generation was missing.
+
+2. **Files modified**
+   * `src/core/patch-suggester.ts` — Added `MarkdownSection` import; added `targetSections` to `DiffAnalysis`; populated in `analyzeDiff`; implemented `"added"` case in `suggestSectionPatches`; added `insert-section` to score table and `describePatch`
+   * `tests/core/patch-suggester.test.ts` — 6 new tests covering all anchor scenarios and scoring
+
+**Status:** suggest insert-section COMPLETE! ✅
+
+***
 
 **2026-04-09 (LSP `when` field + `validate` hover completeness - COMPLETE!):**
 
