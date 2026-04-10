@@ -1,10 +1,27 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (snapshot command test coverage - COMPLETE!):**
+
+* ✅ **30 new tests** in `tests/cli/snapshot.test.ts` covering all three modes of the `kustomark snapshot` command:
+  * **Create mode** (10 tests): manifest file created on disk, manifest contains `version`/`timestamp`/`files` fields, each file entry has `path`/`hash`/`size`, text output reports "Snapshot Created" with file count and location, `--format=json` returns valid JSON with `success`, `mode`, `fileCount`, `snapshotPath`, error handling for missing config.
+  * **Verify mode** (9 tests): exits 1 when no snapshot exists, exits 0 when build matches snapshot, text output confirms match/mismatch, exits 1 when content differs, `--format=json` result includes `diff` (added/removed/modified arrays) and `hasChanges`, `success=true`/`false` reflects match result.
+  * **Update mode** (8 tests): exits 1 when no snapshot exists, exits 0 and updates manifest on content change, timestamp changes after update, text output reports "Snapshot Updated", no-changes message when content identical, `--format=json` returns `mode=update` and `diff`, updated snapshot passes subsequent verify.
+  * **Edge cases** (3 tests): accepts directory path (auto-detects `kustomark.yaml`), fails gracefully with invalid YAML config, manifest files sorted alphabetically by path.
+* ✅ **4,294 tests passing**: Up from 4,264.
+
+**Files created:**
+
+* `tests/cli/snapshot.test.ts` — 30 new tests across `create mode`, `verify mode`, `update mode`, and `edge cases` describe blocks.
+
+**Status:** snapshot command test coverage COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest --interactive flag - COMPLETE!):**
 
