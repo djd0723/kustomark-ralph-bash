@@ -1,0 +1,25 @@
+tests/cli/history.test.ts
+  aa447ebbe575edfa 1-691
+IMPLEMENTATION_PLAN.md
+  aa447ebbe575edfa 3,9-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "4bb489e6547d4b822504c2cc776879a96037812c",
+  "prompts": {
+    "aa447ebbe575edfa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3abb6e1c-49b4-41f3-bb90-1cf83c9138a9",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 712,
+      "total_deletions": 1,
+      "accepted_lines": 712,
+      "overriden_lines": 0
+    }
+  }
+}
