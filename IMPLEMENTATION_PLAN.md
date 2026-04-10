@@ -1,8 +1,31 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-10 (suggest json-merge batch detection - COMPLETE!):**
+
+* ✅ **`suggest` now generates `json-merge` when 2+ sibling keys change**: When comparing JSON, YAML, or TOML files and two or more keys at the same object level are added or modified, the command emits a single compact `json-merge` patch instead of multiple individual `json-set` patches. Single-key changes continue to use `json-set` for precision.
+* ✅ **Detection logic in `collectJsonDiffPatches`**: Scalar changes (non-nested values) at each recursion level are collected separately from nested-object pairs. When 2+ scalar changes exist at the same level, a `json-merge` patch is emitted with all values batched into a single `value` object. When there is only 1 scalar change, the existing `json-set` path is used.
+* ✅ **`path` field for nested batches**: Root-level merges omit the `path` field (merge at root). Nested-level merges include `path: "<dot-notation prefix>"` so the merge targets the correct sub-object.
+* ✅ **`json-delete` always stays individual**: Deletions are never batched into `json-merge` — they remain as separate `json-delete` patches, identical to the `remove-frontmatter` separation in `merge-frontmatter` detection.
+* ✅ **Nested objects recurse independently**: Both-sides plain-record pairs are always recursed; the batching decision is made at each individual recursion level, so a 1-change nested object still emits `json-set` even if the parent level emitted `json-merge`.
+* ✅ **Scoring at 0.9**: `json-merge` already scored at 0.9 in `calculatePatchScore` (same as `json-set`). No scoring changes needed.
+* ✅ **`describePatch` already covered**: "Merge N JSON/YAML field(s)" description already present. No description changes needed.
+* ✅ **7 new tests** in `tests/cli/suggest.test.ts` (`json-merge batch detection` suite): 2+ root-level keys produce `json-merge`, single key still uses `json-set`, nested sibling batch with `path`, `json-delete` stays separate, 2+ added YAML keys produce `json-merge`, `json-merge` scored at 0.9, independent handling of root and nested single-key changes.
+* ✅ **4,231 tests passing**: Up from 4,224.
+
+**Files modified:**
+
+* `src/core/patch-suggester.ts` — Refactored `collectJsonDiffPatches` to separate scalar changes from nested-object pairs; emits `json-merge` (with optional `path`) when ≥2 scalar changes, falls back to `json-set` for single scalar change.
+* `tests/cli/suggest.test.ts` — 7 new tests in `json-merge batch detection` describe block.
+
+**Status:** suggest json-merge batch detection COMPLETE! ✅
+
+***
 
 ## Recent Enhancements
 

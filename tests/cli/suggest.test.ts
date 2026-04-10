@@ -1520,6 +1520,188 @@ More updated content.`;
   });
 
   // ============================================================================
+  // json-merge batching tests
+  // ============================================================================
+
+  describe("json-merge batch detection", () => {
+    test("suggests json-merge when 2+ root-level JSON keys change", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(
+        sourceFile,
+        JSON.stringify({ name: "kustomark", version: "1.0.0", author: "old" }),
+      );
+      writeFileSync(
+        targetFile,
+        JSON.stringify({ name: "kustomark", version: "2.0.0", author: "new" }),
+      );
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const mergePatch = output.config.patches.find((p: any) => p.op === "json-merge");
+      expect(mergePatch).toBeDefined();
+      expect(mergePatch.value).toMatchObject({ version: "2.0.0", author: "new" });
+      expect(mergePatch.path).toBeUndefined();
+      // Should NOT emit individual json-set for these keys
+      const setPatch = output.config.patches.find(
+        (p: any) => p.op === "json-set" && (p.path === "version" || p.path === "author"),
+      );
+      expect(setPatch).toBeUndefined();
+    });
+
+    test("suggests json-set (not json-merge) when only 1 key changes", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(sourceFile, JSON.stringify({ name: "kustomark", version: "1.0.0" }));
+      writeFileSync(targetFile, JSON.stringify({ name: "kustomark", version: "2.0.0" }));
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const setPatch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(setPatch).toBeDefined();
+      expect(setPatch.path).toBe("version");
+      // No json-merge for a single key change
+      const mergePatch = output.config.patches.find((p: any) => p.op === "json-merge");
+      expect(mergePatch).toBeUndefined();
+    });
+
+    test("suggests json-merge with path for 2+ sibling changes in nested object", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(
+        sourceFile,
+        JSON.stringify({ server: { host: "localhost", port: 3000, debug: false } }),
+      );
+      writeFileSync(
+        targetFile,
+        JSON.stringify({ server: { host: "example.com", port: 8080, debug: false } }),
+      );
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const mergePatch = output.config.patches.find((p: any) => p.op === "json-merge");
+      expect(mergePatch).toBeDefined();
+      expect(mergePatch.path).toBe("server");
+      expect(mergePatch.value).toMatchObject({ host: "example.com", port: 8080 });
+    });
+
+    test("keeps json-delete separate from json-merge", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(
+        sourceFile,
+        JSON.stringify({ name: "kustomark", version: "1.0.0", deprecated: true }),
+      );
+      writeFileSync(
+        targetFile,
+        JSON.stringify({ name: "newname", version: "2.0.0" }),
+      );
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      // name and version both changed → json-merge
+      const mergePatch = output.config.patches.find((p: any) => p.op === "json-merge");
+      expect(mergePatch).toBeDefined();
+      expect(mergePatch.value).toMatchObject({ name: "newname", version: "2.0.0" });
+      // deprecated removed → separate json-delete
+      const deletePatch = output.config.patches.find((p: any) => p.op === "json-delete");
+      expect(deletePatch).toBeDefined();
+      expect(deletePatch.path).toBe("deprecated");
+    });
+
+    test("suggests json-merge for 2+ added keys in YAML", () => {
+      const sourceFile = join(testDir, "config.yaml");
+      const targetFile = join(testDir, "config-target.yaml");
+
+      writeFileSync(sourceFile, "name: kustomark\n");
+      writeFileSync(targetFile, "name: kustomark\nversion: 2.0.0\nauthor: team\n");
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const mergePatch = output.config.patches.find((p: any) => p.op === "json-merge");
+      expect(mergePatch).toBeDefined();
+      expect(mergePatch.value).toMatchObject({ version: "2.0.0", author: "team" });
+      expect(mergePatch.path).toBeUndefined();
+    });
+
+    test("scores json-merge at 0.9 (same as json-set)", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(sourceFile, JSON.stringify({ a: 1, b: 2 }));
+      writeFileSync(targetFile, JSON.stringify({ a: 10, b: 20 }));
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const scored = output.scoredPatches.find((sp: any) => sp.patch.op === "json-merge");
+      expect(scored).toBeDefined();
+      expect(scored.score).toBe(0.9);
+    });
+
+    test("nested and root changes are handled independently", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(
+        sourceFile,
+        JSON.stringify({ title: "old", db: { host: "localhost", port: 5432 } }),
+      );
+      writeFileSync(
+        targetFile,
+        JSON.stringify({ title: "new", db: { host: "prod.db", port: 5432 } }),
+      );
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      // title changed alone at root → json-set
+      const setPatch = output.config.patches.find(
+        (p: any) => p.op === "json-set" && p.path === "title",
+      );
+      expect(setPatch).toBeDefined();
+      // db.host changed alone under db → json-set (only 1 sibling changed)
+      const dbPatch = output.config.patches.find(
+        (p: any) => p.op === "json-set" && p.path === "db.host",
+      );
+      expect(dbPatch).toBeDefined();
+      // No json-merge since each level had only 1 change
+      const mergePatch = output.config.patches.find((p: any) => p.op === "json-merge");
+      expect(mergePatch).toBeUndefined();
+    });
+  });
+
+  // ============================================================================
   // TOML file suggestion tests
   // ============================================================================
 

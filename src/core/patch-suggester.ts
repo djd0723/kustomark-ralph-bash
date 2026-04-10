@@ -2739,7 +2739,7 @@ function collectJsonDiffPatches(
 ): void {
   const srcKeys = new Set(Object.keys(source));
 
-  // Deleted keys → json-delete
+  // Deleted keys → json-delete (always individual)
   for (const key of srcKeys) {
     if (!(key in target)) {
       const path = prefix ? `${prefix}.${key}` : key;
@@ -2747,20 +2747,47 @@ function collectJsonDiffPatches(
     }
   }
 
-  // Added or changed keys → json-set (recurse for nested objects)
-  for (const [key, tgtVal] of Object.entries(target)) {
-    const path = prefix ? `${prefix}.${key}` : key;
+  // Separate scalar changes from nested-object pairs
+  const scalarChanges: Record<string, unknown> = {};
+  const nestedPairs: Array<{
+    key: string;
+    src: Record<string, unknown>;
+    tgt: Record<string, unknown>;
+  }> = [];
 
+  for (const [key, tgtVal] of Object.entries(target)) {
     if (!srcKeys.has(key)) {
-      patches.push({ op: "json-set", path, value: tgtVal });
+      // Added key — treat as scalar regardless of shape
+      scalarChanges[key] = tgtVal;
     } else {
       const srcVal = source[key];
       if (isPlainRecord(srcVal) && isPlainRecord(tgtVal)) {
-        collectJsonDiffPatches(srcVal, tgtVal, path, patches);
+        // Both nested objects → recurse
+        nestedPairs.push({ key, src: srcVal, tgt: tgtVal });
       } else if (!jsonDeepEqual(srcVal, tgtVal)) {
-        patches.push({ op: "json-set", path, value: tgtVal });
+        // Scalar change
+        scalarChanges[key] = tgtVal;
       }
     }
+  }
+
+  // Batch scalar changes: 2+ siblings → json-merge, single → json-set
+  const scalarEntries = Object.entries(scalarChanges);
+  if (scalarEntries.length >= 2) {
+    const patch: PatchOperation = prefix
+      ? { op: "json-merge", value: scalarChanges, path: prefix }
+      : { op: "json-merge", value: scalarChanges };
+    patches.push(patch);
+  } else if (scalarEntries.length === 1 && scalarEntries[0] !== undefined) {
+    const [key, val] = scalarEntries[0];
+    const path = prefix ? `${prefix}.${key}` : key;
+    patches.push({ op: "json-set", path, value: val });
+  }
+
+  // Recurse into nested object pairs
+  for (const { key, src, tgt } of nestedPairs) {
+    const subPath = prefix ? `${prefix}.${key}` : key;
+    collectJsonDiffPatches(src, tgt, subPath, patches);
   }
 }
 
