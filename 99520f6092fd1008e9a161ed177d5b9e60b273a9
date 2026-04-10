@@ -1,0 +1,41 @@
+src/core/schema.ts
+  73a59fcce959a97b 4045-4112
+README.md
+  73a59fcce959a97b 2607-2662
+src/core/types.ts
+  73a59fcce959a97b 699-710,760-761
+src/core/config-parser.ts
+  73a59fcce959a97b 640,1388-1412
+src/lsp/completion.ts
+  73a59fcce959a97b 631-638,1195-1217
+IMPLEMENTATION_PLAN.md
+  73a59fcce959a97b 3,9-49
+src/core/patch-engine.ts
+  73a59fcce959a97b 569-622,3053-3056,3455-3456
+tests/core/replace-in-section.test.ts
+  73a59fcce959a97b 1-189
+src/core/suggestion-engine.ts
+  73a59fcce959a97b 223-236
+src/core/index.ts
+  73a59fcce959a97b 195,346
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "99520f6092fd1008e9a161ed177d5b9e60b273a9",
+  "prompts": {
+    "73a59fcce959a97b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab4204e9-c8d6-4a0d-b79c-ed12daa7eb6b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 550,
+      "total_deletions": 48,
+      "accepted_lines": 505,
+      "overriden_lines": 0
+    }
+  }
+}
