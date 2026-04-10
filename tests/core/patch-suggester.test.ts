@@ -423,21 +423,16 @@ Updated summary`;
         }
       });
 
-      test("suggests patches for modified frontmatter fields", () => {
-        const source = "---\ntitle: Old\nversion: 1.0\n---\nContent";
-        const target = "---\ntitle: New\nversion: 2.0\n---\nContent";
+      test("suggests merge-frontmatter for 2+ modified frontmatter fields", () => {
+        const source = "---\ntitle: Old\nstatus: draft\n---\nContent";
+        const target = "---\ntitle: New\nstatus: published\n---\nContent";
 
         const patches = suggestPatches(source, target);
 
-        const setPatches = patches.filter((p) => p.op === "set-frontmatter");
-        expect(setPatches.length).toBe(2);
-
-        const titlePatch = setPatches.find(
-          (p) => p.op === "set-frontmatter" && p.key === "title",
-        );
-        expect(titlePatch).toBeDefined();
-        if (titlePatch?.op === "set-frontmatter") {
-          expect(titlePatch.value).toBe("New");
+        const mergePatch = patches.find((p) => p.op === "merge-frontmatter");
+        expect(mergePatch).toBeDefined();
+        if (mergePatch?.op === "merge-frontmatter") {
+          expect(mergePatch.values).toMatchObject({ title: "New", status: "published" });
         }
       });
 
@@ -463,6 +458,118 @@ Updated summary`;
           (p) => p.op === "set-frontmatter" || p.op === "remove-frontmatter",
         );
         expect(frontmatterPatches.length).toBe(0);
+      });
+    });
+
+    describe("merge-frontmatter detection", () => {
+      test("suggests merge-frontmatter when 2+ keys are added", () => {
+        const source = "---\ntitle: Doc\n---\nContent";
+        const target = "---\ntitle: Doc\nauthor: Alice\ncategory: guide\n---\nContent";
+
+        const patches = suggestPatches(source, target);
+
+        const mergePatch = patches.find((p) => p.op === "merge-frontmatter");
+        expect(mergePatch).toBeDefined();
+        if (mergePatch?.op === "merge-frontmatter") {
+          expect(mergePatch.values).toMatchObject({ author: "Alice", category: "guide" });
+        }
+        // No individual set-frontmatter for the batched keys
+        expect(patches.some((p) => p.op === "set-frontmatter" && (p as { key: string }).key === "author")).toBe(false);
+      });
+
+      test("suggests set-frontmatter (not merge) for a single added key", () => {
+        const source = "---\ntitle: Doc\n---\nContent";
+        const target = "---\ntitle: Doc\nauthor: Alice\n---\nContent";
+
+        const patches = suggestPatches(source, target);
+
+        const setPatch = patches.find((p) => p.op === "set-frontmatter");
+        expect(setPatch).toBeDefined();
+        if (setPatch?.op === "set-frontmatter") {
+          expect(setPatch.key).toBe("author");
+          expect(setPatch.value).toBe("Alice");
+        }
+        expect(patches.some((p) => p.op === "merge-frontmatter")).toBe(false);
+      });
+
+      test("suggests merge-frontmatter when 2+ keys are modified", () => {
+        const source = "---\nfoo: old1\nbar: old2\n---\nContent";
+        const target = "---\nfoo: new1\nbar: new2\n---\nContent";
+
+        const patches = suggestPatches(source, target);
+
+        const mergePatch = patches.find((p) => p.op === "merge-frontmatter");
+        expect(mergePatch).toBeDefined();
+        if (mergePatch?.op === "merge-frontmatter") {
+          expect(mergePatch.values).toMatchObject({ foo: "new1", bar: "new2" });
+        }
+      });
+
+      test("combines added and modified keys into one merge-frontmatter", () => {
+        const source = "---\ntitle: Old\n---\nContent";
+        const target = "---\ntitle: New\nauthor: Bob\n---\nContent";
+
+        const patches = suggestPatches(source, target);
+
+        const mergePatch = patches.find((p) => p.op === "merge-frontmatter");
+        expect(mergePatch).toBeDefined();
+        if (mergePatch?.op === "merge-frontmatter") {
+          expect(mergePatch.values).toMatchObject({ title: "New", author: "Bob" });
+        }
+      });
+
+      test("keeps remove-frontmatter separate from merge-frontmatter", () => {
+        const source = "---\ntitle: Old\nversion: 1.0\ndraft: true\n---\nContent";
+        const target = "---\ntitle: New\nversion: 2.0\n---\nContent";
+
+        const patches = suggestPatches(source, target);
+
+        const mergePatch = patches.find((p) => p.op === "merge-frontmatter");
+        const removePatch = patches.find((p) => p.op === "remove-frontmatter");
+        expect(mergePatch).toBeDefined();
+        expect(removePatch).toBeDefined();
+        if (removePatch?.op === "remove-frontmatter") {
+          expect(removePatch.key).toBe("draft");
+        }
+      });
+
+      test("keeps rename-frontmatter separate; merges remaining adds", () => {
+        const source = "---\nold_key: value\n---\nContent";
+        const target = "---\nnew_key: value\nextra1: a\nextra2: b\n---\nContent";
+
+        const patches = suggestPatches(source, target);
+
+        const renamePatch = patches.find((p) => p.op === "rename-frontmatter");
+        const mergePatch = patches.find((p) => p.op === "merge-frontmatter");
+        expect(renamePatch).toBeDefined();
+        expect(mergePatch).toBeDefined();
+        if (mergePatch?.op === "merge-frontmatter") {
+          expect(Object.keys(mergePatch.values)).toContain("extra1");
+          expect(Object.keys(mergePatch.values)).toContain("extra2");
+          // The renamed key should not be in merge values
+          expect(Object.keys(mergePatch.values)).not.toContain("new_key");
+        }
+      });
+
+      test("scores merge-frontmatter at 0.95", () => {
+        const patches = suggestPatches(
+          "---\na: 1\n---\nContent",
+          "---\na: 1\nb: 2\nc: 3\n---\nContent",
+        );
+        const scored = scorePatches(patches, "---\na: 1\n---\nContent", "---\na: 1\nb: 2\nc: 3\n---\nContent");
+        const mergeScored = scored.find((s) => s.patch.op === "merge-frontmatter");
+        expect(mergeScored).toBeDefined();
+        expect(mergeScored!.score).toBeCloseTo(0.95);
+      });
+
+      test("describes merge-frontmatter with key count", () => {
+        const patches = suggestPatches(
+          "---\na: 1\n---\nContent",
+          "---\na: 1\nb: 2\nc: 3\n---\nContent",
+        );
+        const scored = scorePatches(patches, "---\na: 1\n---\nContent", "---\na: 1\nb: 2\nc: 3\n---\nContent");
+        const mergeScored = scored.find((s) => s.patch.op === "merge-frontmatter");
+        expect(mergeScored?.description).toContain("2");
       });
     });
 
@@ -838,8 +945,8 @@ Updated summary.`;
         const patches = suggestPatches(source, target);
         const scored = scorePatches(patches, source, target);
 
-        // Should suggest various types of patches
-        expect(patches.some((p) => p.op === "set-frontmatter")).toBe(true);
+        // Should suggest various types of patches (3 frontmatter changes → merge-frontmatter)
+        expect(patches.some((p) => p.op === "merge-frontmatter" || p.op === "set-frontmatter")).toBe(true);
         expect(
           patches.some((p) => p.op === "remove-section" || p.op === "rename-header"),
         ).toBe(true);
@@ -1228,8 +1335,8 @@ Set up your config file.`;
       expect(analysis.frontmatterChanges.modified.layout).toBeDefined();
       expect(analysis.frontmatterChanges.added.tags).toBeDefined();
 
-      // Should suggest appropriate patches
-      expect(patches.some((p) => p.op === "set-frontmatter")).toBe(true);
+      // Should suggest appropriate patches (2 frontmatter changes → merge-frontmatter)
+      expect(patches.some((p) => p.op === "merge-frontmatter" || p.op === "set-frontmatter")).toBe(true);
       expect(patches.some((p) => p.op === "replace")).toBe(true);
 
       // Should rank patches appropriately

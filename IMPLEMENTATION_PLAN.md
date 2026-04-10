@@ -1,10 +1,29 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest merge-frontmatter detection - COMPLETE!):**
+
+* ✅ **`suggest` now generates `merge-frontmatter` for batch frontmatter changes**: When 2+ frontmatter keys are added or modified simultaneously, the suggest command now emits a single compact `merge-frontmatter` patch instead of multiple individual `set-frontmatter` calls. Single-key changes continue to use `set-frontmatter` for maximum precision.
+* ✅ **Detection logic in `suggestFrontmatterPatches`**: Non-renamed added keys and modified keys are collected into a `batchValues` map; when the map has ≥2 entries, a `merge-frontmatter` patch is emitted with all values. When the map has exactly 1 entry, the existing `set-frontmatter` path is used.
+* ✅ **`rename-frontmatter` and `remove-frontmatter` remain independent**: Rename detection runs first and claims its keys; removes are always emitted individually. Only the "write" operations (adds + modifications) are batched.
+* ✅ **Scoring at 0.95**: `merge-frontmatter` already scored at 0.95 in `calculatePatchScore` (same as `set-frontmatter`). No scoring changes needed.
+* ✅ **`describePatch` already covered**: "Merge N frontmatter field(s)" description already present. No description changes needed.
+* ✅ **8 new tests**: `suggests merge-frontmatter when 2+ keys are added`, `suggests set-frontmatter (not merge) for a single added key`, `suggests merge-frontmatter when 2+ keys are modified`, `combines added and modified keys into one merge-frontmatter`, `keeps remove-frontmatter separate from merge-frontmatter`, `keeps rename-frontmatter separate; merges remaining adds`, `scores merge-frontmatter at 0.95`, `describes merge-frontmatter with key count`.
+* ✅ **4,187 tests passing**: Up from 4,179.
+
+**Files modified:**
+
+* `src/core/patch-suggester.ts` — Replaced individual `set-frontmatter` loop for added/modified keys with batch collection; emits `merge-frontmatter` when ≥2 keys, falls back to `set-frontmatter` for single key.
+* `tests/core/patch-suggester.test.ts` — Updated 3 existing tests that expected individual `set-frontmatter` for multi-key changes; added 8 new tests in `merge-frontmatter detection` suite.
+
+**Status:** suggest merge-frontmatter detection COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest TOML file support - COMPLETE!):**
 

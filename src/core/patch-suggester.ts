@@ -1812,16 +1812,28 @@ function suggestFrontmatterPatches(analysis: DiffAnalysis): PatchOperation[] {
     }
   }
 
-  // Suggest set-frontmatter for added keys that are not part of a rename
+  // Collect all non-rename additions and modifications for batch detection
+  const batchValues: Record<string, unknown> = {};
+
   for (const [key, value] of Object.entries(added)) {
     if (!renamedAddedKeys.has(key)) {
-      patches.push({ op: "set-frontmatter", key, value });
+      batchValues[key] = value;
     }
   }
 
-  // Suggest set-frontmatter for modified keys
   for (const [key, { new: value }] of Object.entries(modified)) {
-    patches.push({ op: "set-frontmatter", key, value });
+    batchValues[key] = value;
+  }
+
+  // When 2+ keys are being set/updated simultaneously, merge-frontmatter is more
+  // compact and semantically captures the batch nature of the change.
+  if (Object.keys(batchValues).length >= 2) {
+    patches.push({ op: "merge-frontmatter", values: batchValues });
+  } else {
+    // Single key change → individual set-frontmatter for maximum precision
+    for (const [key, value] of Object.entries(batchValues)) {
+      patches.push({ op: "set-frontmatter", key, value });
+    }
   }
 
   // Suggest remove-frontmatter for removed keys that are not part of a rename
