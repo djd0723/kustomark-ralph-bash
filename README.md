@@ -1739,6 +1739,92 @@ Summary:
 
 ---
 
+### `kustomark profile memory [options]`
+
+Memory usage profiling for kustomark patch operations. Measures heap allocation, GC events, and detects potential memory leaks across configurable workload scenarios.
+
+```bash
+# Profile with the default medium scenario (50 files)
+kustomark profile memory
+
+# Small workload (10 files, simple operations)
+kustomark profile memory --scenario small
+
+# Large workload (200 files, complex operations, heap snapshots enabled)
+kustomark profile memory --scenario large
+
+# Custom scenario: 20 files, append and replace operations
+kustomark profile memory --scenario custom --files 20 --operations "append,replace"
+
+# JSON output for programmatic analysis
+kustomark profile memory --format json
+
+# Save profile output to a file
+kustomark profile memory --scenario medium --format json --output profile.json
+
+# Enable heap snapshots for detailed leak analysis
+kustomark profile memory --snapshot
+
+# Adjust sampling frequency (default: 100ms)
+kustomark profile memory --sampling-interval 50
+
+# Load a custom profiler config from JSON
+kustomark profile memory --config profiler-config.json
+```
+
+**Options:**
+
+| Option | Description | Default |
+|---|---|---|
+| `--scenario <name>` | Profiling scenario: `small`, `medium`, `large`, `custom` | `medium` |
+| `--config <path>` | Path to a profiler config JSON file | — |
+| `--snapshot` | Enable heap snapshots during profiling | `false` |
+| `--format <text\|json>` | Output format | `text` |
+| `--output <path>` | Save output to file instead of stdout | — |
+| `--files <count>` | Number of files to process (custom scenario only) | `50` |
+| `--operations <ops>` | Comma-separated operations to run (custom scenario only) | `append` |
+| `--sampling-interval <ms>` | Memory sampling interval in milliseconds (10–10000) | `100` |
+
+**Scenarios:**
+
+* `small` — 10 files, 2 operations (append, replace). Fast baseline for development.
+* `medium` — 50 files, 4 operations (append, prepend, replace, replace-regex). Default general-purpose profile.
+* `large` — 200 files, 5 operations including replace-section. Enables heap snapshots automatically.
+* `custom` — User-defined file count and operation list via `--files` and `--operations`.
+
+**Custom `--operations` values:** `append`, `prepend`, `replace`, `regex`, `replace-section`
+
+**JSON Output Example:**
+
+```json
+{
+  "startMemory": 45678592,
+  "peakMemory": 89234176,
+  "endMemory": 47123456,
+  "avgMemory": 62345600,
+  "gcCount": 3,
+  "gcTime": 12.45,
+  "samples": [...],
+  "leakDetection": [],
+  "duration": 834.21
+}
+```
+
+**Profile Summary (text format):**
+
+```
+Profile Summary:
+  Peak Memory: 85.12 MB
+  Avg Memory: 59.44 MB
+  GC Events: 3
+  GC Time: 12.45ms
+  No memory leaks detected
+```
+
+Archived profiles are saved automatically to `.kustomark/profiles/` as timestamped JSON files.
+
+---
+
 ### `kustomark web [path]`
 
 Launch the Kustomark web interface for browser-based configuration management.
