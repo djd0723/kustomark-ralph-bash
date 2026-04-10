@@ -1,0 +1,31 @@
+IMPLEMENTATION_PLAN.md
+  8f4d3deca0fffbce 3,9-37
+tests/core/utils/string-similarity.test.ts
+  8f4d3deca0fffbce 568-569
+src/lsp/server.ts
+  8f4d3deca0fffbce 15-16,28,49,65,160-174
+tests/lsp/code-actions.test.ts
+  8f4d3deca0fffbce 1-467
+src/lsp/code-actions.ts
+  8f4d3deca0fffbce 1-101,103-123,125-144,147-299
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "5bef9fd7d912ecba42edd7a30660cf9a1b612ada",
+  "prompts": {
+    "8f4d3deca0fffbce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "579fb92b-07cf-471c-8dac-4d4e24b30bd9",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 826,
+      "total_deletions": 2,
+      "accepted_lines": 816,
+      "overriden_lines": 4
+    }
+  }
+}
