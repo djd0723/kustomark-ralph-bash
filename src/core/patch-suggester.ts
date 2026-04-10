@@ -1623,6 +1623,23 @@ function suggestLineInsertionPatches(source: string, target: string): PatchOpera
             content: addedContent,
           });
         }
+
+        // Walk forward past empty lines to find a non-empty following anchor
+        let lookahead = sourceLineIdx;
+        while (
+          lookahead < sourceLines.length &&
+          (sourceLines[lookahead] ?? "").trim().length === 0
+        ) {
+          lookahead++;
+        }
+        const followingLine = lookahead < sourceLines.length ? sourceLines[lookahead] : undefined;
+        if (followingLine !== undefined) {
+          patches.push({
+            op: "insert-before-line",
+            match: followingLine,
+            content: addedContent,
+          });
+        }
       }
     } else {
       sourceLineIdx += lines.length;

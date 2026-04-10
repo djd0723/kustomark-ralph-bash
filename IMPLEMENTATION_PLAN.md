@@ -1,10 +1,30 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest insert-before-line detection - COMPLETE!):**
+
+* ✅ **`suggest` now generates `insert-before-line` patches**: When a pure line insertion is detected at a mid-file position, the command now emits both `insert-after-line` (anchored to the preceding non-empty line) and `insert-before-line` (anchored to the following non-empty line). Users get two anchor options and can choose whichever line is more stable/unique.
+* ✅ **Forward lookahead in `suggestLineInsertionPatches`**: After generating the existing `insert-after-line` patch, a forward scan past empty lines finds the next non-empty source line. If found, an `insert-before-line` patch is emitted with that line as the `match` anchor.
+* ✅ **Skips file-boundary cases**: File-start insertions continue to use `prepend-to-file`; file-end insertions continue to use `append-to-file`. Neither generates `insert-before-line`, avoiding redundancy with the file-level ops.
+* ✅ **Scoring at 0.6**: `insert-before-line` already scored at 0.6 in `calculatePatchScore` (same as `insert-after-line`). No scoring changes needed.
+* ✅ **`describePatch` already covered**: "Insert content before line" description already present. No description changes needed.
+* ✅ **6 new tests**: `generates insert-before-line for mid-file insertion`, `both insert-after-line and insert-before-line generated simultaneously`, `skips empty lines when looking forward`, `no insert-before-line when no following non-empty line`, `no insert-before-line for file-start insertions (prepend-to-file preferred)`, `score 0.6`, `describePatch description`.
+* ✅ **Updated 1 existing test**: Updated the "describePatch returns human-readable description for insert-before-line" test which previously tested only `insert-after-line` with an incorrect comment; now correctly asserts `insert-before-line` is generated and has the right description.
+* ✅ **4,193 tests passing**: Up from 4,187.
+
+**Files modified:**
+
+* `src/core/patch-suggester.ts` — Added forward lookahead block in `suggestLineInsertionPatches`; when a non-empty following source line exists (at `sourceLineIdx`), emits `insert-before-line` with that line as `match`.
+* `tests/core/patch-suggester.test.ts` — Updated outdated "describePatch for insert-before-line" test; added 6 new tests in `line insertion detection` suite covering detection, dual emission, empty-line skipping, boundary guards, scoring, and description.
+
+**Status:** suggest insert-before-line detection COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest merge-frontmatter detection - COMPLETE!):**
 
