@@ -135,16 +135,20 @@ export interface DiffAnalysis {
   frontmatterChanges: {
     added: Record<string, unknown>;
     removed: string[];
+    /** Original values of removed keys (for rename detection) */
+    removedValues: Record<string, unknown>;
     modified: Record<string, { old: unknown; new: unknown }>;
   };
   /** Changes detected in sections */
   sectionChanges: Array<{
     sectionId: string;
-    type: "added" | "removed" | "modified" | "renamed";
+    type: "added" | "removed" | "modified" | "renamed" | "level-changed";
     oldContent?: string;
     newContent?: string;
     oldTitle?: string;
     newTitle?: string;
+    oldLevel?: number;
+    newLevel?: number;
   }>;
   /** Whether the content has frontmatter */
   hasFrontmatter: boolean;
@@ -187,6 +191,7 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
     frontmatterChanges: {
       added: {},
       removed: [],
+      removedValues: {},
       modified: {},
     },
     sectionChanges: [],
@@ -295,10 +300,11 @@ function analyzeFrontmatterChanges(
     }
   }
 
-  // Find removed keys
+  // Find removed keys (and store their original values for rename detection)
   for (const key of sourceKeys) {
     if (!targetKeys.has(key)) {
       changes.removed.push(key);
+      changes.removedValues[key] = sourceData[key];
     }
   }
 
@@ -342,12 +348,35 @@ function analyzeSectionChanges(
       matchedSourceIds.add(sourceSection.id);
       matchedTargetIds.add(targetSection.id);
 
-      const sourceSectionContent = sourceLines
-        .slice(sourceSection.startLine, sourceSection.endLine)
-        .join("\n");
-      const targetSectionContent = targetLines
-        .slice(targetSection.startLine, targetSection.endLine)
-        .join("\n");
+      const sourceSectionLines = sourceLines.slice(sourceSection.startLine, sourceSection.endLine);
+      const targetSectionLines = targetLines.slice(targetSection.startLine, targetSection.endLine);
+      const sourceSectionContent = sourceSectionLines.join("\n");
+      const targetSectionContent = targetSectionLines.join("\n");
+
+      // Check if heading level changed (same ID, different # count)
+      if (sourceSection.level !== targetSection.level) {
+        changes.push({
+          sectionId: targetSection.id,
+          type: "level-changed",
+          oldLevel: sourceSection.level,
+          newLevel: targetSection.level,
+        });
+
+        // Compare body content only (skip header line) to avoid spurious "modified"
+        const sourceBody = sourceSectionLines.slice(1).join("\n");
+        const targetBody = targetSectionLines.slice(1).join("\n");
+        if (sourceBody !== targetBody) {
+          changes.push({
+            sectionId: targetSection.id,
+            type: "modified",
+            oldContent: sourceSectionContent,
+            newContent: targetSectionContent,
+          });
+        }
+        // Skip rename check when level changed (header text comparison strips # symbols
+        // so it would not fire, but skip explicitly for clarity)
+        continue;
+      }
 
       // Check if header was renamed (same ID but different text)
       const sourceHeaderText = extractHeaderText(sourceSection.headerText);
@@ -1158,30 +1187,59 @@ function suggestBetweenPatches(source: string, target: string): PatchOperation[]
  */
 function suggestFrontmatterPatches(analysis: DiffAnalysis): PatchOperation[] {
   const patches: PatchOperation[] = [];
+  const { added, removed, removedValues, modified } = analysis.frontmatterChanges;
 
-  // Suggest set-frontmatter for added or modified keys
-  for (const [key, value] of Object.entries(analysis.frontmatterChanges.added)) {
-    patches.push({
-      op: "set-frontmatter",
-      key,
-      value,
-    });
+  // Detect renames: a removed key with the same serialized value as exactly one added key.
+  // Use two-way uniqueness: the serialized value must appear in exactly one removed key
+  // AND exactly one added key to be unambiguous.
+  const removedBySerialized = new Map<string, string[]>();
+  for (const key of removed) {
+    const serialized = JSON.stringify(removedValues[key]);
+    const existing = removedBySerialized.get(serialized) ?? [];
+    existing.push(key);
+    removedBySerialized.set(serialized, existing);
   }
 
-  for (const [key, { new: value }] of Object.entries(analysis.frontmatterChanges.modified)) {
-    patches.push({
-      op: "set-frontmatter",
-      key,
-      value,
-    });
+  const addedBySerialized = new Map<string, string[]>();
+  for (const [key, value] of Object.entries(added)) {
+    const serialized = JSON.stringify(value);
+    const existing = addedBySerialized.get(serialized) ?? [];
+    existing.push(key);
+    addedBySerialized.set(serialized, existing);
   }
 
-  // Suggest remove-frontmatter for removed keys
-  for (const key of analysis.frontmatterChanges.removed) {
-    patches.push({
-      op: "remove-frontmatter",
-      key,
-    });
+  // Collect unambiguous rename pairs
+  const renamedRemovedKeys = new Set<string>();
+  const renamedAddedKeys = new Set<string>();
+
+  for (const [serialized, removedKeys] of removedBySerialized) {
+    const addedKeys = addedBySerialized.get(serialized);
+    const oldKey = removedKeys[0];
+    const newKey = addedKeys?.[0];
+    if (removedKeys.length === 1 && addedKeys && addedKeys.length === 1 && oldKey && newKey) {
+      patches.push({ op: "rename-frontmatter", old: oldKey, new: newKey });
+      renamedRemovedKeys.add(oldKey);
+      renamedAddedKeys.add(newKey as string);
+    }
+  }
+
+  // Suggest set-frontmatter for added keys that are not part of a rename
+  for (const [key, value] of Object.entries(added)) {
+    if (!renamedAddedKeys.has(key)) {
+      patches.push({ op: "set-frontmatter", key, value });
+    }
+  }
+
+  // Suggest set-frontmatter for modified keys
+  for (const [key, { new: value }] of Object.entries(modified)) {
+    patches.push({ op: "set-frontmatter", key, value });
+  }
+
+  // Suggest remove-frontmatter for removed keys that are not part of a rename
+  for (const key of removed) {
+    if (!renamedRemovedKeys.has(key)) {
+      patches.push({ op: "remove-frontmatter", key });
+    }
   }
 
   return patches;
@@ -1247,6 +1305,16 @@ function suggestSectionPatches(analysis: DiffAnalysis): PatchOperation[] {
             });
           }
           // Otherwise, skip and let line-based patches handle it
+        }
+        break;
+
+      case "level-changed":
+        if (change.oldLevel !== undefined && change.newLevel !== undefined) {
+          patches.push({
+            op: "change-section-level",
+            id: change.sectionId,
+            delta: change.newLevel - change.oldLevel,
+          });
         }
         break;
 
@@ -1584,7 +1652,8 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     patch.op === "remove-section" ||
     patch.op === "replace-section" ||
     patch.op === "rename-header" ||
-    patch.op === "insert-section"
+    patch.op === "insert-section" ||
+    patch.op === "change-section-level"
   ) {
     score = 0.9;
   }
@@ -1675,6 +1744,9 @@ function describePatch(patch: PatchOperation): string {
 
     case "insert-section":
       return `Insert section "${patch.header}" ${patch.position ?? "after"} section "${patch.id}"`;
+
+    case "change-section-level":
+      return `Change section "${patch.id}" level by ${patch.delta > 0 ? "+" : ""}${patch.delta}`;
 
     case "set-frontmatter":
       return `Set frontmatter field "${patch.key}"`;

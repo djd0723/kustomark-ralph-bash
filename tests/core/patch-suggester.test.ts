@@ -2156,5 +2156,221 @@ Upgrade to 2.0.0 today`;
       expect(deleteScored?.description).toContain("Delete content between");
     });
   });
+
+  describe("rename-frontmatter detection", () => {
+    test("suggests rename-frontmatter when key is renamed with same string value", () => {
+      const source = "---\ntitle: My Doc\n---\nContent.";
+      const target = "---\nname: My Doc\n---\nContent.";
+
+      const patches = suggestPatches(source, target);
+      const rename = patches.find((p) => p.op === "rename-frontmatter");
+      expect(rename).toBeDefined();
+      if (rename?.op === "rename-frontmatter") {
+        expect(rename.old).toBe("title");
+        expect(rename.new).toBe("name");
+      }
+      // Should NOT also generate separate set + remove
+      expect(patches.find((p) => p.op === "set-frontmatter" && p.op === "set-frontmatter" && (p as { key: string }).key === "name")).toBeUndefined();
+      expect(patches.find((p) => p.op === "remove-frontmatter" && (p as { key: string }).key === "title")).toBeUndefined();
+    });
+
+    test("suggests rename-frontmatter when key is renamed with array value", () => {
+      const source = "---\ntags: [a, b]\n---\nContent.";
+      const target = "---\nlabels: [a, b]\n---\nContent.";
+
+      const patches = suggestPatches(source, target);
+      const rename = patches.find((p) => p.op === "rename-frontmatter");
+      expect(rename).toBeDefined();
+      if (rename?.op === "rename-frontmatter") {
+        expect(rename.old).toBe("tags");
+        expect(rename.new).toBe("labels");
+      }
+    });
+
+    test("does not suggest rename when values differ", () => {
+      const source = "---\ntitle: Old Title\n---\nContent.";
+      const target = "---\nname: New Name\n---\nContent.";
+
+      const patches = suggestPatches(source, target);
+      expect(patches.find((p) => p.op === "rename-frontmatter")).toBeUndefined();
+      // Falls back to set + remove
+      expect(patches.find((p) => p.op === "set-frontmatter")).toBeDefined();
+      expect(patches.find((p) => p.op === "remove-frontmatter")).toBeDefined();
+    });
+
+    test("does not suggest rename in ambiguous case (two removed keys with same value)", () => {
+      const source = "---\nfoo: active\nbar: active\n---\nContent.";
+      const target = "---\nbaz: active\n---\nContent.";
+
+      const patches = suggestPatches(source, target);
+      // Two removed keys have the same value — ambiguous, no rename suggested
+      expect(patches.find((p) => p.op === "rename-frontmatter")).toBeUndefined();
+    });
+
+    test("does not suggest rename in ambiguous case (two added keys with same value)", () => {
+      const source = "---\nfoo: active\n---\nContent.";
+      const target = "---\nbar: active\nbaz: active\n---\nContent.";
+
+      const patches = suggestPatches(source, target);
+      // Two added keys have the same value — ambiguous, no rename suggested
+      expect(patches.find((p) => p.op === "rename-frontmatter")).toBeUndefined();
+    });
+
+    test("handles rename alongside unrelated add/remove", () => {
+      const source = "---\ntitle: My Doc\nextra: old\n---\nContent.";
+      const target = "---\nname: My Doc\n---\nContent.";
+
+      const patches = suggestPatches(source, target);
+      const rename = patches.find((p) => p.op === "rename-frontmatter");
+      expect(rename).toBeDefined();
+      if (rename?.op === "rename-frontmatter") {
+        expect(rename.old).toBe("title");
+        expect(rename.new).toBe("name");
+      }
+      // "extra" key removed (not a rename) — should generate remove-frontmatter
+      const removePatch = patches.find(
+        (p) => p.op === "remove-frontmatter" && (p as { key: string }).key === "extra",
+      );
+      expect(removePatch).toBeDefined();
+    });
+
+    test("analyzeDiff populates removedValues for removed keys", () => {
+      const source = "---\ntitle: My Doc\nversion: 2\n---\nContent.";
+      const target = "---\nversion: 2\n---\nContent.";
+
+      const analysis = analyzeDiff(source, target);
+      expect(analysis.frontmatterChanges.removed).toContain("title");
+      expect(analysis.frontmatterChanges.removedValues).toHaveProperty("title");
+      expect(analysis.frontmatterChanges.removedValues["title"]).toBe("My Doc");
+    });
+
+    test("scorePatches gives score 0.95 to rename-frontmatter", () => {
+      const source = "---\ntitle: My Doc\n---\nContent.";
+      const target = "---\nname: My Doc\n---\nContent.";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const renameScored = scored.find((s) => s.patch.op === "rename-frontmatter");
+      expect(renameScored).toBeDefined();
+      expect(renameScored?.score).toBe(0.95);
+    });
+
+    test("describePatch returns human-readable description for rename-frontmatter", () => {
+      const source = "---\ntitle: My Doc\n---\nContent.";
+      const target = "---\nname: My Doc\n---\nContent.";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const renameScored = scored.find((s) => s.patch.op === "rename-frontmatter");
+      expect(renameScored?.description).toContain("title");
+      expect(renameScored?.description).toContain("name");
+    });
+  });
+
+  describe("change-section-level detection", () => {
+    test("suggestPatches generates change-section-level when heading level increases", () => {
+      const source = "## Introduction\n\nSome content here.";
+      const target = "### Introduction\n\nSome content here.";
+
+      const patches = suggestPatches(source, target);
+      const levelPatch = patches.find((p) => p.op === "change-section-level");
+      expect(levelPatch).toBeDefined();
+      if (levelPatch?.op === "change-section-level") {
+        expect(levelPatch.id).toBe("introduction");
+        expect(levelPatch.delta).toBe(1);
+      }
+    });
+
+    test("suggestPatches generates change-section-level when heading level decreases", () => {
+      const source = "### Introduction\n\nSome content here.";
+      const target = "## Introduction\n\nSome content here.";
+
+      const patches = suggestPatches(source, target);
+      const levelPatch = patches.find((p) => p.op === "change-section-level");
+      expect(levelPatch).toBeDefined();
+      if (levelPatch?.op === "change-section-level") {
+        expect(levelPatch.id).toBe("introduction");
+        expect(levelPatch.delta).toBe(-1);
+      }
+    });
+
+    test("does not generate change-section-level when level is unchanged", () => {
+      const source = "## Introduction\n\nOld content.";
+      const target = "## Introduction\n\nNew content.";
+
+      const patches = suggestPatches(source, target);
+      expect(patches.find((p) => p.op === "change-section-level")).toBeUndefined();
+    });
+
+    test("generates only change-section-level when only heading level changes (no body change)", () => {
+      const source = "## Introduction\n\nBody content is identical.";
+      const target = "### Introduction\n\nBody content is identical.";
+
+      const patches = suggestPatches(source, target);
+      const levelPatch = patches.find((p) => p.op === "change-section-level");
+      expect(levelPatch).toBeDefined();
+      // Should NOT also generate replace-section since only header level changed
+      const sectionPatches = patches.filter(
+        (p) => p.op === "replace-section" && (p as { id: string }).id === "introduction",
+      );
+      expect(sectionPatches.length).toBe(0);
+    });
+
+    test("generates change-section-level AND replace-section when level and body both change", () => {
+      const source = "## Introduction\n\nOld body content here.";
+      const target = "### Introduction\n\nCompletely different new content that changed a lot.";
+
+      const patches = suggestPatches(source, target);
+      expect(patches.find((p) => p.op === "change-section-level")).toBeDefined();
+      // Body also changed substantially — replace-section should be suggested
+      expect(patches.find((p) => p.op === "replace-section")).toBeDefined();
+    });
+
+    test("handles large level delta (## -> ####)", () => {
+      const source = "## Overview\n\nContent.";
+      const target = "#### Overview\n\nContent.";
+
+      const patches = suggestPatches(source, target);
+      const levelPatch = patches.find((p) => p.op === "change-section-level");
+      expect(levelPatch).toBeDefined();
+      if (levelPatch?.op === "change-section-level") {
+        expect(levelPatch.delta).toBe(2);
+      }
+    });
+
+    test("analyzeDiff populates level-changed in sectionChanges", () => {
+      const source = "## Introduction\n\nContent.";
+      const target = "### Introduction\n\nContent.";
+
+      const analysis = analyzeDiff(source, target);
+      const levelChange = analysis.sectionChanges.find((c) => c.type === "level-changed");
+      expect(levelChange).toBeDefined();
+      expect(levelChange?.sectionId).toBe("introduction");
+      expect(levelChange?.oldLevel).toBe(2);
+      expect(levelChange?.newLevel).toBe(3);
+    });
+
+    test("scorePatches gives score 0.9 to change-section-level", () => {
+      const source = "## Introduction\n\nContent.";
+      const target = "### Introduction\n\nContent.";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const levelScored = scored.find((s) => s.patch.op === "change-section-level");
+      expect(levelScored).toBeDefined();
+      expect(levelScored?.score).toBe(0.9);
+    });
+
+    test("describePatch returns human-readable description for change-section-level", () => {
+      const source = "## Introduction\n\nContent.";
+      const target = "### Introduction\n\nContent.";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const levelScored = scored.find((s) => s.patch.op === "change-section-level");
+      expect(levelScored?.description).toContain("introduction");
+      expect(levelScored?.description).toContain("+1");
+    });
+  });
 });
 

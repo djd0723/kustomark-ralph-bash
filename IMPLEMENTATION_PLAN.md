@@ -1,8 +1,28 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-09 (suggest rename-frontmatter & change-section-level - COMPLETE!):**
+
+* ✅ **`suggest` now detects `rename-frontmatter`**: When a frontmatter key is removed and another key is added with the same value (unambiguous match), the command generates a `rename-frontmatter` patch instead of a separate `set-frontmatter` + `remove-frontmatter`. Two-way uniqueness check prevents false positives when multiple removed or added keys share the same value.
+* ✅ **`suggest` now detects `change-section-level`**: When a section's heading level changes (e.g., `## Intro` → `### Intro`) the command generates a `change-section-level` patch with `delta = newLevel - oldLevel`. The body content comparison excludes the header line to avoid spurious `replace-section` suggestions when only the `#` count changed.
+* ✅ **`DiffAnalysis` extended**: `frontmatterChanges.removedValues` stores the original values of removed frontmatter keys (required for rename detection). `sectionChanges` now supports `"level-changed"` type with `oldLevel`/`newLevel` fields.
+* ✅ **Confidence scoring**: Both `rename-frontmatter` (0.95) and `change-section-level` (0.9) score at the same level as other deterministic structural ops.
+* ✅ **`describePatch` coverage**: Added human-readable description for `change-section-level` (`Change section "X" level by +1`). `rename-frontmatter` description was already implemented.
+* ✅ **18 new tests**: 9 tests for rename-frontmatter detection (key rename, array value, values differ, ambiguous cases, mixed add/remove, analyzeDiff, scoring, describePatch) and 9 tests for change-section-level detection (level increase, decrease, unchanged, body-only unchanged, body+level, large delta, analyzeDiff, scoring, describePatch).
+* ✅ **4,049 tests passing**: Up from 4,031.
+
+**Files modified:**
+* `src/core/patch-suggester.ts` — Extended `DiffAnalysis` interface; added `removedValues` init and population; added level-change detection in `analyzeSectionChanges`; rewrote `suggestFrontmatterPatches` with rename detection; added `"level-changed"` case in `suggestSectionPatches`; added `change-section-level` to scoring and `describePatch`
+* `tests/core/patch-suggester.test.ts` — 18 new tests in `rename-frontmatter detection` and `change-section-level detection` suites
+
+**Status:** suggest rename-frontmatter & change-section-level COMPLETE! ✅
+
+***
 
 ## Recent Enhancements
 
