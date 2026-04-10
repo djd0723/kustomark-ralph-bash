@@ -5,6 +5,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { createInterface } from "node:readline";
 import * as yaml from "js-yaml";
 import micromatch from "micromatch";
 import { parseConfig } from "../core/config-parser.js";
@@ -29,6 +30,7 @@ interface CLIOptions {
   verify?: boolean;
   write?: string;
   apply?: string;
+  interactive?: boolean;
 }
 
 export interface VerificationFileResult {
@@ -69,6 +71,8 @@ export interface SuggestResult {
     confidence: "high" | "medium" | "low";
     /** Number of files written to output dir when --apply is used */
     filesApplied?: number;
+    /** Number of patches approved in interactive session */
+    patchesApproved?: number;
   };
   /** Present when --verify flag is used */
   verification?: VerificationSummary;
@@ -782,9 +786,7 @@ export async function applyPatchesToDirectory(
     // Compute the relative path used for include/exclude matching and output placement.
     // For directory sources: relative path from sourcePath to the file.
     // For single-file sources: use the basename of the file.
-    const relPath = sourceIsDir
-      ? relative(sourcePath, pair.sourcePath)
-      : basename(pair.sourcePath);
+    const relPath = sourceIsDir ? relative(sourcePath, pair.sourcePath) : basename(pair.sourcePath);
 
     const applicablePatches = patches.filter((p) => shouldApplyPatch(p, relPath));
 
@@ -817,6 +819,89 @@ function shouldApplyPatch(patch: PatchOperation, relPath: string): boolean {
   }
 
   return true;
+}
+
+// ============================================================================
+// Interactive Review
+// ============================================================================
+
+/**
+ * Runs an interactive session for reviewing and approving suggested patches.
+ *
+ * Presents each scored patch to the user one-by-one. The user can:
+ *   a / y  → approve the patch (include in output)
+ *   s / n  → skip the patch (exclude from output)
+ *   q      → quit and use patches approved so far
+ *
+ * Falls back silently (returns all patches) when stdin is not a TTY.
+ *
+ * @param scoredPatches - Patches sorted by score descending
+ * @param stdin - Readable stream for user input (default: process.stdin)
+ * @param stdout - Writable stream for output (default: process.stdout)
+ * @returns Array of approved ScoredPatch entries
+ */
+export async function runInteractiveSession(
+  scoredPatches: ScoredPatch[],
+  stdin: NodeJS.ReadableStream = process.stdin,
+  stdout: NodeJS.WritableStream = process.stdout,
+): Promise<ScoredPatch[]> {
+  // Non-TTY fallback — scripts / CI get all patches unchanged
+  if (!(stdin as { isTTY?: boolean }).isTTY) {
+    return [...scoredPatches];
+  }
+
+  if (scoredPatches.length === 0) {
+    return [];
+  }
+
+  const rl = createInterface({ input: stdin, output: stdout });
+
+  const question = (prompt: string): Promise<string> =>
+    new Promise((resolve) => rl.question(prompt, resolve));
+
+  const approved: ScoredPatch[] = [];
+
+  try {
+    stdout.write(`\nInteractive patch review: ${scoredPatches.length} patch(es) to review\n`);
+    stdout.write("Keys: [a]pprove  [s]kip  [q]uit\n");
+
+    for (let i = 0; i < scoredPatches.length; i++) {
+      const sp = scoredPatches[i];
+      if (!sp) continue;
+
+      const pct = Math.round(sp.score * 100);
+      stdout.write(`\n${"─".repeat(60)}\n`);
+      stdout.write(`Patch ${i + 1}/${scoredPatches.length}  [${pct}% confidence]\n`);
+      stdout.write(`  ${sp.description}\n`);
+      stdout.write(`  op: ${sp.patch.op}\n`);
+      if ("include" in sp.patch && sp.patch.include) {
+        stdout.write(`  include: ${sp.patch.include}\n`);
+      }
+
+      const answer = await question("  → [a]pprove / [s]kip / [q]uit: ");
+      const key = answer.trim().toLowerCase();
+
+      if (key === "q") {
+        stdout.write("\nStopping review — using patches approved so far.\n");
+        break;
+      }
+
+      if (key === "a" || key === "y") {
+        approved.push(sp);
+        stdout.write("  ✓ Approved\n");
+      } else {
+        stdout.write("  – Skipped\n");
+      }
+    }
+
+    stdout.write(
+      `\nReview complete: ${approved.length}/${scoredPatches.length} patch(es) approved.\n`,
+    );
+  } finally {
+    rl.close();
+  }
+
+  return approved;
 }
 
 // ============================================================================
@@ -862,6 +947,9 @@ function outputText(result: SuggestResult, options: CLIOptions): void {
       console.log(
         `  Patches consolidated: ${result.stats.patchesConsolidated} duplicate(s) merged into glob includes`,
       );
+    }
+    if (result.stats.patchesApproved !== undefined) {
+      console.log(`  Patches approved: ${result.stats.patchesApproved} (interactive)`);
     }
     console.log(`  Confidence: ${result.stats.confidence}`);
   }
@@ -1017,11 +1105,22 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       patchesConsolidated,
     } = consolidatePatches(patches, scoredPatches);
 
+    // Interactive review: let the user approve/skip each patch before proceeding
+    let finalPatches = consolidatedPatches;
+    let finalScored = consolidatedScored;
+    let patchesApproved: number | undefined;
+    if (options.interactive) {
+      const approvedScored = await runInteractiveSession(finalScored);
+      patchesApproved = approvedScored.length;
+      finalPatches = approvedScored.map((sp) => sp.patch);
+      finalScored = approvedScored;
+    }
+
     // Generate configuration
-    const config = generateConfig(sourcePath, consolidatedPatches);
+    const config = generateConfig(sourcePath, finalPatches);
 
     // Calculate confidence
-    const confidence = calculateConfidence(consolidatedPatches);
+    const confidence = calculateConfidence(finalPatches);
 
     // Run verification if requested: apply patches to source and compare with target
     let verification: VerificationSummary | undefined;
@@ -1029,21 +1128,22 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       if (verbosity >= 2) {
         console.log("\nVerifying patches against target files...");
       }
-      verification = await verifyPatches(filePairs, consolidatedPatches);
+      verification = await verifyPatches(filePairs, finalPatches);
     }
 
     const result: SuggestResult = {
       config,
-      scoredPatches: consolidatedScored,
+      scoredPatches: finalScored,
       stats: {
         filesAnalyzed,
         filesDeleted: fileOpResult.remainingSourceOnly.length,
         filesRenamed: fileOpResult.filesRenamed,
         filesMoved: fileOpResult.filesMoved,
         filesCopied: fileOpResult.filesCopied,
-        patchesGenerated: consolidatedPatches.length,
+        patchesGenerated: finalPatches.length,
         patchesConsolidated,
         confidence,
+        patchesApproved,
       },
       verification,
     };
@@ -1063,7 +1163,7 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
     if (options.apply) {
       const filesApplied = await applyPatchesToDirectory(
         filePairs,
-        consolidatedPatches,
+        finalPatches,
         sourcePath,
         options.apply,
       );

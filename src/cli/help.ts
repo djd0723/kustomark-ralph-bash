@@ -2265,6 +2265,7 @@ ${formatSection("OPTIONS")}
   ${formatFlag("--output")} <path>             Write generated config to file
   ${formatFlag("--write")} <path>              Write patches into a config file (creates or merges into existing patches: array)
   ${formatFlag("--apply")} <dir>              Apply suggested patches to source files and write results to <dir>
+  ${formatFlag("--interactive")}                  Review each patch interactively before applying (approve/skip/quit)
   ${formatFlag("--min-confidence")} <0.0-1.0>  Filter patches below confidence threshold (0.0-1.0)
   ${formatFlag("--verify")}                   Apply patches to source and compare with target to confirm accuracy
   ${formatFlag("--format")} <text|json>        Output format (default: text)
@@ -2317,6 +2318,12 @@ ${formatSection("EXAMPLES")}
 
   ${formatExample("# Compare entire documentation directories")}
   ${formatCommand("kustomark suggest --source vendor-docs/ --target our-docs/")}
+
+  ${formatExample("# Review patches interactively before applying")}
+  ${formatCommand("kustomark suggest --source upstream.md --target modified.md --interactive")}
+
+  ${formatExample("# Review, then apply only approved patches")}
+  ${formatCommand("kustomark suggest --source upstream/ --target team/ --interactive --apply output/")}
 
   ${formatExample("# Filter low-confidence suggestions (only show patches with 0.8+ confidence)")}
   ${formatCommand("kustomark suggest --source old.md --target new.md --min-confidence=0.8")}

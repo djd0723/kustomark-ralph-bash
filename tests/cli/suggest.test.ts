@@ -2415,3 +2415,127 @@ describe("applyPatchesToDirectory", () => {
     expect(count).toBe(0);
   });
 });
+
+// ============================================================================
+// Unit tests for runInteractiveSession
+// ============================================================================
+
+import { runInteractiveSession } from "../../src/cli/suggest-command.js";
+import { PassThrough, Writable } from "node:stream";
+
+// Feed one response per readline prompt. Intercepts each stdout write that
+// ends with ": " (the readline question prompt) and pushes the next answer
+// into the stdin PassThrough so readline can read it.
+function makeInteractiveMocks(responses: string[]): {
+  stdin: PassThrough & { isTTY: boolean };
+  stdout: Writable;
+} {
+  const stdinPT = new PassThrough();
+  (stdinPT as unknown as { isTTY: boolean }).isTTY = true;
+  const stdin = stdinPT as PassThrough & { isTTY: boolean };
+
+  let i = 0;
+  const stdout = new Writable({
+    write(chunk, _enc, cb) {
+      const text: string = chunk.toString();
+      // Readline writes the prompt then waits; push the response when we see it.
+      if (text.endsWith(": ") && i < responses.length) {
+        const answer = responses[i++]!;
+        setImmediate(() => stdinPT.push(answer + "\n"));
+      }
+      cb();
+    },
+  });
+
+  return { stdin, stdout };
+}
+
+function makeMockStdout(): Writable {
+  return new Writable({ write(_chunk, _enc, cb) { cb(); } });
+}
+
+function makeScoredPatch(op: string, score: number): ScoredPatch {
+  return {
+    patch: { op } as import("../../src/core/types.js").PatchOperation,
+    score,
+    description: `Test patch: ${op}`,
+  };
+}
+
+describe("runInteractiveSession", () => {
+  test("non-TTY returns all patches unchanged", async () => {
+    const patches = [makeScoredPatch("replace", 0.9), makeScoredPatch("rename-header", 0.8)];
+    const mockStdin = { isTTY: false } as unknown as NodeJS.ReadableStream;
+    const mockStdout = makeMockStdout();
+
+    const result = await runInteractiveSession(patches, mockStdin, mockStdout);
+
+    expect(result).toEqual(patches);
+  });
+
+  test("empty patches returns empty array", async () => {
+    const { stdin, stdout } = makeInteractiveMocks([]);
+
+    const result = await runInteractiveSession([], stdin, stdout);
+
+    expect(result).toEqual([]);
+  });
+
+  test("approve all with 'a' key", async () => {
+    const patches = [makeScoredPatch("replace", 0.9), makeScoredPatch("rename-header", 0.8)];
+    const { stdin, stdout } = makeInteractiveMocks(["a", "a"]);
+
+    const result = await runInteractiveSession(patches, stdin, stdout);
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(patches);
+  });
+
+  test("approve all with 'y' key", async () => {
+    const patches = [makeScoredPatch("replace", 0.9), makeScoredPatch("rename-header", 0.8)];
+    const { stdin, stdout } = makeInteractiveMocks(["y", "y"]);
+
+    const result = await runInteractiveSession(patches, stdin, stdout);
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(patches);
+  });
+
+  test("skip all with 's' key", async () => {
+    const patches = [makeScoredPatch("replace", 0.9), makeScoredPatch("rename-header", 0.8)];
+    const { stdin, stdout } = makeInteractiveMocks(["s", "s"]);
+
+    const result = await runInteractiveSession(patches, stdin, stdout);
+
+    expect(result).toEqual([]);
+  });
+
+  test("mixed approve and skip", async () => {
+    const patches = [
+      makeScoredPatch("replace", 0.9),
+      makeScoredPatch("rename-header", 0.8),
+      makeScoredPatch("delete", 0.7),
+    ];
+    const { stdin, stdout } = makeInteractiveMocks(["a", "s", "a"]);
+
+    const result = await runInteractiveSession(patches, stdin, stdout);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual(patches[0]);
+    expect(result[1]).toEqual(patches[2]);
+  });
+
+  test("quit early with 'q' stops and returns approved so far", async () => {
+    const patches = [
+      makeScoredPatch("replace", 0.9),
+      makeScoredPatch("rename-header", 0.8),
+      makeScoredPatch("delete", 0.7),
+    ];
+    const { stdin, stdout } = makeInteractiveMocks(["a", "q"]);
+
+    const result = await runInteractiveSession(patches, stdin, stdout);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(patches[0]);
+  });
+});

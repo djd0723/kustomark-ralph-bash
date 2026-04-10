@@ -144,7 +144,7 @@ export interface CLIOptions {
   incremental?: boolean; // Enable incremental builds (default: false)
   cleanCache?: boolean; // Clear cache before building (default: false)
   cacheDir?: string; // Custom cache directory
-  interactive?: boolean; // For init -i/--interactive and template apply -i/--interactive options
+  interactive?: boolean; // For init -i/--interactive, template apply -i/--interactive, and suggest --interactive options
   dev?: boolean; // For web --dev option
   port?: number; // For web --port option
   host?: string; // For web --host option

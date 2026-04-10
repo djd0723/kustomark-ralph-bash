@@ -1,10 +1,39 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest --interactive flag - COMPLETE!):**
+
+* ✅ **`kustomark suggest --interactive`**: New flag that adds a human-in-the-loop review step between patch generation and patch application. After generating and consolidating patches, each patch is presented one-by-one: the user types `a`/`y` to approve, `s`/`n` to skip, or `q` to quit and use patches approved so far. Only approved patches flow into `--write`, `--apply`, and the generated config YAML.
+* ✅ **Non-TTY fallback**: When stdin is not a TTY (piped input, CI), the flag is a no-op — all patches pass through unchanged, so scripts are never broken.
+* ✅ **Composable with all other flags**: `--interactive` can be combined with `--apply`, `--write`, `--verify`, `--min-confidence`, etc. in a single invocation.
+* ✅ **`patchesApproved` stat**: `SuggestResult.stats` gains a `patchesApproved` counter (number of patches approved by the user). Present only when `--interactive` is used. Text output at verbosity ≥ 1 prints `"Patches approved: N (interactive)"`.
+* ✅ **Exported `runInteractiveSession(scoredPatches, stdin?, stdout?)`**: Standalone exported function for unit testing. Accepts injected streams, presents each `ScoredPatch` with its score percentage, description, op type, and include pattern (if any).
+* ✅ **`--interactive` / `-i` flag in help text**: Added to `kustomark suggest --help` OPTIONS section with two examples (standalone review, combined with --apply).
+* ✅ **7 new tests** in `tests/cli/suggest.test.ts` (`runInteractiveSession` suite):
+  * non-TTY stdin returns all patches unchanged
+  * empty patch list returns empty array
+  * approve-all with 'a' key
+  * approve-all with 'y' key
+  * skip-all with 's' key
+  * mixed approve/skip (a, s, a for 3 patches → 2 approved)
+  * quit-early with 'q' stops and returns only pre-quit approvals
+* ✅ **4,264 tests passing**: Up from 4,257.
+
+**Files modified:**
+
+* `src/cli/suggest-command.ts` — Added `createInterface` import; added `interactive?: boolean` to local `CLIOptions`; added `patchesApproved?` to `SuggestResult.stats`; added exported `runInteractiveSession()`; wired interactive session into `suggestCommand` between consolidation and config generation; updated `outputText` to print approval stat.
+* `src/cli/index.ts` — Updated `interactive?` comment to mention suggest; removed duplicate field and duplicate `--interactive` arg parser.
+* `src/cli/help.ts` — Added `--interactive` entry to OPTIONS section and two examples in EXAMPLES section.
+* `tests/cli/suggest.test.ts` — 7 new tests in `runInteractiveSession` describe block.
+
+**Status:** suggest --interactive COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest --apply flag - COMPLETE!):**
 
