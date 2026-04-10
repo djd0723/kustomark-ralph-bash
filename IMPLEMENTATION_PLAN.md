@@ -1,8 +1,37 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-09 (LSP Full Op Coverage - COMPLETE!):**
+
+* ✅ **15 missing ops added to completion**: Table ops (`replace-table-cell`, `add-table-row`, `remove-table-row`, `add-table-column`, `remove-table-column`, `sort-table`, `rename-table-column`, `reorder-table-columns`, `filter-table-rows`, `deduplicate-table-rows`), exec/plugin, and JSON ops (`json-set`, `json-delete`, `json-merge`)
+* ✅ **28 missing hover docs added**: The 13 ops already in completion but lacking hover docs (list ops, AST ops, replace-in-section, prepend/append-to-file, insert-section) plus the 15 new ops — total hover coverage now 50/50 ops
+* ✅ **Completion op count raised 35 → 50**: All 6 count assertions in `completion.test.ts` updated; `allOperations` array expanded from 22 to 50 entries
+* ✅ **3,954 TESTS PASSING**: All tests pass with 0 failures
+* ✅ **Linting clean**: `bun check` passes with no errors
+
+**Details:**
+
+1. **Gap addressed**: `validOps` in `config-parser.ts` listed 50 operations, but the LSP completion provider only surfaced 35. Users typing table ops, `exec`, `plugin`, or `json-set`/`json-delete`/`json-merge` got no autocomplete or hover docs at all.
+
+2. **Files modified**
+   * `src/lsp/completion.ts` — Added 15 op entries to `getPatchOperationCompletions()`; added field-level completions for all 21 previously-missing ops in `getOperationSpecificFields()` fieldMap
+   * `src/lsp/hover.ts` — Added 28 entries to `OPERATION_DOCS` (13 in-completion-but-missing + 15 new ops); all include **Fields:** section and YAML example
+   * `tests/lsp/completion.test.ts` — Updated all 6 count assertions (35 → 50); expanded `allOperations` from 22 to 50 entries; added `toContain` assertions for the 15 new ops
+
+3. **Field coverage for new ops**:
+   - Table ops: `table`, `row`/`column`/`content`/`values`/`header`/`direction`/`type`/`columns`/`match`/`pattern`/`invert`/`keep`/`position`/`defaultValue`
+   - `exec`: `command`, `timeout`
+   - `plugin`: `plugin`, `params`
+   - `json-set`: `path`, `value`; `json-delete`: `path`; `json-merge`: `value`, `path`
+
+**Status:** LSP Full Op Coverage COMPLETE! ✅
+
+---
 
 ## Recent Enhancements
 

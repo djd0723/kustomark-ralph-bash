@@ -328,8 +328,26 @@ patches:
       expect(labels).toContain('reorder-list-items');
       expect(labels).toContain('modify-links');
       expect(labels).toContain('update-toc');
+      // Table operations
+      expect(labels).toContain('replace-table-cell');
+      expect(labels).toContain('add-table-row');
+      expect(labels).toContain('remove-table-row');
+      expect(labels).toContain('add-table-column');
+      expect(labels).toContain('remove-table-column');
+      expect(labels).toContain('sort-table');
+      expect(labels).toContain('rename-table-column');
+      expect(labels).toContain('reorder-table-columns');
+      expect(labels).toContain('filter-table-rows');
+      expect(labels).toContain('deduplicate-table-rows');
+      // Exec / Plugin
+      expect(labels).toContain('exec');
+      expect(labels).toContain('plugin');
+      // JSON/YAML/TOML
+      expect(labels).toContain('json-set');
+      expect(labels).toContain('json-delete');
+      expect(labels).toContain('json-merge');
 
-      expect(labels).toHaveLength(35);
+      expect(labels).toHaveLength(50);
     });
 
     test('provides operations with partial input', () => {
@@ -626,7 +644,7 @@ patches:
       const labels = getLabels(completions);
 
       expect(labels).toContain('replace');
-      expect(labels.length).toBe(35); // All operations (22 original + 7 list operations + 2 AST operations)
+      expect(labels.length).toBe(50); // All 50 operations
     });
 
     test('handles position at end of line with onNoMatch field', () => {
@@ -708,7 +726,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide completions for client filtering
-      expect(completions.length).toBe(35);
+      expect(completions.length).toBe(50);
     });
 
     test('returns empty array for unknown context', () => {
@@ -748,7 +766,7 @@ resources:
 
       const completions = provider.provideCompletions(doc, position);
 
-      expect(completions.length).toBe(35);
+      expect(completions.length).toBe(50);
     });
 
     test('triggers completions mid-line with indentation', () => {
@@ -774,8 +792,8 @@ resources:
         const position = createPosition(1, char);
         const completions = provider.provideCompletions(doc, position);
 
-        // Should get operation completions (29 total: 22 original + 7 list operations)
-        expect(completions.length).toBe(35);
+        // Should get operation completions (all 50)
+        expect(completions.length).toBe(50);
       }
     });
   });
@@ -1045,7 +1063,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide operation completions
-      expect(completions.length).toBe(35);
+      expect(completions.length).toBe(50);
     });
 
     test('handles cursor at document end', () => {
@@ -1134,12 +1152,40 @@ onNoMatch:`;
       'insert-after-line',
       'insert-before-line',
       'move-section',
+      'insert-section',
       'rename-header',
       'change-section-level',
       'copy-file',
       'rename-file',
       'delete-file',
       'move-file',
+      'add-list-item',
+      'remove-list-item',
+      'set-list-item',
+      'sort-list',
+      'filter-list-items',
+      'deduplicate-list-items',
+      'reorder-list-items',
+      'modify-links',
+      'update-toc',
+      'replace-in-section',
+      'prepend-to-file',
+      'append-to-file',
+      'replace-table-cell',
+      'add-table-row',
+      'remove-table-row',
+      'add-table-column',
+      'remove-table-column',
+      'sort-table',
+      'rename-table-column',
+      'reorder-table-columns',
+      'filter-table-rows',
+      'deduplicate-table-rows',
+      'exec',
+      'plugin',
+      'json-set',
+      'json-delete',
+      'json-merge',
     ];
 
     test('all operations are present exactly once', () => {

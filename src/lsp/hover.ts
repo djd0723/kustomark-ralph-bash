@@ -405,6 +405,545 @@ Move files to a destination directory.
 \`\`\`
 
 Moves all matching files to the destination directory.`,
+
+  "insert-section": `# insert-section
+
+Inserts a new markdown section before or after a reference section.
+
+**Fields:**
+- \`id\` (string, required): Section ID of the reference section
+- \`header\` (string, required): Header line for the new section (e.g. "## New Section")
+- \`content\` (string, optional): Body content for the new section
+- \`position\` (string, optional): "before" or "after" the reference section (default: "after")
+
+**Example:**
+\`\`\`yaml
+- op: insert-section
+  id: "installation"
+  position: after
+  header: "## Quick Start"
+  content: |
+    Run the following to get started quickly.
+\`\`\`
+
+Inserts the new section adjacent to the referenced section.`,
+
+  "add-list-item": `# add-list-item
+
+Adds a new item to a markdown list.
+
+**Fields:**
+- \`list\` (number | string, required): Zero-based list index or section ID containing the list
+- \`item\` (string, required): Text of the new list item
+- \`position\` (number, optional): Zero-based index at which to insert the item (default: end)
+
+**Example:**
+\`\`\`yaml
+- op: add-list-item
+  list: 0
+  item: "New feature"
+  position: 0
+\`\`\`
+
+Inserts a new item into the specified list.`,
+
+  "remove-list-item": `# remove-list-item
+
+Removes an item from a markdown list.
+
+**Fields:**
+- \`list\` (number | string, required): Zero-based list index or section ID containing the list
+- \`match\` (string, optional): Exact text of the item to remove (mutually exclusive with pattern/index)
+- \`pattern\` (string, optional): Regex pattern to match the item text
+- \`index\` (number, optional): Zero-based index of the item to remove
+
+**Example:**
+\`\`\`yaml
+- op: remove-list-item
+  list: 0
+  match: "Outdated item"
+\`\`\`
+
+Removes the first matching item from the list.`,
+
+  "set-list-item": `# set-list-item
+
+Replaces an existing list item with new text.
+
+**Fields:**
+- \`list\` (number | string, required): Zero-based list index or section ID containing the list
+- \`index\` (number, optional): Zero-based index of the item to replace
+- \`match\` (string, optional): Find the item with this exact text
+- \`new\` (string, required): Replacement text for the item
+
+**Example:**
+\`\`\`yaml
+- op: set-list-item
+  list: 0
+  index: 2
+  new: "Updated item text"
+\`\`\`
+
+Replaces the targeted item with the new value.`,
+
+  "sort-list": `# sort-list
+
+Sorts items in a markdown list.
+
+**Fields:**
+- \`list\` (number | string, required): Zero-based list index or section ID containing the list
+- \`direction\` (string, required): "asc" or "desc"
+- \`type\` (string, optional): "string", "number", or "date" (default: "string")
+
+**Example:**
+\`\`\`yaml
+- op: sort-list
+  list: 0
+  direction: asc
+  type: string
+\`\`\`
+
+Sorts all items in the list alphabetically, numerically, or by date.`,
+
+  "filter-list-items": `# filter-list-items
+
+Keeps or removes list items that match a pattern.
+
+**Fields:**
+- \`list\` (number | string, required): Zero-based list index or section ID containing the list
+- \`match\` (string, optional): Keep items whose text equals this exactly
+- \`pattern\` (string, optional): Keep items whose text matches this regex
+- \`invert\` (boolean, optional): When true, remove matching items instead of keeping them
+
+**Example:**
+\`\`\`yaml
+- op: filter-list-items
+  list: 0
+  pattern: "^TODO"
+  invert: true
+\`\`\`
+
+Removes or retains items based on the match condition.`,
+
+  "deduplicate-list-items": `# deduplicate-list-items
+
+Removes duplicate items from a markdown list.
+
+**Fields:**
+- \`list\` (number | string, required): Zero-based list index or section ID containing the list
+- \`keep\` (string, optional): Which occurrence to keep: "first" or "last" (default: "first")
+
+**Example:**
+\`\`\`yaml
+- op: deduplicate-list-items
+  list: 0
+  keep: first
+\`\`\`
+
+Deduplicates the list, preserving order of retained items.`,
+
+  "reorder-list-items": `# reorder-list-items
+
+Reorders items in a markdown list to a specified sequence.
+
+**Fields:**
+- \`list\` (number | string, required): Zero-based list index or section ID containing the list
+- \`order\` (array, required): Array of zero-based indices or exact item text strings in the desired order
+
+**Example:**
+\`\`\`yaml
+- op: reorder-list-items
+  list: 0
+  order:
+    - 2
+    - 0
+    - 1
+\`\`\`
+
+Rearranges list items into the specified order.`,
+
+  "modify-links": `# modify-links
+
+Finds and modifies inline markdown links.
+
+**Fields:**
+- \`urlMatch\` (string, optional): Match links whose URL equals this exactly
+- \`urlPattern\` (string, optional): Match links whose URL matches this regex
+- \`textMatch\` (string, optional): Match links whose display text equals this exactly
+- \`textPattern\` (string, optional): Match links whose display text matches this regex
+- \`newUrl\` (string, optional): Replace the matched URL with this value
+- \`urlReplacement\` (string, optional): Regex replacement string for URL (supports $1, $2)
+- \`newText\` (string, optional): Replace the matched display text with this value
+- \`textReplacement\` (string, optional): Regex replacement string for link text (supports $1, $2)
+
+**Example:**
+\`\`\`yaml
+- op: modify-links
+  urlPattern: "^http://"
+  urlReplacement: "https://"
+\`\`\`
+
+Matches links by URL or text and replaces their URL, text, or both.`,
+
+  "update-toc": `# update-toc
+
+Regenerates a table of contents between marker comments.
+
+**Fields:**
+- \`marker\` (string, optional): Opening marker comment (default: "<!-- TOC -->")
+- \`endMarker\` (string, optional): Closing marker comment (default: "<!-- /TOC -->")
+- \`minLevel\` (number, optional): Minimum heading level to include (default: 2)
+- \`maxLevel\` (number, optional): Maximum heading level to include (default: 4)
+- \`ordered\` (boolean, optional): Use numbered list instead of bullets (default: false)
+- \`indent\` (string, optional): Indentation string per heading level (default: "  ")
+
+**Example:**
+\`\`\`yaml
+- op: update-toc
+  minLevel: 2
+  maxLevel: 3
+  ordered: false
+\`\`\`
+
+Replaces the content between the TOC markers with a freshly generated TOC.`,
+
+  "replace-in-section": `# replace-in-section
+
+Replaces text within a specific markdown section only.
+
+**Fields:**
+- \`id\` (string, required): Section slug or custom ID to scope the replacement to
+- \`old\` (string, required): Exact text to find within the section
+- \`new\` (string, required): Replacement text
+
+**Example:**
+\`\`\`yaml
+- op: replace-in-section
+  id: "installation"
+  old: "npm install"
+  new: "bun install"
+\`\`\`
+
+Like \`replace\`, but only affects the content of the specified section.`,
+
+  "prepend-to-file": `# prepend-to-file
+
+Inserts content at the very beginning of a file.
+
+**Fields:**
+- \`content\` (string, required): Content to insert before the first character of the file
+
+**Example:**
+\`\`\`yaml
+- op: prepend-to-file
+  content: |
+    <!-- AUTO-GENERATED: do not edit -->
+\`\`\`
+
+Useful for adding headers, disclaimers, or watermarks to files.`,
+
+  "append-to-file": `# append-to-file
+
+Appends content at the very end of a file.
+
+**Fields:**
+- \`content\` (string, required): Content to insert after the last character of the file
+
+**Example:**
+\`\`\`yaml
+- op: append-to-file
+  content: |
+    ---
+    Generated by kustomark.
+\`\`\`
+
+Useful for footers, signatures, or auto-generation notices.`,
+
+  "replace-table-cell": `# replace-table-cell
+
+Replaces the value of a specific cell in a markdown table.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`row\` (number, required): Zero-based row index (not counting the header row)
+- \`column\` (number | string, required): Zero-based column index or the column header name
+- \`content\` (string, required): The new text content for the cell
+
+**Example:**
+\`\`\`yaml
+- op: replace-table-cell
+  table: 0
+  row: 1
+  column: "Status"
+  content: "Done"
+\`\`\`
+
+Replaces the targeted cell without affecting other rows or columns.`,
+
+  "add-table-row": `# add-table-row
+
+Adds a new row to a markdown table.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`values\` (array, required): Array of cell strings for the new row
+- \`position\` (number, optional): Zero-based index at which to insert the row (default: end)
+
+**Example:**
+\`\`\`yaml
+- op: add-table-row
+  table: 0
+  values:
+    - "v2.0.0"
+    - "2024-01-01"
+    - "Stable"
+\`\`\`
+
+Appends or inserts a row with the given cell values.`,
+
+  "remove-table-row": `# remove-table-row
+
+Removes a row from a markdown table by index.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`row\` (number, required): Zero-based row index of the row to remove
+
+**Example:**
+\`\`\`yaml
+- op: remove-table-row
+  table: 0
+  row: 2
+\`\`\`
+
+Removes the specified row. All subsequent rows shift up by one.`,
+
+  "add-table-column": `# add-table-column
+
+Adds a new column to a markdown table.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`header\` (string, required): Header text for the new column
+- \`defaultValue\` (string, optional): Value to populate in existing rows for this column
+- \`position\` (number, optional): Zero-based index at which to insert the column (default: end)
+
+**Example:**
+\`\`\`yaml
+- op: add-table-column
+  table: 0
+  header: "Notes"
+  defaultValue: ""
+\`\`\`
+
+Adds the column to the header row and fills existing rows with the default value.`,
+
+  "remove-table-column": `# remove-table-column
+
+Removes a column from a markdown table.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`column\` (number | string, required): Zero-based column index or the column header name to remove
+
+**Example:**
+\`\`\`yaml
+- op: remove-table-column
+  table: 0
+  column: "Deprecated"
+\`\`\`
+
+Removes the header and all cell values for the specified column.`,
+
+  "sort-table": `# sort-table
+
+Sorts rows in a markdown table by a column value.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`column\` (number | string, required): Zero-based column index or header name to sort by
+- \`direction\` (string, optional): "asc" or "desc" (default: "asc")
+- \`type\` (string, optional): "string", "number", or "date" (default: "string")
+
+**Example:**
+\`\`\`yaml
+- op: sort-table
+  table: 0
+  column: "Version"
+  direction: desc
+  type: string
+\`\`\`
+
+Sorts all data rows; the header row is preserved in place.`,
+
+  "rename-table-column": `# rename-table-column
+
+Renames a column header in a markdown table.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`column\` (number | string, required): Current header name or zero-based column index
+- \`new\` (string, required): New header text for the column
+
+**Example:**
+\`\`\`yaml
+- op: rename-table-column
+  table: 0
+  column: "Name"
+  new: "Full Name"
+\`\`\`
+
+Only the header cell is changed; data cells are untouched.`,
+
+  "reorder-table-columns": `# reorder-table-columns
+
+Reorders the columns of a markdown table.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`columns\` (array, required): Array of header names or zero-based indices in the desired order
+
+**Example:**
+\`\`\`yaml
+- op: reorder-table-columns
+  table: 0
+  columns:
+    - "Status"
+    - "Name"
+    - "Version"
+\`\`\`
+
+Rearranges all rows (header and data) to match the specified column order.`,
+
+  "filter-table-rows": `# filter-table-rows
+
+Keeps or removes rows in a markdown table based on a column value.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`column\` (number | string, required): Zero-based column index or header name to filter on
+- \`match\` (string, optional): Keep rows where the column value equals this exactly
+- \`pattern\` (string, optional): Keep rows where the column value matches this regex
+- \`invert\` (boolean, optional): When true, remove matching rows instead of keeping them
+
+**Example:**
+\`\`\`yaml
+- op: filter-table-rows
+  table: 0
+  column: "Status"
+  match: "Done"
+  invert: true
+\`\`\`
+
+The header row is always preserved.`,
+
+  "deduplicate-table-rows": `# deduplicate-table-rows
+
+Removes duplicate rows from a markdown table.
+
+**Fields:**
+- \`table\` (number | string, required): Zero-based table index or section ID containing the table
+- \`column\` (number | string, optional): Deduplicate based on this column only (default: entire row)
+- \`keep\` (string, optional): Keep "first" or "last" occurrence of each duplicate (default: "first")
+
+**Example:**
+\`\`\`yaml
+- op: deduplicate-table-rows
+  table: 0
+  column: "Name"
+  keep: first
+\`\`\`
+
+The header row is always preserved.`,
+
+  exec: `# exec
+
+Executes an arbitrary shell command as a patch step.
+
+**Fields:**
+- \`command\` (string, required): The shell command to execute
+- \`timeout\` (number, optional): Maximum execution time in milliseconds (default: 30000)
+
+**Example:**
+\`\`\`yaml
+- op: exec
+  command: "node scripts/update-version.js"
+  timeout: 10000
+\`\`\`
+
+The command runs in the working directory of the kustomark config file.`,
+
+  plugin: `# plugin
+
+Invokes a registered kustomark plugin.
+
+**Fields:**
+- \`plugin\` (string, required): The registered name of the plugin to invoke
+- \`params\` (object, optional): Key-value map of parameters to pass to the plugin
+
+**Example:**
+\`\`\`yaml
+- op: plugin
+  plugin: "my-transform"
+  params:
+    mode: strict
+    output: html
+\`\`\`
+
+Plugins extend kustomark with custom transformation logic.`,
+
+  "json-set": `# json-set
+
+Sets a value at a dot-notation path in a JSON file.
+
+**Fields:**
+- \`path\` (string, required): Dot-notation path to the key (e.g. "config.version")
+- \`value\` (any, required): The value to assign at the path
+
+**Example:**
+\`\`\`yaml
+- op: json-set
+  path: "version"
+  value: "2.0.0"
+  include: "package.json"
+\`\`\`
+
+Creates intermediate objects as needed. Overwrites existing values.`,
+
+  "json-delete": `# json-delete
+
+Deletes a key at a dot-notation path from a JSON file.
+
+**Fields:**
+- \`path\` (string, required): Dot-notation path to the key to delete (e.g. "config.debug")
+
+**Example:**
+\`\`\`yaml
+- op: json-delete
+  path: "scripts.pretest"
+  include: "package.json"
+\`\`\`
+
+Removes the key and its value. No-ops silently if the path does not exist.`,
+
+  "json-merge": `# json-merge
+
+Deep-merges an object into a JSON file.
+
+**Fields:**
+- \`value\` (object, required): Key-value object to deep-merge into the JSON file
+- \`path\` (string, optional): Dot-notation path to merge into a sub-object instead of root
+
+**Example:**
+\`\`\`yaml
+- op: json-merge
+  value:
+    scripts:
+      lint: "eslint ."
+  include: "package.json"
+\`\`\`
+
+Existing keys not present in value are preserved.`,
 };
 
 /**
