@@ -1,0 +1,23 @@
+IMPLEMENTATION_PLAN.md
+  3a781c5dc347a664 3,9-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "8f4b8d66b91cb7e158e7fc3038a2698227944fa2",
+  "prompts": {
+    "3a781c5dc347a664": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c57d57e-b9a9-4caf-8a2e-d93645215294",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 1,
+      "accepted_lines": 19,
+      "overriden_lines": 0
+    }
+  }
+}
