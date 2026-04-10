@@ -1,10 +1,30 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅ | explain-tests ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅ | explain-tests ✅ | history-tests ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (history command test coverage - COMPLETE!):**
+
+* ✅ **62 new tests** in `tests/cli/history.test.ts` covering all `kustomark history` subcommands:
+  * **`list` subcommand** (13 tests): exits 0 with empty history, text "No build history found", JSON `total: 0` / `builds: []` / `hasMore: false`, exits 0 with 1 build, JSON `total` and `builds` length correct, build ID in text output, `total` matches multiple seeded builds, `--status=success` filters error builds, `--status=error` filters success builds, `--limit=1` returns 1 build and `hasMore: true`.
+  * **`show` subcommand** (8 tests): exits 1 with no history, exits 1 for unknown ID, exits 0 for valid ID, JSON `id` field matches, JSON `status` field, JSON has `timestamp`/`duration`/`configHash`/`patchCount`/`fileCount`, text contains "Build ID:", failed build JSON includes `error` field.
+  * **`diff` subcommand** (8 tests): exits 1 with no history, exits 1 for unknown `fromId`, exits 1 for unknown `toId`, same build shows "No differences found", added file in `added` array, removed file in `removed` array, hash-changed file in `modified` array, identical file in `unchanged` array, JSON has all required fields, text contains "Build Comparison".
+  * **`rollback` subcommand** (7 tests): exits 1 with no history, exits 1 for unknown ID, exits 1 for failed build, exits 0 for successful build, `--dry-run` shows "DRY RUN" in output, JSON has `success`/`buildId`/`fileCount`/`dryRun`, `dryRun: true` when flag passed.
+  * **`clean` subcommand** (8 tests): exits 0 with empty history, text "No build history to clean", JSON `removedCount: 0`, default keeps 10 (removes 5 from 15), `--keep-last=3` keeps 3 removes 2, `--dry-run` does not modify manifest, `--dry-run` JSON `dryRun: true`, JSON has `removedCount`/`keptCount`, text shows "Removed:" and "Kept:".
+  * **`stats` subcommand** (8 tests): exits 0 with empty history, text "No build history found", JSON `totalBuilds: 0`, JSON has `successfulBuilds`/`failedBuilds`, sum equals `totalBuilds`, `averageDuration` matches single build, `buildFrequency` has all time-window fields, `trends` has `durationTrend`/`fileCountTrend`, text contains "Overview:"/"Performance:"/"Trends:".
+  * **Error handling** (6 tests): exits 1 when `kustomark.yaml` missing, exits 1 for unknown subcommand, error message mentions valid subcommands, `show` without ID exits 1, `diff` with one ID exits 1, `rollback` without ID exits 1.
+* ✅ **4,565 tests passing**: Up from 4,503. `bun check` clean.
+
+**Files created:**
+
+* `tests/cli/history.test.ts` — 62 new tests across 7 describe blocks.
+
+**Status:** history command test coverage COMPLETE! ✅
+
+***
 
 **2026-04-10 (explain command test coverage - COMPLETE!):**
 
