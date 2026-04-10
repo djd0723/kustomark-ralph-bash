@@ -204,6 +204,24 @@ export interface AppendToSectionPatch extends PatchCommonFields {
 }
 
 /**
+ * Prepend to file operation - adds content to the beginning of a file
+ */
+export interface PrependToFilePatch extends PatchCommonFields {
+  op: "prepend-to-file";
+  /** Content to prepend at the start of the file */
+  content: string;
+}
+
+/**
+ * Append to file operation - adds content to the end of a file
+ */
+export interface AppendToFilePatch extends PatchCommonFields {
+  op: "append-to-file";
+  /** Content to append at the end of the file */
+  content: string;
+}
+
+/**
  * Set frontmatter operation - sets a frontmatter field
  */
 export interface SetFrontmatterPatch extends PatchCommonFields {
@@ -766,7 +784,9 @@ export type PatchOperation =
   | ReorderListItemsPatch
   | ModifyLinksPatch
   | UpdateTocPatch
-  | ReplaceInSectionPatch;
+  | ReplaceInSectionPatch
+  | PrependToFilePatch
+  | AppendToFilePatch;
 
 /**
  * Global validator configuration

@@ -710,6 +710,8 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "modify-links",
     "update-toc",
     "replace-in-section",
+    "prepend-to-file",
+    "append-to-file",
   ];
 
   if (!validOps.includes(p.op as string)) {
@@ -1550,6 +1552,17 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         errors.push({
           field: `${prefix}.new`,
           message: "'new' is required and must be a string",
+        });
+      }
+      break;
+    }
+
+    case "prepend-to-file":
+    case "append-to-file": {
+      if (typeof (p as Record<string, unknown>).content !== "string") {
+        errors.push({
+          field: `${prefix}.content`,
+          message: "'content' is required and must be a string",
         });
       }
       break;

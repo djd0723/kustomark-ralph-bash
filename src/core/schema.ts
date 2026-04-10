@@ -4956,6 +4956,160 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            // prepend-to-file
+            {
+              type: "object",
+              required: ["op", "content"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "prepend-to-file",
+                  description: "Add content to the very beginning of a file",
+                },
+                content: {
+                  type: "string",
+                  description: "Content to prepend at the start of the file",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
+                  },
+                  additionalProperties: false,
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            // append-to-file
+            {
+              type: "object",
+              required: ["op", "content"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "append-to-file",
+                  description: "Add content to the very end of a file",
+                },
+                content: {
+                  type: "string",
+                  description: "Content to append at the end of the file",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
+                  },
+                  additionalProperties: false,
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                },
+                patchId: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
           ],
         },
       },

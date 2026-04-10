@@ -636,6 +636,22 @@ export class CompletionProvider {
           "Like 'replace', but scoped to the content of one section — other sections are untouched",
         insertText: "replace-in-section",
       },
+      {
+        label: "prepend-to-file",
+        kind: CompletionItemKind.Value,
+        detail: "Add content to the beginning of a file",
+        documentation:
+          "Inserts content before the very first character of the file. Useful for headers, disclaimers, or watermarks.",
+        insertText: "prepend-to-file",
+      },
+      {
+        label: "append-to-file",
+        kind: CompletionItemKind.Value,
+        detail: "Add content to the end of a file",
+        documentation:
+          "Appends content after the very last character of the file. Useful for footers, signatures, or auto-generation notices.",
+        insertText: "append-to-file",
+      },
     ];
   }
 
@@ -1213,6 +1229,24 @@ export class CompletionProvider {
           detail: "Replacement text",
           documentation: "Text to replace with",
           insertText: "new: ",
+        },
+      ],
+      "prepend-to-file": [
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "Content to prepend",
+          documentation: "Text to insert at the very beginning of the file",
+          insertText: "content: |",
+        },
+      ],
+      "append-to-file": [
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "Content to append",
+          documentation: "Text to insert at the very end of the file",
+          insertText: "content: |",
         },
       ],
       "update-toc": [

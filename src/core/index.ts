@@ -175,6 +175,7 @@ export {
 export { deleteNestedValue, getNestedValue, setNestedValue } from "./nested-values.js";
 // Export all patch engine functions
 export {
+  applyAppendToFile,
   applyAppendToSection,
   applyDeduplicateListItems,
   applyDeduplicateTableRows,
@@ -184,6 +185,7 @@ export {
   applyModifyLinks,
   applyPatches,
   applyPatchesWithPlugins,
+  applyPrependToFile,
   applyPrependToSection,
   applyRemoveFrontmatter,
   applyRemoveSection,
@@ -292,6 +294,7 @@ export type {
   AllOfCondition,
   AnalyticsReport,
   AnyOfCondition,
+  AppendToFilePatch,
   AppendToSectionPatch,
   BenchmarkComparison,
   BenchmarkConfig,
@@ -336,6 +339,7 @@ export type {
   PatchTest,
   PatchTestSuite,
   PatchValidation,
+  PrependToFilePatch,
   PrependToSectionPatch,
   RemoveFrontmatterPatch,
   RemoveListItemPatch,
