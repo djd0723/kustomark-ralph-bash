@@ -4,7 +4,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, normalize, relative, resolve } from "node:path";
+import { dirname, join, normalize, relative, resolve } from "node:path";
 import { parseConfig, validateConfig } from "../core/config-parser.js";
 import { applyPatches } from "../core/patch-engine.js";
 import { type FilePreview, generatePreview, type LineChange } from "../core/preview-generator.js";
@@ -247,10 +247,16 @@ export async function executePreviewCommand(
   const format = options.format || "text";
 
   try {
-    // Resolve config path
-    const absolutePath = resolve(configPath);
+    // Resolve config path — auto-detect kustomark.yaml when given a directory
+    let resolvedConfigPath = configPath;
+    const absoluteCheck = resolve(configPath);
+    if (existsSync(absoluteCheck) && statSync(absoluteCheck).isDirectory()) {
+      resolvedConfigPath = join(configPath, "kustomark.yaml");
+    }
+
+    const absolutePath = resolve(resolvedConfigPath);
     if (!existsSync(absolutePath)) {
-      console.error(`Error: Config file not found: ${configPath}`);
+      console.error(`Error: Config file not found: ${resolvedConfigPath}`);
       return 1;
     }
 
@@ -309,7 +315,7 @@ export async function executePreviewCommand(
     // Output based on format
     if (format === "json") {
       console.log(JSON.stringify(previewResult, null, 2));
-      return 0;
+      return previewResult.filesChanged > 0 ? 1 : 0;
     }
 
     // Text format: side-by-side diff

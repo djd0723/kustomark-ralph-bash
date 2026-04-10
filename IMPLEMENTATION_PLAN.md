@@ -1,10 +1,42 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (preview command tests + bug fixes - COMPLETE!):**
+
+* ✅ **48 new tests** in `tests/cli/preview.test.ts` covering all `kustomark preview` functionality:
+  * **Exit codes** (4 tests): exits 0 when no patches change anything, exits 1 when patches produce changes, exits 1 on missing config, exits 1 on malformed YAML.
+  * **JSON output** (11 tests): valid JSON with `--format=json`, `filesChanged` field present and correct (0 or 1), `totalLinesAdded`/`totalLinesDeleted`/`totalLinesModified` fields, `files` array with one entry per source file, each file entry has `path`/`hasChanges`/`changes` fields, `hasChanges` true/false reflects whether patch applied, `linesModified` nonzero for replace patch.
+  * **Text output** (6 tests): shows "Preview:" header, "Summary:" line when changes exist, file path in output, +/- stats in summary, correct count in "N files changed" line.
+  * **Quiet mode** (3 tests): `-q` suppresses Preview header and Summary, JSON still works with `-q`.
+  * **Error handling** (3 tests): error message for missing config, malformed YAML, missing required fields.
+  * **Directory path** (3 tests): accepts directory and auto-detects `kustomark.yaml`, JSON output valid, correct change count.
+  * **Multiple files** (5 tests): `filesChanged` is 2 when both files change, `files` array has 2 entries, both file names appear in text output, `totalLinesModified` accounts for all files, exits 1.
+  * **Patch operations** (4 tests): `replace-regex`, `set-frontmatter`, `remove-section` all show `filesChanged: 1` and exit 1; multi-file patch applies to all files.
+  * **Verbose mode** (3 tests): `-v` and `-vv` still show Summary, JSON valid with `-v`.
+  * **No-op configs** (4 tests): patch targeting non-existent text exits 0, empty patches exits 0, `filesChanged` and `totalLinesAdded` are 0.
+
+* ✅ **Bug fix: JSON exit code** — `executePreviewCommand` previously always returned exit code 0 in JSON mode regardless of whether files changed. Fixed to return `filesChanged > 0 ? 1 : 0` consistently across both text and JSON output formats.
+
+* ✅ **Bug fix: directory path auto-detection** — `executePreviewCommand` previously failed when passed a directory path (like `kustomark preview ./team/`). Added the same `isDirectory()` check used by other commands to auto-append `kustomark.yaml`.
+
+* ✅ **4,450 tests passing**: Up from 4,402. `bun check` clean.
+
+**Files created:**
+
+* `tests/cli/preview.test.ts` — 48 new tests across 9 describe blocks.
+
+**Files modified:**
+
+* `src/cli/preview-command.ts` — fixed JSON exit code (was always 0), added directory auto-detection (joins `kustomark.yaml` when path is a directory), added `join` to path imports.
+
+**Status:** preview command tests + bug fixes COMPLETE! ✅
+
+***
 
 **2026-04-10 (web UI preview API - COMPLETE!):**
 
