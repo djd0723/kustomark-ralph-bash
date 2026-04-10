@@ -1,0 +1,39 @@
+src/web/client/src/types/config.ts
+  7c312c0c4ee11eb2 238-299
+src/web/client/src/services/api.ts
+  7c312c0c4ee11eb2 5-12,14,159-210,212-215
+src/web/client/src/App.tsx
+  7c312c0c4ee11eb2 21,340-350,430
+IMPLEMENTATION_PLAN.md
+  7c312c0c4ee11eb2 3,9-53
+src/web/client/src/components/history/HistoryView.tsx
+  7c312c0c4ee11eb2 1-39,41-277
+src/web/server/routes/history.ts
+  7c312c0c4ee11eb2 1-133,135-200
+src/web/server/types.ts
+  7c312c0c4ee11eb2 180-239
+tests/web-server-history.test.ts
+  7c312c0c4ee11eb2 1-296
+src/web/server/server.ts
+  7c312c0c4ee11eb2 17,59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "b9e2b65b498af60f07a8ce041a6cafd71695cd40",
+  "prompts": {
+    "7c312c0c4ee11eb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ca1b1398-bf1b-4f1e-bd20-31e8be5b34d6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 1044,
+      "total_deletions": 26,
+      "accepted_lines": 1022,
+      "overriden_lines": 5
+    }
+  }
+}
