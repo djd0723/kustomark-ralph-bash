@@ -1,10 +1,28 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅ | explain-tests ✅ | history-tests ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅ | explain-tests ✅ | history-tests ✅ | build-tests ✅ | validate-tests ✅ | diff-tests ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (core command test coverage - COMPLETE!):**
+
+* ✅ **95 new tests** across 3 new test files covering the core `build`, `validate`, and `diff` commands:
+  * **`tests/cli/build.test.ts`** (32 tests): exit codes (valid/no-patches/missing-config/malformed-YAML/non-matching), JSON output (`success`/`filesWritten`/`patchesApplied`/`warnings`/`validationErrors`), text output ("Built N file(s) with N patch(es) applied"), files actually written to output dir, patch application (replace/replace-regex/set-frontmatter/remove-section), `--clean` flag (stale files kept/removed), error handling (missing config/malformed YAML/invalid op/JSON error format).
+  * **`tests/cli/validate.test.ts`** (32 tests): exit codes (valid/no-patches/missing/malformed/invalid-op), JSON output for valid (`valid: true`, empty `errors`/`warnings`, `strict` field), JSON output for invalid (`valid: false`, non-empty `errors`, error has `message`), text output ("Configuration is valid"/error messages/directory auto-detection/`-q` suppression), `--strict` mode (exit code changes when warnings present, `strict: true` in JSON), validation checks (apiVersion/patch op/required fields/empty patches).
+  * **`tests/cli/diff.test.ts`** (31 tests): exit codes (0=no-changes/1=changes/1=missing/1=malformed/0=empty-patches), JSON no-changes (`hasChanges: false`, empty `files`/`validationErrors`), JSON with-changes (`hasChanges: true`, file entry has `path`/`status`/`diff`, status="modified", diff has `---`/`+++`), text output ("No changes"/file path shown/`+`-`-` lines with `-vv`/directory auto-detection), no writes (output dir not created for no-change or change scenarios, source unchanged), error handling.
+* ✅ **4,660 tests passing**: Up from 4,565. `bun check` clean.
+
+**Files created:**
+
+* `tests/cli/build.test.ts` — 32 tests across 7 describe blocks.
+* `tests/cli/validate.test.ts` — 32 tests across 6 describe blocks.
+* `tests/cli/diff.test.ts` — 31 tests across 6 describe blocks.
+
+**Status:** core command test coverage COMPLETE! ✅
+
+***
 
 **2026-04-10 (history command test coverage - COMPLETE!):**
 
