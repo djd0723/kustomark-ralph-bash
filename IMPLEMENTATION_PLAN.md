@@ -1,10 +1,32 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅ | explain-tests ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (explain command test coverage - COMPLETE!):**
+
+* ✅ **53 new tests** in `tests/cli/explain.test.ts` covering all `kustomark explain` functionality:
+  * **Exit codes** (6 tests): exits 0 for valid config file path, exits 0 for valid directory path, exits 1 for missing config, exits 1 for malformed YAML, exits 1 when `--file` target not found in chain, exits 0 when `--file` is found.
+  * **JSON output (chain)** (11 tests): valid JSON, `config` field present, `output` field matches config, `chain` is an array with at least one entry, each chain entry has `config`/`resources`/`patches` fields, correct `resources` count, correct `patches` count, `totalFiles` correct, `totalPatches` correct, zero patches reported correctly.
+  * **JSON output (--file lineage)** (7 tests): valid JSON for `--file`, `file` field matches requested file, `source` field present, `patches` is an array, correct patch count, patch entry has `config` and `op`, file with no matching patches returns empty patches array.
+  * **Text output (chain)** (7 tests): contains "Config:", "Output:", "Resolution Chain:", "Total Files:", "Total Patches:", correct file count, correct patch count.
+  * **Text output (--file)** (6 tests): contains "File:", "Source:", "Patches", shows filename, shows patch op type, missing file produces error message.
+  * **Directory path** (3 tests): accepts directory and auto-detects `kustomark.yaml`, produces valid JSON, correct `totalFiles`.
+  * **Nested configs** (4 tests): overlay config exits 0, chain has multiple entries, `totalFiles` accounts for all resources, `totalPatches` sums across all chain entries.
+  * **Error handling** (4 tests): missing config exits 1, invalid YAML exits 1, invalid YAML with `--format=json` returns JSON error object, missing config with `--format=json` returns JSON error object.
+  * **Multiple resources** (5 tests): 3-resource config reports `totalFiles=3`, 2-patch config reports `totalPatches=2`, `--file` for one of multiple files exits 0, `--file` for file with no patches reports correct file field.
+* ✅ **4,503 tests passing**: Up from 4,450. `bun check` clean.
+
+**Files created:**
+
+* `tests/cli/explain.test.ts` — 53 new tests across 8 describe blocks.
+
+**Status:** explain command test coverage COMPLETE! ✅
+
+***
 
 **2026-04-10 (preview command tests + bug fixes - COMPLETE!):**
 
