@@ -55,7 +55,7 @@ interface FilePair {
 // File Discovery Functions
 // ============================================================================
 
-const SUPPORTED_EXTENSIONS = new Set([".md", ".json", ".yaml", ".yml"]);
+const SUPPORTED_EXTENSIONS = new Set([".md", ".json", ".yaml", ".yml", ".toml"]);
 
 function isSupportedFile(name: string): boolean {
   const lower = name.toLowerCase();
@@ -343,8 +343,9 @@ function analyzeFilePairs(
 
       // Suggest patches for this file pair — dispatch by extension
       const fileExt = extname(pair.sourcePath).toLowerCase();
-      const isJsonYaml = fileExt === ".json" || fileExt === ".yaml" || fileExt === ".yml";
-      const rawPatches = isJsonYaml
+      const isStructured =
+        fileExt === ".json" || fileExt === ".yaml" || fileExt === ".yml" || fileExt === ".toml";
+      const rawPatches = isStructured
         ? suggestJsonPatches(sourceContent, targetContent, fileExt)
         : suggestPatches(sourceContent, targetContent);
 

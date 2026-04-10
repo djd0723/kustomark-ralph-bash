@@ -7,6 +7,7 @@
 
 import * as Diff from "diff";
 import * as yaml from "js-yaml";
+import * as smolToml from "smol-toml";
 import { parseLists } from "./list-parser.js";
 import { parseFrontmatter, parseSections } from "./patch-engine.js";
 import { parseTables } from "./table-parser.js";
@@ -2678,6 +2679,9 @@ export function suggestJsonPatches(source: string, target: string, ext: string):
 function parseJsonOrYamlForSuggest(content: string, ext: string): unknown {
   if (ext === ".json") {
     return JSON.parse(content) as unknown;
+  }
+  if (ext === ".toml") {
+    return smolToml.parse(content) as unknown;
   }
   return yaml.load(content);
 }

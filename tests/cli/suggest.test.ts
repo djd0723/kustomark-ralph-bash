@@ -1377,4 +1377,178 @@ More updated content.`;
       expect(jsonPatch.path).toBe("version");
     });
   });
+
+  // ============================================================================
+  // TOML file suggestion tests
+  // ============================================================================
+
+  describe("TOML file support", () => {
+    test("suggests json-set for changed TOML value", () => {
+      const sourceFile = join(testDir, "config.toml");
+      const targetFile = join(testDir, "config-target.toml");
+
+      writeFileSync(sourceFile, 'name = "kustomark"\nversion = "1.0.0"\n');
+      writeFileSync(targetFile, 'name = "kustomark"\nversion = "2.0.0"\n');
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("version");
+      expect(patch.value).toBe("2.0.0");
+    });
+
+    test("suggests json-delete for removed TOML key", () => {
+      const sourceFile = join(testDir, "config.toml");
+      const targetFile = join(testDir, "config-target.toml");
+
+      writeFileSync(sourceFile, 'name = "kustomark"\ndebug = true\n');
+      writeFileSync(targetFile, 'name = "kustomark"\n');
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-delete");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("debug");
+    });
+
+    test("suggests json-set for added TOML key", () => {
+      const sourceFile = join(testDir, "config.toml");
+      const targetFile = join(testDir, "config-target.toml");
+
+      writeFileSync(sourceFile, 'name = "kustomark"\n');
+      writeFileSync(targetFile, 'name = "kustomark"\nport = 8080\n');
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("port");
+      expect(patch.value).toBe(8080);
+    });
+
+    test("suggests nested json-set for changed TOML table value", () => {
+      const sourceFile = join(testDir, "config.toml");
+      const targetFile = join(testDir, "config-target.toml");
+
+      writeFileSync(
+        sourceFile,
+        "[server]\nhost = \"localhost\"\nport = 3000\n",
+      );
+      writeFileSync(
+        targetFile,
+        "[server]\nhost = \"example.com\"\nport = 3000\n",
+      );
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("server.host");
+      expect(patch.value).toBe("example.com");
+    });
+
+    test("produces no patches for identical TOML files", () => {
+      const sourceFile = join(testDir, "config.toml");
+      const targetFile = join(testDir, "config-target.toml");
+
+      const content = 'name = "kustomark"\nversion = "1.0.0"\n';
+      writeFileSync(sourceFile, content);
+      writeFileSync(targetFile, content);
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      expect(output.config.patches).toHaveLength(0);
+      expect(output.stats.filesAnalyzed).toBe(0);
+    });
+
+    test("TOML patches score at 0.9", () => {
+      const sourceFile = join(testDir, "config.toml");
+      const targetFile = join(testDir, "config-target.toml");
+
+      writeFileSync(sourceFile, 'key = "old"\n');
+      writeFileSync(targetFile, 'key = "new"\n');
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const scored = output.scoredPatches.find((sp: any) => sp.patch.op === "json-set");
+      expect(scored).toBeDefined();
+      expect(scored.score).toBe(0.9);
+    });
+
+    test("discovers and suggests patches for TOML files in directory comparison", () => {
+      const sourceDir = join(testDir, "source");
+      const targetDir = join(testDir, "target");
+      mkdirSync(sourceDir, { recursive: true });
+      mkdirSync(targetDir, { recursive: true });
+
+      writeFileSync(
+        join(sourceDir, "Cargo.toml"),
+        '[package]\nname = "myapp"\nversion = "0.1.0"\n',
+      );
+      writeFileSync(
+        join(targetDir, "Cargo.toml"),
+        '[package]\nname = "myapp"\nversion = "0.2.0"\n',
+      );
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      expect(output.stats.filesAnalyzed).toBe(1);
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("package.version");
+      expect(patch.value).toBe("0.2.0");
+    });
+
+    test("handles mixed markdown and TOML files in directory comparison", () => {
+      const sourceDir = join(testDir, "source");
+      const targetDir = join(testDir, "target");
+      mkdirSync(sourceDir, { recursive: true });
+      mkdirSync(targetDir, { recursive: true });
+
+      writeFileSync(join(sourceDir, "README.md"), "# Hello\n\nOld content.");
+      writeFileSync(join(targetDir, "README.md"), "# Hello\n\nNew content.");
+      writeFileSync(join(sourceDir, "config.toml"), 'version = "1.0.0"\n');
+      writeFileSync(join(targetDir, "config.toml"), 'version = "2.0.0"\n');
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      expect(output.stats.filesAnalyzed).toBe(2);
+      const tomlPatch = output.config.patches.find((p: any) => p.op === "json-set" && p.path === "version");
+      expect(tomlPatch).toBeDefined();
+      expect(tomlPatch.value).toBe("2.0.0");
+    });
+  });
 });

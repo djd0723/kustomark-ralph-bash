@@ -1,10 +1,32 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest TOML file support - COMPLETE!):**
+
+* ✅ **`suggest` now handles `.toml` files**: File discovery extended to include `.toml` alongside `.md`, `.json`, `.yaml`, and `.yml`. Directory comparisons now match and diff TOML files.
+* ✅ **TOML parsing in `suggestJsonPatches`**: `parseJsonOrYamlForSuggest` extended to dispatch `.toml` extension to `smol-toml.parse()`, reusing the existing deep-diff logic for `json-set`/`json-delete` patches.
+* ✅ **`smol-toml` import in `patch-suggester.ts`**: Added import (already a project dependency) to enable TOML parsing in the suggester module.
+* ✅ **Extension dispatch updated**: `analyzeFilePairs` now treats `.toml` as a structured data file alongside JSON/YAML, routing it to `suggestJsonPatches`.
+* ✅ **Dot-notation paths for TOML tables**: Nested TOML tables (e.g. `[server]`) produce dot-notation paths (e.g. `server.host`) matching the format expected by `json-set`/`json-delete` in the patch engine.
+* ✅ **Scoring at 0.9**: TOML patches score at 0.9 via the existing `json-set`/`json-delete` scoring rules.
+* ✅ **No patches for identical TOML files**: Identical TOML pairs are skipped (same logic as all other formats).
+* ✅ **8 new tests**: `json-set` for changed value, `json-delete` for removed key, `json-set` for added key, nested dot-notation from TOML table, identical files produce no patches, score at 0.9, TOML in directory comparison, mixed markdown+TOML directory comparison.
+* ✅ **4,179 tests passing**: Up from 4,171.
+
+**Files modified:**
+
+* `src/core/patch-suggester.ts` — Added `import * as smolToml from "smol-toml"`; updated `parseJsonOrYamlForSuggest` to handle `.toml` extension.
+* `src/cli/suggest-command.ts` — Added `.toml` to `SUPPORTED_EXTENSIONS`; updated extension dispatch condition from `isJsonYaml` to `isStructured`.
+* `tests/cli/suggest.test.ts` — 8 new tests in `TOML file support` suite.
+
+**Status:** suggest TOML file support COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest JSON/YAML file support - COMPLETE!):**
 
