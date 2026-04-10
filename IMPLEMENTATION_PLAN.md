@@ -1,10 +1,34 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest structural list and table ops - COMPLETE!):**
+
+* ✅ **`suggest` now detects `sort-list`**: When a list's items are the same set but in ascending or descending alphabetical order, the command generates a `sort-list` patch (direction `"asc"` or `"desc"`) instead of individual `add-list-item`/`remove-list-item` pairs.
+* ✅ **`suggest` now detects `deduplicate-list-items`**: When a list is the same as the source but with duplicate entries removed (keeping first or last occurrence), the command generates a `deduplicate-list-items` patch.
+* ✅ **`suggest` now detects `reorder-list-items`**: When a list has the same items in a different order that is not alphabetically sorted, the command generates a `reorder-list-items` patch with the new item order as strings.
+* ✅ **`suggest` now detects `sort-table`**: When a table's rows are the same set but sorted by one of its columns (ascending or descending), the command generates a `sort-table` patch.
+* ✅ **`suggest` now detects `deduplicate-table-rows`**: When a table is the same as the source but with duplicate rows removed, the command generates a `deduplicate-table-rows` patch.
+* ✅ **`suggest` now detects `rename-table-column`**: When exactly one column header is renamed (same position, all row data unchanged), the command generates a `rename-table-column` patch.
+* ✅ **`suggest` now detects `reorder-table-columns`**: When a table's columns are the same set but in a different order (with row cells moved accordingly), the command generates a `reorder-table-columns` patch.
+* ✅ **Suppression of redundant per-item patches**: Structural list/table patches claim their list/table index; per-item `add-list-item`, `remove-list-item`, `add-table-row`, `remove-table-row` suggestions are suppressed for claimed indices to avoid conflicting output.
+* ✅ **Scoring**: All 7 new structural op types score at 0.95 (deterministic detection, high confidence).
+* ✅ **`describePatch` coverage**: Human-readable descriptions for all 7 new op types.
+* ✅ **25 new tests**: 13 list tests (sort asc/desc, reorder, dedup first/last, no-op, suppression, scoring, describePatch) and 12 table tests (sort asc/desc, dedup, rename-column, reorder-columns, suppression, scoring, describePatch).
+* ✅ **4,091 tests passing**: Up from 4,066.
+
+**Files modified:**
+
+* `src/core/patch-suggester.ts` — Added `arraysEqual`, `areSameItemSet`, `deduplicateArray`, `suggestStructuralListPatches`; added `rowSetsOrderEqual`, `rowSetsEqual`, `deduplicateRows`, `detectRenamedColumn`, `suggestStructuralTablePatches`; updated `suggestListPatches` and `suggestTablePatches` to accept `claimedIndices`; wired structural detection into `suggestPatches`; added scoring and `describePatch` entries for all 7 new op types.
+* `tests/core/patch-suggester.test.ts` — 25 new tests in `structural list detection` and `structural table detection` suites.
+
+**Status:** suggest structural list and table ops COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest scored output - COMPLETE!):**
 

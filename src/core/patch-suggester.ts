@@ -693,10 +693,14 @@ function extractLinks(content: string): ParsedLink[] {
 /**
  * Suggests list-related patches
  */
-function suggestListPatches(analysis: DiffAnalysis): PatchOperation[] {
+function suggestListPatches(
+  analysis: DiffAnalysis,
+  claimedIndices: Set<number> = new Set(),
+): PatchOperation[] {
   const patches: PatchOperation[] = [];
 
   for (const change of analysis.listChanges) {
+    if (claimedIndices.has(change.listIndex)) continue;
     if (change.type === "item-added") {
       patches.push({
         op: "add-list-item",
@@ -721,6 +725,113 @@ function suggestListPatches(analysis: DiffAnalysis): PatchOperation[] {
   }
 
   return patches;
+}
+
+/**
+ * Returns true if two arrays are identical (same items in same order).
+ */
+function arraysEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((val, idx) => val === b[idx]);
+}
+
+/**
+ * Returns true if two arrays contain exactly the same multiset of items
+ * (same items including duplicates, but any order).
+ */
+function areSameItemSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((val, idx) => val === sortedB[idx]);
+}
+
+/**
+ * Removes duplicates from an array, keeping either the first or last occurrence.
+ */
+function deduplicateArray(items: string[], keep: "first" | "last"): string[] {
+  if (keep === "first") {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+  }
+  const reversed = [...items].reverse();
+  const seen = new Set<string>();
+  const result = reversed.filter((item) => {
+    if (seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+  return result.reverse();
+}
+
+/**
+ * Detects structural list operations (sort, deduplicate, reorder) that apply
+ * to whole lists rather than individual items.
+ *
+ * @returns patches to suggest and the list indices they "claim" (so per-item
+ *          suggestions are suppressed for those lists)
+ */
+function suggestStructuralListPatches(
+  source: string,
+  target: string,
+): { patches: PatchOperation[]; claimedIndices: Set<number> } {
+  const patches: PatchOperation[] = [];
+  const claimedIndices = new Set<number>();
+
+  const sourceLists = parseLists(source);
+  const targetLists = parseLists(target);
+
+  const count = Math.min(sourceLists.length, targetLists.length);
+  for (let i = 0; i < count; i++) {
+    const src = sourceLists[i];
+    const tgt = targetLists[i];
+    if (!src || !tgt) continue;
+
+    const srcItems = src.items.map((item) => item.text);
+    const tgtItems = tgt.items.map((item) => item.text);
+
+    // No change at all — skip
+    if (arraysEqual(srcItems, tgtItems)) continue;
+
+    // Same items, same count — could be sort or custom reorder
+    if (srcItems.length === tgtItems.length && areSameItemSet(srcItems, tgtItems)) {
+      const sortedAsc = [...srcItems].sort((a, b) => a.localeCompare(b));
+      const sortedDesc = [...srcItems].sort((a, b) => b.localeCompare(a));
+
+      if (arraysEqual(tgtItems, sortedAsc)) {
+        patches.push({ op: "sort-list", list: i, direction: "asc" });
+        claimedIndices.add(i);
+      } else if (arraysEqual(tgtItems, sortedDesc)) {
+        patches.push({ op: "sort-list", list: i, direction: "desc" });
+        claimedIndices.add(i);
+      } else {
+        // Custom reorder — express the new order as target item texts
+        patches.push({ op: "reorder-list-items", list: i, order: tgtItems });
+        claimedIndices.add(i);
+      }
+      continue;
+    }
+
+    // Source had duplicates and target is deduplicated
+    if (srcItems.length > tgtItems.length) {
+      const dedupedFirst = deduplicateArray(srcItems, "first");
+      if (arraysEqual(tgtItems, dedupedFirst)) {
+        patches.push({ op: "deduplicate-list-items", list: i, keep: "first" });
+        claimedIndices.add(i);
+        continue;
+      }
+      const dedupedLast = deduplicateArray(srcItems, "last");
+      if (arraysEqual(tgtItems, dedupedLast)) {
+        patches.push({ op: "deduplicate-list-items", list: i, keep: "last" });
+        claimedIndices.add(i);
+      }
+    }
+  }
+
+  return { patches, claimedIndices };
 }
 
 /**
@@ -925,12 +1036,187 @@ function suggestCodeBlockPatches(analysis: DiffAnalysis): PatchOperation[] {
 }
 
 /**
+ * Returns true if two row arrays are identical in order and content.
+ */
+function rowSetsOrderEqual(a: string[][], b: string[][]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((row, idx) => arraysEqual(row, b[idx] ?? []));
+}
+
+/**
+ * Returns true if two row sets contain exactly the same rows (as multisets,
+ * ignoring order).
+ */
+function rowSetsEqual(a: string[][], b: string[][]): boolean {
+  if (a.length !== b.length) return false;
+  const serialize = (row: string[]) => JSON.stringify(row);
+  const aStrings = [...a].map(serialize).sort();
+  const bStrings = [...b].map(serialize).sort();
+  return aStrings.every((val, idx) => val === bStrings[idx]);
+}
+
+/**
+ * Removes duplicate rows, keeping either the first or last occurrence.
+ */
+function deduplicateRows(rows: string[][], keep: "first" | "last"): string[][] {
+  const serialize = (row: string[]) => JSON.stringify(row);
+  if (keep === "first") {
+    const seen = new Set<string>();
+    return rows.filter((row) => {
+      const key = serialize(row);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  const reversed = [...rows].reverse();
+  const seen = new Set<string>();
+  const result = reversed.filter((row) => {
+    const key = serialize(row);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return result.reverse();
+}
+
+/**
+ * Detects if exactly one column was renamed at the same position.
+ * Returns the index of the differing column, or null if not a simple rename.
+ */
+function detectRenamedColumn(srcHeaders: string[], tgtHeaders: string[]): number | null {
+  if (srcHeaders.length !== tgtHeaders.length) return null;
+  const diffs: number[] = [];
+  for (let i = 0; i < srcHeaders.length; i++) {
+    if (srcHeaders[i] !== tgtHeaders[i]) diffs.push(i);
+  }
+  return diffs.length === 1 ? (diffs[0] ?? null) : null;
+}
+
+/**
+ * Detects structural table operations (sort, deduplicate, rename-column,
+ * reorder-columns) that apply to whole tables rather than individual cells/rows.
+ */
+function suggestStructuralTablePatches(
+  source: string,
+  target: string,
+): { patches: PatchOperation[]; claimedIndices: Set<number> } {
+  const patches: PatchOperation[] = [];
+  const claimedIndices = new Set<number>();
+
+  const sourceTables = parseTables(source);
+  const targetTables = parseTables(target);
+
+  const count = Math.min(sourceTables.length, targetTables.length);
+  for (let i = 0; i < count; i++) {
+    const src = sourceTables[i];
+    const tgt = targetTables[i];
+    if (!src || !tgt) continue;
+
+    // No change at all — skip
+    if (arraysEqual(src.headers, tgt.headers) && rowSetsOrderEqual(src.rows, tgt.rows)) {
+      continue;
+    }
+
+    // Same number of columns — check for rename or reorder
+    if (src.headers.length === tgt.headers.length) {
+      const srcHeadersSet = [...src.headers].sort();
+      const tgtHeadersSet = [...tgt.headers].sort();
+      const sameHeaderSet = arraysEqual(srcHeadersSet, tgtHeadersSet);
+
+      // Detect column rename: exactly one header changed at same position, rows unchanged
+      if (!sameHeaderSet) {
+        const renamedIdx = detectRenamedColumn(src.headers, tgt.headers);
+        if (renamedIdx !== null && rowSetsOrderEqual(src.rows, tgt.rows)) {
+          patches.push({
+            op: "rename-table-column",
+            table: i,
+            column: src.headers[renamedIdx] ?? renamedIdx,
+            new: tgt.headers[renamedIdx] ?? String(renamedIdx),
+          });
+          claimedIndices.add(i);
+          continue;
+        }
+      }
+
+      // Detect column reorder: same column set in different order, rows reordered consistently
+      if (sameHeaderSet && !arraysEqual(src.headers, tgt.headers)) {
+        const colMap = tgt.headers.map((h) => src.headers.indexOf(h));
+        const reorderedRows = src.rows.map((row) =>
+          colMap.map((ci) => (ci >= 0 ? (row[ci] ?? "") : "")),
+        );
+        if (rowSetsOrderEqual(reorderedRows, tgt.rows)) {
+          patches.push({
+            op: "reorder-table-columns",
+            table: i,
+            columns: tgt.headers,
+          });
+          claimedIndices.add(i);
+          continue;
+        }
+      }
+    }
+
+    // Headers must match for row-level structural ops
+    if (!arraysEqual(src.headers, tgt.headers)) continue;
+
+    // Detect sort: same rows but in sorted order by some column
+    if (src.rows.length === tgt.rows.length && rowSetsEqual(src.rows, tgt.rows)) {
+      if (!rowSetsOrderEqual(src.rows, tgt.rows)) {
+        let detected = false;
+        for (let ci = 0; ci < src.headers.length; ci++) {
+          const header = src.headers[ci];
+          if (header === undefined) continue;
+
+          const sortedAsc = [...src.rows].sort((a, b) => (a[ci] ?? "").localeCompare(b[ci] ?? ""));
+          const sortedDesc = [...src.rows].sort((a, b) => (b[ci] ?? "").localeCompare(a[ci] ?? ""));
+
+          if (rowSetsOrderEqual(sortedAsc, tgt.rows)) {
+            patches.push({ op: "sort-table", table: i, column: header, direction: "asc" });
+            claimedIndices.add(i);
+            detected = true;
+            break;
+          } else if (rowSetsOrderEqual(sortedDesc, tgt.rows)) {
+            patches.push({ op: "sort-table", table: i, column: header, direction: "desc" });
+            claimedIndices.add(i);
+            detected = true;
+            break;
+          }
+        }
+        if (detected) continue;
+      }
+    }
+
+    // Detect deduplicate: target is source with duplicate rows removed
+    if (src.rows.length > tgt.rows.length) {
+      const dedupedFirst = deduplicateRows(src.rows, "first");
+      if (rowSetsOrderEqual(dedupedFirst, tgt.rows)) {
+        patches.push({ op: "deduplicate-table-rows", table: i, keep: "first" });
+        claimedIndices.add(i);
+        continue;
+      }
+      const dedupedLast = deduplicateRows(src.rows, "last");
+      if (rowSetsOrderEqual(dedupedLast, tgt.rows)) {
+        patches.push({ op: "deduplicate-table-rows", table: i, keep: "last" });
+        claimedIndices.add(i);
+      }
+    }
+  }
+
+  return { patches, claimedIndices };
+}
+
+/**
  * Suggests table-related patches
  */
-function suggestTablePatches(analysis: DiffAnalysis): PatchOperation[] {
+function suggestTablePatches(
+  analysis: DiffAnalysis,
+  claimedIndices: Set<number> = new Set(),
+): PatchOperation[] {
   const patches: PatchOperation[] = [];
 
   for (const change of analysis.tableChanges) {
+    if (claimedIndices.has(change.tableIndex)) continue;
     switch (change.type) {
       case "cell-changed":
         patches.push({
@@ -996,14 +1282,26 @@ export function suggestPatches(source: string, target: string): PatchOperation[]
   // Suggest section patches
   patches.push(...suggestSectionPatches(analysis));
 
-  // Suggest list patches
-  patches.push(...suggestListPatches(analysis));
+  // Detect structural list operations (sort/deduplicate/reorder) first so that
+  // per-item add/remove suggestions are suppressed for those lists.
+  const { patches: structuralListPatches, claimedIndices: claimedListIndices } =
+    suggestStructuralListPatches(source, target);
+  patches.push(...structuralListPatches);
+
+  // Suggest per-item list patches (skip structurally-claimed lists)
+  patches.push(...suggestListPatches(analysis, claimedListIndices));
 
   // Suggest link patches
   patches.push(...suggestLinkPatches(analysis));
 
-  // Suggest table patches
-  patches.push(...suggestTablePatches(analysis));
+  // Detect structural table operations (sort/deduplicate/rename-column/reorder-columns)
+  // first so that per-cell/row suggestions are suppressed for those tables.
+  const { patches: structuralTablePatches, claimedIndices: claimedTableIndices } =
+    suggestStructuralTablePatches(source, target);
+  patches.push(...structuralTablePatches);
+
+  // Suggest per-cell/row table patches (skip structurally-claimed tables)
+  patches.push(...suggestTablePatches(analysis, claimedTableIndices));
 
   // Suggest code block patches
   patches.push(...suggestCodeBlockPatches(analysis));
@@ -1854,6 +2152,25 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     score = 0.9;
   }
 
+  // Structural table operations are high confidence (deterministic)
+  if (
+    patch.op === "sort-table" ||
+    patch.op === "deduplicate-table-rows" ||
+    patch.op === "rename-table-column" ||
+    patch.op === "reorder-table-columns"
+  ) {
+    score = 0.95;
+  }
+
+  // Structural list operations are high confidence (deterministic)
+  if (
+    patch.op === "sort-list" ||
+    patch.op === "deduplicate-list-items" ||
+    patch.op === "reorder-list-items"
+  ) {
+    score = 0.95;
+  }
+
   // Code block operations are high confidence (structurally precise)
   if (patch.op === "replace-code-block") {
     score = 0.9;
@@ -1945,6 +2262,27 @@ function describePatch(patch: PatchOperation): string {
 
     case "remove-table-column":
       return `Remove column "${patch.column}" from table ${patch.table}`;
+
+    case "sort-table":
+      return `Sort table ${patch.table} by column "${patch.column}" (${patch.direction ?? "asc"})`;
+
+    case "deduplicate-table-rows":
+      return `Deduplicate rows in table ${patch.table} (keep ${patch.keep ?? "first"})`;
+
+    case "rename-table-column":
+      return `Rename column "${patch.column}" to "${patch.new}" in table ${patch.table}`;
+
+    case "reorder-table-columns":
+      return `Reorder columns in table ${patch.table}`;
+
+    case "sort-list":
+      return `Sort list ${patch.list} items (${patch.direction ?? "asc"})`;
+
+    case "deduplicate-list-items":
+      return `Deduplicate items in list ${patch.list} (keep ${patch.keep ?? "first"})`;
+
+    case "reorder-list-items":
+      return `Reorder items in list ${patch.list}`;
 
     case "replace-code-block":
       return `Replace code block ${patch.index}${patch.language ? ` (language: ${patch.language})` : ""}`;

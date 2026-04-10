@@ -2505,5 +2505,345 @@ Upgrade to 2.0.0 today`;
       }
     });
   });
+
+  describe("structural list detection", () => {
+    test("suggests sort-list asc when target list is sorted ascending", () => {
+      const source = "- Banana\n- Apple\n- Cherry";
+      const target = "- Apple\n- Banana\n- Cherry";
+
+      const patches = suggestPatches(source, target);
+      const sortPatch = patches.find((p) => p.op === "sort-list");
+      expect(sortPatch).toBeDefined();
+      if (sortPatch?.op === "sort-list") {
+        expect(sortPatch.list).toBe(0);
+        expect(sortPatch.direction).toBe("asc");
+      }
+    });
+
+    test("suggests sort-list desc when target list is sorted descending", () => {
+      const source = "- Apple\n- Banana\n- Cherry";
+      const target = "- Cherry\n- Banana\n- Apple";
+
+      const patches = suggestPatches(source, target);
+      const sortPatch = patches.find((p) => p.op === "sort-list");
+      expect(sortPatch).toBeDefined();
+      if (sortPatch?.op === "sort-list") {
+        expect(sortPatch.direction).toBe("desc");
+      }
+    });
+
+    test("suggests reorder-list-items when items are reordered but not sorted", () => {
+      const source = "- Alpha\n- Beta\n- Gamma";
+      const target = "- Gamma\n- Alpha\n- Beta";
+
+      const patches = suggestPatches(source, target);
+      const reorderPatch = patches.find((p) => p.op === "reorder-list-items");
+      expect(reorderPatch).toBeDefined();
+      if (reorderPatch?.op === "reorder-list-items") {
+        expect(reorderPatch.order).toEqual(["Gamma", "Alpha", "Beta"]);
+      }
+    });
+
+    test("suggests deduplicate-list-items when duplicates removed (keep first)", () => {
+      const source = "- Apple\n- Banana\n- Apple\n- Cherry";
+      const target = "- Apple\n- Banana\n- Cherry";
+
+      const patches = suggestPatches(source, target);
+      const dedupPatch = patches.find((p) => p.op === "deduplicate-list-items");
+      expect(dedupPatch).toBeDefined();
+      if (dedupPatch?.op === "deduplicate-list-items") {
+        expect(dedupPatch.keep).toBe("first");
+      }
+    });
+
+    test("suggests deduplicate-list-items when duplicates removed (keep last)", () => {
+      const source = "- Apple\n- Banana\n- Apple\n- Cherry";
+      const target = "- Banana\n- Apple\n- Cherry";
+
+      const patches = suggestPatches(source, target);
+      const dedupPatch = patches.find((p) => p.op === "deduplicate-list-items");
+      expect(dedupPatch).toBeDefined();
+      if (dedupPatch?.op === "deduplicate-list-items") {
+        expect(dedupPatch.keep).toBe("last");
+      }
+    });
+
+    test("does not suggest sort-list when items are already in sorted order", () => {
+      const source = "- Apple\n- Banana\n- Cherry";
+      const target = "- Apple\n- Banana\n- Cherry";
+
+      const patches = suggestPatches(source, target);
+      const sortPatch = patches.find((p) => p.op === "sort-list");
+      expect(sortPatch).toBeUndefined();
+    });
+
+    test("suppresses individual add/remove patches for structurally-claimed lists", () => {
+      const source = "- Banana\n- Apple\n- Cherry";
+      const target = "- Apple\n- Banana\n- Cherry";
+
+      const patches = suggestPatches(source, target);
+      // Should have sort-list but NOT individual add-list-item / remove-list-item
+      expect(patches.some((p) => p.op === "sort-list")).toBe(true);
+      expect(patches.some((p) => p.op === "add-list-item")).toBe(false);
+      expect(patches.some((p) => p.op === "remove-list-item")).toBe(false);
+    });
+
+    test("scores sort-list at 0.95", () => {
+      const source = "- Banana\n- Apple\n- Cherry";
+      const target = "- Apple\n- Banana\n- Cherry";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const sortScored = scored.find((s) => s.patch.op === "sort-list");
+      expect(sortScored?.score).toBe(0.95);
+    });
+
+    test("scores deduplicate-list-items at 0.95", () => {
+      const source = "- Apple\n- Banana\n- Apple\n- Cherry";
+      const target = "- Apple\n- Banana\n- Cherry";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const dedupScored = scored.find((s) => s.patch.op === "deduplicate-list-items");
+      expect(dedupScored?.score).toBe(0.95);
+    });
+
+    test("scores reorder-list-items at 0.95", () => {
+      const source = "- Alpha\n- Beta\n- Gamma";
+      const target = "- Gamma\n- Alpha\n- Beta";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const reorderScored = scored.find((s) => s.patch.op === "reorder-list-items");
+      expect(reorderScored?.score).toBe(0.95);
+    });
+
+    test("describePatch for sort-list", () => {
+      const source = "- Banana\n- Apple";
+      const target = "- Apple\n- Banana";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const sortScored = scored.find((s) => s.patch.op === "sort-list");
+      expect(sortScored?.description).toContain("Sort list");
+      expect(sortScored?.description).toContain("asc");
+    });
+
+    test("describePatch for deduplicate-list-items", () => {
+      const source = "- Apple\n- Banana\n- Apple";
+      const target = "- Apple\n- Banana";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const dedupScored = scored.find((s) => s.patch.op === "deduplicate-list-items");
+      expect(dedupScored?.description).toContain("Deduplicate");
+    });
+
+    test("describePatch for reorder-list-items", () => {
+      const source = "- Alpha\n- Beta\n- Gamma";
+      const target = "- Gamma\n- Alpha\n- Beta";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const reorderScored = scored.find((s) => s.patch.op === "reorder-list-items");
+      expect(reorderScored?.description).toContain("Reorder");
+    });
+  });
+
+  describe("structural table detection", () => {
+    const tableSource = [
+      "| Name | Age | City |",
+      "| ---- | --- | ---- |",
+      "| Charlie | 30 | NYC |",
+      "| Alice | 25 | LA |",
+      "| Bob | 35 | Chicago |",
+    ].join("\n");
+
+    test("suggests sort-table asc when rows sorted ascending by a column", () => {
+      const target = [
+        "| Name | Age | City |",
+        "| ---- | --- | ---- |",
+        "| Alice | 25 | LA |",
+        "| Bob | 35 | Chicago |",
+        "| Charlie | 30 | NYC |",
+      ].join("\n");
+
+      const patches = suggestPatches(tableSource, target);
+      const sortPatch = patches.find((p) => p.op === "sort-table");
+      expect(sortPatch).toBeDefined();
+      if (sortPatch?.op === "sort-table") {
+        expect(sortPatch.column).toBe("Name");
+        expect(sortPatch.direction).toBe("asc");
+      }
+    });
+
+    test("suggests sort-table desc when rows sorted descending by a column", () => {
+      const target = [
+        "| Name | Age | City |",
+        "| ---- | --- | ---- |",
+        "| Charlie | 30 | NYC |",
+        "| Bob | 35 | Chicago |",
+        "| Alice | 25 | LA |",
+      ].join("\n");
+
+      const patches = suggestPatches(tableSource, target);
+      const sortPatch = patches.find((p) => p.op === "sort-table");
+      expect(sortPatch).toBeDefined();
+      if (sortPatch?.op === "sort-table") {
+        expect(sortPatch.direction).toBe("desc");
+      }
+    });
+
+    test("suggests deduplicate-table-rows when duplicate rows removed", () => {
+      const source = [
+        "| Name | Score |",
+        "| ---- | ----- |",
+        "| Alice | 90 |",
+        "| Bob | 80 |",
+        "| Alice | 90 |",
+      ].join("\n");
+      const target = [
+        "| Name | Score |",
+        "| ---- | ----- |",
+        "| Alice | 90 |",
+        "| Bob | 80 |",
+      ].join("\n");
+
+      const patches = suggestPatches(source, target);
+      const dedupPatch = patches.find((p) => p.op === "deduplicate-table-rows");
+      expect(dedupPatch).toBeDefined();
+      if (dedupPatch?.op === "deduplicate-table-rows") {
+        expect(dedupPatch.keep).toBe("first");
+      }
+    });
+
+    test("suggests rename-table-column when a column header is renamed", () => {
+      const source = [
+        "| Name | Age | City |",
+        "| ---- | --- | ---- |",
+        "| Alice | 25 | LA |",
+      ].join("\n");
+      const target = [
+        "| Name | Years | City |",
+        "| ---- | ----- | ---- |",
+        "| Alice | 25 | LA |",
+      ].join("\n");
+
+      const patches = suggestPatches(source, target);
+      const renamePatch = patches.find((p) => p.op === "rename-table-column");
+      expect(renamePatch).toBeDefined();
+      if (renamePatch?.op === "rename-table-column") {
+        expect(renamePatch.column).toBe("Age");
+        expect(renamePatch.new).toBe("Years");
+      }
+    });
+
+    test("suggests reorder-table-columns when column order changes", () => {
+      const source = [
+        "| Name | Age | City |",
+        "| ---- | --- | ---- |",
+        "| Alice | 25 | LA |",
+      ].join("\n");
+      const target = [
+        "| City | Name | Age |",
+        "| ---- | ---- | --- |",
+        "| LA | Alice | 25 |",
+      ].join("\n");
+
+      const patches = suggestPatches(source, target);
+      const reorderPatch = patches.find((p) => p.op === "reorder-table-columns");
+      expect(reorderPatch).toBeDefined();
+      if (reorderPatch?.op === "reorder-table-columns") {
+        expect(reorderPatch.columns).toEqual(["City", "Name", "Age"]);
+      }
+    });
+
+    test("suppresses individual row add/remove for structurally-claimed tables", () => {
+      const target = [
+        "| Name | Age | City |",
+        "| ---- | --- | ---- |",
+        "| Alice | 25 | LA |",
+        "| Bob | 35 | Chicago |",
+        "| Charlie | 30 | NYC |",
+      ].join("\n");
+
+      const patches = suggestPatches(tableSource, target);
+      expect(patches.some((p) => p.op === "sort-table")).toBe(true);
+      expect(patches.some((p) => p.op === "add-table-row")).toBe(false);
+      expect(patches.some((p) => p.op === "remove-table-row")).toBe(false);
+    });
+
+    test("scores sort-table at 0.95", () => {
+      const target = [
+        "| Name | Age | City |",
+        "| ---- | --- | ---- |",
+        "| Alice | 25 | LA |",
+        "| Bob | 35 | Chicago |",
+        "| Charlie | 30 | NYC |",
+      ].join("\n");
+
+      const patches = suggestPatches(tableSource, target);
+      const scored = scorePatches(patches, tableSource, target);
+      const sortScored = scored.find((s) => s.patch.op === "sort-table");
+      expect(sortScored?.score).toBe(0.95);
+    });
+
+    test("scores rename-table-column at 0.95", () => {
+      const source = "| Name | Age |\n| ---- | --- |\n| Alice | 25 |";
+      const target = "| Name | Years |\n| ---- | ----- |\n| Alice | 25 |";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const renameScored = scored.find((s) => s.patch.op === "rename-table-column");
+      expect(renameScored?.score).toBe(0.95);
+    });
+
+    test("describePatch for sort-table", () => {
+      const target = [
+        "| Name | Age | City |",
+        "| ---- | --- | ---- |",
+        "| Alice | 25 | LA |",
+        "| Bob | 35 | Chicago |",
+        "| Charlie | 30 | NYC |",
+      ].join("\n");
+
+      const patches = suggestPatches(tableSource, target);
+      const scored = scorePatches(patches, tableSource, target);
+      const sortScored = scored.find((s) => s.patch.op === "sort-table");
+      expect(sortScored?.description).toContain("Sort table");
+      expect(sortScored?.description).toContain("Name");
+    });
+
+    test("describePatch for rename-table-column", () => {
+      const source = "| Name | Age |\n| ---- | --- |\n| Alice | 25 |";
+      const target = "| Name | Years |\n| ---- | ----- |\n| Alice | 25 |";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const renameScored = scored.find((s) => s.patch.op === "rename-table-column");
+      expect(renameScored?.description).toContain("Age");
+      expect(renameScored?.description).toContain("Years");
+    });
+
+    test("describePatch for deduplicate-table-rows", () => {
+      const source = "| Name |\n| ---- |\n| Alice |\n| Alice |";
+      const target = "| Name |\n| ---- |\n| Alice |";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const dedupScored = scored.find((s) => s.patch.op === "deduplicate-table-rows");
+      expect(dedupScored?.description).toContain("Deduplicate");
+    });
+
+    test("describePatch for reorder-table-columns", () => {
+      const source = "| A | B |\n| --- | --- |\n| 1 | 2 |";
+      const target = "| B | A |\n| --- | --- |\n| 2 | 1 |";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const reorderScored = scored.find((s) => s.patch.op === "reorder-table-columns");
+      expect(reorderScored?.description).toContain("Reorder columns");
+    });
+  });
 });
 
