@@ -1,0 +1,39 @@
+README.md
+  a1369ea2821469ba 4708-4780
+src/core/index.ts
+  a1369ea2821469ba 178,188,297,342
+src/core/config-parser.ts
+  a1369ea2821469ba 713-714,1559-1569
+src/core/patch-engine.ts
+  a1369ea2821469ba 575-627,3117-3124,3581-3584
+src/core/schema.ts
+  a1369ea2821469ba 4959-5064
+tests/core/prepend-append-file.test.ts
+  a1369ea2821469ba 1-204
+IMPLEMENTATION_PLAN.md
+  a1369ea2821469ba 3,9-56
+src/core/types.ts
+  a1369ea2821469ba 207-223,787-789
+src/lsp/completion.ts
+  a1369ea2821469ba 639-654,1234-1251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "0020e6bcbe369bcd29c91bd2501888e3a9b0aedd",
+  "prompts": {
+    "a1369ea2821469ba": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d699436e-c58f-4bcf-8919-329397b23583",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 633,
+      "total_deletions": 17,
+      "accepted_lines": 618,
+      "overriden_lines": 0
+    }
+  }
+}
