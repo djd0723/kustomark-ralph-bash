@@ -3338,6 +3338,94 @@ export function generateSchema(): object {
               },
               additionalProperties: false,
             },
+            // reorder-list-items
+            {
+              type: "object",
+              required: ["op", "list", "order"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "reorder-list-items",
+                  description: "Reorder items in a markdown list to a specified order",
+                },
+                list: {
+                  oneOf: [
+                    {
+                      type: "integer",
+                      minimum: 0,
+                      description: "Zero-based list index (0 = first list in file)",
+                    },
+                    {
+                      type: "string",
+                      description: "Section ID containing the list",
+                    },
+                  ],
+                  description: "List identifier: zero-based index or section ID",
+                },
+                order: {
+                  type: "array",
+                  items: {
+                    oneOf: [
+                      {
+                        type: "integer",
+                        minimum: 0,
+                        description: "Zero-based item index",
+                      },
+                      {
+                        type: "string",
+                        description: "Exact item text to match",
+                      },
+                    ],
+                  },
+                  description:
+                    "New item order as array of 0-based indices or exact item text strings",
+                },
+                include: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  type: "object",
+                  description: "Per-patch validation rules",
+                  properties: {
+                    notContains: {
+                      type: "string",
+                      description: "Validate that the result does not contain this string",
+                    },
+                  },
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
             // set-list-item
             {
               type: "object",

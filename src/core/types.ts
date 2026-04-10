@@ -643,6 +643,17 @@ export interface DeduplicateListItemsPatch extends PatchCommonFields {
 }
 
 /**
+ * Reorder list items operation - puts items into a specified order
+ */
+export interface ReorderListItemsPatch extends PatchCommonFields {
+  op: "reorder-list-items";
+  /** List identifier (zero-based index or section ID containing the list) */
+  list: number | string;
+  /** New item order as array of 0-based indices or exact item text strings */
+  order: (number | string)[];
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -688,7 +699,8 @@ export type PatchOperation =
   | SetListItemPatch
   | SortListPatch
   | FilterListItemsPatch
-  | DeduplicateListItemsPatch;
+  | DeduplicateListItemsPatch
+  | ReorderListItemsPatch;
 
 /**
  * Global validator configuration

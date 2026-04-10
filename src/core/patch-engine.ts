@@ -1921,6 +1921,57 @@ export function applyDeduplicateListItems(
 }
 
 /**
+ * Apply a reorder-list-items patch operation
+ *
+ * @param content - The content to patch
+ * @param listIdentifier - List index (number) or section ID (string) containing the list
+ * @param order - New item order as array of 0-based indices or exact item text strings
+ * @returns Object with patched content and count (1 if reordered, 0 if list not found or order invalid)
+ */
+export function applyReorderListItems(
+  content: string,
+  listIdentifier: number | string,
+  order: (number | string)[],
+): { content: string; count: number } {
+  const list = findList(content, listIdentifier);
+  if (!list || list.items.length === 0) {
+    return { content, count: 0 };
+  }
+
+  if (order.length !== list.items.length) {
+    return { content, count: 0 };
+  }
+
+  // Resolve each order entry to an index
+  const newIndices: number[] = [];
+  for (const entry of order) {
+    let idx: number;
+    if (typeof entry === "number") {
+      idx = entry;
+    } else {
+      idx = list.items.findIndex((item) => item.text === entry);
+    }
+    if (idx < 0 || idx >= list.items.length) {
+      return { content, count: 0 };
+    }
+    newIndices.push(idx);
+  }
+
+  // Ensure no duplicates
+  if (new Set(newIndices).size !== newIndices.length) {
+    return { content, count: 0 };
+  }
+
+  const lines = content.split("\n");
+  const blocks = list.itemRanges.map((range) => lines.slice(range.startLine, range.endLine + 1));
+  const reorderedLines = newIndices.flatMap((i) => blocks[i] ?? []);
+
+  lines.splice(list.startLine, list.endLine - list.startLine + 1, ...reorderedLines);
+
+  return { content: lines.join("\n"), count: 1 };
+}
+
+/**
  * Apply an exec patch operation - runs a shell command to transform content
  *
  * This function executes a shell command with the markdown content piped to stdin,
@@ -2958,6 +3009,10 @@ export async function applySinglePatch(
       result = applyDeduplicateListItems(content, patch.list, patch.keep);
       break;
 
+    case "reorder-list-items":
+      result = applyReorderListItems(content, patch.list, patch.order);
+      break;
+
     case "plugin":
       // Plugin operation requires a registry to be passed
       // This will be handled by applyPatchesWithPlugins
@@ -3125,6 +3180,8 @@ function getPatchDescription(patch: PatchOperation): string {
     }
     case "deduplicate-list-items":
       return `deduplicate-list-items '${patch.list}'${patch.keep ? ` (keep=${patch.keep})` : ""}`;
+    case "reorder-list-items":
+      return `reorder-list-items '${patch.list}' to [${patch.order.join(", ")}]`;
     case "copy-file":
       return `copy-file '${patch.src}' to '${patch.dest}'`;
     case "rename-file":

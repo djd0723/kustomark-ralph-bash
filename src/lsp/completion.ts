@@ -563,6 +563,56 @@ export class CompletionProvider {
         documentation: "Move files to a destination directory",
         insertText: "move-file",
       },
+      {
+        label: "add-list-item",
+        kind: CompletionItemKind.Value,
+        detail: "Add an item to a markdown list",
+        documentation: "Add an item to a markdown list",
+        insertText: "add-list-item",
+      },
+      {
+        label: "remove-list-item",
+        kind: CompletionItemKind.Value,
+        detail: "Remove an item from a markdown list",
+        documentation: "Remove an item from a markdown list",
+        insertText: "remove-list-item",
+      },
+      {
+        label: "set-list-item",
+        kind: CompletionItemKind.Value,
+        detail: "Replace an item in a markdown list",
+        documentation: "Replace an item in a markdown list",
+        insertText: "set-list-item",
+      },
+      {
+        label: "sort-list",
+        kind: CompletionItemKind.Value,
+        detail: "Sort items in a markdown list",
+        documentation: "Sort items in a markdown list alphabetically or numerically",
+        insertText: "sort-list",
+      },
+      {
+        label: "filter-list-items",
+        kind: CompletionItemKind.Value,
+        detail: "Keep or remove list items matching a pattern",
+        documentation: "Keep or remove list items matching an exact string or regex pattern",
+        insertText: "filter-list-items",
+      },
+      {
+        label: "deduplicate-list-items",
+        kind: CompletionItemKind.Value,
+        detail: "Remove duplicate items from a markdown list",
+        documentation: "Remove duplicate items from a markdown list",
+        insertText: "deduplicate-list-items",
+      },
+      {
+        label: "reorder-list-items",
+        kind: CompletionItemKind.Value,
+        detail: "Reorder items in a markdown list to a specified order",
+        documentation:
+          "Put list items into a specific order using 0-based indices or exact item text",
+        insertText: "reorder-list-items",
+      },
     ];
   }
 
@@ -1041,6 +1091,24 @@ export class CompletionProvider {
           detail: "Destination directory",
           documentation: "Directory to move files to",
           insertText: "destination: ",
+        },
+      ],
+      "reorder-list-items": [
+        {
+          label: "list",
+          kind: CompletionItemKind.Field,
+          detail: "List identifier",
+          documentation:
+            "Zero-based list index (0 = first list in file) or section ID containing the list",
+          insertText: "list: ",
+        },
+        {
+          label: "order",
+          kind: CompletionItemKind.Field,
+          detail: "New item order",
+          documentation:
+            "Array of 0-based indices or exact item text strings specifying the new order",
+          insertText: "order:\n  - ",
         },
       ],
     };

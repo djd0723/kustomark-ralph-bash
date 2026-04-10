@@ -1,10 +1,55 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (reorder-list-items - COMPLETE!):**
+
+* ✅ **`reorder-list-items`**: New patch operation to reorder items in a markdown list
+* ✅ **INDEX OR TEXT**: `order` array accepts 0-based indices, exact item text, or a mix of both
+* ✅ **SUB-ITEM PRESERVATION**: Sub-items (indented lines) travel with their parent when reordered
+* ✅ **VALIDATION**: Returns count=0 for wrong item count, duplicate entries, or unmatched text
+* ✅ **LSP COMPLETION**: Added `reorder-list-items` (and all previously missing list ops) to LSP completion
+* ✅ **SCHEMA UPDATED**: JSON Schema includes `reorder-list-items` with full field definitions
+* ✅ **15 NEW TESTS PASSING**: Unit tests cover index, text, mixed, sub-item, and error cases
+* ✅ **3,736 TESTS PASSING**: All tests pass with 0 failures
+* ✅ **README UPDATED**: Documented `reorder-list-items` with examples and field reference
+
+**Details:**
+
+1. **Usage**
+   ```yaml
+   # Reorder by 0-based index
+   - op: reorder-list-items
+     list: "steps"
+     order: [2, 0, 1]
+
+   # Reorder by exact item text
+   - op: reorder-list-items
+     list: "steps"
+     order:
+       - "Step 3: Deploy"
+       - "Step 1: Build"
+       - "Step 2: Test"
+   ```
+
+2. **Implementation Files**
+   * `src/core/types.ts` — Added `ReorderListItemsPatch` interface
+   * `src/core/patch-engine.ts` — Added `applyReorderListItems()` function
+   * `src/core/config-parser.ts` — Added `reorder-list-items` to `validOps`
+   * `src/core/schema.ts` — Added JSON Schema definition for `reorder-list-items`
+   * `src/core/index.ts` — Exported `applyReorderListItems` and `ReorderListItemsPatch`
+   * `src/lsp/completion.ts` — Added `reorder-list-items` and all list ops to completion
+   * `tests/core/list-operations.test.ts` — 15 new tests (unit + integration)
+   * `tests/lsp/completion.test.ts` — Updated counts from 22 → 29 ops
+   * `README.md` — Added `reorder-list-items` section under List Operations
+
+**Status:** reorder-list-items COMPLETE! ✅
+
+---
 
 **2026-04-09 (incremental-watch - COMPLETE!):**
 

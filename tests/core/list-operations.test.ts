@@ -5,7 +5,11 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { applyFilterListItems, applyPatches } from "../../src/core/patch-engine.js";
+import {
+  applyFilterListItems,
+  applyPatches,
+  applyReorderListItems,
+} from "../../src/core/patch-engine.js";
 
 function makeList(items: string[], bullet = "-"): string {
   return items.map((item) => `${bullet} ${item}`).join("\n");
@@ -201,5 +205,127 @@ describe("filter-list-items (integration via applyPatches)", () => {
     ]);
     expect(result.content).not.toContain("info:");
     expect(result.applied).toBe(1);
+  });
+});
+
+describe("applyReorderListItems (unit)", () => {
+  test("reorders items by index", () => {
+    const content = makeList(["alpha", "beta", "gamma"]);
+    const result = applyReorderListItems(content, 0, [2, 0, 1]);
+    const lines = result.content.split("\n").filter((l) => l.trim() !== "");
+    expect(lines).toEqual(["- gamma", "- alpha", "- beta"]);
+    expect(result.count).toBe(1);
+  });
+
+  test("reorders items by exact text", () => {
+    const content = makeList(["Step 1", "Step 2", "Step 3"]);
+    const result = applyReorderListItems(content, 0, ["Step 3", "Step 1", "Step 2"]);
+    const lines = result.content.split("\n").filter((l) => l.trim() !== "");
+    expect(lines).toEqual(["- Step 3", "- Step 1", "- Step 2"]);
+    expect(result.count).toBe(1);
+  });
+
+  test("reorders with mixed index and text", () => {
+    const content = makeList(["alpha", "beta", "gamma"]);
+    const result = applyReorderListItems(content, 0, [2, "alpha", 1]);
+    const lines = result.content.split("\n").filter((l) => l.trim() !== "");
+    expect(lines).toEqual(["- gamma", "- alpha", "- beta"]);
+    expect(result.count).toBe(1);
+  });
+
+  test("returns count 0 when order length does not match item count", () => {
+    const content = makeList(["alpha", "beta", "gamma"]);
+    const result = applyReorderListItems(content, 0, [0, 1]);
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(content);
+  });
+
+  test("returns count 0 when order contains duplicate indices", () => {
+    const content = makeList(["alpha", "beta", "gamma"]);
+    const result = applyReorderListItems(content, 0, [0, 0, 2]);
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(content);
+  });
+
+  test("returns count 0 when text match not found", () => {
+    const content = makeList(["alpha", "beta", "gamma"]);
+    const result = applyReorderListItems(content, 0, ["alpha", "beta", "NOTFOUND"]);
+    expect(result.count).toBe(0);
+    expect(result.content).toBe(content);
+  });
+
+  test("returns count 0 when index out of range", () => {
+    const content = makeList(["alpha", "beta"]);
+    const result = applyReorderListItems(content, 0, [0, 5]);
+    expect(result.count).toBe(0);
+  });
+
+  test("returns count 0 when list not found", () => {
+    const content = makeList(["alpha", "beta"]);
+    const result = applyReorderListItems(content, 99, [0, 1]);
+    expect(result.count).toBe(0);
+  });
+
+  test("preserves surrounding content", () => {
+    const content = "Before\n\n- alpha\n- beta\n- gamma\n\nAfter";
+    const result = applyReorderListItems(content, 0, [2, 1, 0]);
+    expect(result.content).toBe("Before\n\n- gamma\n- beta\n- alpha\n\nAfter");
+    expect(result.count).toBe(1);
+  });
+
+  test("preserves sub-items when reordering", () => {
+    const content = "- alpha\n  - sub-alpha\n- beta\n- gamma";
+    const result = applyReorderListItems(content, 0, [1, 0, 2]);
+    const lines = result.content.split("\n");
+    expect(lines[0]).toBe("- beta");
+    expect(lines[1]).toBe("- alpha");
+    expect(lines[2]).toBe("  - sub-alpha");
+    expect(lines[3]).toBe("- gamma");
+  });
+
+  test("targets list by section heading ID", () => {
+    const content = "## Steps\n\n- alpha\n- beta\n- gamma";
+    const result = applyReorderListItems(content, "steps", [2, 0, 1]);
+    const lines = result.content.split("\n");
+    expect(lines[2]).toBe("- gamma");
+    expect(lines[3]).toBe("- alpha");
+    expect(lines[4]).toBe("- beta");
+    expect(result.count).toBe(1);
+  });
+
+  test("no-op when order is already correct (same order)", () => {
+    const content = makeList(["alpha", "beta", "gamma"]);
+    const result = applyReorderListItems(content, 0, [0, 1, 2]);
+    expect(result.count).toBe(1);
+    expect(result.content).toBe(content);
+  });
+});
+
+describe("reorder-list-items (integration via applyPatches)", () => {
+  test("wires up correctly through applyPatches with indices", async () => {
+    const content = makeList(["alpha", "beta", "gamma"]);
+    const result = await applyPatches(content, [
+      { op: "reorder-list-items", list: 0, order: [2, 0, 1] },
+    ]);
+    expect(result.content).toBe(makeList(["gamma", "alpha", "beta"]));
+    expect(result.applied).toBe(1);
+  });
+
+  test("wires up correctly through applyPatches with text", async () => {
+    const content = makeList(["Step 1", "Step 2", "Step 3"]);
+    const result = await applyPatches(content, [
+      { op: "reorder-list-items", list: 0, order: ["Step 3", "Step 1", "Step 2"] },
+    ]);
+    expect(result.content).toBe(makeList(["Step 3", "Step 1", "Step 2"]));
+    expect(result.applied).toBe(1);
+  });
+
+  test("applied=0 when order is invalid", async () => {
+    const content = makeList(["alpha", "beta"]);
+    const result = await applyPatches(content, [
+      { op: "reorder-list-items", list: 0, order: [0] },
+    ]);
+    expect(result.applied).toBe(0);
+    expect(result.content).toBe(content);
   });
 });

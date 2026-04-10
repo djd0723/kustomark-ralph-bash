@@ -4250,6 +4250,57 @@ Remove duplicate items from a markdown list. Comparison is case-sensitive. Choos
 - `keep: "first"` removes later duplicates; `keep: "last"` removes earlier ones
 - Returns count of items removed (0 triggers `onNoMatch`)
 
+### `reorder-list-items` - Reorder List Items
+
+Put items in a markdown list into a specific order using 0-based indices or exact item text. The `order` array must contain every item exactly once.
+
+```yaml
+- op: reorder-list-items
+  list: 0           # zero-based index or section heading ID
+  order: [2, 0, 1]  # new order by 0-based index
+```
+
+**Fields:**
+
+| Field   | Type                       | Required | Description                                                        |
+| ------- | -------------------------- | -------- | ------------------------------------------------------------------ |
+| `list`  | number \| string           | Yes      | Zero-based list index or section heading ID containing the list    |
+| `order` | (number \| string)[]       | Yes      | New order: array of 0-based indices or exact item text strings     |
+
+**Example — reorder steps by index:**
+
+```yaml
+- op: reorder-list-items
+  list: "steps"
+  order: [2, 0, 1]   # move item 2 to first, item 0 to second, item 1 to third
+```
+
+**Example — reorder by content:**
+
+```yaml
+- op: reorder-list-items
+  list: "steps"
+  order:
+    - "Step 3: Deploy"
+    - "Step 1: Build"
+    - "Step 2: Test"
+```
+
+**Example — mixed index and text:**
+
+```yaml
+- op: reorder-list-items
+  list: 0
+  order: ["Step 3: Deploy", 0, 1]
+```
+
+**Notes:**
+
+* The `order` array must contain exactly as many entries as there are items in the list
+* Each item must appear exactly once (no duplicates)
+* Text matching is exact and case-sensitive
+* Returns count 1 if reordered, 0 if list not found or order is invalid
+
 ### Real-World Example
 
 ```yaml

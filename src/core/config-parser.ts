@@ -634,6 +634,7 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "filter-list-items",
     "deduplicate-table-rows",
     "deduplicate-list-items",
+    "reorder-list-items",
   ];
 
   if (!validOps.includes(p.op as string)) {
