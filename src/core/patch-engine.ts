@@ -685,6 +685,54 @@ export function applyReplaceInSection(
 }
 
 /**
+ * Apply a replace-code-block patch operation.
+ *
+ * Replaces the body (and optionally the language tag) of the Nth fenced code block
+ * (0-indexed). Both backtick (```) and tilde (~~~) fences are supported.
+ *
+ * @param content - The markdown content to patch
+ * @param index - Zero-based index of the code block to replace
+ * @param newBody - New content for the code block body (without fences)
+ * @param language - Optional new language tag; if omitted the original tag is kept
+ * @returns Object with patched content and count (1 if block found, 0 otherwise)
+ *
+ * @example
+ * ```typescript
+ * const md = "Some text\n\n```js\nconsole.log('old');\n```\n\nMore text";
+ * const result = applyReplaceCodeBlock(md, 0, "console.log('new');", "typescript");
+ * // Result: "Some text\n\n```typescript\nconsole.log('new');\n```\n\nMore text"
+ * ```
+ */
+export function applyReplaceCodeBlock(
+  content: string,
+  index: number,
+  newBody: string,
+  language?: string,
+): { content: string; count: number } {
+  // Regex matches an opening fence (``` or ~~~, optionally with a language tag),
+  // the body (any characters including newlines, lazily), and the closing fence.
+  const fenceRegex = /^(`{3,}|~{3,})([^\n]*)\n([\s\S]*?)\n?\1\s*$/gm;
+
+  let matchIndex = 0;
+  let result = content;
+  let found = false;
+
+  result = content.replace(fenceRegex, (match, fence, langTag, _body) => {
+    if (matchIndex !== index) {
+      matchIndex++;
+      return match;
+    }
+    found = true;
+    matchIndex++;
+    const newLang = language !== undefined ? language : langTag;
+    const newBodyNormalized = newBody.endsWith("\n") ? newBody.slice(0, -1) : newBody;
+    return `${fence}${newLang}\n${newBodyNormalized}\n${fence}`;
+  });
+
+  return { content: result, count: found ? 1 : 0 };
+}
+
+/**
  * Parse frontmatter from markdown content
  *
  * @param content - The markdown content
@@ -3419,6 +3467,10 @@ export async function applySinglePatch(
         `Plugin operation requires a plugin registry. Use applyPatchesWithPlugins() instead of applySinglePatch().`,
       );
 
+    case "replace-code-block":
+      result = applyReplaceCodeBlock(content, patch.index, patch.content, patch.language);
+      break;
+
     case "copy-file":
     case "rename-file":
     case "delete-file":
@@ -3687,6 +3739,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `update-toc (marker='${patch.marker ?? "<!-- TOC -->"}')`;
     case "replace-in-section":
       return `replace-in-section id='${patch.id}' '${patch.old}' → '${patch.new}'`;
+    case "replace-code-block":
+      return `replace-code-block index=${patch.index}${patch.language ? ` language=${patch.language}` : ""}`;
     case "prepend-to-file":
       return "prepend-to-file";
     case "append-to-file":

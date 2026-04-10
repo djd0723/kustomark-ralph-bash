@@ -626,6 +626,26 @@ Replaces text within a specific markdown section only.
 
 Like \`replace\`, but only affects the content of the specified section.`,
 
+  "replace-code-block": `# replace-code-block
+
+Replaces the content (and optionally the language tag) of a fenced code block.
+
+**Fields:**
+- \`index\` (number, required): Zero-based index of the fenced code block to replace
+- \`content\` (string, required): New body content for the code block (without the fences)
+- \`language\` (string, optional): Change the language tag on the opening fence
+
+**Example:**
+\`\`\`yaml
+- op: replace-code-block
+  index: 0
+  content: |
+    console.log('updated');
+  language: typescript
+\`\`\`
+
+Supports both backtick (\`\`\`) and tilde (~~~) fences. Use \`language\` only when you also want to change the syntax highlighting tag.`,
+
   "prepend-to-file": `# prepend-to-file
 
 Inserts content at the very beginning of a file.

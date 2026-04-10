@@ -96,6 +96,26 @@ type TableChange =
   | TableColumnAdded
   | TableColumnRemoved;
 
+/** A fenced code block */
+interface CodeBlock {
+  index: number;
+  language: string;
+  body: string;
+}
+
+/** A code block whose content changed */
+type CodeBlockChanged = {
+  blockIndex: number;
+  type: "content-changed";
+  oldBody: string;
+  newBody: string;
+  oldLanguage: string;
+  newLanguage: string;
+};
+
+/** A code block change event */
+type CodeBlockChange = CodeBlockChanged;
+
 /**
  * Analysis of differences between source and target content
  */
@@ -134,6 +154,8 @@ export interface DiffAnalysis {
   linkChanges: Array<LinkChange>;
   /** Changes detected in markdown tables */
   tableChanges: Array<TableChange>;
+  /** Changes detected in fenced code blocks */
+  codeBlockChanges: Array<CodeBlockChange>;
   /** Parsed sections from the target document (for anchor resolution) */
   targetSections: MarkdownSection[];
 }
@@ -172,6 +194,7 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
     listChanges: [],
     linkChanges: [],
     tableChanges: [],
+    codeBlockChanges: [],
     targetSections: [],
   };
 
@@ -203,6 +226,9 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
 
   // Analyze table changes
   analysis.tableChanges = analyzeTableChanges(source, target);
+
+  // Analyze code block changes
+  analysis.codeBlockChanges = analyzeCodeBlockChanges(source, target);
 
   // Analyze line-by-line changes using the diff library
   const changes = Diff.diffLines(source, target);
@@ -805,6 +831,67 @@ function analyzeTableChanges(source: string, target: string): TableChange[] {
 }
 
 /**
+ * Parses fenced code blocks from markdown content.
+ * Supports both backtick (```) and tilde (~~~) fences.
+ */
+function parseCodeBlocks(content: string): CodeBlock[] {
+  const blocks: CodeBlock[] = [];
+  const fenceRegex = /^(`{3,}|~{3,})([^\n]*)\n([\s\S]*?)\n?\1\s*$/gm;
+  let idx = 0;
+  for (const match of content.matchAll(fenceRegex)) {
+    blocks.push({ index: idx++, language: (match[2] ?? "").trim(), body: match[3] ?? "" });
+  }
+  return blocks;
+}
+
+/**
+ * Analyzes code block changes between source and target
+ */
+function analyzeCodeBlockChanges(source: string, target: string): CodeBlockChange[] {
+  const changes: CodeBlockChange[] = [];
+  const sourceBlocks = parseCodeBlocks(source);
+  const targetBlocks = parseCodeBlocks(target);
+
+  const count = Math.min(sourceBlocks.length, targetBlocks.length);
+  for (let i = 0; i < count; i++) {
+    const src = sourceBlocks[i];
+    const tgt = targetBlocks[i];
+    if (!src || !tgt) continue;
+    if (src.body !== tgt.body || src.language !== tgt.language) {
+      changes.push({
+        blockIndex: i,
+        type: "content-changed",
+        oldBody: src.body,
+        newBody: tgt.body,
+        oldLanguage: src.language,
+        newLanguage: tgt.language,
+      });
+    }
+  }
+
+  return changes;
+}
+
+/**
+ * Suggests code block patches
+ */
+function suggestCodeBlockPatches(analysis: DiffAnalysis): PatchOperation[] {
+  const patches: PatchOperation[] = [];
+
+  for (const change of analysis.codeBlockChanges) {
+    const patch: PatchOperation = {
+      op: "replace-code-block",
+      index: change.blockIndex,
+      content: change.newBody,
+      ...(change.newLanguage !== change.oldLanguage ? { language: change.newLanguage } : {}),
+    };
+    patches.push(patch);
+  }
+
+  return patches;
+}
+
+/**
  * Suggests table-related patches
  */
 function suggestTablePatches(analysis: DiffAnalysis): PatchOperation[] {
@@ -884,6 +971,9 @@ export function suggestPatches(source: string, target: string): PatchOperation[]
 
   // Suggest table patches
   patches.push(...suggestTablePatches(analysis));
+
+  // Suggest code block patches
+  patches.push(...suggestCodeBlockPatches(analysis));
 
   // Suggest line-based patches
   patches.push(...suggestLinePatches(analysis, source, target));
@@ -1369,6 +1459,11 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     score = 0.9;
   }
 
+  // Code block operations are high confidence (structurally precise)
+  if (patch.op === "replace-code-block") {
+    score = 0.9;
+  }
+
   // Line operations are lower confidence
   if (
     patch.op === "replace-line" ||
@@ -1444,6 +1539,9 @@ function describePatch(patch: PatchOperation): string {
 
     case "remove-table-column":
       return `Remove column "${patch.column}" from table ${patch.table}`;
+
+    case "replace-code-block":
+      return `Replace code block ${patch.index}${patch.language ? ` (language: ${patch.language})` : ""}`;
 
     default:
       return `Apply ${patch.op} operation`;

@@ -758,6 +758,19 @@ export interface ReplaceInSectionPatch extends PatchCommonFields {
 }
 
 /**
+ * Replace-code-block patch operation - replaces the content of a fenced code block
+ */
+export interface ReplaceCodeBlockPatch extends PatchCommonFields {
+  op: "replace-code-block";
+  /** Zero-based index of the fenced code block to replace */
+  index: number;
+  /** New content for the code block body (without the fences) */
+  content: string;
+  /** Optional: change the language tag on the opening fence */
+  language?: string;
+}
+
+/**
  * Union type of all supported patch operations
  */
 export type PatchOperation =
@@ -810,7 +823,8 @@ export type PatchOperation =
   | UpdateTocPatch
   | ReplaceInSectionPatch
   | PrependToFilePatch
-  | AppendToFilePatch;
+  | AppendToFilePatch
+  | ReplaceCodeBlockPatch;
 
 /**
  * Global validator configuration

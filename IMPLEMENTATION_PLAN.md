@@ -1,10 +1,35 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (replace-code-block & Suggest Code Block Detection - COMPLETE!):**
+
+* ✅ **New `replace-code-block` patch operation**: Replaces the body (and optionally the language tag) of the Nth fenced code block (0-based index). Supports both backtick (```) and tilde (~~~) fences.
+* ✅ **`suggest` command now detects code block changes**: When a fenced code block's content or language tag changes between source and target, generates a `replace-code-block` patch instead of falling back to generic `replace` ops.
+* ✅ **High confidence scoring**: Code block patches scored at 0.9 (same as section, list, link, and table ops).
+* ✅ **Full LSP integration**: `replace-code-block` added to completion (51 ops total), field completions (`index`, `content`, `language`), and hover documentation.
+* ✅ **Full config validation**: `index` (required non-negative integer), `content` (required string), `language` (optional string) — with proper error messages.
+* ✅ **24 new tests**: 15 unit tests for `applyReplaceCodeBlock` and `validateConfig`, 9 tests in `patch-suggester.test.ts` covering `analyzeDiff`, `suggestPatches`, `scorePatches`, `describePatch`, tilde fences, multiple blocks, identical content (no false positives).
+* ✅ **4,015 tests passing**: Up from 3,991.
+
+**Files modified/created:**
+* `src/core/types.ts` — Added `ReplaceCodeBlockPatch` interface; added to `PatchOperation` union
+* `src/core/config-parser.ts` — Added `"replace-code-block"` to `validOps`; added field validation
+* `src/core/patch-engine.ts` — Implemented `applyReplaceCodeBlock`; added case in `applySinglePatch` and `getPatchDescription`
+* `src/core/patch-suggester.ts` — Added `CodeBlock`/`CodeBlockChange` types; `codeBlockChanges` in `DiffAnalysis`; `parseCodeBlocks`, `analyzeCodeBlockChanges`, `suggestCodeBlockPatches`; updated `calculatePatchScore` and `describePatch`
+* `src/lsp/completion.ts` — Added `replace-code-block` entry and field completions
+* `src/lsp/hover.ts` — Added hover docs for `replace-code-block`
+* `tests/core/replace-code-block.test.ts` — New test file (15 tests)
+* `tests/core/patch-suggester.test.ts` — 9 new tests in `code block change detection` suite
+* `tests/lsp/completion.test.ts` — Updated count assertions (50 → 51); added to `allOperations`
+
+**Status:** replace-code-block COMPLETE! ✅
+
+***
 
 **2026-04-09 (Suggest Table Op Detection - COMPLETE!):**
 

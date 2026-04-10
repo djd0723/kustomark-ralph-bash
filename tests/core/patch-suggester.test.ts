@@ -1748,5 +1748,179 @@ Upgrade to 2.0.0 today`;
       }
     });
   });
+
+  describe("code block change detection", () => {
+    const CODE_SOURCE = [
+      "Some intro text.",
+      "",
+      "```javascript",
+      "console.log('hello');",
+      "```",
+      "",
+      "More text.",
+    ].join("\n");
+
+    test("detects code block content change", () => {
+      const target = [
+        "Some intro text.",
+        "",
+        "```javascript",
+        "console.log('world');",
+        "```",
+        "",
+        "More text.",
+      ].join("\n");
+
+      const analysis = analyzeDiff(CODE_SOURCE, target);
+
+      expect(analysis.codeBlockChanges.length).toBe(1);
+      const change = analysis.codeBlockChanges[0];
+      expect(change?.type).toBe("content-changed");
+      expect(change?.blockIndex).toBe(0);
+      expect(change?.type === "content-changed" && change.oldBody).toBe("console.log('hello');");
+      expect(change?.type === "content-changed" && change.newBody).toBe("console.log('world');");
+    });
+
+    test("detects language tag change", () => {
+      const target = [
+        "Some intro text.",
+        "",
+        "```typescript",
+        "console.log('hello');",
+        "```",
+        "",
+        "More text.",
+      ].join("\n");
+
+      const analysis = analyzeDiff(CODE_SOURCE, target);
+
+      expect(analysis.codeBlockChanges.length).toBe(1);
+      const change = analysis.codeBlockChanges[0];
+      expect(change?.type === "content-changed" && change.oldLanguage).toBe("javascript");
+      expect(change?.type === "content-changed" && change.newLanguage).toBe("typescript");
+    });
+
+    test("no changes when code blocks are identical", () => {
+      const analysis = analyzeDiff(CODE_SOURCE, CODE_SOURCE);
+      expect(analysis.codeBlockChanges.length).toBe(0);
+    });
+
+    test("suggestPatches generates replace-code-block for changed block", () => {
+      const target = [
+        "Some intro text.",
+        "",
+        "```javascript",
+        "console.log('updated');",
+        "```",
+        "",
+        "More text.",
+      ].join("\n");
+
+      const patches = suggestPatches(CODE_SOURCE, target);
+      const codeBlockPatch = patches.find((p) => p.op === "replace-code-block");
+
+      expect(codeBlockPatch).toBeDefined();
+      expect(codeBlockPatch?.op === "replace-code-block" && codeBlockPatch.index).toBe(0);
+      expect(codeBlockPatch?.op === "replace-code-block" && codeBlockPatch.content).toBe(
+        "console.log('updated');",
+      );
+    });
+
+    test("suggestPatches includes language field when language changes", () => {
+      const target = [
+        "Some intro text.",
+        "",
+        "```typescript",
+        "console.log('hello');",
+        "```",
+        "",
+        "More text.",
+      ].join("\n");
+
+      const patches = suggestPatches(CODE_SOURCE, target);
+      const codeBlockPatch = patches.find((p) => p.op === "replace-code-block");
+
+      expect(codeBlockPatch).toBeDefined();
+      expect(codeBlockPatch?.op === "replace-code-block" && codeBlockPatch.language).toBe(
+        "typescript",
+      );
+    });
+
+    test("handles multiple code blocks independently", () => {
+      const source = [
+        "```js",
+        "const a = 1;",
+        "```",
+        "",
+        "```python",
+        "x = 1",
+        "```",
+      ].join("\n");
+
+      const target = [
+        "```js",
+        "const a = 2;",
+        "```",
+        "",
+        "```python",
+        "x = 1",
+        "```",
+      ].join("\n");
+
+      const analysis = analyzeDiff(source, target);
+
+      expect(analysis.codeBlockChanges.length).toBe(1);
+      expect(analysis.codeBlockChanges[0]?.blockIndex).toBe(0);
+    });
+
+    test("scorePatches gives high confidence to replace-code-block", () => {
+      const target = [
+        "Some intro text.",
+        "",
+        "```javascript",
+        "console.log('scored');",
+        "```",
+        "",
+        "More text.",
+      ].join("\n");
+
+      const patches = suggestPatches(CODE_SOURCE, target);
+      const scored = scorePatches(patches, CODE_SOURCE, target);
+      const codeBlockScored = scored.find((s) => s.patch.op === "replace-code-block");
+
+      expect(codeBlockScored).toBeDefined();
+      expect(codeBlockScored?.score).toBe(0.9);
+    });
+
+    test("describePatch returns human-readable description for replace-code-block", () => {
+      const target = [
+        "Some intro text.",
+        "",
+        "```typescript",
+        "console.log('desc');",
+        "```",
+        "",
+        "More text.",
+      ].join("\n");
+
+      const patches = suggestPatches(CODE_SOURCE, target);
+      const scored = scorePatches(patches, CODE_SOURCE, target);
+      const codeBlockScored = scored.find((s) => s.patch.op === "replace-code-block");
+
+      expect(codeBlockScored).toBeDefined();
+      expect(codeBlockScored?.description).toContain("code block");
+      expect(codeBlockScored?.description).toContain("0");
+    });
+
+    test("detects tilde-fenced code blocks", () => {
+      const source = ["~~~bash", "echo hello", "~~~"].join("\n");
+      const target = ["~~~bash", "echo world", "~~~"].join("\n");
+
+      const analysis = analyzeDiff(source, target);
+
+      expect(analysis.codeBlockChanges.length).toBe(1);
+      expect(analysis.codeBlockChanges[0]?.type).toBe("content-changed");
+    });
+  });
 });
 

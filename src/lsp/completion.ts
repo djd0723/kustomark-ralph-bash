@@ -644,6 +644,14 @@ export class CompletionProvider {
         insertText: "replace-in-section",
       },
       {
+        label: "replace-code-block",
+        kind: CompletionItemKind.Value,
+        detail: "Replace a fenced code block by index",
+        documentation:
+          "Replaces the content (and optionally the language tag) of the Nth fenced code block (0-based). Supports both backtick and tilde fences.",
+        insertText: "replace-code-block",
+      },
+      {
         label: "prepend-to-file",
         kind: CompletionItemKind.Value,
         detail: "Add content to the beginning of a file",
@@ -1379,6 +1387,29 @@ export class CompletionProvider {
           detail: "Replacement text",
           documentation: "Text to replace with",
           insertText: "new: ",
+        },
+      ],
+      "replace-code-block": [
+        {
+          label: "index",
+          kind: CompletionItemKind.Field,
+          detail: "Code block index (0-based)",
+          documentation: "Zero-based index of the fenced code block to replace",
+          insertText: "index: ",
+        },
+        {
+          label: "content",
+          kind: CompletionItemKind.Field,
+          detail: "New code block body",
+          documentation: "New content for the code block body (without the fences)",
+          insertText: "content: |",
+        },
+        {
+          label: "language",
+          kind: CompletionItemKind.Field,
+          detail: "Language tag (optional)",
+          documentation: "Change the language tag on the opening fence (e.g. typescript, bash)",
+          insertText: "language: ",
         },
       ],
       "prepend-to-file": [

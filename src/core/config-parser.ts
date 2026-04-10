@@ -757,6 +757,7 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "replace-in-section",
     "prepend-to-file",
     "append-to-file",
+    "replace-code-block",
   ];
 
   if (!validOps.includes(p.op as string)) {
@@ -1681,6 +1682,30 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         errors.push({
           field: `${prefix}.content`,
           message: "'content' is required and must be a string",
+        });
+      }
+      break;
+    }
+
+    case "replace-code-block": {
+      const idx = (p as Record<string, unknown>).index;
+      if (typeof idx !== "number" || !Number.isInteger(idx) || idx < 0) {
+        errors.push({
+          field: `${prefix}.index`,
+          message: "'index' is required and must be a non-negative integer",
+        });
+      }
+      if (typeof (p as Record<string, unknown>).content !== "string") {
+        errors.push({
+          field: `${prefix}.content`,
+          message: "'content' is required and must be a string",
+        });
+      }
+      const lang = (p as Record<string, unknown>).language;
+      if (lang !== undefined && typeof lang !== "string") {
+        errors.push({
+          field: `${prefix}.language`,
+          message: "'language' must be a string",
         });
       }
       break;

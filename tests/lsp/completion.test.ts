@@ -347,7 +347,7 @@ patches:
       expect(labels).toContain('json-delete');
       expect(labels).toContain('json-merge');
 
-      expect(labels).toHaveLength(50);
+      expect(labels).toHaveLength(51);
     });
 
     test('provides operations with partial input', () => {
@@ -644,7 +644,7 @@ patches:
       const labels = getLabels(completions);
 
       expect(labels).toContain('replace');
-      expect(labels.length).toBe(50); // All 50 operations
+      expect(labels.length).toBe(51); // All 51 operations
     });
 
     test('handles position at end of line with onNoMatch field', () => {
@@ -726,7 +726,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide completions for client filtering
-      expect(completions.length).toBe(50);
+      expect(completions.length).toBe(51);
     });
 
     test('returns empty array for unknown context', () => {
@@ -766,7 +766,7 @@ resources:
 
       const completions = provider.provideCompletions(doc, position);
 
-      expect(completions.length).toBe(50);
+      expect(completions.length).toBe(51);
     });
 
     test('triggers completions mid-line with indentation', () => {
@@ -792,8 +792,8 @@ resources:
         const position = createPosition(1, char);
         const completions = provider.provideCompletions(doc, position);
 
-        // Should get operation completions (all 50)
-        expect(completions.length).toBe(50);
+        // Should get operation completions (all 51)
+        expect(completions.length).toBe(51);
       }
     });
   });
@@ -1063,7 +1063,7 @@ patches:
       const completions = provider.provideCompletions(doc, position);
 
       // Should still provide operation completions
-      expect(completions.length).toBe(50);
+      expect(completions.length).toBe(51);
     });
 
     test('handles cursor at document end', () => {
@@ -1169,6 +1169,7 @@ onNoMatch:`;
       'modify-links',
       'update-toc',
       'replace-in-section',
+      'replace-code-block',
       'prepend-to-file',
       'append-to-file',
       'replace-table-cell',
