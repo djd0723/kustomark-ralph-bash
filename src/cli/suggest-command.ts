@@ -4,10 +4,10 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import * as yaml from "js-yaml";
 import type { ScoredPatch } from "../core/patch-suggester.js";
-import { scorePatches, suggestPatches } from "../core/patch-suggester.js";
+import { scorePatches, suggestJsonPatches, suggestPatches } from "../core/patch-suggester.js";
 import type { KustomarkConfig, PatchOperation } from "../core/types.js";
 import { createProgressReporter } from "./progress.js";
 
@@ -55,10 +55,20 @@ interface FilePair {
 // File Discovery Functions
 // ============================================================================
 
+const SUPPORTED_EXTENSIONS = new Set([".md", ".json", ".yaml", ".yml"]);
+
+function isSupportedFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  for (const ext of SUPPORTED_EXTENSIONS) {
+    if (lower.endsWith(ext)) return true;
+  }
+  return false;
+}
+
 /**
- * Recursively find all markdown files in a directory
+ * Recursively find all supported files (markdown, JSON, YAML) in a directory
  */
-function findMarkdownFiles(dir: string): string[] {
+function findSupportedFiles(dir: string): string[] {
   const files: string[] = [];
 
   if (!existsSync(dir)) {
@@ -75,8 +85,8 @@ function findMarkdownFiles(dir: string): string[] {
       if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "output") {
         continue;
       }
-      files.push(...findMarkdownFiles(fullPath));
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      files.push(...findSupportedFiles(fullPath));
+    } else if (entry.isFile() && isSupportedFile(entry.name)) {
       files.push(fullPath);
     }
   }
@@ -112,8 +122,8 @@ function matchFiles(sourcePath: string, targetPath: string): MatchResult {
     });
   } else if (sourceIsDir && targetIsDir) {
     // Both are directories - match files by relative path
-    const sourceFiles = findMarkdownFiles(sourcePath);
-    const targetFiles = findMarkdownFiles(targetPath);
+    const sourceFiles = findSupportedFiles(sourcePath);
+    const targetFiles = findSupportedFiles(targetPath);
 
     // Build maps of relative paths for both sides
     const sourceMap = new Map<string, string>();
@@ -331,8 +341,12 @@ function analyzeFilePairs(
         continue;
       }
 
-      // Suggest patches for this file pair
-      const rawPatches = suggestPatches(sourceContent, targetContent);
+      // Suggest patches for this file pair — dispatch by extension
+      const fileExt = extname(pair.sourcePath).toLowerCase();
+      const isJsonYaml = fileExt === ".json" || fileExt === ".yaml" || fileExt === ".yml";
+      const rawPatches = isJsonYaml
+        ? suggestJsonPatches(sourceContent, targetContent, fileExt)
+        : suggestPatches(sourceContent, targetContent);
 
       // Always score patches for confidence tracking
       let scored = scorePatches(rawPatches, sourceContent, targetContent);

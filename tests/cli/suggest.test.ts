@@ -1164,4 +1164,217 @@ More updated content.`;
     expect(result).toMatch(/\[\d+%\]/);
     expect(result).toContain("Patch confidence scores:");
   });
+
+  // ============================================================================
+  // JSON/YAML file suggestion tests
+  // ============================================================================
+
+  describe("JSON/YAML file support", () => {
+    test("suggests json-set for changed JSON value", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(sourceFile, JSON.stringify({ name: "kustomark", version: "1.0.0" }));
+      writeFileSync(targetFile, JSON.stringify({ name: "kustomark", version: "2.0.0" }));
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("version");
+      expect(patch.value).toBe("2.0.0");
+    });
+
+    test("suggests json-delete for removed JSON key", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(sourceFile, JSON.stringify({ name: "kustomark", debug: true }));
+      writeFileSync(targetFile, JSON.stringify({ name: "kustomark" }));
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-delete");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("debug");
+    });
+
+    test("suggests json-set for added JSON key", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(sourceFile, JSON.stringify({ name: "kustomark" }));
+      writeFileSync(targetFile, JSON.stringify({ name: "kustomark", port: 8080 }));
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("port");
+      expect(patch.value).toBe(8080);
+    });
+
+    test("suggests nested json-set using dot notation", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(
+        sourceFile,
+        JSON.stringify({ server: { host: "localhost", port: 3000 } }),
+      );
+      writeFileSync(
+        targetFile,
+        JSON.stringify({ server: { host: "example.com", port: 3000 } }),
+      );
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("server.host");
+      expect(patch.value).toBe("example.com");
+    });
+
+    test("produces no patches for identical JSON files", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      const content = JSON.stringify({ name: "kustomark", version: "1.0.0" });
+      writeFileSync(sourceFile, content);
+      writeFileSync(targetFile, content);
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      expect(output.config.patches).toHaveLength(0);
+      expect(output.stats.filesAnalyzed).toBe(0);
+    });
+
+    test("suggests json-set for changed YAML value", () => {
+      const sourceFile = join(testDir, "config.yaml");
+      const targetFile = join(testDir, "config-target.yaml");
+
+      writeFileSync(sourceFile, "name: kustomark\nenabled: false\n");
+      writeFileSync(targetFile, "name: kustomark\nenabled: true\n");
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("enabled");
+      expect(patch.value).toBe(true);
+    });
+
+    test("suggests json-set for changed .yml value", () => {
+      const sourceFile = join(testDir, "config.yml");
+      const targetFile = join(testDir, "config-target.yml");
+
+      writeFileSync(sourceFile, "timeout: 30\nretries: 3\n");
+      writeFileSync(targetFile, "timeout: 60\nretries: 3\n");
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("timeout");
+      expect(patch.value).toBe(60);
+    });
+
+    test("JSON patches score at 0.9", () => {
+      const sourceFile = join(testDir, "config.json");
+      const targetFile = join(testDir, "config-target.json");
+
+      writeFileSync(sourceFile, JSON.stringify({ key: "old" }));
+      writeFileSync(targetFile, JSON.stringify({ key: "new" }));
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      const scored = output.scoredPatches.find((sp: any) => sp.patch.op === "json-set");
+      expect(scored).toBeDefined();
+      expect(scored.score).toBe(0.9);
+    });
+
+    test("discovers and suggests patches for JSON files in directory comparison", () => {
+      const sourceDir = join(testDir, "source");
+      const targetDir = join(testDir, "target");
+      mkdirSync(sourceDir, { recursive: true });
+      mkdirSync(targetDir, { recursive: true });
+
+      writeFileSync(
+        join(sourceDir, "app.json"),
+        JSON.stringify({ version: "1.0.0", env: "dev" }),
+      );
+      writeFileSync(
+        join(targetDir, "app.json"),
+        JSON.stringify({ version: "2.0.0", env: "dev" }),
+      );
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      expect(output.stats.filesAnalyzed).toBe(1);
+      const patch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(patch).toBeDefined();
+      expect(patch.path).toBe("version");
+      expect(patch.value).toBe("2.0.0");
+    });
+
+    test("handles mixed markdown and JSON files in directory comparison", () => {
+      const sourceDir = join(testDir, "source");
+      const targetDir = join(testDir, "target");
+      mkdirSync(sourceDir, { recursive: true });
+      mkdirSync(targetDir, { recursive: true });
+
+      writeFileSync(join(sourceDir, "README.md"), "# Hello\n\nOld content.");
+      writeFileSync(join(targetDir, "README.md"), "# Hello\n\nNew content.");
+      writeFileSync(join(sourceDir, "config.json"), JSON.stringify({ version: "1.0.0" }));
+      writeFileSync(join(targetDir, "config.json"), JSON.stringify({ version: "2.0.0" }));
+
+      const result = execSync(
+        `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+        { encoding: "utf-8" },
+      );
+      const output = JSON.parse(result);
+
+      expect(output.stats.filesAnalyzed).toBe(2);
+      // Should have both markdown patches and JSON patches
+      const jsonPatch = output.config.patches.find((p: any) => p.op === "json-set");
+      expect(jsonPatch).toBeDefined();
+      expect(jsonPatch.path).toBe("version");
+    });
+  });
 });

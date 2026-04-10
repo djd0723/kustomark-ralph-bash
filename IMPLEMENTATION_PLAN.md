@@ -1,8 +1,31 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-10 (suggest JSON/YAML file support - COMPLETE!):**
+
+* ✅ **`suggest` now handles `.json`, `.yaml`, and `.yml` files**: File discovery extended from markdown-only to all three structured data formats. Directory comparisons now match and diff JSON/YAML files alongside `.md` files.
+* ✅ **`suggestJsonPatches(source, target, ext)`**: New exported function in `patch-suggester.ts` that deep-diffs two parsed objects and emits `json-set` for added/changed values and `json-delete` for removed keys. Recurses into nested plain objects; treats arrays as atomic replacements.
+* ✅ **Dot-notation paths**: Nested key changes are emitted with fully-qualified dot-notation paths (e.g. `server.host`) matching the format expected by `json-set`/`json-delete` in the patch engine.
+* ✅ **Extension-based dispatch**: `analyzeFilePairs` detects `.json`/`.yaml`/`.yml` extensions and calls `suggestJsonPatches`; all other files use the existing markdown `suggestPatches`.
+* ✅ **Scoring at 0.9**: `json-set` and `json-delete` patches already scored at 0.9 in `calculatePatchScore` — no changes needed.
+* ✅ **No patches for identical files**: Identical JSON/YAML pairs are skipped (same logic as markdown).
+* ✅ **10 new tests**: `json-set` for changed value, `json-delete` for removed key, `json-set` for added key, nested dot-notation path, identical files produce no patches, YAML changed value, `.yml` changed value, score at 0.9, JSON in directory comparison, mixed markdown+JSON directory comparison.
+* ✅ **4,171 tests passing**: Up from 4,161.
+
+**Files modified:**
+
+* `src/core/patch-suggester.ts` — Added `import * as yaml from "js-yaml"`; added `suggestJsonPatches`, `parseJsonOrYamlForSuggest`, `isPlainRecord`, `jsonDeepEqual`, `collectJsonDiffPatches`.
+* `src/cli/suggest-command.ts` — Added `extname` to path imports; added `suggestJsonPatches` to core import; replaced `findMarkdownFiles` with `findSupportedFiles` (adds `.json`/`.yaml`/`.yml` discovery); added `SUPPORTED_EXTENSIONS`, `isSupportedFile`; updated `matchFiles` to use `findSupportedFiles`; added extension-based dispatch in `analyzeFilePairs`.
+* `tests/cli/suggest.test.ts` — 10 new tests in `JSON/YAML file support` suite.
+
+**Status:** suggest JSON/YAML file support COMPLETE! ✅
+
+***
 
 ## Recent Enhancements
 

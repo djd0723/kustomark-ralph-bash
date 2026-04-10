@@ -6,6 +6,7 @@
  */
 
 import * as Diff from "diff";
+import * as yaml from "js-yaml";
 import { parseLists } from "./list-parser.js";
 import { parseFrontmatter, parseSections } from "./patch-engine.js";
 import { parseTables } from "./table-parser.js";
@@ -2639,6 +2640,86 @@ function describePatch(patch: PatchOperation): string {
 
     case "plugin":
       return `Apply plugin operation "${patch.plugin}"`;
+  }
+}
+
+/**
+ * Suggest patches for a JSON or YAML file by deep-diffing source and target objects.
+ *
+ * Generates `json-set` for added or changed keys and `json-delete` for removed keys.
+ * Recurses into nested plain objects; treats arrays and mixed-type changes as atomic
+ * `json-set` replacements so the patches stay easy to understand and apply.
+ *
+ * @param source - Original file content
+ * @param target - Target file content
+ * @param ext - File extension (e.g. ".json", ".yaml", ".yml")
+ * @returns Array of patch operations describing the diff
+ */
+export function suggestJsonPatches(source: string, target: string, ext: string): PatchOperation[] {
+  let sourceObj: unknown;
+  let targetObj: unknown;
+
+  try {
+    sourceObj = parseJsonOrYamlForSuggest(source, ext);
+    targetObj = parseJsonOrYamlForSuggest(target, ext);
+  } catch {
+    return [];
+  }
+
+  if (!isPlainRecord(sourceObj) || !isPlainRecord(targetObj)) {
+    return [];
+  }
+
+  const patches: PatchOperation[] = [];
+  collectJsonDiffPatches(sourceObj, targetObj, "", patches);
+  return patches;
+}
+
+function parseJsonOrYamlForSuggest(content: string, ext: string): unknown {
+  if (ext === ".json") {
+    return JSON.parse(content) as unknown;
+  }
+  return yaml.load(content);
+}
+
+function isPlainRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
+function jsonDeepEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function collectJsonDiffPatches(
+  source: Record<string, unknown>,
+  target: Record<string, unknown>,
+  prefix: string,
+  patches: PatchOperation[],
+): void {
+  const srcKeys = new Set(Object.keys(source));
+
+  // Deleted keys → json-delete
+  for (const key of srcKeys) {
+    if (!(key in target)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      patches.push({ op: "json-delete", path });
+    }
+  }
+
+  // Added or changed keys → json-set (recurse for nested objects)
+  for (const [key, tgtVal] of Object.entries(target)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+
+    if (!srcKeys.has(key)) {
+      patches.push({ op: "json-set", path, value: tgtVal });
+    } else {
+      const srcVal = source[key];
+      if (isPlainRecord(srcVal) && isPlainRecord(tgtVal)) {
+        collectJsonDiffPatches(srcVal, tgtVal, path, patches);
+      } else if (!jsonDeepEqual(srcVal, tgtVal)) {
+        patches.push({ op: "json-set", path, value: tgtVal });
+      }
+    }
   }
 }
 
