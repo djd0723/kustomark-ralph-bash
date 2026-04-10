@@ -162,6 +162,8 @@ export interface DiffAnalysis {
   codeBlockChanges: Array<CodeBlockChange>;
   /** Parsed sections from the target document (for anchor resolution) */
   targetSections: MarkdownSection[];
+  /** Parsed sections from the source document (for move detection) */
+  sourceSections: MarkdownSection[];
 }
 
 /**
@@ -201,6 +203,7 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
     tableChanges: [],
     codeBlockChanges: [],
     targetSections: [],
+    sourceSections: [],
   };
 
   // Analyze frontmatter changes
@@ -222,6 +225,7 @@ export function analyzeDiff(source: string, target: string): DiffAnalysis {
   const targetSections = parseSections(target);
   analysis.sectionChanges = analyzeSectionChanges(sourceSections, targetSections, source, target);
   analysis.targetSections = targetSections;
+  analysis.sourceSections = sourceSections;
 
   // Analyze list changes
   analysis.listChanges = analyzeListChanges(source, target);
@@ -1010,8 +1014,157 @@ export function suggestPatches(source: string, target: string): PatchOperation[]
   // Suggest between-marker patches
   patches.push(...suggestBetweenPatches(source, target));
 
+  // Suggest move-section patches for reordered sections
+  patches.push(...suggestMoveSectionPatches(analysis, source, target));
+
   // Suggest line-based patches
   patches.push(...suggestLinePatches(analysis, source, target));
+
+  return patches;
+}
+
+/**
+ * Computes the Longest Common Subsequence of two string arrays.
+ * Returns the elements in the LCS (preserving the order from `a`).
+ */
+function computeLCS(a: string[], b: string[]): string[] {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const row = dp[i] as number[];
+      const prevRow = dp[i - 1] as number[];
+      if (a[i - 1] === b[j - 1]) {
+        row[j] = (prevRow[j - 1] ?? 0) + 1;
+      } else {
+        row[j] = Math.max(prevRow[j] ?? 0, row[j - 1] ?? 0);
+      }
+    }
+  }
+
+  // Backtrack to reconstruct LCS
+  const lcs: string[] = [];
+  let i = m;
+  let j = n;
+  while (i > 0 && j > 0) {
+    const row = dp[i] as number[];
+    const prevRow = dp[i - 1] as number[];
+    if (a[i - 1] === b[j - 1]) {
+      lcs.unshift(a[i - 1] as string);
+      i--;
+      j--;
+    } else if ((prevRow[j] ?? 0) > (row[j - 1] ?? 0)) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+
+  return lcs;
+}
+
+/**
+ * Extracts the core content of a section (header line + body) from raw document lines,
+ * trimmed of trailing blank lines that are just separator whitespace to the next section.
+ */
+function extractSectionCoreContent(lines: string[], startLine: number, endLine: number): string {
+  const sectionLines = lines.slice(startLine, endLine);
+  // Drop trailing blank lines — they're positional separators, not real content
+  while (sectionLines.length > 0 && sectionLines[sectionLines.length - 1]?.trim() === "") {
+    sectionLines.pop();
+  }
+  return sectionLines.join("\n");
+}
+
+/**
+ * Detects section reordering between source and target and suggests move-section patches.
+ *
+ * Uses the Longest Common Subsequence of section IDs to identify which sections
+ * are already in the correct relative order (the "stable" set). Sections outside
+ * the LCS are the ones that moved; for each, a `move-section` patch is generated
+ * using the preceding section in the target as the anchor.
+ *
+ * Only considers sections that exist in both source and target and have NOT been
+ * significantly modified. Content comparison trims trailing blank lines to avoid
+ * false positives when a section moves to/from the end of the document.
+ */
+function suggestMoveSectionPatches(
+  analysis: DiffAnalysis,
+  source: string,
+  target: string,
+): PatchOperation[] {
+  const patches: PatchOperation[] = [];
+
+  // IDs removed or added wholesale — these are not moves.
+  const removedOrAdded = new Set(
+    analysis.sectionChanges
+      .filter((c) => c.type === "removed" || c.type === "added")
+      .map((c) => c.sectionId),
+  );
+
+  const sourceLines = source.split("\n");
+  const targetLines = target.split("\n");
+
+  // Build maps from id → section for direct content lookup.
+  const sourceMap = new Map(analysis.sourceSections.map((s) => [s.id, s]));
+  const targetMap = new Map(analysis.targetSections.map((s) => [s.id, s]));
+
+  const sourceIds = analysis.sourceSections.map((s) => s.id);
+  const targetIds = analysis.targetSections.map((s) => s.id);
+  const targetIdSet = new Set(targetIds);
+
+  // Only consider sections present in both docs and not removed/added wholesale.
+  // For each candidate, compare trimmed core content to distinguish a pure move
+  // (same content, different position) from a move+edit (both position and content changed).
+  const contentUnchanged = new Set<string>();
+  for (const id of sourceIds) {
+    if (!targetIdSet.has(id) || removedOrAdded.has(id)) continue;
+    const src = sourceMap.get(id);
+    const tgt = targetMap.get(id);
+    if (!src || !tgt) continue;
+    const srcContent = extractSectionCoreContent(sourceLines, src.startLine, src.endLine);
+    const tgtContent = extractSectionCoreContent(targetLines, tgt.startLine, tgt.endLine);
+    if (srcContent === tgtContent) {
+      contentUnchanged.add(id);
+    }
+  }
+
+  const sourceOrder = sourceIds.filter((id) => contentUnchanged.has(id));
+  const targetOrder = targetIds.filter((id) => contentUnchanged.has(id));
+
+  // Fast-path: same relative order, nothing to do.
+  if (sourceOrder.join(",") === targetOrder.join(",")) {
+    return [];
+  }
+
+  // The LCS gives us the largest set of sections that are already in the correct
+  // relative order — we call these "stable". Everything else needs to move.
+  const stable = new Set(computeLCS(sourceOrder, targetOrder));
+
+  for (let i = 0; i < targetOrder.length; i++) {
+    const sectionId = targetOrder[i];
+    if (sectionId === undefined || stable.has(sectionId)) continue;
+
+    // Find the nearest preceding section in the target that is a common section.
+    // Using the immediately preceding entry in targetOrder is correct because by
+    // the time a move patch is applied, earlier-position patches will already have
+    // executed (patches are applied in order).
+    if (i > 0) {
+      const afterId = targetOrder[i - 1];
+      if (afterId !== undefined) {
+        patches.push({
+          op: "move-section",
+          id: sectionId,
+          after: afterId,
+        });
+      }
+    }
+    // When i === 0 the section needs to become the first section. The move-section
+    // op only supports "after", so we skip this case; the section will stay put and
+    // the surrounding sections will be repositioned by their own patches.
+  }
 
   return patches;
 }
@@ -1653,7 +1806,8 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     patch.op === "replace-section" ||
     patch.op === "rename-header" ||
     patch.op === "insert-section" ||
-    patch.op === "change-section-level"
+    patch.op === "change-section-level" ||
+    patch.op === "move-section"
   ) {
     score = 0.9;
   }
@@ -1747,6 +1901,9 @@ function describePatch(patch: PatchOperation): string {
 
     case "change-section-level":
       return `Change section "${patch.id}" level by ${patch.delta > 0 ? "+" : ""}${patch.delta}`;
+
+    case "move-section":
+      return `Move section "${patch.id}" after section "${patch.after}"`;
 
     case "set-frontmatter":
       return `Set frontmatter field "${patch.key}"`;

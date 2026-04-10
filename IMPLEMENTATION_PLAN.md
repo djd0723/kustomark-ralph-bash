@@ -1,8 +1,29 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-09 (suggest move-section - COMPLETE!):**
+
+* ✅ **`suggest` now detects section reordering**: When sections exist in both source and target but appear in a different relative order (and content is unchanged), the command generates `move-section` patches instead of silently producing no patches.
+* ✅ **LCS-based minimal patch set**: Uses the Longest Common Subsequence of section IDs to find the "stable" set (sections already in correct relative order). Only sections outside the LCS get `move-section` patches, minimising the number of operations generated.
+* ✅ **Trailing-whitespace-aware content comparison**: Sections that move to/from the last position in a document gain/lose a trailing blank line in the raw slice. `extractSectionCoreContent` strips these positional separators before comparing, preventing false "modified" detections.
+* ✅ **`sourceSections` added to `DiffAnalysis`**: New field stores the parsed source sections alongside the existing `targetSections`, making both orderings available without re-parsing.
+* ✅ **Scoring**: `move-section` scores 0.9 (same as other deterministic section ops).
+* ✅ **`describePatch` coverage**: Added human-readable description: `Move section "X" after section "Y"`.
+* ✅ **10 new tests**: adjacent swap, single section moved to end, no-op (identical order), single-section file, modified-section exclusion, three-section rotation, `analyzeDiff` populates `sourceSections`, scoring at 0.9, `describePatch`, and first-position edge case.
+* ✅ **4,059 tests passing**: Up from 4,049.
+
+**Files modified:**
+* `src/core/patch-suggester.ts` — Added `sourceSections` to `DiffAnalysis`; populated in `analyzeDiff`; added `computeLCS`, `extractSectionCoreContent`, `suggestMoveSectionPatches`; wired into `suggestPatches`; added `move-section` to scoring and `describePatch`
+* `tests/core/patch-suggester.test.ts` — 10 new tests in `move-section detection` suite
+
+**Status:** suggest move-section COMPLETE! ✅
+
+***
 
 ## Recent Enhancements
 

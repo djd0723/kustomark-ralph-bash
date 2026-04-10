@@ -2372,5 +2372,138 @@ Upgrade to 2.0.0 today`;
       expect(levelScored?.description).toContain("+1");
     });
   });
+
+  describe("move-section detection", () => {
+    test("detects swap of two adjacent sections", () => {
+      const source = "# Alpha\n\nA content.\n\n# Beta\n\nB content.";
+      const target = "# Beta\n\nB content.\n\n# Alpha\n\nA content.";
+
+      const patches = suggestPatches(source, target);
+      const movePatch = patches.find((p) => p.op === "move-section");
+      expect(movePatch).toBeDefined();
+      if (movePatch?.op === "move-section") {
+        expect(movePatch.id).toBe("alpha");
+        expect(movePatch.after).toBe("beta");
+      }
+    });
+
+    test("detects single section moved to end", () => {
+      const source =
+        "# Overview\n\nOverview.\n\n# Setup\n\nSetup.\n\n# Usage\n\nUsage.";
+      const target =
+        "# Setup\n\nSetup.\n\n# Usage\n\nUsage.\n\n# Overview\n\nOverview.";
+
+      const patches = suggestPatches(source, target);
+      const movePatches = patches.filter((p) => p.op === "move-section");
+      expect(movePatches.length).toBeGreaterThan(0);
+      // Overview should end up after Usage
+      const overviewMove = movePatches.find(
+        (p) => p.op === "move-section" && p.id === "overview",
+      );
+      expect(overviewMove).toBeDefined();
+      if (overviewMove?.op === "move-section") {
+        expect(overviewMove.after).toBe("usage");
+      }
+    });
+
+    test("does not suggest move-section when order is unchanged", () => {
+      const source = "# Alpha\n\nA content.\n\n# Beta\n\nB content.";
+      const target = "# Alpha\n\nA content.\n\n# Beta\n\nB content.";
+
+      const patches = suggestPatches(source, target);
+      const movePatches = patches.filter((p) => p.op === "move-section");
+      expect(movePatches.length).toBe(0);
+    });
+
+    test("does not suggest move-section for single section", () => {
+      const source = "# Intro\n\nIntro content.";
+      const target = "# Intro\n\nIntro content.";
+
+      const patches = suggestPatches(source, target);
+      const movePatches = patches.filter((p) => p.op === "move-section");
+      expect(movePatches.length).toBe(0);
+    });
+
+    test("does not suggest move-section for modified sections", () => {
+      // Section content changed significantly — should NOT be a move
+      const source = "# Alpha\n\nOriginal alpha content.\n\n# Beta\n\nBeta content.";
+      const target = "# Beta\n\nBeta content.\n\n# Alpha\n\nCompletely rewritten content with many new lines.\nAnd more lines.\nEven more lines.";
+
+      const patches = suggestPatches(source, target);
+      // modified sections should not generate move-section patches
+      const movePatches = patches.filter((p) => p.op === "move-section");
+      // The alpha section was modified (>50% lines changed), so it shouldn't be
+      // treated as a pure move
+      expect(movePatches.length).toBe(0);
+    });
+
+    test("handles three-section reorder (rotation)", () => {
+      const source =
+        "# One\n\nContent one.\n\n# Two\n\nContent two.\n\n# Three\n\nContent three.";
+      const target =
+        "# Two\n\nContent two.\n\n# Three\n\nContent three.\n\n# One\n\nContent one.";
+
+      const patches = suggestPatches(source, target);
+      const movePatches = patches.filter((p) => p.op === "move-section");
+      expect(movePatches.length).toBeGreaterThan(0);
+      // One should be moved after Three
+      const oneMove = movePatches.find(
+        (p) => p.op === "move-section" && p.id === "one",
+      );
+      expect(oneMove).toBeDefined();
+      if (oneMove?.op === "move-section") {
+        expect(oneMove.after).toBe("three");
+      }
+    });
+
+    test("analyzeDiff populates sourceSections", () => {
+      const source = "# Alpha\n\nA content.\n\n# Beta\n\nB content.";
+      const target = "# Beta\n\nB content.\n\n# Alpha\n\nA content.";
+
+      const analysis = analyzeDiff(source, target);
+      expect(analysis.sourceSections.length).toBe(2);
+      expect(analysis.sourceSections[0]?.id).toBe("alpha");
+      expect(analysis.sourceSections[1]?.id).toBe("beta");
+    });
+
+    test("scorePatches gives score 0.9 to move-section", () => {
+      const source = "# Alpha\n\nA content.\n\n# Beta\n\nB content.";
+      const target = "# Beta\n\nB content.\n\n# Alpha\n\nA content.";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const moveScored = scored.find((s) => s.patch.op === "move-section");
+      expect(moveScored).toBeDefined();
+      expect(moveScored?.score).toBe(0.9);
+    });
+
+    test("describePatch returns human-readable description for move-section", () => {
+      const source = "# Alpha\n\nA content.\n\n# Beta\n\nB content.";
+      const target = "# Beta\n\nB content.\n\n# Alpha\n\nA content.";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const moveScored = scored.find((s) => s.patch.op === "move-section");
+      expect(moveScored?.description).toContain("alpha");
+      expect(moveScored?.description).toContain("beta");
+    });
+
+    test("does not generate move-section when section is already first", () => {
+      // Beta needs to be first, Alpha moved after Beta — only one patch needed
+      const source = "# Alpha\n\nA content.\n\n# Beta\n\nB content.\n\n# Gamma\n\nG content.";
+      const target = "# Beta\n\nB content.\n\n# Alpha\n\nA content.\n\n# Gamma\n\nG content.";
+
+      const patches = suggestPatches(source, target);
+      const movePatches = patches.filter((p) => p.op === "move-section");
+      // Alpha should be moved after Beta; Gamma stays put
+      const alphaMove = movePatches.find(
+        (p) => p.op === "move-section" && p.id === "alpha",
+      );
+      expect(alphaMove).toBeDefined();
+      if (alphaMove?.op === "move-section") {
+        expect(alphaMove.after).toBe("beta");
+      }
+    });
+  });
 });
 
