@@ -1,10 +1,30 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (lint command test coverage - COMPLETE!):**
+
+* ✅ **80 new tests** in `tests/cli/lint.test.ts` covering all lint command functionality:
+  * **`areRedundantPatches` unit tests** (19 tests): all patch types (replace, replace-regex, remove/replace/prepend/append-to-section, set/remove/rename/merge-frontmatter, delete/replace-between, replace-line, insert-after/before-line, move-section, rename-header, change-section-level) — identical params → redundant, different params → not redundant, different op types → never redundant.
+  * **`areOverlappingPatches` unit tests** (14 tests): section ops on same/different ids, frontmatter ops on same/different keys, replace same/different old values, replace-regex same/different patterns, between-marker ops same/different markers, mixed op types.
+  * **`validateRegexPattern` unit tests** (5 tests): valid pattern, valid with flags, invalid pattern returns error message, empty pattern.
+  * **`checkRegexPatternWarnings` unit tests** (7 tests): missing g flag warns, g flag suppresses warning, anchored pattern suppresses warning, `.*` broad-match warns, unused capture groups warn, used groups suppress warning, backreference to nonexistent group warns.
+  * **`checkGlobPatternWarnings` unit tests** (5 tests): `**/*.md` warns, `**/*` warns, absolute path warns, specific relative glob clean, object resource skipped.
+  * **`checkDestructiveOperationWarnings` unit tests** (7 tests): remove-section includeChildren:true warns/false clean, delete-between short markers warns/long markers clean, replace with empty new warns/non-empty clean, non-destructive op clean.
+  * **CLI integration tests** (23 tests): exit codes (0=clean/0=warnings/1=errors), JSON structure (`issues`, `errorCount`, `warningCount`, `infoCount`), redundant patches detected as warnings, overlapping patches as info, unreachable patches (include matches nothing) as warnings, invalid regex → error + exit 1, `--strict` promotes warnings → exit 1 (warningCount preserved), text output at default verbosity shows "No issues found", text output with issues shows "Found N issue(s)" summary, directory path auto-detects kustomark.yaml, missing config → exit 1, invalid YAML config → exit 1, regex missing-g-flag → info issue, broad glob resource → info issue.
+* ✅ **4,389 tests passing**: Up from 4,309.
+
+**Files created:**
+
+* `tests/cli/lint.test.ts` — 80 new tests across 8 describe blocks.
+
+**Status:** lint command test coverage COMPLETE! ✅
+
+***
 
 **2026-04-10 (write-file patch operation - COMPLETE!):**
 
