@@ -691,18 +691,98 @@ Per-patch validation rules to run after applying this patch.
 **Required:** No
 
 **Fields:**
+- \`contains\`: Ensure result includes this string
 - \`notContains\`: Ensure result doesn't contain this string
+- \`matchesRegex\`: Ensure result matches this regex pattern
+- \`notMatchesRegex\`: Ensure result does not match this regex pattern
+- \`frontmatterRequired\`: Ensure result has these frontmatter keys (array of strings)
+- \`minWordCount\`: Minimum number of words in the result (integer)
+- \`maxWordCount\`: Maximum number of words in the result (integer)
+- \`minLineCount\`: Minimum number of lines in the result (integer)
+- \`maxLineCount\`: Maximum number of lines in the result (integer)
 
 **Example:**
 \`\`\`yaml
 - op: replace
-  old: "password123"
-  new: "***"
+  old: "npm install"
+  new: "bun install"
   validate:
-    notContains: "password123"
+    contains: "bun"
+    notMatchesRegex: "npm"
+    minWordCount: 10
 \`\`\`
 
 Validates that the patch was successfully applied.`,
+
+  when: `# when
+
+Apply this patch only when the condition evaluates to true for the current file.
+
+**Type:** condition object
+**Required:** No
+
+**Condition types:**
+
+- \`fileContains\`: Match if file content contains a string
+  \`\`\`yaml
+  when:
+    type: fileContains
+    value: "production"
+  \`\`\`
+
+- \`fileMatches\`: Match if file content matches a regex pattern
+  \`\`\`yaml
+  when:
+    type: fileMatches
+    pattern: "/v\\\\d+\\\\.\\\\d+/"
+  \`\`\`
+
+- \`frontmatterEquals\`: Match if a frontmatter field equals a value
+  \`\`\`yaml
+  when:
+    type: frontmatterEquals
+    key: "status"
+    value: "draft"
+  \`\`\`
+
+- \`frontmatterExists\`: Match if a frontmatter key exists
+  \`\`\`yaml
+  when:
+    type: frontmatterExists
+    key: "tags"
+  \`\`\`
+
+- \`not\`: Negate another condition
+  \`\`\`yaml
+  when:
+    type: not
+    condition:
+      type: fileContains
+      value: "SKIP"
+  \`\`\`
+
+- \`anyOf\`: Match if any sub-condition matches (logical OR)
+  \`\`\`yaml
+  when:
+    type: anyOf
+    conditions:
+      - type: fileContains
+        value: "production"
+      - type: frontmatterEquals
+        key: "env"
+        value: "prod"
+  \`\`\`
+
+- \`allOf\`: Match if all sub-conditions match (logical AND)
+  \`\`\`yaml
+  when:
+    type: allOf
+    conditions:
+      - type: fileContains
+        value: "production"
+      - type: frontmatterExists
+        key: "title"
+  \`\`\``,
 };
 
 /**

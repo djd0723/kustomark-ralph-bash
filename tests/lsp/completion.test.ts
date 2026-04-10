@@ -240,6 +240,25 @@ patches:
       expect(validate?.insertText).toContain('notContains');
     });
 
+    test('provides when field for conditional patches', () => {
+      const content = `patches:
+  -
+    op: replace
+    old: foo
+    new: bar
+    `;
+      const doc = createDocument(content);
+      const position = createPosition(5, 4);
+
+      const completions = provider.provideCompletions(doc, position);
+      const when = completions.find(c => c.label === 'when');
+
+      expect(when).toBeDefined();
+      expect(when?.detail).toContain('Conditional');
+      expect(when?.insertText).toContain('when:');
+      expect(when?.insertText).toContain('fileContains');
+    });
+
     test('provides extends field for patch inheritance', () => {
       const content = `patches:
   -
@@ -1189,7 +1208,7 @@ onNoMatch:`;
       const position = createPosition(6, 4);
 
       const completions = provider.provideCompletions(doc, position);
-      const patchFields = ['op', 'id', 'extends', 'include', 'exclude', 'onNoMatch', 'group', 'validate'];
+      const patchFields = ['op', 'id', 'extends', 'include', 'exclude', 'onNoMatch', 'group', 'validate', 'when'];
 
       for (const field of patchFields) {
         const completion = completions.find(c => c.label === field);

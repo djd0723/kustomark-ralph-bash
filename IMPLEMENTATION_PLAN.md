@@ -1,10 +1,35 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-09 (LSP `when` field + `validate` hover completeness - COMPLETE!):**
+
+* ✅ **`when` field in LSP completions**: Added `when` as a common patch field in `completion.ts` with `fileContains` starter insert text
+* ✅ **`when` field hover documentation**: Full hover doc in `hover.ts` covering all 7 condition types (`fileContains`, `fileMatches`, `frontmatterEquals`, `frontmatterExists`, `not`, `anyOf`, `allOf`) with YAML examples for each
+* ✅ **`validate` hover doc completeness**: Updated from 1 field (`notContains`) to all 9 validator fields (`contains`, `notContains`, `matchesRegex`, `notMatchesRegex`, `frontmatterRequired`, `minWordCount`, `maxWordCount`, `minLineCount`, `maxLineCount`)
+* ✅ **`when` field in common patch fields assertion**: Test at line 1192 of `completion.test.ts` now includes `when`
+* ✅ **New completion test**: `provides when field for conditional patches` — verifies presence, detail, and insertText
+* ✅ **New hover tests**: `provides hover for when field` and extended `provides hover for validate field` — cover all condition types and all 9 validator fields
+* ✅ **3,934 TESTS PASSING**: All tests pass with 0 failures
+* ✅ **Linting clean**: `bun check` passes with no errors
+
+**Details:**
+
+1. **Gap addressed**: The `when` field (conditional patch application) was implemented in the core engine, schema, and config-parser — but had **zero LSP support**. Users writing `when:` blocks in YAML got no autocomplete and no hover docs.
+
+2. **Files modified**
+   * `src/lsp/completion.ts` — Added `when` entry to `commonFields` array (line ~762)
+   * `src/lsp/hover.ts` — Added `when` entry to `PATCH_FIELD_DOCS`; expanded `validate` entry from 1 to 9 fields
+   * `tests/lsp/completion.test.ts` — Added `when` to common-fields assertion; added `provides when field for conditional patches` test
+   * `tests/lsp/hover.test.ts` — Extended `validate` test to check all 9 fields; added `provides hover for when field` test
+
+**Status:** LSP `when` field + `validate` hover completeness COMPLETE! ✅
+
+---
 
 **2026-04-09 (insert-section - COMPLETE!):**
 

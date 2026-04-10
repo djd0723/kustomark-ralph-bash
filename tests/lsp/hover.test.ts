@@ -510,6 +510,33 @@ describe("HoverProvider", () => {
 			expect(value).toContain("# validate");
 			expect(value).toContain("validation rules");
 			expect(value).toContain("notContains");
+			expect(value).toContain("contains");
+			expect(value).toContain("matchesRegex");
+			expect(value).toContain("notMatchesRegex");
+			expect(value).toContain("frontmatterRequired");
+			expect(value).toContain("minWordCount");
+			expect(value).toContain("maxWordCount");
+			expect(value).toContain("minLineCount");
+			expect(value).toContain("maxLineCount");
+		});
+
+		test("provides hover for when field", () => {
+			const content = "  when:\n    type: fileContains\n    value: production";
+			const doc = createMockDocument(content);
+			const position: Position = { line: 0, character: 4 }; // hovering over "when"
+
+			const hover = provider.provideHover(doc, position);
+
+			expect(hover).not.toBeNull();
+			const value = (hover?.contents as { value: string }).value;
+			expect(value).toContain("# when");
+			expect(value).toContain("fileContains");
+			expect(value).toContain("fileMatches");
+			expect(value).toContain("frontmatterEquals");
+			expect(value).toContain("frontmatterExists");
+			expect(value).toContain("not");
+			expect(value).toContain("anyOf");
+			expect(value).toContain("allOf");
 		});
 	});
 

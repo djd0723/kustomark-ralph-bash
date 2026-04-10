@@ -766,6 +766,14 @@ export class CompletionProvider {
         documentation: "Per-patch validation configuration",
         insertText: "validate:\n  notContains: ",
       },
+      {
+        label: "when",
+        kind: CompletionItemKind.Field,
+        detail: "Conditional application",
+        documentation:
+          "Only apply this patch when the condition evaluates to true for the current file",
+        insertText: "when:\n  type: fileContains\n  value: ",
+      },
     ];
 
     // Add operation-specific fields
