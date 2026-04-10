@@ -828,6 +828,23 @@ function suggestStructuralListPatches(
         patches.push({ op: "deduplicate-list-items", list: i, keep: "last" });
         claimedIndices.add(i);
       }
+
+      // Detect filter: multiple removed items all share the same exact text.
+      // Suggests filter-list-items with invert:true (keep items NOT equal to the shared value).
+      if (!claimedIndices.has(i)) {
+        const removedItems = srcItems.filter((item) => !tgtItems.includes(item));
+        if (removedItems.length >= 2) {
+          const firstRemoved = removedItems[0];
+          if (
+            firstRemoved !== undefined &&
+            removedItems.every((item) => item === firstRemoved) &&
+            !tgtItems.includes(firstRemoved)
+          ) {
+            patches.push({ op: "filter-list-items", list: i, match: firstRemoved, invert: true });
+            claimedIndices.add(i);
+          }
+        }
+      }
     }
   }
 
@@ -1200,10 +1217,91 @@ function suggestStructuralTablePatches(
         patches.push({ op: "deduplicate-table-rows", table: i, keep: "last" });
         claimedIndices.add(i);
       }
+
+      // Detect filter-table-rows: multiple rows removed that all share the same value in one column.
+      // Strategy A: all removed rows share a value → filter with invert:true (remove rows matching that value).
+      // Strategy B: all kept rows share a value → filter without invert (keep rows matching that value).
+      if (!claimedIndices.has(i) && arraysEqual(src.headers, tgt.headers)) {
+        const removedRows = src.rows.filter(
+          (srcRow) => !tgt.rows.some((tgtRow) => arraysEqual(srcRow, tgtRow)),
+        );
+        if (removedRows.length >= 2) {
+          const filterResult = detectFilterColumn(src.headers, removedRows, tgt.rows);
+          if (filterResult !== null) {
+            const patch: PatchOperation = filterResult.invert
+              ? {
+                  op: "filter-table-rows",
+                  table: i,
+                  column: filterResult.column,
+                  match: filterResult.value,
+                  invert: true,
+                }
+              : {
+                  op: "filter-table-rows",
+                  table: i,
+                  column: filterResult.column,
+                  match: filterResult.value,
+                };
+            patches.push(patch);
+            claimedIndices.add(i);
+          }
+        }
+      }
     }
   }
 
   return { patches, claimedIndices };
+}
+
+/**
+ * Finds a column where all removed rows (or all kept rows) share exactly one value,
+ * allowing a filter-table-rows patch to be suggested.
+ *
+ * Returns the column header, the shared value, and whether to use invert:true.
+ * Returns null if no such column exists.
+ */
+function detectFilterColumn(
+  headers: string[],
+  removedRows: string[][],
+  keptRows: string[][],
+): { column: string; value: string; invert: boolean } | null {
+  // Strategy A: all removed rows share the same value in some column
+  // (suggest keeping rows that do NOT have that value → invert:true)
+  for (let ci = 0; ci < headers.length; ci++) {
+    const header = headers[ci];
+    if (!header) continue;
+    const removedValues = removedRows.map((row) => row[ci] ?? "");
+    const uniqueRemoved = [...new Set(removedValues)];
+    if (uniqueRemoved.length === 1 && uniqueRemoved[0] !== undefined) {
+      const value = uniqueRemoved[0];
+      // Confirm kept rows don't contain this value (no ambiguity)
+      const keptValues = keptRows.map((row) => row[ci] ?? "");
+      if (!keptValues.includes(value)) {
+        return { column: header, value, invert: true };
+      }
+    }
+  }
+
+  // Strategy B: all kept rows (≥2) share the same value in some column
+  // (suggest keeping rows that DO have that value → no invert)
+  if (keptRows.length >= 2) {
+    for (let ci = 0; ci < headers.length; ci++) {
+      const header = headers[ci];
+      if (!header) continue;
+      const keptValues = keptRows.map((row) => row[ci] ?? "");
+      const uniqueKept = [...new Set(keptValues)];
+      if (uniqueKept.length === 1 && uniqueKept[0] !== undefined) {
+        const value = uniqueKept[0];
+        // Confirm removed rows don't contain this value (no ambiguity)
+        const removedValues = removedRows.map((row) => row[ci] ?? "");
+        if (!removedValues.includes(value)) {
+          return { column: header, value, invert: false };
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -2157,7 +2255,8 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     patch.op === "sort-table" ||
     patch.op === "deduplicate-table-rows" ||
     patch.op === "rename-table-column" ||
-    patch.op === "reorder-table-columns"
+    patch.op === "reorder-table-columns" ||
+    patch.op === "filter-table-rows"
   ) {
     score = 0.95;
   }
@@ -2166,7 +2265,8 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
   if (
     patch.op === "sort-list" ||
     patch.op === "deduplicate-list-items" ||
-    patch.op === "reorder-list-items"
+    patch.op === "reorder-list-items" ||
+    patch.op === "filter-list-items"
   ) {
     score = 0.95;
   }
@@ -2298,6 +2398,20 @@ function describePatch(patch: PatchOperation): string {
 
     case "replace-between":
       return `Replace content between "${truncate(patch.start, 30)}" and "${truncate(patch.end, 30)}"`;
+
+    case "filter-list-items": {
+      const listFilterDesc =
+        patch.match !== undefined
+          ? `match "${truncate(patch.match, 30)}"`
+          : `pattern /${patch.pattern}/`;
+      return `Filter list ${patch.list} items by ${listFilterDesc}${patch.invert ? " (keep non-matching)" : ""}`;
+    }
+
+    case "filter-table-rows": {
+      const tableFilterDesc =
+        patch.match !== undefined ? `"${truncate(patch.match, 30)}"` : `/${patch.pattern}/`;
+      return `Filter table ${patch.table} rows on column "${patch.column}" by ${tableFilterDesc}${patch.invert ? " (keep non-matching)" : ""}`;
+    }
 
     default:
       return `Apply ${patch.op} operation`;

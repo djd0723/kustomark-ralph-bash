@@ -2845,5 +2845,214 @@ Upgrade to 2.0.0 today`;
       expect(reorderScored?.description).toContain("Reorder columns");
     });
   });
+
+  describe("filter-list-items detection", () => {
+    test("detects filter when all removed items share the same exact text", () => {
+      const source = "- Error\n- Warning\n- Error\n- Info";
+      const target = "- Warning\n- Info";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-list-items");
+      expect(filterPatch).toBeDefined();
+      if (filterPatch?.op === "filter-list-items") {
+        expect(filterPatch.match).toBe("Error");
+        expect(filterPatch.invert).toBe(true);
+        expect(filterPatch.list).toBe(0);
+      }
+    });
+
+    test("no filter suggestion when removed items differ", () => {
+      const source = "- Alpha\n- Beta\n- Gamma\n- Delta";
+      const target = "- Alpha\n- Delta";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-list-items");
+      expect(filterPatch).toBeUndefined();
+    });
+
+    test("no filter suggestion when only one item is removed", () => {
+      const source = "- Alpha\n- Beta\n- Gamma";
+      const target = "- Alpha\n- Gamma";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-list-items");
+      expect(filterPatch).toBeUndefined();
+    });
+
+    test("no filter suggestion when lists are identical", () => {
+      const source = "- Alpha\n- Beta\n- Gamma";
+      const target = "- Alpha\n- Beta\n- Gamma";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-list-items");
+      expect(filterPatch).toBeUndefined();
+    });
+
+    test("filter suppresses per-item remove-list-item suggestions for claimed list", () => {
+      const source = "- DEPRECATED\n- Keep\n- DEPRECATED\n- Keep2";
+      const target = "- Keep\n- Keep2";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-list-items");
+      expect(filterPatch).toBeDefined();
+      // Per-item patches for list 0 should be suppressed since filter claimed it
+      const removePatches = patches.filter(
+        (p) => p.op === "remove-list-item" && (p as { list: number }).list === 0,
+      );
+      expect(removePatches).toHaveLength(0);
+    });
+
+    test("filter scores at 0.95", () => {
+      const source = "- Error\n- Warning\n- Error\n- Info";
+      const target = "- Warning\n- Info";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const filterScored = scored.find((s) => s.patch.op === "filter-list-items");
+      expect(filterScored?.score).toBe(0.95);
+    });
+
+    test("describePatch for filter-list-items", () => {
+      const source = "- Error\n- Warning\n- Error\n- Info";
+      const target = "- Warning\n- Info";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const filterScored = scored.find((s) => s.patch.op === "filter-list-items");
+      expect(filterScored?.description).toContain("Filter list");
+      expect(filterScored?.description).toContain("Error");
+      expect(filterScored?.description).toContain("keep non-matching");
+    });
+
+    test("handles multiple lists independently", () => {
+      const source =
+        "- Error\n- Warning\n- Error\n\nOther text\n\n- Alpha\n- Beta\n- Alpha";
+      const target = "- Warning\n\nOther text\n\n- Beta";
+
+      const patches = suggestPatches(source, target);
+      const filterPatches = patches.filter((p) => p.op === "filter-list-items");
+      expect(filterPatches.length).toBe(2);
+    });
+  });
+
+  describe("filter-table-rows detection", () => {
+    test("detects filter when all removed rows share the same column value (strategy A — invert)", () => {
+      const source =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Bob | Inactive |\n| Carol | Inactive |";
+      const target = "| Name | Status |\n| ---- | ------ |\n| Alice | Active |";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-table-rows");
+      expect(filterPatch).toBeDefined();
+      if (filterPatch?.op === "filter-table-rows") {
+        expect(filterPatch.column).toBe("Status");
+        expect(filterPatch.match).toBe("Inactive");
+        expect(filterPatch.invert).toBe(true);
+        expect(filterPatch.table).toBe(0);
+      }
+    });
+
+    test("detects filter when all kept rows share the same column value (strategy B — no invert)", () => {
+      // Two removed rows with different Status values, two kept rows both Status=Active
+      const source =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Bob | Inactive |\n| Carol | Pending |\n| Dave | Active |";
+      const target =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Dave | Active |";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-table-rows");
+      expect(filterPatch).toBeDefined();
+      if (filterPatch?.op === "filter-table-rows") {
+        expect(filterPatch.column).toBe("Status");
+        expect(filterPatch.match).toBe("Active");
+        expect(filterPatch.invert).toBeUndefined();
+      }
+    });
+
+    test("no filter suggestion when removed rows have different values in every column", () => {
+      const source =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Bob | Inactive |\n| Carol | Pending |";
+      const target = "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Bob | Inactive |";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-table-rows");
+      expect(filterPatch).toBeUndefined();
+    });
+
+    test("no filter suggestion when only one row is removed", () => {
+      const source =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Bob | Inactive |";
+      const target = "| Name | Status |\n| ---- | ------ |\n| Alice | Active |";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-table-rows");
+      expect(filterPatch).toBeUndefined();
+    });
+
+    test("filter suppresses per-row remove-table-row suggestions for claimed table", () => {
+      const source =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Bob | Inactive |\n| Carol | Inactive |";
+      const target = "| Name | Status |\n| ---- | ------ |\n| Alice | Active |";
+
+      const patches = suggestPatches(source, target);
+      const filterPatch = patches.find((p) => p.op === "filter-table-rows");
+      expect(filterPatch).toBeDefined();
+      const removePatches = patches.filter(
+        (p) => p.op === "remove-table-row" && (p as { tableIndex: number }).tableIndex === 0,
+      );
+      expect(removePatches).toHaveLength(0);
+    });
+
+    test("filter scores at 0.95", () => {
+      const source =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Bob | Inactive |\n| Carol | Inactive |";
+      const target = "| Name | Status |\n| ---- | ------ |\n| Alice | Active |";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const filterScored = scored.find((s) => s.patch.op === "filter-table-rows");
+      expect(filterScored?.score).toBe(0.95);
+    });
+
+    test("describePatch for filter-table-rows (invert)", () => {
+      const source =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Bob | Inactive |\n| Carol | Inactive |";
+      const target = "| Name | Status |\n| ---- | ------ |\n| Alice | Active |";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const filterScored = scored.find((s) => s.patch.op === "filter-table-rows");
+      expect(filterScored?.description).toContain("Filter table");
+      expect(filterScored?.description).toContain("Status");
+      expect(filterScored?.description).toContain("Inactive");
+      expect(filterScored?.description).toContain("keep non-matching");
+    });
+
+    test("describePatch for filter-table-rows (no invert)", () => {
+      const source =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Bob | Inactive |\n| Carol | Pending |\n| Dave | Active |";
+      const target =
+        "| Name | Status |\n| ---- | ------ |\n| Alice | Active |\n| Dave | Active |";
+
+      const patches = suggestPatches(source, target);
+      const scored = scorePatches(patches, source, target);
+      const filterScored = scored.find((s) => s.patch.op === "filter-table-rows");
+      expect(filterScored?.description).toContain("Filter table");
+      expect(filterScored?.description).toContain("Status");
+      expect(filterScored?.description).toContain("Active");
+      expect(filterScored?.description).not.toContain("keep non-matching");
+    });
+
+    test("handles multiple tables independently", () => {
+      const source =
+        "| X | Type |\n| - | ---- |\n| a | keep |\n| b | drop |\n| c | drop |\n\nText\n\n| Y | Kind |\n| - | ---- |\n| p | good |\n| q | bad |\n| r | bad |";
+      const target =
+        "| X | Type |\n| - | ---- |\n| a | keep |\n\nText\n\n| Y | Kind |\n| - | ---- |\n| p | good |";
+
+      const patches = suggestPatches(source, target);
+      const filterPatches = patches.filter((p) => p.op === "filter-table-rows");
+      expect(filterPatches.length).toBe(2);
+    });
+  });
 });
 

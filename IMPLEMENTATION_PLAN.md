@@ -1,10 +1,32 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest filter-list-items & filter-table-rows detection - COMPLETE!):**
+
+* ✅ **`suggest` now detects `filter-list-items`**: When multiple list items are removed and they all share the same exact text value, the command generates a `filter-list-items` patch with `invert: true` (keep items NOT equal to the shared value). Requires ≥2 removed items with identical text; single-item removals continue to generate `remove-list-item` patches.
+* ✅ **`suggest` now detects `filter-table-rows`**: When multiple table rows are removed (≥2), two strategies are tried in order:
+  * **Strategy A (invert)**: All removed rows share the same value in exactly one column → `filter-table-rows` with `invert: true` (remove rows matching that column value).
+  * **Strategy B (keep)**: All kept rows (≥2) share the same value in exactly one column, and that value is absent from removed rows → `filter-table-rows` without `invert` (keep rows matching that column value).
+* ✅ **Suppression of redundant per-item patches**: Filter patches claim their list/table index; per-item `remove-list-item` and `remove-table-row` suggestions are suppressed for claimed indices.
+* ✅ **Scoring**: Both `filter-list-items` and `filter-table-rows` score at 0.95 (deterministic detection).
+* ✅ **`describePatch` coverage**: Human-readable descriptions for both ops (e.g., `Filter list 0 items by match "Error" (keep non-matching)`).
+* ✅ **New helper `detectFilterColumn`**: Encapsulates the two-strategy column search for filter-table-rows detection.
+* ✅ **17 new tests**: 8 list tests (exact-match detection, no-op for differing removals, single-removal no-op, identical no-op, suppression, scoring, describePatch, multi-list) and 9 table tests (strategy A, strategy B, no-op when no column qualifies, single-row-removed no-op, suppression, scoring, describePatch invert, describePatch no-invert, multi-table).
+* ✅ **4,108 tests passing**: Up from 4,091.
+
+**Files modified:**
+
+* `src/core/patch-suggester.ts` — Added filter detection block in `suggestStructuralListPatches`; added filter detection block and `detectFilterColumn` helper in `suggestStructuralTablePatches`; added `filter-list-items` and `filter-table-rows` to `calculatePatchScore` (score 0.95) and `describePatch`.
+* `tests/core/patch-suggester.test.ts` — 17 new tests in `filter-list-items detection` and `filter-table-rows detection` suites.
+
+**Status:** suggest filter-list-items & filter-table-rows detection COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest structural list and table ops - COMPLETE!):**
 
