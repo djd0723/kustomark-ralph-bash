@@ -2254,6 +2254,9 @@ ${formatSection("DESCRIPTION")}
     - Section modifications (rename, remove, replace)
     - Pattern-based replacements (URLs, versions, repeated strings)
     - Line-level edits (insert, delete, replace)
+    - New files (target-only or git-added) → write-file patches
+    - Deleted files (source-only or git-deleted) → delete-file patches
+    - Renamed/moved files → rename-file/move-file patches
 
   It assigns confidence scores to each suggestion and generates a complete
   kustomark.yaml configuration that you can review and use.
@@ -2299,6 +2302,8 @@ ${formatSection("HOW IT WORKS")}
      - remove-section: For deleted sections
      - replace-regex: For pattern-based changes
      - replace: For simple string replacements
+     - write-file: For new files in target (or added in --from-git range)
+     - delete-file: For files removed from source (or deleted in --from-git range)
 
   ${formatHighlight("4. Confidence Scoring:")}
      High (0.9+):   Frontmatter and section operations

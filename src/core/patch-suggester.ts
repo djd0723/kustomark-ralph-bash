@@ -2490,7 +2490,8 @@ function calculatePatchScore(patch: PatchOperation, source: string, _target: str
     patch.op === "copy-file" ||
     patch.op === "rename-file" ||
     patch.op === "delete-file" ||
-    patch.op === "move-file"
+    patch.op === "move-file" ||
+    patch.op === "write-file"
   ) {
     score = 0.9;
   }
@@ -2660,6 +2661,9 @@ function describePatch(patch: PatchOperation): string {
 
     case "move-file":
       return `Move file matching "${patch.match}" to "${patch.dest}"`;
+
+    case "write-file":
+      return `Write file "${patch.path}" (${patch.content.length} chars)`;
 
     case "json-set":
       return `Set JSON/YAML path "${patch.path}" to ${JSON.stringify(patch.value).slice(0, 30)}`;

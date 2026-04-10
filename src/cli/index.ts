@@ -87,6 +87,7 @@ import type {
   ValidationResult,
   ValidationWarning,
   WatchHooks,
+  WriteFilePatch,
 } from "../core/types.js";
 import { createLogger, type Logger, LogLevel, Verbosity } from "../core/utils/logger.js";
 import { runValidators } from "../core/validators.js";
@@ -991,10 +992,16 @@ async function resolveResources(
  * Partition patches into file operations and content operations
  */
 function partitionPatches(patches: PatchOperation[]): {
-  fileOps: (CopyFilePatch | RenameFilePatch | DeleteFilePatch | MoveFilePatch)[];
+  fileOps: (CopyFilePatch | RenameFilePatch | DeleteFilePatch | MoveFilePatch | WriteFilePatch)[];
   contentOps: PatchOperation[];
 } {
-  const fileOps: (CopyFilePatch | RenameFilePatch | DeleteFilePatch | MoveFilePatch)[] = [];
+  const fileOps: (
+    | CopyFilePatch
+    | RenameFilePatch
+    | DeleteFilePatch
+    | MoveFilePatch
+    | WriteFilePatch
+  )[] = [];
   const contentOps: PatchOperation[] = [];
 
   for (const patch of patches) {
@@ -1002,7 +1009,8 @@ function partitionPatches(patches: PatchOperation[]): {
       patch.op === "copy-file" ||
       patch.op === "rename-file" ||
       patch.op === "delete-file" ||
-      patch.op === "move-file"
+      patch.op === "move-file" ||
+      patch.op === "write-file"
     ) {
       fileOps.push(patch);
     } else {
@@ -1021,7 +1029,7 @@ function partitionPatches(patches: PatchOperation[]): {
  */
 function applyFileOperations(
   fileMap: Map<string, string>,
-  fileOps: (CopyFilePatch | RenameFilePatch | DeleteFilePatch | MoveFilePatch)[],
+  fileOps: (CopyFilePatch | RenameFilePatch | DeleteFilePatch | MoveFilePatch | WriteFilePatch)[],
   basePath: string,
   options: CLIOptions,
 ): {
@@ -1062,6 +1070,14 @@ function applyFileOperations(
           log(`  Applying move-file: match=${patch.match}, dest=${patch.dest}`, 3, options);
           result = applyMoveFile(currentMap, patch.match, patch.dest, basePath);
           break;
+
+        case "write-file": {
+          log(`  Applying write-file: path=${patch.path}`, 3, options);
+          const newMap = new Map(currentMap);
+          newMap.set(patch.path, patch.content);
+          result = { fileMap: newMap, count: 1 };
+          break;
+        }
       }
 
       if (result) {

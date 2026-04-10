@@ -3624,6 +3624,7 @@ export async function applySinglePatch(
     case "rename-file":
     case "delete-file":
     case "move-file":
+    case "write-file":
       // File operations should be processed by the file operations engine, not the patch engine
       throw new Error(
         `File operation '${patch.op}' should be processed by the file operations engine, not the patch engine`,
@@ -3904,6 +3905,8 @@ function getPatchDescription(patch: PatchOperation): string {
       return `delete-file match='${patch.match}'`;
     case "move-file":
       return `move-file match='${patch.match}' to '${patch.dest}'`;
+    case "write-file":
+      return `write-file path='${patch.path}'`;
     default:
       return "unknown patch";
   }

@@ -2049,6 +2049,81 @@ export function generateSchema(): object {
             },
             {
               type: "object",
+              required: ["op", "path", "content"],
+              properties: {
+                op: {
+                  type: "string",
+                  const: "write-file",
+                  description: "Write specific content to a file in the output directory",
+                },
+                path: {
+                  type: "string",
+                  description: "File path to write (relative to output directory)",
+                },
+                content: {
+                  type: "string",
+                  description: "Content to write to the file",
+                },
+                include: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to include specific files",
+                },
+                exclude: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Glob pattern(s) to exclude specific files",
+                },
+                onNoMatch: {
+                  type: "string",
+                  enum: ["skip", "warn", "error"],
+                  description: "Override the default onNoMatch behavior for this patch",
+                },
+                validate: {
+                  $ref: "#/$defs/patchValidate",
+                  description: "Per-patch validation rules applied after the patch is applied",
+                },
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this patch (for inheritance)",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                extends: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  ],
+                  description: "Patch ID(s) to extend from (inherit fields)",
+                },
+                group: {
+                  type: "string",
+                  description:
+                    "Optional group name for selective patch application via --enable-groups or --disable-groups",
+                  pattern: "^[a-zA-Z0-9_-]+$",
+                },
+                when: {
+                  $ref: "#/$defs/condition",
+                  description:
+                    "Optional condition - patch only applies if condition evaluates to true",
+                },
+              },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
               required: ["op", "table", "row", "column", "content"],
               properties: {
                 op: {

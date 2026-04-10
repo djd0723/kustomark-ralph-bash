@@ -1,8 +1,48 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-10 (write-file patch operation - COMPLETE!):**
+
+* ✅ **`write-file` patch operation**: New operation that writes specific content to a file in the output directory. Closes the gap in `suggest` where new files (target-only or git-added) had no corresponding patch.
+* ✅ **`WriteFilePatch` type**: Added to `src/core/types.ts` and the `PatchOperation` union.
+* ✅ **JSON schema**: Added `write-file` schema entry in `src/core/schema.ts` with required `op`, `path`, `content` fields and all common optional fields (`include`, `exclude`, `onNoMatch`, `validate`, `id`, `extends`, `group`, `when`).
+* ✅ **Patch engine**: `write-file` throws in `applySinglePatch` (like other file ops) and is described in `getPatchDescription`.
+* ✅ **CLI pipeline** (`src/cli/index.ts`): `partitionPatches` and `applyFileOperations` handle `write-file` by inserting `path → content` directly into the resources map.
+* ✅ **`suggest` normal path**: `detectFileOperationPatches` now returns `remainingTargetOnly` (new files in target not claimed by rename/move/copy). `suggestCommand` generates `write-file` patches for each, reads content from the target directory, and reports `filesAdded` in stats.
+* ✅ **`suggest --from-git` path**: `fetchGitPairs` now returns `addedFiles: Array<{path, content}>` (fetches content via `git show`) instead of just `addedPaths`. `suggestCommand` generates `write-file` patches for each added file and reports `filesAdded` in stats.
+* ✅ **`patch-suggester.ts`**: `write-file` scored at 0.9 (high confidence, same as other file ops). `describePatch` returns `Write file "<path>" (N chars)`.
+* ✅ **Help text** (`src/cli/help.ts`): `getSuggestHelp` mentions new-file detection → `write-file` patches.
+* ✅ **8 new tests** in `tests/cli/suggest.test.ts`:
+  * `addedFiles includes file content from git` — fetchGitPairs returns full file content
+  * `addedFiles not returned when file is unsupported extension`
+  * `target-only file generates write-file patch in config YAML` — CLI integration test
+  * `filesAdded stat is reported in JSON output` — 2 new target-only files → filesAdded=2
+  * `write-file patch content matches target file exactly`
+  * `fetchGitPairs returns addedFiles with content for git-added files`
+  * `--from-git generates write-file patch for added file in config`
+  * `filesAdded stat is set when --from-git detects added files`
+* ✅ **Updated 2 existing tests**: `addedPaths` → `addedFiles` in `--from-git: fetchGitPairs` suite.
+* ✅ **4,309 tests passing**: Up from 4,301.
+
+**Files modified:**
+
+* `src/core/types.ts` — Added `WriteFilePatch` interface; added `| WriteFilePatch` to `PatchOperation` union.
+* `src/core/schema.ts` — Added `write-file` schema block after `move-file`.
+* `src/core/patch-engine.ts` — Added `"write-file"` to file-ops throw case; added description in `getPatchDescription`.
+* `src/core/patch-suggester.ts` — Added `write-file` to high-confidence file-ops check; added `describePatch` case.
+* `src/cli/index.ts` — Added `WriteFilePatch` import; updated `partitionPatches` and `applyFileOperations` to handle `write-file`.
+* `src/cli/suggest-command.ts` — Added `WriteFilePatch` import; added `remainingTargetOnly` to `FileOpResult`; added `filesAdded` to stats; updated `NON_CONSOLIDATABLE_OPS`; updated `fetchGitPairs` signature to return `addedFiles` with content; generated `write-file` patches in both normal and `--from-git` paths.
+* `src/cli/help.ts` — Updated `getSuggestHelp` to document new-file detection and `write-file` patches.
+* `tests/cli/suggest.test.ts` — 8 new tests + 2 updated tests.
+
+**Status:** write-file patch operation COMPLETE! ✅
+
+***
 
 ## Recent Enhancements
 

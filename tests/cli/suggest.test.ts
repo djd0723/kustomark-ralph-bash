@@ -2594,10 +2594,12 @@ describe("--from-git: fetchGitPairs", () => {
     expect(deletedPaths).toContain("notes.md");
   });
 
-  test("returns addedPaths for files added in range", async () => {
-    const { addedPaths } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
+  test("returns addedFiles with content for files added in range", async () => {
+    const { addedFiles } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
 
-    expect(addedPaths).toContain("added.md");
+    expect(addedFiles.map((f) => f.path)).toContain("added.md");
+    const added = addedFiles.find((f) => f.path === "added.md");
+    expect(added?.content).toContain("# Added");
   });
 
   test("single ref without '..' defaults to <ref>..HEAD", async () => {
@@ -2633,12 +2635,180 @@ describe("--from-git: fetchGitPairs", () => {
     writeFileSync(join(gitTestDir, "data.bin"), Buffer.from([0x00, 0x01, 0x02]));
     execSync("git add -A && git commit -m 'add binary'", { cwd: gitTestDir, shell: true as any });
     // The binary file is not in a supported extension set
-    const { pairs, deletedPaths, addedPaths } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
+    const { pairs, deletedPaths, addedFiles } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
 
     // Only added non-.md/.json/.yaml/.yml/.toml file — should not appear in pairs
     expect(pairs.length).toBe(0);
     expect(deletedPaths.length).toBe(0);
-    // addedPaths only collects supported files
-    expect(addedPaths.length).toBe(0);
+    // addedFiles only collects supported files
+    expect(addedFiles.length).toBe(0);
+  });
+
+  test("addedFiles includes file content from git", async () => {
+    const { addedFiles } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
+
+    const added = addedFiles.find((f) => f.path === "added.md");
+    expect(added).toBeDefined();
+    expect(added?.content).toBe("# Added\n\nNew file.\n");
+  });
+
+  test("addedFiles not returned when file is unsupported extension", async () => {
+    writeFileSync(join(gitTestDir, "script.sh"), "#!/bin/bash\necho hello\n");
+    execSync("git add -A && git commit -m 'add script'", {
+      cwd: gitTestDir,
+      shell: true as any,
+    });
+    const { addedFiles } = await fetchGitPairs("HEAD~1..HEAD", gitTestDir);
+    expect(addedFiles.map((f) => f.path)).not.toContain("script.sh");
+  });
+});
+
+// ============================================================================
+// write-file patch operation
+// ============================================================================
+
+describe("write-file: suggest generates write-file patches for new target files", () => {
+  const testDir = "/tmp/kustomark-write-file-test";
+
+  beforeEach(() => {
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+    mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test("target-only file generates write-file patch in config YAML", () => {
+    const srcDir = join(testDir, "src");
+    const tgtDir = join(testDir, "tgt");
+    mkdirSync(srcDir);
+    mkdirSync(tgtDir);
+
+    // Source has one file, target has that file plus a new one
+    writeFileSync(join(srcDir, "existing.md"), "# Existing\n");
+    writeFileSync(join(tgtDir, "existing.md"), "# Existing\n");
+    writeFileSync(join(tgtDir, "new.md"), "# New File\n\nAdded content.\n");
+
+    const cliPath = join(process.cwd(), "dist/cli/index.js");
+    const result = execSync(
+      `bun run ${cliPath} suggest --source ${srcDir} --target ${tgtDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    const json = JSON.parse(result);
+    const writeOps = (json.config?.patches ?? []).filter((p: any) => p.op === "write-file");
+    expect(writeOps.length).toBe(1);
+    expect(writeOps[0].path).toBe("new.md");
+    expect(writeOps[0].content).toContain("Added content.");
+  });
+
+  test("filesAdded stat is reported in JSON output", () => {
+    const srcDir = join(testDir, "src");
+    const tgtDir = join(testDir, "tgt");
+    mkdirSync(srcDir);
+    mkdirSync(tgtDir);
+
+    writeFileSync(join(srcDir, "a.md"), "# A\n");
+    writeFileSync(join(tgtDir, "a.md"), "# A\n");
+    writeFileSync(join(tgtDir, "b.md"), "# B\n");
+    writeFileSync(join(tgtDir, "c.md"), "# C\n");
+
+    const cliPath = join(process.cwd(), "dist/cli/index.js");
+    const result = execSync(
+      `bun run ${cliPath} suggest --source ${srcDir} --target ${tgtDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    const json = JSON.parse(result);
+    expect(json.stats.filesAdded).toBe(2);
+  });
+
+  test("write-file patch content matches target file exactly", () => {
+    const srcDir = join(testDir, "src");
+    const tgtDir = join(testDir, "tgt");
+    mkdirSync(srcDir);
+    mkdirSync(tgtDir);
+
+    const newContent = "# Brand New\n\nThis is fresh content.\n";
+    writeFileSync(join(srcDir, "old.md"), "# Old\n");
+    writeFileSync(join(tgtDir, "old.md"), "# Old\n");
+    writeFileSync(join(tgtDir, "brand-new.md"), newContent);
+
+    const cliPath = join(process.cwd(), "dist/cli/index.js");
+    const result = execSync(
+      `bun run ${cliPath} suggest --source ${srcDir} --target ${tgtDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    const json = JSON.parse(result);
+    const writeOp = (json.config?.patches ?? []).find((p: any) => p.op === "write-file");
+    expect(writeOp?.content).toBe(newContent);
+  });
+});
+
+describe("write-file: --from-git generates write-file patches for added files", () => {
+  const gitDir = "/tmp/kustomark-write-file-git-test";
+
+  beforeEach(() => {
+    if (existsSync(gitDir)) {
+      rmSync(gitDir, { recursive: true, force: true });
+    }
+    mkdirSync(gitDir, { recursive: true });
+
+    execSync("git init", { cwd: gitDir });
+    execSync('git config user.email "test@example.com"', { cwd: gitDir });
+    execSync('git config user.name "Test"', { cwd: gitDir });
+
+    // First commit
+    writeFileSync(join(gitDir, "base.md"), "# Base\n");
+    execSync("git add -A && git commit -m 'initial'", { cwd: gitDir, shell: true as any });
+
+    // Second commit: add a new file
+    writeFileSync(join(gitDir, "added.md"), "# Added\n\nNew content.\n");
+    execSync("git add -A && git commit -m 'add file'", { cwd: gitDir, shell: true as any });
+  });
+
+  afterEach(() => {
+    if (existsSync(gitDir)) {
+      rmSync(gitDir, { recursive: true, force: true });
+    }
+  });
+
+  test("fetchGitPairs returns addedFiles with content for git-added files", async () => {
+    const { addedFiles } = await fetchGitPairs("HEAD~1..HEAD", gitDir);
+
+    expect(addedFiles.length).toBe(1);
+    expect(addedFiles[0].path).toBe("added.md");
+    expect(addedFiles[0].content).toBe("# Added\n\nNew content.\n");
+  });
+
+  test("--from-git generates write-file patch for added file in config", () => {
+    const cliPath = join(process.cwd(), "dist/cli/index.js");
+    const result = execSync(
+      `bun run ${cliPath} suggest --from-git HEAD~1..HEAD --format=json`,
+      { cwd: gitDir, encoding: "utf-8" },
+    );
+
+    const json = JSON.parse(result);
+    const writeOps = (json.config?.patches ?? []).filter((p: any) => p.op === "write-file");
+    expect(writeOps.length).toBe(1);
+    expect(writeOps[0].path).toBe("added.md");
+    expect(writeOps[0].content).toContain("New content.");
+  });
+
+  test("filesAdded stat is set when --from-git detects added files", () => {
+    const cliPath = join(process.cwd(), "dist/cli/index.js");
+    const result = execSync(
+      `bun run ${cliPath} suggest --from-git HEAD~1..HEAD --format=json`,
+      { cwd: gitDir, encoding: "utf-8" },
+    );
+
+    const json = JSON.parse(result);
+    expect(json.stats.filesAdded).toBe(1);
   });
 });

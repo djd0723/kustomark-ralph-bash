@@ -429,6 +429,17 @@ export interface MoveFilePatch extends PatchCommonFields {
 }
 
 /**
+ * Write file operation - writes specific content to a file in the output directory
+ */
+export interface WriteFilePatch extends PatchCommonFields {
+  op: "write-file";
+  /** File path to write (relative to output directory) */
+  path: string;
+  /** Content to write to the file */
+  content: string;
+}
+
+/**
  * Replace table cell operation - replaces content in a specific table cell
  */
 export interface ReplaceTableCellPatch extends PatchCommonFields {
@@ -820,6 +831,7 @@ export type PatchOperation =
   | RenameFilePatch
   | DeleteFilePatch
   | MoveFilePatch
+  | WriteFilePatch
   | ReplaceTableCellPatch
   | AddTableRowPatch
   | RemoveTableRowPatch

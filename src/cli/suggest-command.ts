@@ -12,7 +12,7 @@ import { parseConfig } from "../core/config-parser.js";
 import { applyPatches } from "../core/patch-engine.js";
 import type { ScoredPatch } from "../core/patch-suggester.js";
 import { scorePatches, suggestJsonPatches, suggestPatches } from "../core/patch-suggester.js";
-import type { KustomarkConfig, PatchOperation } from "../core/types.js";
+import type { KustomarkConfig, PatchOperation, WriteFilePatch } from "../core/types.js";
 import { createProgressReporter } from "./progress.js";
 
 // ============================================================================
@@ -72,6 +72,8 @@ export interface SuggestResult {
     confidence: "high" | "medium" | "low";
     /** Number of files written to output dir when --apply is used */
     filesApplied?: number;
+    /** Number of new files written (from write-file patches) */
+    filesAdded?: number;
     /** Number of patches approved in interactive session */
     patchesApproved?: number;
   };
@@ -223,6 +225,8 @@ interface FileOpResult {
   scoredFileOps: ScoredPatch[];
   /** Source-only paths not claimed by a rename/move — should become delete-file patches */
   remainingSourceOnly: string[];
+  /** Target-only paths not claimed by a rename/move/copy — should become write-file patches */
+  remainingTargetOnly: string[];
   filesRenamed: number;
   filesMoved: number;
   filesCopied: number;
@@ -346,8 +350,17 @@ function detectFileOperationPatches(
   }
 
   const remainingSourceOnly = sourceOnlyPaths.filter((p) => !claimedSourceOnly.has(p));
+  const remainingTargetOnly = targetOnlyPaths.filter((p) => !claimedTargetOnly.has(p));
 
-  return { fileOps, scoredFileOps, remainingSourceOnly, filesRenamed, filesMoved, filesCopied };
+  return {
+    fileOps,
+    scoredFileOps,
+    remainingSourceOnly,
+    remainingTargetOnly,
+    filesRenamed,
+    filesMoved,
+    filesCopied,
+  };
 }
 
 // ============================================================================
@@ -358,7 +371,13 @@ function detectFileOperationPatches(
  * File operations that target a specific file and must NOT be consolidated
  * across multiple files (their `match`/`src`/`dest` fields are file-specific).
  */
-const NON_CONSOLIDATABLE_OPS = new Set(["copy-file", "rename-file", "move-file", "delete-file"]);
+const NON_CONSOLIDATABLE_OPS = new Set([
+  "copy-file",
+  "rename-file",
+  "move-file",
+  "delete-file",
+  "write-file",
+]);
 
 /**
  * Returns a stable JSON identity key for a patch, excluding the `include` field.
@@ -555,20 +574,24 @@ function parseGitRange(range: string): { beforeRef: string; afterRef: string } {
  * @param range    - Git range (e.g. "HEAD~1..HEAD", "HEAD~3", "abc..def")
  * @param repoDir  - Directory of the git repository (or any sub-directory)
  * @param filterPath - Optional relative path prefix to restrict results
- * @returns Matched content pairs plus lists of added/deleted paths
+ * @returns Matched content pairs plus lists of added/deleted paths (added files include content)
  */
 export async function fetchGitPairs(
   range: string,
   repoDir: string,
   filterPath?: string,
-): Promise<{ pairs: FilePair[]; deletedPaths: string[]; addedPaths: string[] }> {
+): Promise<{
+  pairs: FilePair[];
+  deletedPaths: string[];
+  addedFiles: Array<{ path: string; content: string }>;
+}> {
   const { beforeRef, afterRef } = parseGitRange(range);
 
   const nameStatus = await runGit(["diff", "--name-status", `${beforeRef}..${afterRef}`], repoDir);
 
   const pairs: FilePair[] = [];
   const deletedPaths: string[] = [];
-  const addedPaths: string[] = [];
+  const addedFiles: Array<{ path: string; content: string }> = [];
 
   const normalizedFilter = filterPath ? filterPath.replace(/\\/g, "/").replace(/\/$/, "") : null;
 
@@ -608,7 +631,12 @@ export async function fetchGitPairs(
       }
     } else if (status === "A") {
       if (isSupportedFile(newPath)) {
-        addedPaths.push(toRelPath(newPath));
+        try {
+          const content = await runGit(["show", `${afterRef}:${newPath}`], repoDir);
+          addedFiles.push({ path: toRelPath(newPath), content });
+        } catch {
+          // Skip files that can't be read from git
+        }
       }
     } else {
       // M (modified), C (copied), R (renamed) — diff old→new content
@@ -643,7 +671,7 @@ export async function fetchGitPairs(
     }
   }
 
-  return { pairs, deletedPaths, addedPaths };
+  return { pairs, deletedPaths, addedFiles };
 }
 
 // ============================================================================
@@ -1091,6 +1119,9 @@ function outputText(result: SuggestResult, options: CLIOptions): void {
     if (result.stats.filesDeleted > 0) {
       console.log(`  Files deleted (source-only): ${result.stats.filesDeleted}`);
     }
+    if (result.stats.filesAdded !== undefined && result.stats.filesAdded > 0) {
+      console.log(`  Files added (write-file patches): ${result.stats.filesAdded}`);
+    }
     if (result.stats.filesRenamed > 0) {
       console.log(`  Files renamed: ${result.stats.filesRenamed}`);
     }
@@ -1216,13 +1247,13 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
         console.log("Fetching git diff...\n");
       }
 
-      const { pairs: filePairs, deletedPaths } = await fetchGitPairs(
-        options.fromGit,
-        repoDir,
-        gitFilter,
-      );
+      const {
+        pairs: filePairs,
+        deletedPaths,
+        addedFiles,
+      } = await fetchGitPairs(options.fromGit, repoDir, gitFilter);
 
-      if (filePairs.length === 0 && deletedPaths.length === 0) {
+      if (filePairs.length === 0 && deletedPaths.length === 0 && addedFiles.length === 0) {
         throw new Error(`No supported file changes found in git range: ${options.fromGit}`);
       }
 
@@ -1230,6 +1261,9 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
         console.log(`Found ${filePairs.length} modified file(s) in range\n`);
         if (deletedPaths.length > 0) {
           console.log(`Found ${deletedPaths.length} deleted file(s)\n`);
+        }
+        if (addedFiles.length > 0) {
+          console.log(`Found ${addedFiles.length} added file(s)\n`);
         }
       }
 
@@ -1241,6 +1275,14 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
         const deletePatch = { op: "delete-file" as const, match: relPath };
         patches.push(deletePatch);
         const [scored] = scorePatches([deletePatch], "", "");
+        if (scored) scoredPatches.push(scored);
+      }
+
+      // Add write-file patches for files added in the range
+      for (const { path: filePath, content } of addedFiles) {
+        const writePatch: WriteFilePatch = { op: "write-file", path: filePath, content };
+        patches.push(writePatch);
+        const [scored] = scorePatches([writePatch], "", content);
         if (scored) scoredPatches.push(scored);
       }
 
@@ -1273,6 +1315,7 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
         stats: {
           filesAnalyzed,
           filesDeleted: deletedPaths.length,
+          filesAdded: addedFiles.length,
           filesRenamed: 0,
           filesMoved: 0,
           filesCopied: 0,
@@ -1376,6 +1419,15 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       if (scored) scoredPatches.push(scored);
     }
 
+    // Generate write-file patches for target-only files not claimed by a rename/move/copy
+    for (const relPath of fileOpResult.remainingTargetOnly) {
+      const content = readFileSafe(join(targetPath, relPath)) ?? "";
+      const writePatch: WriteFilePatch = { op: "write-file", path: relPath, content };
+      patches.push(writePatch);
+      const [scored] = scorePatches([writePatch], "", content);
+      if (scored) scoredPatches.push(scored);
+    }
+
     // Consolidate duplicate patches across files into single glob-include patches
     const {
       patches: consolidatedPatches,
@@ -1415,6 +1467,7 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       stats: {
         filesAnalyzed,
         filesDeleted: fileOpResult.remainingSourceOnly.length,
+        filesAdded: fileOpResult.remainingTargetOnly.length,
         filesRenamed: fileOpResult.filesRenamed,
         filesMoved: fileOpResult.filesMoved,
         filesCopied: fileOpResult.filesCopied,
