@@ -1,0 +1,25 @@
+tests/cli/snapshot.test.ts
+  e5ea27605f72acc4 1-435
+IMPLEMENTATION_PLAN.md
+  e5ea27605f72acc4 3,9-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "90e0ec6cda372511056438eccbe71cccc7a74313",
+  "prompts": {
+    "e5ea27605f72acc4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73bd4cd2-944c-4418-8310-ede17f754541",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 454,
+      "total_deletions": 2,
+      "accepted_lines": 453,
+      "overriden_lines": 0
+    }
+  }
+}
