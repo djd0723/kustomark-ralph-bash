@@ -12,6 +12,8 @@
  */
 
 import {
+  type CodeAction,
+  type CodeActionParams,
   type CompletionItem,
   createConnection,
   type Hover,
@@ -23,6 +25,7 @@ import {
   TextDocuments,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
+import { CodeActionsProvider } from "./code-actions.js";
 import { CompletionProvider } from "./completion.js";
 import { DefinitionProvider } from "./definition.js";
 import { DiagnosticsProvider } from "./diagnostics.js";
@@ -43,6 +46,7 @@ const completionProvider = new CompletionProvider();
 const hoverProvider = new HoverProvider();
 const definitionProvider = new DefinitionProvider();
 const documentSymbolsProvider = new DocumentSymbolsProvider();
+const codeActionsProvider = new CodeActionsProvider();
 
 // Server initialization
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
@@ -58,6 +62,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
       hoverProvider: true,
       definitionProvider: true,
       documentSymbolProvider: true,
+      codeActionProvider: true,
     },
   };
 });
@@ -149,6 +154,21 @@ connection.onDefinition((params: TextDocumentPositionParams) => {
   } catch (error) {
     connection.console.error(`Error providing definition: ${error}`);
     return null;
+  }
+});
+
+// Code actions handler
+connection.onCodeAction((params: CodeActionParams): CodeAction[] => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return [];
+  }
+
+  try {
+    return codeActionsProvider.provideCodeActions(document, params);
+  } catch (error) {
+    connection.console.error(`Error providing code actions: ${error}`);
+    return [];
   }
 });
 

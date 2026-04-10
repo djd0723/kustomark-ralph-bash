@@ -1,8 +1,39 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-09 (LSP Code Actions - COMPLETE!):**
+
+* ✅ **`CodeActionsProvider`**: New LSP provider that surfaces quick-fix actions from diagnostics
+* ✅ **Insert missing required fields**: Fixes for `apiVersion is required`, `kind is required`, `resources is required`
+* ✅ **Fix wrong field values**: Replaces bad `apiVersion` / `kind` values with the correct canonical values
+* ✅ **Typo correction for invalid ops**: Fuzzy-matches the invalid op string against all 50 valid ops using `findSimilarStrings` (Levenshtein), offering up to 3 ranked suggestions
+* ✅ **onNoMatch quick-picks**: Offers all 3 valid values (`skip`, `warn`, `error`) when `onNoMatch` is invalid
+* ✅ **`codeActionProvider: true`** registered in server capabilities
+* ✅ **20 NEW TESTS PASSING**: Full coverage of all action types, multiple-diagnostics case, wrong URI filtering, edit structure
+* ✅ **3,954 TESTS PASSING**: All tests pass with 0 failures
+* ✅ **Linting clean**: `bun check` passes with no errors
+
+**Details:**
+
+1. **Files modified / created**
+   * `src/lsp/code-actions.ts` — New `CodeActionsProvider` class with `insertAtStart`, `insertAtEnd`, `replaceFieldValue` helpers
+   * `src/lsp/server.ts` — Import + instantiate `CodeActionsProvider`; register `connection.onCodeAction`; add `codeActionProvider: true` to capabilities
+   * `tests/lsp/code-actions.test.ts` — 20 tests covering all quick-fix variants and edge cases
+
+2. **Fuzzy op correction** uses the project's existing `findSimilarStrings` utility (already used by the suggest/fix commands), so no new dependencies.
+
+3. **Rationale**: The LSP already had diagnostics pointing out invalid ops, wrong field values, and missing required keys — but users had to manually look up and type corrections. Code actions close the last-mile gap: one click applies the fix.
+
+**Status:** LSP Code Actions COMPLETE! ✅
+
+---
+
+
 
 ## Recent Enhancements
 

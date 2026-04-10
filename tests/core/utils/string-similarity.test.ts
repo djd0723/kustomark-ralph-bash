@@ -565,7 +565,8 @@ describe("String Similarity Utilities", () => {
       expect(distWithThreshold).toBeGreaterThan(10);
       expect(distWithoutThreshold).toBe(500);
       // Threshold version should be faster (or at least not significantly slower)
-      expect(durationWithThreshold).toBeLessThanOrEqual(durationWithoutThreshold * 2);
+      // Use Math.max to avoid division by zero when both durations round to 0ms
+      expect(durationWithThreshold).toBeLessThanOrEqual(Math.max(durationWithoutThreshold, 1) * 2);
     });
   });
 });
