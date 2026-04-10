@@ -1,10 +1,35 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest --apply flag - COMPLETE!):**
+
+* ✅ **`kustomark suggest --apply <dir>`**: New flag that closes the suggest→build feedback loop in one step. After generating patches, immediately applies them to source files and writes transformed results to the specified output directory — no need to create a kustomark.yaml and run `kustomark build` separately.
+* ✅ **Directory and single-file support**: Works for both single-file comparisons (output file is named after the source basename) and directory comparisons (relative directory structure is preserved in the output).
+* ✅ **`include`/`exclude` patterns respected**: Only patches whose `include`/`exclude` globs match a given file (via `micromatch`) are applied to that file during the apply pass, matching main build pipeline behaviour exactly.
+* ✅ **`filesApplied` stat**: `SuggestResult.stats` gains a `filesApplied` counter (number of files written to output dir). JSON output includes it; text output prints `"Applied to: <dir> (N file(s) written)"` after the patch config.
+* ✅ **Composes with `--write`**: `--apply` and `--write` can be combined in a single invocation to simultaneously write the transformed files AND persist the suggested patches into a config file.
+* ✅ **`applyPatchesToDirectory(filePairs, patches, sourcePath, outputDir)`**: New exported helper that handles directory creation, per-file patch filtering, and content application using the existing `applyPatches` engine.
+* ✅ **`shouldApplyPatch(patch, relPath)`**: Private helper mirroring the main build pipeline's include/exclude logic using `micromatch`.
+* ✅ **10 new tests** across two describe blocks:
+  * `--apply flag` (6 CLI tests): creates output dir, transformed content matches target, `filesApplied` in JSON, `"Applied to:"` in text output, combines with `--write`, applies across multiple files in a directory.
+  * `applyPatchesToDirectory` (4 unit tests): applies patch and returns count, preserves files with non-matching include patterns, creates nested subdirectories, returns 0 for empty pairs.
+* ✅ **4,257 tests passing**: Up from 4,247.
+
+**Files modified:**
+
+* `src/cli/suggest-command.ts` — Added `mkdirSync` import; added `apply?: string` to local `CLIOptions`; added `filesApplied?` to `SuggestResult.stats`; added `micromatch` import; added exported `applyPatchesToDirectory()` and private `shouldApplyPatch()`; wired apply call in `suggestCommand`; updated `outputText` to print apply confirmation.
+* `src/cli/index.ts` — Added `apply?: string` to exported `CLIOptions` interface; added `--apply` / `--apply=` arg parsing block.
+* `src/cli/help.ts` — Added `--apply <dir>` entry to `getSuggestHelp()` OPTIONS section and two examples.
+* `tests/cli/suggest.test.ts` — 10 new tests in `--apply flag` and `applyPatchesToDirectory` describe blocks.
+
+**Status:** suggest --apply COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest cross-file patch consolidation - COMPLETE!):**
 

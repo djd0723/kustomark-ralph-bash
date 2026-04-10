@@ -2216,3 +2216,202 @@ describe("consolidatePatches", () => {
     expect(patchesConsolidated).toBe(1);
   });
 });
+
+// ============================================================================
+// --apply flag: apply patches directly to an output directory
+// ============================================================================
+
+import { applyPatchesToDirectory } from "../../src/cli/suggest-command.js";
+
+describe("--apply flag", () => {
+  const testDir = "/tmp/kustomark-apply-test";
+  const cliPath = join(process.cwd(), "dist/cli/index.js");
+
+  beforeEach(() => {
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+    mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test("creates output directory and writes patched file", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+    const applyDir = join(testDir, "output");
+
+    writeFileSync(sourceFile, "# Hello\n\nOld content.");
+    writeFileSync(targetFile, "# Hello\n\nNew content.");
+
+    execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --apply ${applyDir}`,
+      { encoding: "utf-8" },
+    );
+
+    expect(existsSync(applyDir)).toBe(true);
+    const outFile = join(applyDir, "source.md");
+    expect(existsSync(outFile)).toBe(true);
+  });
+
+  test("applied file content matches target", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+    const applyDir = join(testDir, "output");
+
+    writeFileSync(sourceFile, "Hello foo world.");
+    writeFileSync(targetFile, "Hello bar world.");
+
+    execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --apply ${applyDir}`,
+      { encoding: "utf-8" },
+    );
+
+    const outContent = readFileSync(join(applyDir, "source.md"), "utf-8");
+    expect(outContent).toContain("bar");
+    expect(outContent).not.toContain("foo");
+  });
+
+  test("reports filesApplied count in JSON output", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+    const applyDir = join(testDir, "output");
+
+    writeFileSync(sourceFile, "Hello foo.");
+    writeFileSync(targetFile, "Hello bar.");
+
+    const stdout = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --apply ${applyDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    const output = JSON.parse(stdout);
+    expect(output.stats.filesApplied).toBe(1);
+  });
+
+  test("prints 'Applied to:' confirmation in text output", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+    const applyDir = join(testDir, "output");
+
+    writeFileSync(sourceFile, "Hello foo.");
+    writeFileSync(targetFile, "Hello bar.");
+
+    const stdout = execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --apply ${applyDir}`,
+      { encoding: "utf-8" },
+    );
+
+    expect(stdout).toContain("Applied to:");
+    expect(stdout).toContain("output");
+  });
+
+  test("can be combined with --write", () => {
+    const sourceFile = join(testDir, "source.md");
+    const targetFile = join(testDir, "target.md");
+    const applyDir = join(testDir, "output");
+    const writeFile = join(testDir, "patches.yaml");
+
+    writeFileSync(sourceFile, "Hello foo.");
+    writeFileSync(targetFile, "Hello bar.");
+
+    execSync(
+      `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --apply ${applyDir} --write ${writeFile}`,
+      { encoding: "utf-8" },
+    );
+
+    expect(existsSync(applyDir)).toBe(true);
+    expect(existsSync(writeFile)).toBe(true);
+    const patchConfig = readFileSync(writeFile, "utf-8");
+    expect(patchConfig).toContain("patches:");
+  });
+
+  test("applies across multiple files in a directory", () => {
+    const srcDir = join(testDir, "src");
+    const tgtDir = join(testDir, "tgt");
+    const applyDir = join(testDir, "output");
+
+    mkdirSync(srcDir, { recursive: true });
+    mkdirSync(tgtDir, { recursive: true });
+
+    writeFileSync(join(srcDir, "a.md"), "Company: Acme");
+    writeFileSync(join(srcDir, "b.md"), "Company: Acme");
+    writeFileSync(join(tgtDir, "a.md"), "Company: Corp");
+    writeFileSync(join(tgtDir, "b.md"), "Company: Corp");
+
+    execSync(
+      `${cliPath} suggest --source ${srcDir} --target ${tgtDir} --apply ${applyDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+
+    expect(existsSync(join(applyDir, "a.md"))).toBe(true);
+    expect(existsSync(join(applyDir, "b.md"))).toBe(true);
+    const aContent = readFileSync(join(applyDir, "a.md"), "utf-8");
+    expect(aContent).toContain("Corp");
+  });
+});
+
+// Unit tests for applyPatchesToDirectory
+describe("applyPatchesToDirectory", () => {
+  const testDir = "/tmp/kustomark-apply-unit-test";
+
+  beforeEach(() => {
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+    mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test("applies patches to file and returns count", async () => {
+    const srcFile = join(testDir, "doc.md");
+    writeFileSync(srcFile, "Hello foo.");
+
+    const pairs = [{ sourcePath: srcFile, targetPath: srcFile, relativePath: "doc.md" }];
+    const patches = [{ op: "replace" as const, old: "foo", new: "bar" }];
+
+    const outDir = join(testDir, "out");
+    const count = await applyPatchesToDirectory(pairs, patches, testDir, outDir);
+
+    expect(count).toBe(1);
+    const result = readFileSync(join(outDir, "doc.md"), "utf-8");
+    expect(result).toBe("Hello bar.");
+  });
+
+  test("preserves files with no applicable patches", async () => {
+    const srcFile = join(testDir, "doc.md");
+    writeFileSync(srcFile, "Unchanged content.");
+
+    const pairs = [{ sourcePath: srcFile, targetPath: srcFile, relativePath: "doc.md" }];
+    const patches = [{ op: "replace" as const, old: "other", new: "thing", include: "other.md" }];
+
+    const outDir = join(testDir, "out");
+    const count = await applyPatchesToDirectory(pairs, patches, testDir, outDir);
+
+    expect(count).toBe(1);
+    const result = readFileSync(join(outDir, "doc.md"), "utf-8");
+    expect(result).toBe("Unchanged content.");
+  });
+
+  test("creates nested output directories for subdirectory files", async () => {
+    mkdirSync(join(testDir, "sub"), { recursive: true });
+    const srcFile = join(testDir, "sub", "doc.md");
+    writeFileSync(srcFile, "Hello foo.");
+
+    const pairs = [{ sourcePath: srcFile, targetPath: srcFile, relativePath: "sub/doc.md" }];
+    const patches = [{ op: "replace" as const, old: "foo", new: "bar" }];
+
+    const outDir = join(testDir, "out");
+    const count = await applyPatchesToDirectory(pairs, patches, testDir, outDir);
+
+    expect(count).toBe(1);
+    expect(existsSync(join(outDir, "sub", "doc.md"))).toBe(true);
+  });
+
+  test("returns 0 for empty file pairs", async () => {
+    const outDir = join(testDir, "out");
+    const count = await applyPatchesToDirectory([], [], testDir, outDir);
+    expect(count).toBe(0);
+  });
+});

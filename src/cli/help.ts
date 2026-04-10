@@ -2264,6 +2264,7 @@ ${formatSection("ARGUMENTS")}
 ${formatSection("OPTIONS")}
   ${formatFlag("--output")} <path>             Write generated config to file
   ${formatFlag("--write")} <path>              Write patches into a config file (creates or merges into existing patches: array)
+  ${formatFlag("--apply")} <dir>              Apply suggested patches to source files and write results to <dir>
   ${formatFlag("--min-confidence")} <0.0-1.0>  Filter patches below confidence threshold (0.0-1.0)
   ${formatFlag("--verify")}                   Apply patches to source and compare with target to confirm accuracy
   ${formatFlag("--format")} <text|json>        Output format (default: text)
@@ -2319,6 +2320,12 @@ ${formatSection("EXAMPLES")}
 
   ${formatExample("# Filter low-confidence suggestions (only show patches with 0.8+ confidence)")}
   ${formatCommand("kustomark suggest --source old.md --target new.md --min-confidence=0.8")}
+
+  ${formatExample("# Apply suggested patches immediately to an output directory")}
+  ${formatCommand("kustomark suggest --source upstream/ --target team-docs/ --apply output/")}
+
+  ${formatExample("# Apply and write config in one step")}
+  ${formatCommand("kustomark suggest --source src/ --target dst/ --apply output/ --write kustomark.yaml")}
 
 ${formatSection("TEXT OUTPUT")}
   Text format displays:

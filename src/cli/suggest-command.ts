@@ -3,9 +3,10 @@
  * Analyzes differences and generates kustomark.yaml configuration with suggested patches
  */
 
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import * as yaml from "js-yaml";
+import micromatch from "micromatch";
 import { parseConfig } from "../core/config-parser.js";
 import { applyPatches } from "../core/patch-engine.js";
 import type { ScoredPatch } from "../core/patch-suggester.js";
@@ -27,6 +28,7 @@ interface CLIOptions {
   minConfidence?: number;
   verify?: boolean;
   write?: string;
+  apply?: string;
 }
 
 export interface VerificationFileResult {
@@ -65,6 +67,8 @@ export interface SuggestResult {
     patchesGenerated: number;
     patchesConsolidated: number;
     confidence: "high" | "medium" | "low";
+    /** Number of files written to output dir when --apply is used */
+    filesApplied?: number;
   };
   /** Present when --verify flag is used */
   verification?: VerificationSummary;
@@ -749,6 +753,73 @@ function writePatches(
 }
 
 // ============================================================================
+// Apply Function
+// ============================================================================
+
+/**
+ * Apply the suggested patches to each source file and write results to outputDir.
+ * Files that have no patches (identical to source) are still copied.
+ * Returns the count of files written.
+ */
+export async function applyPatchesToDirectory(
+  filePairs: FilePair[],
+  patches: PatchOperation[],
+  sourcePath: string,
+  outputDir: string,
+): Promise<number> {
+  const resolvedOutput = resolve(outputDir);
+  mkdirSync(resolvedOutput, { recursive: true });
+
+  // Determine if sourcePath is a directory or single file
+  const sourceIsDir = existsSync(sourcePath) && statSync(sourcePath).isDirectory();
+
+  let filesWritten = 0;
+
+  for (const pair of filePairs) {
+    const sourceContent = readFileSafe(pair.sourcePath);
+    if (sourceContent === null) continue;
+
+    // Compute the relative path used for include/exclude matching and output placement.
+    // For directory sources: relative path from sourcePath to the file.
+    // For single-file sources: use the basename of the file.
+    const relPath = sourceIsDir
+      ? relative(sourcePath, pair.sourcePath)
+      : basename(pair.sourcePath);
+
+    const applicablePatches = patches.filter((p) => shouldApplyPatch(p, relPath));
+
+    let resultContent = sourceContent;
+    if (applicablePatches.length > 0) {
+      const patchResult = await applyPatches(resultContent, applicablePatches);
+      resultContent = patchResult.content;
+    }
+
+    const outPath = join(resolvedOutput, relPath);
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, resultContent, "utf-8");
+    filesWritten++;
+  }
+
+  return filesWritten;
+}
+
+// Determines whether a patch's include/exclude patterns match a given relative file path.
+// Mirrors the logic used in the main build pipeline.
+function shouldApplyPatch(patch: PatchOperation, relPath: string): boolean {
+  if (patch.include) {
+    const includePatterns = Array.isArray(patch.include) ? patch.include : [patch.include];
+    if (!micromatch.isMatch(relPath, includePatterns)) return false;
+  }
+
+  if (patch.exclude) {
+    const excludePatterns = Array.isArray(patch.exclude) ? patch.exclude : [patch.exclude];
+    if (micromatch.isMatch(relPath, excludePatterns)) return false;
+  }
+
+  return true;
+}
+
+// ============================================================================
 // Output Functions
 // ============================================================================
 
@@ -820,6 +891,10 @@ function outputText(result: SuggestResult, options: CLIOptions): void {
   }
   if (options.write && options.write !== "-" && options.write !== "stdout") {
     console.log(`\nPatches written to: ${options.write}`);
+  }
+  if (options.apply) {
+    const count = result.stats.filesApplied ?? 0;
+    console.log(`\nApplied to: ${options.apply} (${count} file(s) written)`);
   }
 }
 
@@ -982,6 +1057,17 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
     // Merge-aware write if --write is specified
     if (options.write && options.write !== "-" && options.write !== "stdout") {
       writePatches(options.write, config.patches ?? [], sourcePath);
+    }
+
+    // Apply patches to output directory if --apply is specified
+    if (options.apply) {
+      const filesApplied = await applyPatchesToDirectory(
+        filePairs,
+        consolidatedPatches,
+        sourcePath,
+        options.apply,
+      );
+      result.stats.filesApplied = filesApplied;
     }
 
     // Output results
