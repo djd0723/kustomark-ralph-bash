@@ -1,0 +1,31 @@
+tests/cli/profile.test.ts
+  8b7482f656cff23e 1-420
+tests/cli/benchmark.test.ts
+  8b7482f656cff23e 1-220
+IMPLEMENTATION_PLAN.md
+  8b7482f656cff23e 3,9-17
+tests/core/memory-profiler.test.ts
+  8b7482f656cff23e 1-775
+README.md
+  8b7482f656cff23e 1742-1827
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "31ce54d034ee6e8bf497207880a2ad0ed810cc0f",
+  "prompts": {
+    "8b7482f656cff23e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b15ffc1d-04a9-4354-a412-59524496ab74",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 1517,
+      "total_deletions": 4,
+      "accepted_lines": 1514,
+      "overriden_lines": 0
+    }
+  }
+}
