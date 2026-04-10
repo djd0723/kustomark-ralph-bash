@@ -1,0 +1,39 @@
+tests/cli/suggest.test.ts
+  297e91dbbbd71c4f 2597-2598,2600-2602,2638,2643-2644,2646-2812
+src/core/patch-engine.ts
+  297e91dbbbd71c4f 3627,3908-3909
+IMPLEMENTATION_PLAN.md
+  297e91dbbbd71c4f 3,9-48
+src/core/types.ts
+  297e91dbbbd71c4f 432-441,834
+src/cli/suggest-command.ts
+  297e91dbbbd71c4f 15,75-76,228-229,353,355-363,374-380,577,583-587,594,634-639,674,1122-1124,1250-1254,1256,1265-1267,1281-1285,1318,1422-1430,1470
+src/cli/help.ts
+  297e91dbbbd71c4f 2257-2259,2305-2306
+src/cli/index.ts
+  297e91dbbbd71c4f 90,995,998-1004,1012-1013,1032,1073-1080
+src/core/patch-suggester.ts
+  297e91dbbbd71c4f 2493-2494,2665-2667
+src/core/schema.ts
+  297e91dbbbd71c4f 2052-2093
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "8e44c11518bc1e8c8e198837f4ea1ad2dcdead9a",
+  "prompts": {
+    "297e91dbbbd71c4f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e854922-114a-4c98-9152-88ca816cf8d3",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 415,
+      "total_deletions": 37,
+      "accepted_lines": 406,
+      "overriden_lines": 0
+    }
+  }
+}
