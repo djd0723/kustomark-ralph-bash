@@ -1,0 +1,25 @@
+tests/cli/explain.test.ts
+  1f232f207206664b 1-655
+IMPLEMENTATION_PLAN.md
+  1f232f207206664b 3,9-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "673df62075f8031873513c85212ab9ef81a68708",
+  "prompts": {
+    "1f232f207206664b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8125c585-675d-40fb-ae1c-6cea07585dea",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 680,
+      "total_deletions": 3,
+      "accepted_lines": 678,
+      "overriden_lines": 0
+    }
+  }
+}
