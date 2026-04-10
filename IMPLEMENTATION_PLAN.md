@@ -1,8 +1,56 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅ | explain-tests ✅ | history-tests ✅ | build-tests ✅ | validate-tests ✅ | diff-tests ✅ | readme-undocumented-ops ✅ | memory-profiler-tests ✅ | profile-cli-tests ✅ | benchmark-cli-tests ✅ | profile-docs ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅ | explain-tests ✅ | history-tests ✅ | build-tests ✅ | validate-tests ✅ | diff-tests ✅ | readme-undocumented-ops ✅ | memory-profiler-tests ✅ | profile-cli-tests ✅ | benchmark-cli-tests ✅ | profile-docs ✅ | web-history-ui ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-10 (Web UI History View - COMPLETE!):**
+
+The `kustomark history` CLI command was fully implemented but had no web UI integration. This adds a complete History tab to the web UI backed by a new `/api/history` REST endpoint.
+
+* ✅ **`/api/history` server route** (`src/web/server/routes/history.ts`): Four endpoints exposing build history:
+  * `GET /api/history?configPath=...&limit=N&success=true|false` — list builds with optional filters
+  * `GET /api/history/stats?configPath=...` — aggregate statistics (total, success/fail counts, avg file count)
+  * `GET /api/history/:id?configPath=...` — fetch a single build entry by ID
+  * `POST /api/history/rollback/:id` — restore a build snapshot to the output directory (with dry-run support)
+* ✅ **Server types** (`src/web/server/types.ts`): Added `HistoryListRequest`, `HistoryListResponse`, `HistoryStatsResponse`, `HistoryRollbackRequest`, `HistoryRollbackResponse`
+* ✅ **Route registered** in `src/web/server/server.ts` at `/api/history`
+* ✅ **Client types** (`src/web/client/src/types/config.ts`): Added `HistoryFileEntry`, `HistoryEntry`, `HistoryListResult`, `HistoryStatsResult`, `HistoryRollbackResult`
+* ✅ **API service** (`src/web/client/src/services/api.ts`): Added `api.history.list()`, `api.history.get()`, `api.history.stats()`, `api.history.rollback()`
+* ✅ **`HistoryView` component** (`src/web/client/src/components/history/HistoryView.tsx`): Full React component with:
+  * Stats bar (total/succeeded/failed builds, avg file count)
+  * Scrollable list of `BuildRow` entries showing status badge, short build ID, timestamp, file count, patch count, duration
+  * Expandable row detail: full build ID, version, tags, description, per-file breakdown with sizes and patch counts
+  * Rollback button (success builds only) with in-flight state and dismissible result banner
+  * Empty state with helpful message when no history exists
+  * Refresh button
+* ✅ **History tab** added to `src/web/client/src/App.tsx`: "History" button in view-mode tab bar, renders `<HistoryView configPath={configPath} />`
+* ✅ **17 new tests** in `tests/web-server-history.test.ts` covering:
+  * `listBuilds`: empty history, single build, reverse-chronological ordering, `success=true/false` filters, `limit`
+  * `loadBuild`: null for unknown ID, roundtrip of recorded entry, field preservation (duration, tags, description)
+  * `getHistoryStats`: zero state, total count, success/failed split, oldest/newest timestamps, avg file count
+  * `rollbackBuild`: success=false when no snapshot on disk, throws for unknown build ID, restores files when snapshot exists
+* ✅ **4,771 tests passing**: Up from 4,754. `bun check` clean.
+
+**Files created:**
+
+* `src/web/server/routes/history.ts` — history API route (4 endpoints)
+* `src/web/client/src/components/history/HistoryView.tsx` — React history view component
+* `tests/web-server-history.test.ts` — 17 tests across 4 describe blocks
+
+**Files modified:**
+
+* `src/web/server/types.ts` — 5 new server-side history types
+* `src/web/server/server.ts` — registered `/api/history` route
+* `src/web/client/src/types/config.ts` — 5 new client-side history types
+* `src/web/client/src/services/api.ts` — `api.history` with 4 methods
+* `src/web/client/src/App.tsx` — added History tab and `HistoryView` render
+
+**Status:** Web UI History View COMPLETE! ✅
+
+***
 
 ## Recent Enhancements
 

@@ -2,7 +2,16 @@
  * API client for communicating with the Kustomark web server
  */
 
-import type { BuildResult, FileNode, PreviewResult, ValidationResult } from "../types/config";
+import type {
+  BuildResult,
+  FileNode,
+  HistoryEntry,
+  HistoryListResult,
+  HistoryRollbackResult,
+  HistoryStatsResult,
+  PreviewResult,
+  ValidationResult,
+} from "../types/config";
 
 const API_BASE = "/api";
 
@@ -144,6 +153,63 @@ export const api = {
      */
     async tree(path = ""): Promise<FileNode> {
       const response = await fetch(`${API_BASE}/files/tree?path=${encodeURIComponent(path)}`);
+      return handleResponse(response);
+    },
+  },
+
+  /**
+   * History API — build history, stats, and rollback
+   */
+  history: {
+    /**
+     * List build history entries
+     */
+    async list(params: {
+      configPath: string;
+      limit?: number;
+      success?: boolean;
+    }): Promise<HistoryListResult> {
+      const query = new URLSearchParams({ configPath: params.configPath });
+      if (params.limit !== undefined) query.set("limit", String(params.limit));
+      if (params.success !== undefined) query.set("success", String(params.success));
+      const response = await fetch(`${API_BASE}/history?${query}`);
+      return handleResponse(response);
+    },
+
+    /**
+     * Get a specific build entry by ID
+     */
+    async get(id: string, configPath: string): Promise<HistoryEntry> {
+      const query = new URLSearchParams({ configPath });
+      const response = await fetch(`${API_BASE}/history/${encodeURIComponent(id)}?${query}`);
+      return handleResponse(response);
+    },
+
+    /**
+     * Get aggregate statistics for build history
+     */
+    async stats(configPath: string): Promise<HistoryStatsResult> {
+      const query = new URLSearchParams({ configPath });
+      const response = await fetch(`${API_BASE}/history/stats?${query}`);
+      return handleResponse(response);
+    },
+
+    /**
+     * Rollback to a specific build
+     */
+    async rollback(params: {
+      id: string;
+      configPath: string;
+      dryRun?: boolean;
+    }): Promise<HistoryRollbackResult> {
+      const response = await fetch(
+        `${API_BASE}/history/rollback/${encodeURIComponent(params.id)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ configPath: params.configPath, dryRun: params.dryRun ?? false }),
+        },
+      );
       return handleResponse(response);
     },
   },

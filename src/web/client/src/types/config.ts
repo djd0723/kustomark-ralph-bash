@@ -235,3 +235,65 @@ export interface PreviewResult {
   totalLinesModified: number;
   duration: number;
 }
+
+/**
+ * A single file entry in build history
+ */
+export interface HistoryFileEntry {
+  path: string;
+  sourceHash: string;
+  outputHash: string;
+  patchesApplied: number;
+  sourceSize: number;
+  outputSize: number;
+  processedAt: string;
+}
+
+/**
+ * A single build history entry
+ */
+export interface HistoryEntry {
+  id: string;
+  timestamp: string;
+  duration: number;
+  success: boolean;
+  configHash: string;
+  version: string;
+  fileCount: number;
+  totalPatchesApplied: number;
+  files: HistoryFileEntry[];
+  tags?: string[];
+  description?: string;
+}
+
+/**
+ * Result from GET /api/history
+ */
+export interface HistoryListResult {
+  builds: HistoryEntry[];
+  totalBuilds: number;
+}
+
+/**
+ * Result from GET /api/history/stats
+ */
+export interface HistoryStatsResult {
+  totalBuilds: number;
+  successfulBuilds: number;
+  failedBuilds: number;
+  totalSize: number;
+  oldestBuild?: string;
+  newestBuild?: string;
+  avgFileCount: number;
+  avgBuildSize: number;
+}
+
+/**
+ * Result from POST /api/history/rollback/:id
+ */
+export interface HistoryRollbackResult {
+  success: boolean;
+  filesRestored: string[];
+  dryRun: boolean;
+  buildId: string;
+}

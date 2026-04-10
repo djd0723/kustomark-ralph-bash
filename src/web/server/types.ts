@@ -177,3 +177,63 @@ export interface ErrorResponse {
   /** Additional error details */
   details?: unknown;
 }
+
+/**
+ * History list request (query parameters)
+ */
+export interface HistoryListRequest {
+  /** Path to config file (relative to base directory) */
+  configPath: string;
+  /** Maximum number of builds to return (optional) */
+  limit?: number;
+  /** Filter by success status (optional) */
+  success?: boolean;
+}
+
+/**
+ * History list response
+ */
+export interface HistoryListResponse {
+  /** List of build history entries */
+  builds: import("../../core/types.js").BuildHistoryEntry[];
+  /** Total number of builds in history */
+  totalBuilds: number;
+}
+
+/**
+ * History stats response
+ */
+export interface HistoryStatsResponse {
+  totalBuilds: number;
+  successfulBuilds: number;
+  failedBuilds: number;
+  totalSize: number;
+  oldestBuild?: string;
+  newestBuild?: string;
+  avgFileCount: number;
+  avgBuildSize: number;
+}
+
+/**
+ * History rollback request
+ */
+export interface HistoryRollbackRequest {
+  /** Path to config file (relative to base directory) */
+  configPath: string;
+  /** Dry-run mode (do not actually restore files) */
+  dryRun?: boolean;
+}
+
+/**
+ * History rollback response
+ */
+export interface HistoryRollbackResponse {
+  /** Whether the rollback was successful */
+  success: boolean;
+  /** Files that were restored */
+  filesRestored: string[];
+  /** Whether this was a dry run */
+  dryRun: boolean;
+  /** Build ID that was rolled back to */
+  buildId: string;
+}

@@ -5,6 +5,7 @@ import * as YAML from "yaml";
 import { Button } from "./components/common/Button";
 import FileBrowser from "./components/editor/FileBrowser";
 import { PatchEditor } from "./components/editor/PatchEditor";
+import { HistoryView } from "./components/history/HistoryView";
 import { DiffViewer } from "./components/preview/DiffViewer";
 import FileViewer from "./components/preview/FileViewer";
 import { MarkdownPreview } from "./components/preview/MarkdownPreview";
@@ -17,7 +18,7 @@ import type {
   ValidationResult,
 } from "./types/config";
 
-type ViewMode = "editor" | "diff" | "preview" | "files";
+type ViewMode = "editor" | "diff" | "preview" | "files" | "history";
 
 export const App: React.FC = () => {
   const [configPath] = useState("kustomark.yaml");
@@ -336,6 +337,17 @@ export const App: React.FC = () => {
               >
                 Files
               </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("history")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === "history"
+                    ? "bg-white text-primary-600 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                History
+              </button>
             </div>
           </div>
 
@@ -415,6 +427,8 @@ export const App: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {viewMode === "history" && <HistoryView configPath={configPath} />}
           </div>
         </div>
       </div>
