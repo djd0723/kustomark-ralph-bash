@@ -186,6 +186,7 @@ export interface CLIOptions {
   verify?: boolean; // For --verify flag (verify current build against snapshot)
   updateSnapshot?: boolean; // For --update-snapshot flag (update snapshot with current build)
   noHistory?: boolean; // For --no-history flag (disable build history recording)
+  write?: string; // For suggest --write option (write patches to config file, merging with existing)
 }
 
 interface RecoveryStats {
@@ -656,6 +657,17 @@ function parseArgs(args: string[]): { command: string; path: string; options: CL
         const nextArg = args[i + 1];
         if (nextArg && !nextArg.startsWith("-")) {
           options.minConfidence = Number.parseFloat(nextArg);
+          i++;
+        }
+      }
+    } else if (arg === "--write" || arg.startsWith("--write=")) {
+      if (arg.includes("=")) {
+        const value = arg.split("=")[1];
+        if (value) options.write = value;
+      } else if (i + 1 < args.length) {
+        const nextArg = args[i + 1];
+        if (nextArg !== undefined) {
+          options.write = nextArg;
           i++;
         }
       }

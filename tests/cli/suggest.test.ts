@@ -755,6 +755,147 @@ Maximum 1000 requests per hour.`;
   });
 
   // ============================================================================
+  // --write flag: merge-aware patch writing
+  // ============================================================================
+
+  describe("--write flag", () => {
+    test("creates a new config file when none exists", () => {
+      const sourceFile = join(testDir, "source.md");
+      const targetFile = join(testDir, "target.md");
+      const writeFile = join(testDir, "patches.yaml");
+
+      writeFileSync(sourceFile, "# Hello\n\nOld content.");
+      writeFileSync(targetFile, "# Hello\n\nNew content.");
+
+      execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --write ${writeFile}`,
+        { encoding: "utf-8" },
+      );
+
+      expect(existsSync(writeFile)).toBe(true);
+      const content = readFileSync(writeFile, "utf-8");
+      expect(content).toContain("apiVersion: kustomark/v1");
+      expect(content).toContain("kind: Kustomization");
+      expect(content).toContain("patches:");
+    });
+
+    test("merges patches into existing config file", () => {
+      const sourceFile = join(testDir, "source.md");
+      const targetFile = join(testDir, "target.md");
+      const writeFile = join(testDir, "patches.yaml");
+
+      writeFileSync(sourceFile, "# Hello\n\nOld content.");
+      writeFileSync(targetFile, "# Hello\n\nNew content.");
+
+      // Pre-create a config with one existing patch
+      const existingConfig = `apiVersion: kustomark/v1
+kind: Kustomization
+output: ./output
+resources:
+  - source.md
+patches:
+  - op: replace
+    old: existing
+    new: replaced
+`;
+      writeFileSync(writeFile, existingConfig, "utf-8");
+
+      execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --write ${writeFile}`,
+        { encoding: "utf-8" },
+      );
+
+      const content = readFileSync(writeFile, "utf-8");
+      // Should still have the original patch
+      expect(content).toContain("existing");
+      // Should have new patches too
+      expect(content).toContain("Old content");
+      // apiVersion preserved
+      expect(content).toContain("apiVersion: kustomark/v1");
+    });
+
+    test("still prints to stdout when --write is used", () => {
+      const sourceFile = join(testDir, "source.md");
+      const targetFile = join(testDir, "target.md");
+      const writeFile = join(testDir, "patches.yaml");
+
+      writeFileSync(sourceFile, "# Hello\n\nOld content.");
+      writeFileSync(targetFile, "# Hello\n\nNew content.");
+
+      const output = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --write ${writeFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+
+      // stdout still has JSON output
+      const parsed = JSON.parse(output);
+      expect(parsed.config).toBeDefined();
+      expect(parsed.config.patches).toBeDefined();
+    });
+
+    test("without --write flag, no config file is created", () => {
+      const sourceFile = join(testDir, "source.md");
+      const targetFile = join(testDir, "target.md");
+      const writeFile = join(testDir, "not-created.yaml");
+
+      writeFileSync(sourceFile, "# Hello\n\nOld content.");
+      writeFileSync(targetFile, "# Hello\n\nNew content.");
+
+      execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --format=json`,
+        { encoding: "utf-8" },
+      );
+
+      expect(existsSync(writeFile)).toBe(false);
+    });
+
+    test("confirmation message appears in text output", () => {
+      const sourceFile = join(testDir, "source.md");
+      const targetFile = join(testDir, "target.md");
+      const writeFile = join(testDir, "patches.yaml");
+
+      writeFileSync(sourceFile, "# Hello\n\nOld content.");
+      writeFileSync(targetFile, "# Hello\n\nNew content.");
+
+      const output = execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --write ${writeFile}`,
+        { encoding: "utf-8" },
+      );
+
+      expect(output).toContain("Patches written to:");
+    });
+
+    test("merges into config file with no existing patches key", () => {
+      const sourceFile = join(testDir, "source.md");
+      const targetFile = join(testDir, "target.md");
+      const writeFile = join(testDir, "patches.yaml");
+
+      writeFileSync(sourceFile, "# Hello\n\nOld content.");
+      writeFileSync(targetFile, "# Hello\n\nNew content.");
+
+      // Pre-create a config with no patches key
+      const existingConfig = `apiVersion: kustomark/v1
+kind: Kustomization
+output: ./output
+resources:
+  - source.md
+`;
+      writeFileSync(writeFile, existingConfig, "utf-8");
+
+      execSync(
+        `${cliPath} suggest --source ${sourceFile} --target ${targetFile} --write ${writeFile}`,
+        { encoding: "utf-8" },
+      );
+
+      const content = readFileSync(writeFile, "utf-8");
+      expect(content).toContain("patches:");
+      // Original fields preserved
+      expect(content).toContain("apiVersion: kustomark/v1");
+      expect(content).toContain("resources:");
+    });
+  });
+
+  // ============================================================================
   // Edge cases
   // ============================================================================
 

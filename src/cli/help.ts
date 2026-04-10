@@ -2263,6 +2263,7 @@ ${formatSection("ARGUMENTS")}
 
 ${formatSection("OPTIONS")}
   ${formatFlag("--output")} <path>             Write generated config to file
+  ${formatFlag("--write")} <path>              Write patches into a config file (creates or merges into existing patches: array)
   ${formatFlag("--min-confidence")} <0.0-1.0>  Filter patches below confidence threshold (0.0-1.0)
   ${formatFlag("--verify")}                   Apply patches to source and compare with target to confirm accuracy
   ${formatFlag("--format")} <text|json>        Output format (default: text)
@@ -2300,6 +2301,12 @@ ${formatSection("EXAMPLES")}
 
   ${formatExample("# Generate config and save to file")}
   ${formatCommand("kustomark suggest --source docs/ --target customized/ --output kustomark.yaml")}
+
+  ${formatExample("# Write suggested patches to a new config file")}
+  ${formatCommand("kustomark suggest --source upstream.md --target modified.md --write kustomark.yaml")}
+
+  ${formatExample("# Merge suggested patches into an existing config file")}
+  ${formatCommand("kustomark suggest --source source/ --target target/ --write existing.yaml")}
 
   ${formatExample("# Analyze directories with verbose output")}
   ${formatCommand("kustomark suggest --source upstream/ --target team-docs/ -v")}

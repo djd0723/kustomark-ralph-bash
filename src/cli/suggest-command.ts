@@ -6,6 +6,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import * as yaml from "js-yaml";
+import { parseConfig } from "../core/config-parser.js";
 import { applyPatches } from "../core/patch-engine.js";
 import type { ScoredPatch } from "../core/patch-suggester.js";
 import { scorePatches, suggestJsonPatches, suggestPatches } from "../core/patch-suggester.js";
@@ -25,6 +26,7 @@ interface CLIOptions {
   output?: string;
   minConfidence?: number;
   verify?: boolean;
+  write?: string;
 }
 
 export interface VerificationFileResult {
@@ -579,6 +581,24 @@ function serializeConfig(config: KustomarkConfig): string {
   });
 }
 
+function writePatches(
+  writePath: string,
+  newPatches: PatchOperation[],
+  sourcePath: string,
+): "created" | "merged" {
+  if (!existsSync(writePath)) {
+    const config = generateConfig(sourcePath, newPatches);
+    writeFileSync(writePath, serializeConfig(config), "utf-8");
+    return "created";
+  }
+  const existingYaml = readFileSync(writePath, "utf-8");
+  const existingConfig = parseConfig(existingYaml);
+  const existingPatches: PatchOperation[] = existingConfig.patches ?? [];
+  existingConfig.patches = [...existingPatches, ...newPatches];
+  writeFileSync(writePath, serializeConfig(existingConfig), "utf-8");
+  return "merged";
+}
+
 // ============================================================================
 // Output Functions
 // ============================================================================
@@ -643,6 +663,9 @@ function outputText(result: SuggestResult, options: CLIOptions): void {
 
   if (options.output) {
     console.log(`\nConfiguration written to: ${options.output}`);
+  }
+  if (options.write && options.write !== "-" && options.write !== "stdout") {
+    console.log(`\nPatches written to: ${options.write}`);
   }
 }
 
@@ -792,6 +815,11 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
     if (options.output) {
       const configYaml = serializeConfig(config);
       writeFileSync(options.output, configYaml, "utf-8");
+    }
+
+    // Merge-aware write if --write is specified
+    if (options.write && options.write !== "-" && options.write !== "stdout") {
+      writePatches(options.write, config.patches ?? [], sourcePath);
     }
 
     // Output results

@@ -1,10 +1,34 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest --write flag - COMPLETE!):**
+
+* ✅ **`kustomark suggest --write <path>`**: New flag implementing bidirectional sync. Writes suggested patches into a kustomark config file — creating a new file if it doesn't exist, or merging the new patches into the existing `patches:` array if it does. Closes the suggest→config feedback loop without overwriting the full config.
+* ✅ **Create mode**: When the target file does not exist, generates a fresh config via `generateConfig()` and writes it. The resulting file has `apiVersion`, `kind`, `output`, `resources`, and `patches` fields.
+* ✅ **Merge mode**: When the target file already exists, reads and parses it with `parseConfig()`, appends new patches to the existing `patches` array (or starts a new one if the key is absent), and writes back — preserving all other config fields (`resources`, `onNoMatch`, etc.).
+* ✅ **Sentinel values**: `--write -` and `--write stdout` fall through to normal stdout output, enabling scripting composability without creating a file named `-`.
+* ✅ **Confirmation message**: Text output prints `Patches written to: <path>` after the patch YAML when `--write` is used.
+* ✅ **Stdout unaffected**: Normal text and JSON stdout output is always emitted regardless of `--write`, so the flag composes cleanly with `--format=json` and shell pipelines.
+* ✅ **`writePatches()` function**: Exported-friendly helper encapsulating the create/merge logic; uses `parseConfig` from `config-parser.ts` and existing `generateConfig`/`serializeConfig` utilities.
+* ✅ **`--write` in help text**: Added to `kustomark suggest --help` OPTIONS section with two examples (create and merge).
+* ✅ **6 new tests** in `tests/cli/suggest.test.ts` (`--write flag` suite): creates new file, merges into existing config, stdout still emitted with `--format=json`, no file created when flag absent, confirmation message in text output, merges into config with no existing `patches:` key.
+* ✅ **4,224 tests passing**: Up from 4,218.
+
+**Files modified:**
+
+* `src/cli/suggest-command.ts` — Added `write?: string` to local `CLIOptions`; added `import { parseConfig }`; added `writePatches()` function; wired call in `suggestCommand`; updated `outputText` to print confirmation.
+* `src/cli/index.ts` — Added `write?: string` to exported `CLIOptions` interface; added `--write` / `--write=` arg parsing block.
+* `src/cli/help.ts` — Added `--write` flag entry and two examples to `getSuggestHelp()` OPTIONS/EXAMPLES sections.
+* `tests/cli/suggest.test.ts` — 6 new tests in `--write flag` describe block.
+
+**Status:** suggest --write COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest --verify flag - COMPLETE!):**
 
