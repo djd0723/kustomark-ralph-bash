@@ -730,6 +730,7 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
     "rename-file",
     "delete-file",
     "move-file",
+    "write-file",
     "replace-table-cell",
     "add-table-row",
     "remove-table-row",
@@ -1113,6 +1114,32 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
         errors.push({
           field: `${prefix}.dest`,
           message: "'dest' must be a string",
+        });
+      }
+      break;
+
+    case "write-file":
+      if (!p.path) {
+        errors.push({
+          field: `${prefix}.path`,
+          message: "write-file operation requires 'path' field",
+        });
+      } else if (typeof p.path !== "string") {
+        errors.push({
+          field: `${prefix}.path`,
+          message: "'path' must be a string",
+        });
+      }
+
+      if (p.content === undefined || p.content === null) {
+        errors.push({
+          field: `${prefix}.content`,
+          message: "write-file operation requires 'content' field",
+        });
+      } else if (typeof p.content !== "string") {
+        errors.push({
+          field: `${prefix}.content`,
+          message: "'content' must be a string",
         });
       }
       break;

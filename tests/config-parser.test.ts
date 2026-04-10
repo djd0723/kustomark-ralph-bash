@@ -3992,6 +3992,7 @@ describe('validateConfig', () => {
       { op: 'remove-list-item', list: 0, item: 0 },
       { op: 'set-list-item', list: 0, item: 0, new: 'Updated item' },
       { op: 'sort-list', list: 0 },
+      { op: 'write-file', path: 'output.md', content: '# Hello' },
     ];
 
     for (const patch of validOpsToTest) {
@@ -4009,5 +4010,59 @@ describe('validateConfig', () => {
         expect(result.errors.filter(e => e.field === 'patches[0].op')).toHaveLength(0);
       });
     }
+  });
+
+  describe('write-file patch validation', () => {
+    test('accepts valid write-file patch', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        output: 'out',
+        patches: [{ op: 'write-file', path: 'new-file.md', content: '# New File' } as PatchOperation],
+      };
+      const result = validateConfig(config);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('rejects write-file missing path', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        output: 'out',
+        patches: [{ op: 'write-file', content: '# Hello' } as PatchOperation],
+      };
+      const result = validateConfig(config);
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.field === 'patches[0].path')).toBe(true);
+    });
+
+    test('rejects write-file missing content', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        output: 'out',
+        patches: [{ op: 'write-file', path: 'new-file.md' } as PatchOperation],
+      };
+      const result = validateConfig(config);
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.field === 'patches[0].content')).toBe(true);
+    });
+
+    test('accepts write-file with empty string content', () => {
+      const config: KustomarkConfig = {
+        apiVersion: 'kustomark/v1',
+        kind: 'Kustomization',
+        resources: ['*.md'],
+        output: 'out',
+        patches: [{ op: 'write-file', path: 'empty.md', content: '' } as PatchOperation],
+      };
+      const result = validateConfig(config);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
   });
 });
