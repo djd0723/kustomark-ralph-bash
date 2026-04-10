@@ -398,6 +398,275 @@ Maximum 1000 requests per hour.`;
   });
 
   // ============================================================================
+  // File operation detection: rename-file, move-file, copy-file
+  // ============================================================================
+
+  test("suggests rename-file when source-only and target-only share content in same dir", () => {
+    const sourceDir = join(testDir, "source-rename");
+    const targetDir = join(testDir, "target-rename");
+
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
+
+    const sharedContent = "# Hello World\n\nThis is content.";
+    // source-only: old-name.md; target-only: new-name.md; same content → rename-file
+    writeFileSync(join(sourceDir, "old-name.md"), sharedContent);
+    writeFileSync(join(targetDir, "new-name.md"), sharedContent);
+
+    // A paired file so the command has context (avoids "no matching files" error)
+    writeFileSync(join(sourceDir, "kept.md"), "# Kept\n\nSame.");
+    writeFileSync(join(targetDir, "kept.md"), "# Kept\n\nSame.");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    const renamePatch = output.config.patches.find((p: any) => p.op === "rename-file");
+    expect(renamePatch).toBeDefined();
+    expect(renamePatch.match).toBe("old-name.md");
+    expect(renamePatch.rename).toBe("new-name.md");
+
+    expect(output.stats.filesRenamed).toBe(1);
+  });
+
+  test("rename-file is not also emitted as delete-file for the same source file", () => {
+    const sourceDir = join(testDir, "source-rename-no-del");
+    const targetDir = join(testDir, "target-rename-no-del");
+
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
+
+    const sharedContent = "# Content\n\nSome text.";
+    writeFileSync(join(sourceDir, "before.md"), sharedContent);
+    writeFileSync(join(targetDir, "after.md"), sharedContent);
+    writeFileSync(join(sourceDir, "base.md"), "# Base");
+    writeFileSync(join(targetDir, "base.md"), "# Base");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    // rename-file should be suggested
+    expect(output.config.patches.some((p: any) => p.op === "rename-file")).toBe(true);
+    // delete-file should NOT be suggested for before.md
+    const deletePatches = output.config.patches.filter((p: any) => p.op === "delete-file");
+    expect(deletePatches.every((p: any) => p.match !== "before.md")).toBe(true);
+    expect(output.stats.filesDeleted).toBe(0);
+  });
+
+  test("suggests move-file when source-only and target-only share content and basename in different dirs", () => {
+    const sourceDir = join(testDir, "source-move");
+    const targetDir = join(testDir, "target-move");
+
+    mkdirSync(join(sourceDir, "old-dir"), { recursive: true });
+    mkdirSync(join(targetDir, "new-dir"), { recursive: true });
+
+    const sharedContent = "# Document\n\nSome content.";
+    // Same basename (doc.md), different directory → move-file
+    writeFileSync(join(sourceDir, "old-dir", "doc.md"), sharedContent);
+    writeFileSync(join(targetDir, "new-dir", "doc.md"), sharedContent);
+
+    // Paired file so command has context
+    writeFileSync(join(sourceDir, "base.md"), "# Base");
+    writeFileSync(join(targetDir, "base.md"), "# Base");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    const movePatch = output.config.patches.find((p: any) => p.op === "move-file");
+    expect(movePatch).toBeDefined();
+    expect(movePatch.match).toBe("old-dir/doc.md");
+    expect(movePatch.dest).toContain("new-dir");
+
+    expect(output.stats.filesMoved).toBe(1);
+  });
+
+  test("move-file is not also emitted as delete-file for the same source file", () => {
+    const sourceDir = join(testDir, "source-move-no-del");
+    const targetDir = join(testDir, "target-move-no-del");
+
+    mkdirSync(join(sourceDir, "subA"), { recursive: true });
+    mkdirSync(join(targetDir, "subB"), { recursive: true });
+
+    const sharedContent = "# Moved\n\nContent.";
+    writeFileSync(join(sourceDir, "subA", "file.md"), sharedContent);
+    writeFileSync(join(targetDir, "subB", "file.md"), sharedContent);
+    writeFileSync(join(sourceDir, "base.md"), "# Base");
+    writeFileSync(join(targetDir, "base.md"), "# Base");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    expect(output.config.patches.some((p: any) => p.op === "move-file")).toBe(true);
+    const deletePatches = output.config.patches.filter((p: any) => p.op === "delete-file");
+    expect(deletePatches.every((p: any) => p.match !== "subA/file.md")).toBe(true);
+    expect(output.stats.filesDeleted).toBe(0);
+  });
+
+  test("suggests copy-file when an unchanged paired source file content appears in a target-only file", () => {
+    const sourceDir = join(testDir, "source-copy");
+    const targetDir = join(testDir, "target-copy");
+
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
+
+    const sharedContent = "# Original\n\nContent to copy.";
+    // original.md: paired, unchanged
+    writeFileSync(join(sourceDir, "original.md"), sharedContent);
+    writeFileSync(join(targetDir, "original.md"), sharedContent);
+    // copy.md: target-only with same content as original.md
+    writeFileSync(join(targetDir, "copy.md"), sharedContent);
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    const copyPatch = output.config.patches.find((p: any) => p.op === "copy-file");
+    expect(copyPatch).toBeDefined();
+    expect(copyPatch.src).toBe("original.md");
+    expect(copyPatch.dest).toBe("copy.md");
+
+    expect(output.stats.filesCopied).toBe(1);
+  });
+
+  test("copy-file not suggested when paired source file was modified in target", () => {
+    const sourceDir = join(testDir, "source-copy-modified");
+    const targetDir = join(testDir, "target-copy-modified");
+
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
+
+    const sourceContent = "# Original\n\nOriginal content.";
+    const targetContent = "# Original\n\nModified content.";
+    // original.md: paired, CHANGED → copy-file must not be suggested
+    writeFileSync(join(sourceDir, "original.md"), sourceContent);
+    writeFileSync(join(targetDir, "original.md"), targetContent);
+    // extra.md: target-only with the ORIGINAL source content
+    writeFileSync(join(targetDir, "extra.md"), sourceContent);
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    expect(output.config.patches.some((p: any) => p.op === "copy-file")).toBe(false);
+    expect(output.stats.filesCopied).toBe(0);
+  });
+
+  test("ambiguous rename (multiple source-only files with same content) falls back to delete-file", () => {
+    const sourceDir = join(testDir, "source-ambig");
+    const targetDir = join(testDir, "target-ambig");
+
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
+
+    const sharedContent = "# Duplicate\n\nSame content.";
+    // Two source-only files with identical content → ambiguous, not renamed
+    writeFileSync(join(sourceDir, "dup1.md"), sharedContent);
+    writeFileSync(join(sourceDir, "dup2.md"), sharedContent);
+    // One target-only with same content
+    writeFileSync(join(targetDir, "target.md"), sharedContent);
+
+    writeFileSync(join(sourceDir, "base.md"), "# Base");
+    writeFileSync(join(targetDir, "base.md"), "# Base");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    // No rename-file suggested for ambiguous content
+    expect(output.config.patches.some((p: any) => p.op === "rename-file")).toBe(false);
+    // Both source-only files should fall back to delete-file
+    expect(output.stats.filesDeleted).toBe(2);
+  });
+
+  test("rename-file patch has score 0.9", () => {
+    const sourceDir = join(testDir, "source-rename-score");
+    const targetDir = join(testDir, "target-rename-score");
+
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
+
+    const content = "# Score Test\n\nContent.";
+    writeFileSync(join(sourceDir, "old.md"), content);
+    writeFileSync(join(targetDir, "new.md"), content);
+    writeFileSync(join(sourceDir, "base.md"), "# Base");
+    writeFileSync(join(targetDir, "base.md"), "# Base");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    const renameScored = output.scoredPatches.find((sp: any) => sp.patch.op === "rename-file");
+    expect(renameScored).toBeDefined();
+    expect(renameScored.score).toBe(0.9);
+  });
+
+  test("move-file patch has score 0.9", () => {
+    const sourceDir = join(testDir, "source-move-score");
+    const targetDir = join(testDir, "target-move-score");
+
+    mkdirSync(join(sourceDir, "dirA"), { recursive: true });
+    mkdirSync(join(targetDir, "dirB"), { recursive: true });
+
+    const content = "# Score Test\n\nContent.";
+    writeFileSync(join(sourceDir, "dirA", "file.md"), content);
+    writeFileSync(join(targetDir, "dirB", "file.md"), content);
+    writeFileSync(join(sourceDir, "base.md"), "# Base");
+    writeFileSync(join(targetDir, "base.md"), "# Base");
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    const moveScored = output.scoredPatches.find((sp: any) => sp.patch.op === "move-file");
+    expect(moveScored).toBeDefined();
+    expect(moveScored.score).toBe(0.9);
+  });
+
+  test("copy-file patch has score 0.9", () => {
+    const sourceDir = join(testDir, "source-copy-score");
+    const targetDir = join(testDir, "target-copy-score");
+
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
+
+    const content = "# Score Test\n\nContent.";
+    writeFileSync(join(sourceDir, "original.md"), content);
+    writeFileSync(join(targetDir, "original.md"), content);
+    writeFileSync(join(targetDir, "copy.md"), content);
+
+    const result = execSync(
+      `${cliPath} suggest --source ${sourceDir} --target ${targetDir} --format=json`,
+      { encoding: "utf-8" },
+    );
+    const output = JSON.parse(result);
+
+    const copyScored = output.scoredPatches.find((sp: any) => sp.patch.op === "copy-file");
+    expect(copyScored).toBeDefined();
+    expect(copyScored.score).toBe(0.9);
+  });
+
+  // ============================================================================
   // Output formats
   // ============================================================================
 

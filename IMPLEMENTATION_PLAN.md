@@ -1,10 +1,32 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest rename-file, move-file, copy-file detection - COMPLETE!):**
+
+* ✅ **`suggest` now detects `rename-file`**: When a source-only file and a target-only file share identical content and live in the same directory but have different basenames, the command generates a `rename-file` patch (`match`: original relative path, `rename`: new basename). Requires unambiguous 1:1 content match to prevent false positives.
+* ✅ **`suggest` now detects `move-file`**: When a source-only file and a target-only file share identical content and have the same basename but live in different directories, the command generates a `move-file` patch (`match`: original relative path, `dest`: new directory path with trailing slash).
+* ✅ **`suggest` now detects `copy-file`**: When a paired source file is unchanged in the target (identical content on both sides) and the same content also appears in a target-only file, the command generates a `copy-file` patch (`src`: source relative path, `dest`: target-only relative path).
+* ✅ **Rename/move claims suppress delete-file**: Source-only files matched by a rename or move are removed from the `delete-file` candidate list, so no conflicting patches are generated.
+* ✅ **Ambiguous cases skipped**: If multiple source-only or target-only files share the same content, the detection is skipped for that content key and the source-only files fall back to `delete-file` as before.
+* ✅ **High-confidence scoring**: All three operations score at 0.9 (same as `delete-file` and other explicit file ops — already handled by `calculatePatchScore`).
+* ✅ **New stats fields**: `SuggestResult.stats` now includes `filesRenamed`, `filesMoved`, `filesCopied` counters. Text output prints these when non-zero.
+* ✅ **`targetOnlyPaths` tracked in `matchFiles`**: The internal `matchFiles` function now returns `targetOnlyPaths` (files in target with no corresponding source file) alongside the existing `pairs` and `sourceOnlyPaths`.
+* ✅ **10 new tests**: `suggests rename-file` (patch shape, match/rename values, stat), `rename-file not also delete-file` (no conflict), `suggests move-file` (patch shape, match/dest values, stat), `move-file not also delete-file`, `suggests copy-file` (src/dest values, stat), `copy-file not when source changed` (guard), `ambiguous rename falls back to delete-file`, `rename-file score 0.9`, `move-file score 0.9`, `copy-file score 0.9`.
+* ✅ **4,161 tests passing**: Up from 4,151.
+
+**Files modified:**
+
+* `src/cli/suggest-command.ts` — Added `basename`, `dirname` to path imports; added `targetOnlyPaths` to `MatchResult`; rewrote `matchFiles` to populate `targetOnlyPaths`; added `readFileSafe`, `FileOpResult`, `detectFileOperationPatches`; updated `SuggestResult.stats` with `filesRenamed`/`filesMoved`/`filesCopied`; wired `detectFileOperationPatches` into `suggestCommand`; updated `outputText` to print new stat lines.
+* `tests/cli/suggest.test.ts` — 10 new tests in `File operation detection: rename-file, move-file, copy-file` suite.
+
+**Status:** suggest rename-file, move-file, copy-file detection COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest delete-file detection for source-only files - COMPLETE!):**
 

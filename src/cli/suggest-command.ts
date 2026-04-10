@@ -4,7 +4,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import * as yaml from "js-yaml";
 import type { ScoredPatch } from "../core/patch-suggester.js";
 import { scorePatches, suggestPatches } from "../core/patch-suggester.js";
@@ -31,6 +31,9 @@ export interface SuggestResult {
   stats: {
     filesAnalyzed: number;
     filesDeleted: number;
+    filesRenamed: number;
+    filesMoved: number;
+    filesCopied: number;
     patchesGenerated: number;
     confidence: "high" | "medium" | "low";
   };
@@ -84,6 +87,7 @@ function findMarkdownFiles(dir: string): string[] {
 interface MatchResult {
   pairs: FilePair[];
   sourceOnlyPaths: string[];
+  targetOnlyPaths: string[];
 }
 
 /**
@@ -94,6 +98,7 @@ interface MatchResult {
 function matchFiles(sourcePath: string, targetPath: string): MatchResult {
   const pairs: FilePair[] = [];
   const sourceOnlyPaths: string[] = [];
+  const targetOnlyPaths: string[] = [];
 
   const sourceIsDir = statSync(sourcePath).isDirectory();
   const targetIsDir = statSync(targetPath).isDirectory();
@@ -110,33 +115,186 @@ function matchFiles(sourcePath: string, targetPath: string): MatchResult {
     const sourceFiles = findMarkdownFiles(sourcePath);
     const targetFiles = findMarkdownFiles(targetPath);
 
-    // Build a map of relative paths to target files
+    // Build maps of relative paths for both sides
+    const sourceMap = new Map<string, string>();
+    for (const sourceFile of sourceFiles) {
+      sourceMap.set(relative(sourcePath, sourceFile), sourceFile);
+    }
+
     const targetMap = new Map<string, string>();
     for (const targetFile of targetFiles) {
-      const relPath = relative(targetPath, targetFile);
-      targetMap.set(relPath, targetFile);
+      targetMap.set(relative(targetPath, targetFile), targetFile);
     }
 
     // Match source files with target files; track source-only files
-    for (const sourceFile of sourceFiles) {
-      const relPath = relative(sourcePath, sourceFile);
+    for (const [relPath, sourceFile] of sourceMap) {
       const matchingTarget = targetMap.get(relPath);
-
       if (matchingTarget) {
-        pairs.push({
-          relativePath: relPath,
-          sourcePath: sourceFile,
-          targetPath: matchingTarget,
-        });
+        pairs.push({ relativePath: relPath, sourcePath: sourceFile, targetPath: matchingTarget });
       } else {
         sourceOnlyPaths.push(relPath);
+      }
+    }
+
+    // Track target-only files (present in target but not source)
+    for (const relPath of targetMap.keys()) {
+      if (!sourceMap.has(relPath)) {
+        targetOnlyPaths.push(relPath);
       }
     }
   } else {
     throw new Error("Source and target must both be files or both be directories");
   }
 
-  return { pairs, sourceOnlyPaths };
+  return { pairs, sourceOnlyPaths, targetOnlyPaths };
+}
+
+// ============================================================================
+// File Operation Detection
+// ============================================================================
+
+/**
+ * Read file content safely, returning null on error or empty content
+ */
+function readFileSafe(filePath: string): string | null {
+  try {
+    const content = readFileSync(filePath, "utf-8");
+    return content.trim() ? content : null;
+  } catch {
+    return null;
+  }
+}
+
+interface FileOpResult {
+  fileOps: PatchOperation[];
+  scoredFileOps: ScoredPatch[];
+  /** Source-only paths not claimed by a rename/move — should become delete-file patches */
+  remainingSourceOnly: string[];
+  filesRenamed: number;
+  filesMoved: number;
+  filesCopied: number;
+}
+
+/**
+ * Detect rename-file, move-file, and copy-file patches by comparing file contents
+ * across source-only, target-only, and paired file sets.
+ *
+ * rename-file: source-only + target-only, same content, same parent dir, different basename
+ * move-file:   source-only + target-only, same content, same basename, different parent dir
+ * copy-file:   unchanged paired source file + target-only with same content
+ */
+function detectFileOperationPatches(
+  sourcePath: string,
+  targetPath: string,
+  sourceOnlyPaths: string[],
+  targetOnlyPaths: string[],
+  pairs: FilePair[],
+): FileOpResult {
+  const fileOps: PatchOperation[] = [];
+  const scoredFileOps: ScoredPatch[] = [];
+  const claimedSourceOnly = new Set<string>();
+  const claimedTargetOnly = new Set<string>();
+  let filesRenamed = 0;
+  let filesMoved = 0;
+  let filesCopied = 0;
+
+  // Read source-only file contents
+  const sourceOnlyContents = new Map<string, string>();
+  for (const relPath of sourceOnlyPaths) {
+    const content = readFileSafe(join(sourcePath, relPath));
+    if (content) sourceOnlyContents.set(relPath, content);
+  }
+
+  // Read target-only file contents
+  const targetOnlyContents = new Map<string, string>();
+  for (const relPath of targetOnlyPaths) {
+    const content = readFileSafe(join(targetPath, relPath));
+    if (content) targetOnlyContents.set(relPath, content);
+  }
+
+  // Build reverse maps: content → list of paths (for ambiguity detection)
+  const contentToSourceOnly = new Map<string, string[]>();
+  for (const [relPath, content] of sourceOnlyContents) {
+    const existing = contentToSourceOnly.get(content) ?? [];
+    existing.push(relPath);
+    contentToSourceOnly.set(content, existing);
+  }
+
+  const contentToTargetOnly = new Map<string, string[]>();
+  for (const [relPath, content] of targetOnlyContents) {
+    const existing = contentToTargetOnly.get(content) ?? [];
+    existing.push(relPath);
+    contentToTargetOnly.set(content, existing);
+  }
+
+  // Detect rename-file and move-file: match source-only ↔ target-only by content
+  for (const [srcRelPath, srcContent] of sourceOnlyContents) {
+    const matchingTargetPaths = contentToTargetOnly.get(srcContent) ?? [];
+    const matchingSourcePaths = contentToSourceOnly.get(srcContent) ?? [];
+
+    // Only process unambiguous 1:1 content matches
+    if (matchingTargetPaths.length !== 1 || matchingSourcePaths.length !== 1) continue;
+
+    // biome-ignore lint/style/noNonNullAssertion: length === 1 is verified above
+    const tgtRelPath = matchingTargetPaths[0]!;
+    if (claimedTargetOnly.has(tgtRelPath)) continue;
+
+    const srcBase = basename(srcRelPath);
+    const tgtBase = basename(tgtRelPath);
+    const srcDir = dirname(srcRelPath) === "." ? "" : dirname(srcRelPath);
+    const tgtDir = dirname(tgtRelPath) === "." ? "" : dirname(tgtRelPath);
+
+    if (srcBase !== tgtBase && srcDir === tgtDir) {
+      // Different basename, same directory → rename-file
+      const patch: PatchOperation = { op: "rename-file", match: srcRelPath, rename: tgtBase };
+      fileOps.push(patch);
+      const [scored] = scorePatches([patch], "", "");
+      if (scored) scoredFileOps.push(scored);
+      claimedSourceOnly.add(srcRelPath);
+      claimedTargetOnly.add(tgtRelPath);
+      filesRenamed++;
+    } else if (srcBase === tgtBase && srcDir !== tgtDir) {
+      // Same basename, different directory → move-file
+      const destDir = tgtDir === "" ? "./" : `${tgtDir}/`;
+      const patch: PatchOperation = { op: "move-file", match: srcRelPath, dest: destDir };
+      fileOps.push(patch);
+      const [scored] = scorePatches([patch], "", "");
+      if (scored) scoredFileOps.push(scored);
+      claimedSourceOnly.add(srcRelPath);
+      claimedTargetOnly.add(tgtRelPath);
+      filesMoved++;
+    }
+    // Both name and dir differ → ambiguous, skip
+  }
+
+  // Detect copy-file: paired source file (unchanged) + target-only with same content
+  for (const pair of pairs) {
+    const srcContent = readFileSafe(pair.sourcePath);
+    const tgtContent = readFileSafe(pair.targetPath);
+    // Only suggest copy-file when the source file is unchanged in the target
+    if (!srcContent || srcContent !== tgtContent) continue;
+
+    const matchingTargetOnly = (contentToTargetOnly.get(srcContent) ?? []).filter(
+      (p) => !claimedTargetOnly.has(p),
+    );
+
+    for (const tgtRelPath of matchingTargetOnly) {
+      const patch: PatchOperation = {
+        op: "copy-file",
+        src: pair.relativePath,
+        dest: tgtRelPath,
+      };
+      fileOps.push(patch);
+      const [scored] = scorePatches([patch], "", "");
+      if (scored) scoredFileOps.push(scored);
+      claimedTargetOnly.add(tgtRelPath);
+      filesCopied++;
+    }
+  }
+
+  const remainingSourceOnly = sourceOnlyPaths.filter((p) => !claimedSourceOnly.has(p));
+
+  return { fileOps, scoredFileOps, remainingSourceOnly, filesRenamed, filesMoved, filesCopied };
 }
 
 // ============================================================================
@@ -311,6 +469,15 @@ function outputText(result: SuggestResult, options: CLIOptions): void {
     if (result.stats.filesDeleted > 0) {
       console.log(`  Files deleted (source-only): ${result.stats.filesDeleted}`);
     }
+    if (result.stats.filesRenamed > 0) {
+      console.log(`  Files renamed: ${result.stats.filesRenamed}`);
+    }
+    if (result.stats.filesMoved > 0) {
+      console.log(`  Files moved: ${result.stats.filesMoved}`);
+    }
+    if (result.stats.filesCopied > 0) {
+      console.log(`  Files copied: ${result.stats.filesCopied}`);
+    }
     console.log(`  Patches generated: ${result.stats.patchesGenerated}`);
     console.log(`  Confidence: ${result.stats.confidence}`);
   }
@@ -388,7 +555,11 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       console.log("Matching files...\n");
     }
 
-    const { pairs: filePairs, sourceOnlyPaths } = matchFiles(sourcePath, targetPath);
+    const {
+      pairs: filePairs,
+      sourceOnlyPaths,
+      targetOnlyPaths,
+    } = matchFiles(sourcePath, targetPath);
 
     if (filePairs.length === 0 && sourceOnlyPaths.length === 0) {
       throw new Error("No matching files found between source and target");
@@ -397,17 +568,31 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
     if (verbosity >= 2) {
       console.log(`Found ${filePairs.length} file pair(s) to analyze\n`);
       if (sourceOnlyPaths.length > 0) {
-        console.log(
-          `Found ${sourceOnlyPaths.length} file(s) only in source (will suggest delete-file)\n`,
-        );
+        console.log(`Found ${sourceOnlyPaths.length} file(s) only in source\n`);
+      }
+      if (targetOnlyPaths.length > 0) {
+        console.log(`Found ${targetOnlyPaths.length} file(s) only in target\n`);
       }
     }
 
-    // Analyze files and generate patches
+    // Detect rename-file, move-file, copy-file patches via content comparison
+    const fileOpResult = detectFileOperationPatches(
+      sourcePath,
+      targetPath,
+      sourceOnlyPaths,
+      targetOnlyPaths,
+      filePairs,
+    );
+
+    // Analyze content-differing file pairs and generate patches
     const { patches, scoredPatches, filesAnalyzed } = analyzeFilePairs(filePairs, opts);
 
-    // Generate delete-file patches for files only in source (deleted in target)
-    for (const relPath of sourceOnlyPaths) {
+    // Add file operation patches (rename, move, copy)
+    patches.push(...fileOpResult.fileOps);
+    scoredPatches.push(...fileOpResult.scoredFileOps);
+
+    // Generate delete-file patches for source-only files not claimed by a rename/move
+    for (const relPath of fileOpResult.remainingSourceOnly) {
       const deletePatch = { op: "delete-file" as const, match: relPath };
       patches.push(deletePatch);
       const [scored] = scorePatches([deletePatch], "", "");
@@ -425,7 +610,10 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       scoredPatches,
       stats: {
         filesAnalyzed,
-        filesDeleted: sourceOnlyPaths.length,
+        filesDeleted: fileOpResult.remainingSourceOnly.length,
+        filesRenamed: fileOpResult.filesRenamed,
+        filesMoved: fileOpResult.filesMoved,
+        filesCopied: fileOpResult.filesCopied,
         patchesGenerated: patches.length,
         confidence,
       },
