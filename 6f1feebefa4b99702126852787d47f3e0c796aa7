@@ -1,0 +1,27 @@
+IMPLEMENTATION_PLAN.md
+  d5b7e7cf7371b032 3,1386-1394
+src/core/config-parser.ts
+  d5b7e7cf7371b032 733,1121-1146
+tests/config-parser.test.ts
+  d5b7e7cf7371b032 3995,4014-4067
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "6f1feebefa4b99702126852787d47f3e0c796aa7",
+  "prompts": {
+    "d5b7e7cf7371b032": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f11b40d0-3967-4722-9a14-d17247c935ef",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 92,
+      "total_deletions": 1,
+      "accepted_lines": 92,
+      "overriden_lines": 0
+    }
+  }
+}
