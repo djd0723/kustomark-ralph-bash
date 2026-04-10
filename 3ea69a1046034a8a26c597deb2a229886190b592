@@ -1,0 +1,27 @@
+src/cli/preview-command.ts
+  2d2c5a92b60140ba 7,250-257,259,318
+IMPLEMENTATION_PLAN.md
+  2d2c5a92b60140ba 3,9-40
+tests/cli/preview.test.ts
+  2d2c5a92b60140ba 1-568
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "3ea69a1046034a8a26c597deb2a229886190b592",
+  "prompts": {
+    "2d2c5a92b60140ba": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c6678d45-1ed9-43d0-aaf1-8c224a7ea819",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dominic Dones",
+      "messages": [],
+      "total_additions": 620,
+      "total_deletions": 14,
+      "accepted_lines": 612,
+      "overriden_lines": 0
+    }
+  }
+}
