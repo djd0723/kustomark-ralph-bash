@@ -37,6 +37,8 @@ Kustomark solves the "upstream fork problem" for markdown files. Consume markdow
 - [Table Operations](#table-operations)
 - [List Operations](#list-operations)
 - [File Operations](#file-operations)
+- [JSON / YAML / TOML Operations](#json--yaml--toml-operations)
+- [AI Transform](#ai-transform)
 - [Conditional Patches](#conditional-patches)
   - [Condition Types](#condition-types)
   - [Logical Operators](#logical-operators)
@@ -3511,6 +3513,41 @@ patches:
 - Commands run in the same security context as kustomark
 - Complex command-line arguments should be in a wrapper script
 
+### `replace-code-block` - Replace Content of a Code Block
+
+Replace the body of a fenced code block by its zero-based index in the document.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `op` | string | ✓ | `"replace-code-block"` |
+| `index` | number | ✓ | Zero-based index of the code block to replace (0 = first block) |
+| `content` | string | ✓ | New body for the code block (without the fences) |
+| `language` | string | | New language tag for the opening fence. If omitted, the original tag is preserved |
+| `include` | string \| string[] | | Glob pattern(s) to target specific files |
+| `exclude` | string \| string[] | | Glob pattern(s) to exclude specific files |
+| `onNoMatch` | string | | Behavior when the index is out of range: `"skip"`, `"warn"`, or `"error"` |
+
+```yaml
+# Replace the first code block (index 0), changing language to bash
+- op: replace-code-block
+  index: 0
+  content: "npm install my-package"
+  language: bash
+
+# Replace the second code block, keeping the original language tag
+- op: replace-code-block
+  index: 1
+  content: |
+    import pkg from 'my-package';
+    pkg.init({ verbose: true });
+```
+
+**Notes:**
+- Supports both backtick (` ``` `) and tilde (`~~~`) fence styles; the original style is preserved
+- `count` is 1 if the block was found and replaced, 0 if `index` is out of range
+- Empty `content` is valid — it produces an empty but still-fenced code block
+- `index` is document-wide (counts all fenced code blocks in order)
+
 ## Table Operations
 
 Table operations allow you to manipulate GitHub Flavored Markdown tables. Tables can be identified by their zero-based index in the document or by the section ID containing the table.
@@ -4724,6 +4761,47 @@ All matching files are moved to the specified destination directory, preserving 
 - Consolidate scattered files into a single directory
 - Move files to match your preferred directory layout
 
+### `write-file` - Write a New File
+
+Create or overwrite a file in the output directory with specific content. Useful for generating new files, manifests, or configuration files that do not exist in any source.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `op` | string | ✓ | `"write-file"` |
+| `path` | string | ✓ | File path relative to the output directory. Missing parent directories are created automatically |
+| `content` | string | ✓ | Complete content to write to the file (empty string is valid) |
+| `include` | string \| string[] | | Glob pattern(s) — rarely needed; write-file targets its own path |
+| `exclude` | string \| string[] | | Glob pattern(s) to exclude |
+| `onNoMatch` | string | | Not applicable; this operation always succeeds |
+
+```yaml
+# Create a new CONTRIBUTING.md from scratch
+- op: write-file
+  path: "CONTRIBUTING.md"
+  content: |
+    # Contributing
+
+    Thank you for contributing to this project!
+
+    ## Getting Started
+    Run `bun install` to install dependencies.
+
+# Create a nested file — directories are created automatically
+- op: write-file
+  path: "docs/api/endpoints.md"
+  content: |
+    # API Endpoints
+
+    ## GET /users
+    Returns the list of users.
+```
+
+**Notes:**
+- `count` is always 1 — the operation unconditionally creates the file
+- Path traversal is blocked: paths that escape the output directory raise an error
+- If two patches write to the same `path`, the last one wins
+- Unlike `copy-file`/`move-file`, `write-file` does not require a source file — content is defined inline
+
 ### Common Patterns
 
 File operations work with the same common fields as other patch operations:
@@ -4853,6 +4931,177 @@ Append content after the very last character of the file.
 - Content is appended verbatim; include a leading newline in `content` if needed
 - Use `include`/`exclude` to limit which files are affected
 - Symmetrical with `prepend-to-file`
+
+## JSON / YAML / TOML Operations
+
+Structured-data operations work on `.json`, `.yaml`, `.yml`, and `.toml` files using dot-notation paths. The file is parsed, modified, and serialized back in its original format. Markdown and plain-text files are skipped (count=0).
+
+**Supported file types:** `.json`, `.yaml`, `.yml`, `.toml`, `.env`, `.properties`
+
+### `json-set` - Set a Structured Data Field
+
+Set (or create) a value at a dot-notation path.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `op` | string | ✓ | `"json-set"` |
+| `path` | string | ✓ | Dot-notation path (e.g., `"server.port"`, `"users[0].name"`) |
+| `value` | any | ✓ | Value to set. Can be a string, number, boolean, array, or nested object |
+| `include` | string \| string[] | | Glob pattern(s) to target specific files |
+| `exclude` | string \| string[] | | Glob pattern(s) to exclude specific files |
+| `onNoMatch` | string | | Behavior when no files match: `"skip"`, `"warn"`, or `"error"` |
+
+```yaml
+# Set a scalar value
+- op: json-set
+  path: server.port
+  value: 8080
+
+# Create a nested object (intermediate keys are created automatically)
+- op: json-set
+  path: database.connection.pool.max
+  value: 20
+  include: "config.json"
+
+# Set an array value
+- op: json-set
+  path: allowed_origins
+  value:
+    - "https://example.com"
+    - "https://api.example.com"
+```
+
+**Notes:**
+- Intermediate objects are created automatically if any key in the path is missing
+- Overwrites existing values at the path (including type changes)
+- `count` is 1 on success, 0 for unsupported file types or parse/serialization errors
+- `.env` and `.properties` files are supported as flat key=value; dotted keys create nested structures
+
+### `json-delete` - Delete a Structured Data Field
+
+Remove a key at a dot-notation path. No-ops silently if the path doesn't exist.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `op` | string | ✓ | `"json-delete"` |
+| `path` | string | ✓ | Dot-notation path to the key to remove |
+| `include` | string \| string[] | | Glob pattern(s) to target specific files |
+| `exclude` | string \| string[] | | Glob pattern(s) to exclude specific files |
+| `onNoMatch` | string | | Behavior when no files match: `"skip"`, `"warn"`, or `"error"` |
+
+```yaml
+# Remove a debug flag
+- op: json-delete
+  path: debug.verbose
+
+# Remove a nested key from all JSON files
+- op: json-delete
+  path: build.experimental
+  include: "*.json"
+  onNoMatch: skip
+```
+
+**Notes:**
+- Returns `count: 1` only if the key existed and was deleted; `count: 0` if path was not found
+- Idempotent: applying twice is safe (second apply returns count=0)
+- Parent objects are not removed even if they become empty after deletion
+
+### `json-merge` - Deep-Merge Into Structured Data
+
+Recursively merge an object into the file (or a sub-path within the file).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `op` | string | ✓ | `"json-merge"` |
+| `value` | object | ✓ | Object to deep-merge into the file (or into `path` if specified) |
+| `path` | string | | Dot-notation path to merge into (default: root of the file) |
+| `include` | string \| string[] | | Glob pattern(s) to target specific files |
+| `exclude` | string \| string[] | | Glob pattern(s) to exclude specific files |
+| `onNoMatch` | string | | Behavior when no files match: `"skip"`, `"warn"`, or `"error"` |
+
+```yaml
+# Merge new keys into the root
+- op: json-merge
+  value:
+    logging:
+      level: info
+      format: json
+    metrics:
+      enabled: true
+
+# Merge into a specific sub-path (creates path if missing)
+- op: json-merge
+  path: server
+  value:
+    ssl: true
+    timeout: 30
+  include: "config.json"
+```
+
+**Notes:**
+- Deep merge: nested objects are merged recursively; existing keys not in `value` are preserved
+- Arrays are replaced (not element-wise merged)
+- If `path` points to a non-object value it is replaced with the merged result
+- `count` is 1 on success, 0 for unsupported file types or parse/serialization errors
+
+## AI Transform
+
+### `ai-transform` - Transform Content with an LLM
+
+Send file content to an AI language model and replace it with the model's response. The model receives the current file content plus a prompt describing the transformation.
+
+> **Note**: AI transforms are non-deterministic. Use this for one-off content generation, then commit the result and remove the patch for reproducible builds.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `op` | string | ✓ | `"ai-transform"` |
+| `prompt` | string | ✓ | Instruction sent to the model describing the transformation |
+| `provider` | string | | AI provider: `"openai"` (default), `"anthropic"`, or `"custom"` |
+| `model` | string | | Model name. Defaults: `gpt-4o` for OpenAI, `claude-opus-4-5` for Anthropic |
+| `endpoint` | string | | Custom API base URL (overrides the provider default) |
+| `apiKeyEnv` | string | | Environment variable holding the API key. Defaults: `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` |
+| `maxTokens` | number | | Maximum response tokens (default: 4096) |
+| `temperature` | number | | Generation temperature 0–2 (default: 0 for determinism) |
+| `timeout` | number | | Request timeout in milliseconds (default: 60000) |
+| `include` | string \| string[] | | Glob pattern(s) to target specific files |
+| `exclude` | string \| string[] | | Glob pattern(s) to exclude specific files |
+| `onNoMatch` | string | | Behavior when no files match: `"skip"`, `"warn"`, or `"error"` |
+
+```yaml
+# Fix grammar and improve clarity using OpenAI
+- op: ai-transform
+  prompt: "Fix all grammatical errors and improve clarity. Return only the corrected content."
+  provider: openai
+  model: gpt-4o
+
+# Translate documentation to Spanish using Anthropic
+- op: ai-transform
+  prompt: "Translate this markdown document to Spanish. Preserve all code blocks and headings unchanged."
+  provider: anthropic
+  model: claude-opus-4-5
+  include: "docs/**/*.md"
+  temperature: 0.2
+
+# Use a custom endpoint (e.g., Azure OpenAI or a local model)
+- op: ai-transform
+  prompt: "Summarize this document in 3 bullet points at the top."
+  provider: custom
+  endpoint: "https://my-deployment.openai.azure.com/openai"
+  apiKeyEnv: AZURE_OPENAI_KEY
+  model: gpt-4o
+```
+
+**Required environment variables:**
+- `OPENAI_API_KEY` — for `provider: openai` (default)
+- `ANTHROPIC_API_KEY` — for `provider: anthropic`
+- Custom variable name set via `apiKeyEnv` — for `provider: custom`
+
+**Notes:**
+- `count` is 1 on a successful API call, 0 on any error (missing key, network failure, API error)
+- On failure the original content is returned unchanged — no partial writes
+- `temperature: 0` (the default) maximizes reproducibility; raise it for creative tasks
+- The entire file content is passed as context; use `include`/`exclude` to limit scope
+- `timeout` range: 100 to 300,000 ms
 
 ## Conditional Patches
 

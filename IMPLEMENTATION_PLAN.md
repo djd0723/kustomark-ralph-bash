@@ -1,10 +1,30 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅ | explain-tests ✅ | history-tests ✅ | build-tests ✅ | validate-tests ✅ | diff-tests ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅ | suggest-apply ✅ | suggest-interactive ✅ | snapshot-tests ✅ | suggest-from-git ✅ | write-file ✅ | lint-tests ✅ | write-file-validation ✅ | web-preview-api ✅ | preview-tests ✅ | explain-tests ✅ | history-tests ✅ | build-tests ✅ | validate-tests ✅ | diff-tests ✅ | readme-undocumented-ops ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (README documentation for undocumented operations - COMPLETE!):**
+
+Six implemented operations had no README documentation. All are now fully documented with field tables, YAML examples, and behavioral notes:
+
+* ✅ **`replace-code-block`**: Added to Patch Operations section. Documents `index`, `content`, `language` fields; fence-style preservation; count semantics.
+* ✅ **`write-file`**: Added to File Operations section (after `move-file`). Documents `path`, `content` fields; directory auto-creation; path traversal protection; last-writer-wins behavior.
+* ✅ **`json-set`**: New `## JSON / YAML / TOML Operations` section. Documents dot-notation path, value, supported file types, intermediate key creation.
+* ✅ **`json-delete`**: Same section. Documents idempotent delete, count=0-if-missing behavior.
+* ✅ **`json-merge`**: Same section. Documents deep-merge semantics, optional `path` field, array replacement behavior.
+* ✅ **`ai-transform`**: New `## AI Transform` section. Documents all provider/model/endpoint/apiKeyEnv/timeout/maxTokens/temperature fields, required environment variables, failure-safe behavior.
+* ✅ **TOC updated**: Added `JSON / YAML / TOML Operations` and `AI Transform` entries between `File Operations` and `Conditional Patches`.
+* ✅ **4,660 tests passing**: All tests pass with 0 failures, `bun check` clean.
+
+**Files Modified:**
+- `README.md` — Added 6 operation documentation sections; updated TOC
+
+**Status:** README documentation for undocumented operations COMPLETE! ✅
+
+***
 
 **2026-04-10 (core command test coverage - COMPLETE!):**
 
