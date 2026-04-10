@@ -1,8 +1,61 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
+
+## Recent Enhancements
+
+**2026-04-09 (Extended Validators - COMPLETE!):**
+
+* ✅ **`contains`**: New validator — content MUST include this string (complementary to `notContains`)
+* ✅ **`matchesRegex`**: New validator — content must match a JavaScript regex pattern
+* ✅ **`notMatchesRegex`**: New validator — content must NOT match a JavaScript regex pattern
+* ✅ **`frontmatterRequired` in per-patch `validate`**: Brought per-patch validation to parity with global validators
+* ✅ **BOTH CONTEXTS**: All four new fields work in per-patch `validate:` and global `validators:` arrays
+* ✅ **INVALID REGEX DETECTION**: `matchesRegex`/`notMatchesRegex` are validated at config parse time; bad patterns produce actionable error messages
+* ✅ **JSON SCHEMA UPDATED**: All new fields appear in `kustomark schema` output for editor autocomplete
+* ✅ **51 NEW TESTS PASSING**: Unit tests for each new function, runValidator coverage, per-patch integration, config validation
+* ✅ **3,835 TESTS PASSING**: All tests pass with 0 failures
+
+**Details:**
+
+1. **Usage — per-patch**
+   ```yaml
+   patches:
+     - op: replace
+       old: "npm install"
+       new: "bun install"
+       validate:
+         contains: "bun"             # result must include "bun"
+         notMatchesRegex: "npm"      # result must not contain npm
+         matchesRegex: "^bun"        # result must match pattern
+         frontmatterRequired: [title] # result must have frontmatter
+   ```
+
+2. **Usage — global validators**
+   ```yaml
+   validators:
+     - name: has-version
+       contains: "version:"
+     - name: no-drafts
+       notMatchesRegex: "DRAFT|WIP"
+     - name: valid-semver-present
+       matchesRegex: "\\d+\\.\\d+\\.\\d+"
+   ```
+
+3. **Implementation Files**
+   * `src/core/types.ts` — Added `contains`, `matchesRegex`, `notMatchesRegex` to `PatchValidation`; added `contains`, `matchesRegex`, `notMatchesRegex` to `Validator`; added `frontmatterRequired` to `PatchValidation`
+   * `src/core/validators.ts` — Added `validateContains()`, `validateMatchesRegex()`, `validateNotMatchesRegex()`; updated `runValidator()` to handle all new fields
+   * `src/core/patch-engine.ts` — Extracted `runPatchValidation()` helper; both per-patch validation sites now use it; added `validateContains`, `validateFrontmatterRequired`, `validateMatchesRegex`, `validateNotMatchesRegex` imports
+   * `src/core/schema.ts` — Added `contains`, `matchesRegex`, `notMatchesRegex`, `frontmatterRequired` to all per-patch `validate` schema objects (40+ ops); added same fields to global `validators` schema
+   * `src/core/config-parser.ts` — Added per-patch `validate` field validation (type checks + regex compilation); added global `validators` array validation with same checks
+   * `src/core/index.ts` — Exported `validateContains`, `validateMatchesRegex`, `validateNotMatchesRegex`
+   * `tests/core/extended-validators.test.ts` — 51 new tests covering all new functions, `runValidator`, `runValidators`, per-patch integration, config validation
+
+**Status:** Extended Validators COMPLETE! ✅
+
+---
 
 ## Recent Enhancements
 

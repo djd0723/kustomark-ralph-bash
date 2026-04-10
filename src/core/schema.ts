@@ -302,7 +302,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -388,7 +406,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -471,7 +507,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 patchId: {
                   type: "string",
@@ -552,7 +606,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 patchId: {
                   type: "string",
@@ -633,7 +705,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 patchId: {
                   type: "string",
@@ -714,7 +804,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 patchId: {
                   type: "string",
@@ -794,7 +902,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -871,7 +997,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -952,7 +1096,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -1029,7 +1191,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -1115,7 +1295,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -1205,7 +1403,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -1286,7 +1502,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -1376,7 +1610,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -1466,7 +1718,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -1548,7 +1818,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 patchId: {
                   type: "string",
@@ -1629,7 +1917,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 patchId: {
                   type: "string",
@@ -1711,7 +2017,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 patchId: {
                   type: "string",
@@ -1792,7 +2116,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -1873,7 +2215,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -1950,7 +2310,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2031,7 +2409,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2138,7 +2534,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2224,7 +2638,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2323,7 +2755,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2413,7 +2863,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2494,7 +2962,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2580,7 +3066,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2666,7 +3170,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2758,7 +3280,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2841,7 +3381,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2911,7 +3469,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -2990,7 +3566,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3074,7 +3668,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3154,7 +3766,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3238,7 +3868,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3313,7 +3961,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3401,7 +4067,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3489,7 +4173,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3568,7 +4270,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3651,7 +4371,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3720,7 +4458,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3780,7 +4536,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3845,7 +4619,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -3933,7 +4725,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -4017,7 +4827,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 id: {
                   type: "string",
@@ -4086,7 +4914,25 @@ export function generateSchema(): object {
                       type: "string",
                       description: "Validate that the result does not contain this string",
                     },
+                    contains: {
+                      type: "string",
+                      description: "Validate that the result contains this string",
+                    },
+                    matchesRegex: {
+                      type: "string",
+                      description: "Validate that the result matches this regex pattern",
+                    },
+                    notMatchesRegex: {
+                      type: "string",
+                      description: "Validate that the result does NOT match this regex pattern",
+                    },
+                    frontmatterRequired: {
+                      type: "array",
+                      description: "Validate that the result has these required frontmatter keys",
+                      items: { type: "string" },
+                    },
                   },
+                  additionalProperties: false,
                 },
                 group: {
                   type: "string",
@@ -4127,6 +4973,18 @@ export function generateSchema(): object {
             notContains: {
               type: "string",
               description: "Validate that content does not contain this string",
+            },
+            contains: {
+              type: "string",
+              description: "Validate that content contains this string",
+            },
+            matchesRegex: {
+              type: "string",
+              description: "Validate that content matches this regex pattern",
+            },
+            notMatchesRegex: {
+              type: "string",
+              description: "Validate that content does NOT match this regex pattern",
             },
             frontmatterRequired: {
               type: "array",

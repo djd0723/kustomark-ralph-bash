@@ -366,6 +366,9 @@ export type {
 export {
   runValidator,
   runValidators,
+  validateContains,
   validateFrontmatterRequired,
+  validateMatchesRegex,
   validateNotContains,
+  validateNotMatchesRegex,
 } from "./validators.js";

@@ -41,6 +41,61 @@ export function validateNotContains(content: string, pattern: string): boolean {
 }
 
 /**
+ * Validate that content contains a specific string
+ *
+ * @param {string} content - The content to validate
+ * @param {string} pattern - The pattern that must be present in the content
+ * @returns {boolean} true if content contains the pattern, false if it does not
+ */
+export function validateContains(content: string, pattern: string): boolean {
+  return content.includes(pattern);
+}
+
+/**
+ * Validate that content matches a regex pattern
+ *
+ * @param {string} content - The content to validate
+ * @param {string} pattern - Regex pattern the content must match
+ * @returns {{ valid: boolean; error?: string }} Object with valid flag and optional error message
+ */
+export function validateMatchesRegex(
+  content: string,
+  pattern: string,
+): { valid: boolean; error?: string } {
+  try {
+    const regex = new RegExp(pattern);
+    return { valid: regex.test(content) };
+  } catch (e) {
+    return {
+      valid: false,
+      error: `Invalid regex pattern '${pattern}': ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}
+
+/**
+ * Validate that content does NOT match a regex pattern
+ *
+ * @param {string} content - The content to validate
+ * @param {string} pattern - Regex pattern the content must not match
+ * @returns {{ valid: boolean; error?: string }} Object with valid flag and optional error message
+ */
+export function validateNotMatchesRegex(
+  content: string,
+  pattern: string,
+): { valid: boolean; error?: string } {
+  try {
+    const regex = new RegExp(pattern);
+    return { valid: !regex.test(content) };
+  } catch (e) {
+    return {
+      valid: false,
+      error: `Invalid regex pattern '${pattern}': ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}
+
+/**
  * Validate that frontmatter contains all required keys
  *
  * Checks whether the content's YAML frontmatter includes all specified required
@@ -170,6 +225,41 @@ export function runValidator(content: string, validator: Validator): ValidationE
       return {
         validator: validator.name,
         message: `Content contains forbidden pattern: '${validator.notContains}'`,
+      };
+    }
+  }
+
+  // Check contains validation
+  if (validator.contains !== undefined) {
+    const isValid = validateContains(content, validator.contains);
+    if (!isValid) {
+      return {
+        validator: validator.name,
+        message: `Content is missing required pattern: '${validator.contains}'`,
+      };
+    }
+  }
+
+  // Check matchesRegex validation
+  if (validator.matchesRegex !== undefined) {
+    const result = validateMatchesRegex(content, validator.matchesRegex);
+    if (!result.valid) {
+      return {
+        validator: validator.name,
+        message:
+          result.error ?? `Content does not match required pattern: '${validator.matchesRegex}'`,
+      };
+    }
+  }
+
+  // Check notMatchesRegex validation
+  if (validator.notMatchesRegex !== undefined) {
+    const result = validateNotMatchesRegex(content, validator.notMatchesRegex);
+    if (!result.valid) {
+      return {
+        validator: validator.name,
+        message:
+          result.error ?? `Content matches forbidden pattern: '${validator.notMatchesRegex}'`,
       };
     }
   }

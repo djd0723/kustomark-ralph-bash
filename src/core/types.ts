@@ -30,6 +30,14 @@ export type OnNoMatchStrategy = "skip" | "warn" | "error";
 export interface PatchValidation {
   /** Validate that the result does not contain this string */
   notContains?: string;
+  /** Validate that the result contains this string */
+  contains?: string;
+  /** Validate that the result matches this regex pattern */
+  matchesRegex?: string;
+  /** Validate that the result does NOT match this regex pattern */
+  notMatchesRegex?: string;
+  /** Validate that frontmatter has these required fields */
+  frontmatterRequired?: string[];
 }
 
 /**
@@ -768,6 +776,12 @@ export interface Validator {
   name: string;
   /** Validate that content does not contain this string */
   notContains?: string;
+  /** Validate that content contains this string */
+  contains?: string;
+  /** Validate that content matches this regex pattern */
+  matchesRegex?: string;
+  /** Validate that content does NOT match this regex pattern */
+  notMatchesRegex?: string;
   /** Validate that frontmatter has these required fields */
   frontmatterRequired?: string[];
 }

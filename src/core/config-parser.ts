@@ -259,6 +259,78 @@ export function validateConfig(config: KustomarkConfig): ValidationResult {
     }
   }
 
+  // Validate global validators (optional)
+  if (config.validators !== undefined) {
+    if (!Array.isArray(config.validators)) {
+      errors.push({ field: "validators", message: "validators must be an array" });
+    } else {
+      config.validators.forEach((validator: unknown, index: number) => {
+        const vprefix = `validators[${index}]`;
+        if (!validator || typeof validator !== "object" || Array.isArray(validator)) {
+          errors.push({ field: vprefix, message: "validator must be an object" });
+          return;
+        }
+        const v = validator as Record<string, unknown>;
+
+        if (!v.name || typeof v.name !== "string") {
+          errors.push({
+            field: `${vprefix}.name`,
+            message: "validator 'name' is required and must be a string",
+          });
+        }
+        if (v.notContains !== undefined && typeof v.notContains !== "string") {
+          errors.push({
+            field: `${vprefix}.notContains`,
+            message: "'notContains' must be a string",
+          });
+        }
+        if (v.contains !== undefined && typeof v.contains !== "string") {
+          errors.push({ field: `${vprefix}.contains`, message: "'contains' must be a string" });
+        }
+        if (v.matchesRegex !== undefined) {
+          if (typeof v.matchesRegex !== "string") {
+            errors.push({
+              field: `${vprefix}.matchesRegex`,
+              message: "'matchesRegex' must be a string",
+            });
+          } else {
+            try {
+              new RegExp(v.matchesRegex as string);
+            } catch (e) {
+              errors.push({
+                field: `${vprefix}.matchesRegex`,
+                message: `Invalid regex pattern: ${e instanceof Error ? e.message : String(e)}`,
+              });
+            }
+          }
+        }
+        if (v.notMatchesRegex !== undefined) {
+          if (typeof v.notMatchesRegex !== "string") {
+            errors.push({
+              field: `${vprefix}.notMatchesRegex`,
+              message: "'notMatchesRegex' must be a string",
+            });
+          } else {
+            try {
+              new RegExp(v.notMatchesRegex as string);
+            } catch (e) {
+              errors.push({
+                field: `${vprefix}.notMatchesRegex`,
+                message: `Invalid regex pattern: ${e instanceof Error ? e.message : String(e)}`,
+              });
+            }
+          }
+        }
+        if (v.frontmatterRequired !== undefined && !Array.isArray(v.frontmatterRequired)) {
+          errors.push({
+            field: `${vprefix}.frontmatterRequired`,
+            message: "'frontmatterRequired' must be an array of strings",
+          });
+        }
+      });
+    }
+  }
+
   // Validate watch hooks (optional)
   if (config.watch !== undefined) {
     if (typeof config.watch !== "object" || Array.isArray(config.watch)) {
@@ -715,6 +787,78 @@ function validatePatch(patch: unknown, index: number): ValidationError[] {
   if (p.when !== undefined) {
     const conditionErrors = validateCondition(p.when, `${prefix}.when`);
     errors.push(...conditionErrors);
+  }
+
+  // Validate per-patch validate field
+  if (p.validate !== undefined) {
+    const v = p.validate as Record<string, unknown>;
+    if (typeof v !== "object" || Array.isArray(v)) {
+      errors.push({ field: `${prefix}.validate`, message: "'validate' must be an object" });
+    } else {
+      if (v.notContains !== undefined && typeof v.notContains !== "string") {
+        errors.push({
+          field: `${prefix}.validate.notContains`,
+          message: "'notContains' must be a string",
+        });
+      }
+      if (v.contains !== undefined && typeof v.contains !== "string") {
+        errors.push({
+          field: `${prefix}.validate.contains`,
+          message: "'contains' must be a string",
+        });
+      }
+      if (v.matchesRegex !== undefined) {
+        if (typeof v.matchesRegex !== "string") {
+          errors.push({
+            field: `${prefix}.validate.matchesRegex`,
+            message: "'matchesRegex' must be a string",
+          });
+        } else {
+          try {
+            new RegExp(v.matchesRegex as string);
+          } catch (e) {
+            errors.push({
+              field: `${prefix}.validate.matchesRegex`,
+              message: `Invalid regex pattern: ${e instanceof Error ? e.message : String(e)}`,
+            });
+          }
+        }
+      }
+      if (v.notMatchesRegex !== undefined) {
+        if (typeof v.notMatchesRegex !== "string") {
+          errors.push({
+            field: `${prefix}.validate.notMatchesRegex`,
+            message: "'notMatchesRegex' must be a string",
+          });
+        } else {
+          try {
+            new RegExp(v.notMatchesRegex as string);
+          } catch (e) {
+            errors.push({
+              field: `${prefix}.validate.notMatchesRegex`,
+              message: `Invalid regex pattern: ${e instanceof Error ? e.message : String(e)}`,
+            });
+          }
+        }
+      }
+      if (v.frontmatterRequired !== undefined) {
+        if (!Array.isArray(v.frontmatterRequired)) {
+          errors.push({
+            field: `${prefix}.validate.frontmatterRequired`,
+            message: "'frontmatterRequired' must be an array of strings",
+          });
+        } else {
+          (v.frontmatterRequired as unknown[]).forEach((key, i) => {
+            if (typeof key !== "string") {
+              errors.push({
+                field: `${prefix}.validate.frontmatterRequired[${i}]`,
+                message: "frontmatterRequired entry must be a string",
+              });
+            }
+          });
+        }
+      }
+    }
   }
 
   // Validate operation-specific fields

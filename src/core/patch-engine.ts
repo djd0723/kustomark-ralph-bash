@@ -31,7 +31,13 @@ import type {
   ValidationError,
   ValidationWarning,
 } from "./types.js";
-import { validateNotContains } from "./validators.js";
+import {
+  validateContains,
+  validateFrontmatterRequired,
+  validateMatchesRegex,
+  validateNotContains,
+  validateNotMatchesRegex,
+} from "./validators.js";
 
 /**
  * Substitutes ${varName} placeholders in a string with values from the vars map.
@@ -3324,16 +3330,7 @@ export async function applySinglePatch(
   if (patch.validate && result.count > 0) {
     // Only validate if the patch was actually applied
     const patchDesc = getPatchDescription(patch);
-
-    // Check notContains validation
-    if (patch.validate.notContains !== undefined) {
-      const isValid = validateNotContains(result.content, patch.validate.notContains);
-      if (!isValid) {
-        validationErrors.push({
-          message: `Patch '${patchDesc}' validation failed: content contains forbidden pattern '${patch.validate.notContains}'`,
-        });
-      }
-    }
+    validationErrors.push(...runPatchValidation(result.content, patch.validate, patchDesc));
   }
 
   return {
@@ -3343,6 +3340,71 @@ export async function applySinglePatch(
     validationErrors,
     conditionSkipped: false,
   };
+}
+
+/**
+ * Run all per-patch validation rules against the given content.
+ *
+ * @param content - The patched content to validate
+ * @param validate - The PatchValidation config from the patch
+ * @param patchDesc - Human-readable patch description for error messages
+ * @returns Array of ValidationErrors (empty if all checks pass)
+ */
+function runPatchValidation(
+  content: string,
+  validate: import("./types.js").PatchValidation,
+  patchDesc: string,
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  if (validate.notContains !== undefined) {
+    if (!validateNotContains(content, validate.notContains)) {
+      errors.push({
+        message: `Patch '${patchDesc}' validation failed: content contains forbidden pattern '${validate.notContains}'`,
+      });
+    }
+  }
+
+  if (validate.contains !== undefined) {
+    if (!validateContains(content, validate.contains)) {
+      errors.push({
+        message: `Patch '${patchDesc}' validation failed: content is missing required pattern '${validate.contains}'`,
+      });
+    }
+  }
+
+  if (validate.matchesRegex !== undefined) {
+    const result = validateMatchesRegex(content, validate.matchesRegex);
+    if (!result.valid) {
+      errors.push({
+        message:
+          result.error ??
+          `Patch '${patchDesc}' validation failed: content does not match required pattern '${validate.matchesRegex}'`,
+      });
+    }
+  }
+
+  if (validate.notMatchesRegex !== undefined) {
+    const result = validateNotMatchesRegex(content, validate.notMatchesRegex);
+    if (!result.valid) {
+      errors.push({
+        message:
+          result.error ??
+          `Patch '${patchDesc}' validation failed: content matches forbidden pattern '${validate.notMatchesRegex}'`,
+      });
+    }
+  }
+
+  if (validate.frontmatterRequired !== undefined && validate.frontmatterRequired.length > 0) {
+    const result = validateFrontmatterRequired(content, validate.frontmatterRequired);
+    if (!result.valid) {
+      errors.push({
+        message: `Patch '${patchDesc}' validation failed: missing required frontmatter keys: ${result.missing.join(", ")}`,
+      });
+    }
+  }
+
+  return errors;
 }
 
 /**
@@ -3703,15 +3765,7 @@ export async function applyPatchesWithPlugins(
         // Run per-patch validation if specified
         if (patch.validate && result.count > 0) {
           const patchDesc = getPatchDescription(patch);
-
-          if (patch.validate.notContains !== undefined) {
-            const isValid = validateNotContains(result.content, patch.validate.notContains);
-            if (!isValid) {
-              validationErrors.push({
-                message: `Patch '${patchDesc}' validation failed: content contains forbidden pattern '${patch.validate.notContains}'`,
-              });
-            }
-          }
+          validationErrors.push(...runPatchValidation(result.content, patch.validate, patchDesc));
         }
       } catch (error) {
         // Handle plugin errors
