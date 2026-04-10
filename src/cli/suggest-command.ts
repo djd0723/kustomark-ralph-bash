@@ -63,6 +63,7 @@ export interface SuggestResult {
     filesMoved: number;
     filesCopied: number;
     patchesGenerated: number;
+    patchesConsolidated: number;
     confidence: "high" | "medium" | "low";
   };
   /** Present when --verify flag is used */
@@ -335,6 +336,154 @@ function detectFileOperationPatches(
   const remainingSourceOnly = sourceOnlyPaths.filter((p) => !claimedSourceOnly.has(p));
 
   return { fileOps, scoredFileOps, remainingSourceOnly, filesRenamed, filesMoved, filesCopied };
+}
+
+// ============================================================================
+// Cross-File Patch Consolidation
+// ============================================================================
+
+/**
+ * File operations that target a specific file and must NOT be consolidated
+ * across multiple files (their `match`/`src`/`dest` fields are file-specific).
+ */
+const NON_CONSOLIDATABLE_OPS = new Set(["copy-file", "rename-file", "move-file", "delete-file"]);
+
+/**
+ * Returns a stable JSON identity key for a patch, excluding the `include` field.
+ * Two patches with the same key but different `include` values are candidates
+ * for consolidation.
+ */
+function patchIdentityKey(patch: PatchOperation): string {
+  const { include: _include, ...rest } = patch as PatchOperation & { include?: unknown };
+  const sorted: Record<string, unknown> = {};
+  for (const k of Object.keys(rest).sort()) {
+    sorted[k] = (rest as Record<string, unknown>)[k];
+  }
+  return JSON.stringify(sorted);
+}
+
+/**
+ * Computes the most specific glob pattern that covers all provided relative paths.
+ *
+ * Rules:
+ * - All files in the same directory with same extension → `dir/*.ext`
+ * - All files under a common ancestor with same extension → `prefix/**\/*.ext`
+ * - Mixed extensions → strip the extension part (`dir/*` or `**\/*`)
+ */
+export function computeMinimalGlob(paths: string[]): string {
+  if (paths.length === 0) return "**/*";
+
+  const dirs = paths.map((p) => (dirname(p) === "." ? "" : dirname(p)));
+  const exts = paths.map((p) => extname(p).toLowerCase());
+
+  const allSameExt = exts.every((e) => e === exts[0]);
+  const ext = allSameExt ? (exts[0] ?? "") : "";
+
+  // Find the longest common directory prefix segment-by-segment
+  const splitDirs = dirs.map((d) => (d === "" ? [] : d.split("/")));
+  const commonParts: string[] = [];
+  const minLen = Math.min(...splitDirs.map((d) => d.length));
+  for (let i = 0; i < minLen; i++) {
+    const seg = splitDirs[0]?.[i];
+    if (seg !== undefined && splitDirs.every((d) => d[i] === seg)) {
+      commonParts.push(seg);
+    } else {
+      break;
+    }
+  }
+  const commonDir = commonParts.join("/");
+  const prefix = commonDir ? `${commonDir}/` : "";
+
+  // Determine whether all files sit directly in commonDir or in sub-directories
+  const allDirect = dirs.every((d) => d === commonDir);
+
+  if (allDirect) {
+    return ext ? `${prefix}*${ext}` : `${prefix}*`;
+  }
+  return ext ? `${prefix}**/*${ext}` : `${prefix}**/*`;
+}
+
+/**
+ * Consolidates identical patches that span multiple files into a single patch
+ * with a broader glob `include` pattern.
+ *
+ * Example: three files each producing `{ op: "replace", old: "Acme", new: "Corp" }`
+ * with per-file `include` fields become one patch with `include: "**\/*.md"`.
+ *
+ * File-operation patches (delete-file, rename-file, move-file, copy-file) are
+ * never consolidated — they carry file-specific paths in their fields.
+ *
+ * @returns New arrays with consolidated patches and their corresponding scored entries.
+ */
+export function consolidatePatches(
+  patches: PatchOperation[],
+  scored: ScoredPatch[],
+): { patches: PatchOperation[]; scoredPatches: ScoredPatch[]; patchesConsolidated: number } {
+  if (patches.length === 0) {
+    return { patches: [], scoredPatches: [], patchesConsolidated: 0 };
+  }
+
+  type Entry = { patch: PatchOperation; sp: ScoredPatch; includeStr: string | undefined };
+
+  const groups = new Map<string, Entry[]>();
+
+  for (let i = 0; i < patches.length; i++) {
+    const patch = patches[i] as PatchOperation;
+    const sp = (scored[i] ?? { patch, score: 0.5, description: "" }) as ScoredPatch;
+    const rawInclude = (patch as PatchOperation & { include?: string | string[] }).include;
+    const includeStr = Array.isArray(rawInclude) ? rawInclude.join(",") : rawInclude;
+
+    // Non-consolidatable ops go in their own unique group (never merged)
+    if (NON_CONSOLIDATABLE_OPS.has(patch.op)) {
+      const key = `__file_op__:${i}`;
+      groups.set(key, [{ patch, sp, includeStr }]);
+      continue;
+    }
+
+    const key = patchIdentityKey(patch);
+    const group = groups.get(key) ?? [];
+    group.push({ patch, sp, includeStr });
+    groups.set(key, group);
+  }
+
+  const outPatches: PatchOperation[] = [];
+  const outScored: ScoredPatch[] = [];
+  let patchesConsolidated = 0;
+
+  for (const group of groups.values()) {
+    const first = group[0];
+    if (!first) continue;
+
+    if (group.length === 1) {
+      outPatches.push(first.patch);
+      outScored.push(first.sp);
+      continue;
+    }
+
+    // Multiple entries with the same content — consolidate
+    const includeStrings = group
+      .map((e) => e.includeStr)
+      .filter((s): s is string => typeof s === "string");
+
+    const { patch, sp } = first;
+    const consolidated = { ...patch } as PatchOperation & { include?: string };
+
+    if (includeStrings.length === group.length) {
+      // Every entry had an individual include path — replace with glob
+      consolidated.include = computeMinimalGlob(includeStrings);
+    } else {
+      // Some patches had no include (whole-directory match) — drop include
+      delete consolidated.include;
+    }
+
+    // Use the maximum score from the group
+    const maxScore = Math.max(...group.map((e) => e.sp.score));
+    outPatches.push(consolidated);
+    outScored.push({ patch: consolidated, score: maxScore, description: sp.description });
+    patchesConsolidated += group.length - 1; // how many were merged away
+  }
+
+  return { patches: outPatches, scoredPatches: outScored, patchesConsolidated };
 }
 
 // ============================================================================
@@ -638,6 +787,11 @@ function outputText(result: SuggestResult, options: CLIOptions): void {
       console.log(`  Files copied: ${result.stats.filesCopied}`);
     }
     console.log(`  Patches generated: ${result.stats.patchesGenerated}`);
+    if (result.stats.patchesConsolidated > 0) {
+      console.log(
+        `  Patches consolidated: ${result.stats.patchesConsolidated} duplicate(s) merged into glob includes`,
+      );
+    }
     console.log(`  Confidence: ${result.stats.confidence}`);
   }
 
@@ -781,11 +935,18 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       if (scored) scoredPatches.push(scored);
     }
 
+    // Consolidate duplicate patches across files into single glob-include patches
+    const {
+      patches: consolidatedPatches,
+      scoredPatches: consolidatedScored,
+      patchesConsolidated,
+    } = consolidatePatches(patches, scoredPatches);
+
     // Generate configuration
-    const config = generateConfig(sourcePath, patches);
+    const config = generateConfig(sourcePath, consolidatedPatches);
 
     // Calculate confidence
-    const confidence = calculateConfidence(patches);
+    const confidence = calculateConfidence(consolidatedPatches);
 
     // Run verification if requested: apply patches to source and compare with target
     let verification: VerificationSummary | undefined;
@@ -793,19 +954,20 @@ export async function suggestCommand(options: CLIOptions): Promise<number> {
       if (verbosity >= 2) {
         console.log("\nVerifying patches against target files...");
       }
-      verification = await verifyPatches(filePairs, patches);
+      verification = await verifyPatches(filePairs, consolidatedPatches);
     }
 
     const result: SuggestResult = {
       config,
-      scoredPatches,
+      scoredPatches: consolidatedScored,
       stats: {
         filesAnalyzed,
         filesDeleted: fileOpResult.remainingSourceOnly.length,
         filesRenamed: fileOpResult.filesRenamed,
         filesMoved: fileOpResult.filesMoved,
         filesCopied: fileOpResult.filesCopied,
-        patchesGenerated: patches.length,
+        patchesGenerated: consolidatedPatches.length,
+        patchesConsolidated,
         confidence,
       },
       verification,

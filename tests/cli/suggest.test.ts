@@ -2049,3 +2049,170 @@ describe("verifyPatches", () => {
     expect(result.results[0]?.unmatchedLines).toBeGreaterThan(0);
   });
 });
+
+// ============================================================================
+// Unit tests for consolidatePatches and computeMinimalGlob
+// ============================================================================
+
+import { consolidatePatches, computeMinimalGlob } from "../../src/cli/suggest-command.js";
+import type { ScoredPatch } from "../../src/core/patch-suggester.js";
+
+describe("computeMinimalGlob", () => {
+  test("files in the same directory with same extension", () => {
+    const glob = computeMinimalGlob(["docs/guide.md", "docs/intro.md"]);
+    expect(glob).toBe("docs/*.md");
+  });
+
+  test("files across different directories with same extension", () => {
+    const glob = computeMinimalGlob(["docs/guide.md", "api/guide.md"]);
+    expect(glob).toBe("**/*.md");
+  });
+
+  test("files in subdirectories under a common ancestor with same extension", () => {
+    const glob = computeMinimalGlob(["docs/v1/guide.md", "docs/v2/guide.md"]);
+    expect(glob).toBe("docs/**/*.md");
+  });
+
+  test("files with mixed extensions", () => {
+    const glob = computeMinimalGlob(["docs/guide.md", "config/settings.json"]);
+    expect(glob).toBe("**/*");
+  });
+
+  test("single file returns specific glob", () => {
+    const glob = computeMinimalGlob(["docs/guide.md"]);
+    expect(glob).toBe("docs/*.md");
+  });
+
+  test("root-level files with same extension", () => {
+    const glob = computeMinimalGlob(["guide.md", "intro.md"]);
+    expect(glob).toBe("*.md");
+  });
+
+  test("empty array returns catch-all glob", () => {
+    const glob = computeMinimalGlob([]);
+    expect(glob).toBe("**/*");
+  });
+});
+
+describe("consolidatePatches", () => {
+  function makeScoredPatch(patch: Record<string, unknown>, score = 0.9): ScoredPatch {
+    return { patch: patch as Parameters<typeof consolidatePatches>[0][0], score, description: "test" };
+  }
+
+  test("identical replace patches across two files are consolidated into a single glob patch", () => {
+    const patches = [
+      { op: "replace" as const, old: "Acme", new: "Corp", include: "docs/a.md" },
+      { op: "replace" as const, old: "Acme", new: "Corp", include: "docs/b.md" },
+    ];
+    const scored = patches.map((p) => makeScoredPatch(p));
+
+    const { patches: out, patchesConsolidated } = consolidatePatches(patches, scored);
+
+    expect(out).toHaveLength(1);
+    expect((out[0] as { include: string }).include).toBe("docs/*.md");
+    expect(patchesConsolidated).toBe(1);
+  });
+
+  test("different patches are kept separate", () => {
+    const patches = [
+      { op: "replace" as const, old: "Acme", new: "Corp", include: "docs/a.md" },
+      { op: "replace" as const, old: "Foo", new: "Bar", include: "docs/b.md" },
+    ];
+    const scored = patches.map((p) => makeScoredPatch(p));
+
+    const { patches: out, patchesConsolidated } = consolidatePatches(patches, scored);
+
+    expect(out).toHaveLength(2);
+    expect(patchesConsolidated).toBe(0);
+  });
+
+  test("same set-frontmatter across three files consolidates to glob", () => {
+    const patches = [
+      { op: "set-frontmatter" as const, key: "draft", value: false, include: "posts/a.md" },
+      { op: "set-frontmatter" as const, key: "draft", value: false, include: "posts/b.md" },
+      { op: "set-frontmatter" as const, key: "draft", value: false, include: "posts/c.md" },
+    ];
+    const scored = patches.map((p) => makeScoredPatch(p));
+
+    const { patches: out, patchesConsolidated } = consolidatePatches(patches, scored);
+
+    expect(out).toHaveLength(1);
+    expect(patchesConsolidated).toBe(2);
+    expect((out[0] as { include: string }).include).toBe("posts/*.md");
+  });
+
+  test("file operation patches (delete-file) are never consolidated", () => {
+    const patches = [
+      { op: "delete-file" as const, match: "old/a.md" },
+      { op: "delete-file" as const, match: "old/b.md" },
+    ];
+    const scored = patches.map((p) => makeScoredPatch(p));
+
+    const { patches: out, patchesConsolidated } = consolidatePatches(patches, scored);
+
+    expect(out).toHaveLength(2);
+    expect(patchesConsolidated).toBe(0);
+  });
+
+  test("uses highest score from the group", () => {
+    const patches = [
+      { op: "replace" as const, old: "X", new: "Y", include: "a.md" },
+      { op: "replace" as const, old: "X", new: "Y", include: "b.md" },
+    ];
+    const scored = [makeScoredPatch(patches[0]!, 0.7), makeScoredPatch(patches[1]!, 0.95)];
+
+    const { scoredPatches: out } = consolidatePatches(patches, scored);
+
+    expect(out).toHaveLength(1);
+    expect(out[0]!.score).toBe(0.95);
+  });
+
+  test("patches across directories with same extension get **/*.ext glob", () => {
+    const patches = [
+      { op: "replace" as const, old: "v1", new: "v2", include: "docs/guide.md" },
+      { op: "replace" as const, old: "v1", new: "v2", include: "api/ref.md" },
+    ];
+    const scored = patches.map((p) => makeScoredPatch(p));
+
+    const { patches: out } = consolidatePatches(patches, scored);
+
+    expect(out).toHaveLength(1);
+    expect((out[0] as { include: string }).include).toBe("**/*.md");
+  });
+
+  test("empty input returns empty output with zero consolidation", () => {
+    const { patches, scoredPatches, patchesConsolidated } = consolidatePatches([], []);
+    expect(patches).toHaveLength(0);
+    expect(scoredPatches).toHaveLength(0);
+    expect(patchesConsolidated).toBe(0);
+  });
+
+  test("patches with no include field are kept as-is", () => {
+    const patches = [
+      { op: "replace" as const, old: "X", new: "Y" },
+      { op: "replace" as const, old: "X", new: "Y" },
+    ];
+    const scored = patches.map((p) => makeScoredPatch(p));
+
+    // Both have no include — they share identity key but no include to build glob from
+    const { patches: out } = consolidatePatches(patches, scored);
+
+    // Without include, consolidation removes duplicates and drops include
+    expect(out).toHaveLength(1);
+    expect((out[0] as { include?: string }).include).toBeUndefined();
+  });
+
+  test("mixed: some patches consolidate, others stay separate", () => {
+    const patches = [
+      { op: "replace" as const, old: "Acme", new: "Corp", include: "docs/a.md" },
+      { op: "replace" as const, old: "Acme", new: "Corp", include: "docs/b.md" },
+      { op: "replace" as const, old: "Foo", new: "Bar", include: "docs/a.md" },
+    ];
+    const scored = patches.map((p) => makeScoredPatch(p));
+
+    const { patches: out, patchesConsolidated } = consolidatePatches(patches, scored);
+
+    expect(out).toHaveLength(2);
+    expect(patchesConsolidated).toBe(1);
+  });
+});

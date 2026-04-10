@@ -1,10 +1,31 @@
 # Kustomark Implementation Plan
 
-## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅
+## Status: M1 Complete ✅ | M2 Complete ✅ | M3 Complete ✅ | M4 Complete ✅ | JSON/YAML Patches ✅ | Variable Substitution ✅ | Environment Variable Templating ✅ | .env/.properties Support ✅ | List Operations ✅ | Dependency Upgrades ✅ | sort-table ✅ | sort-list ✅ | rename-table-column ✅ | validOps fix ✅ | filter-table-rows ✅ | CI action bumps ✅ | filter-list-items ✅ | deduplicate-table-rows ✅ | deduplicate-list-items ✅ | reorder-table-columns ✅ | incremental-watch ✅ | reorder-list-items ✅ | modify-links ✅ | update-toc ✅ | replace-in-section ✅ | extended-validators ✅ | prepend-to-file ✅ | append-to-file ✅ | word-line-count-validators ✅ | insert-section ✅ | lsp-when-field ✅ | lsp-code-actions ✅ | lsp-full-op-coverage ✅ | suggest-list-link-ops ✅ | suggest-table-ops ✅ | suggest-insert-section ✅ | replace-code-block ✅ | suggest-code-block-ops ✅ | suggest-line-insertion-ops ✅ | suggest-between-ops ✅ | suggest-rename-frontmatter ✅ | suggest-change-section-level ✅ | suggest-move-section ✅ | suggest-scored-output ✅ | suggest-structural-list-ops ✅ | suggest-structural-table-ops ✅ | suggest-filter-list-items ✅ | suggest-filter-table-rows ✅ | suggest-prepend-append-file ✅ | suggest-prepend-append-section ✅ | suggest-replace-in-section ✅ | suggest-update-toc ✅ | suggest-full-op-coverage ✅ | suggest-delete-file ✅ | suggest-file-ops ✅ | suggest-json-yaml ✅ | suggest-toml ✅ | suggest-merge-frontmatter ✅ | suggest-insert-before-line ✅ | ai-transform ✅ | suggest-verify ✅ | suggest-write ✅ | suggest-json-merge ✅ | suggest-consolidate ✅
 
 This document tracks the implementation of kustomark based on the spec milestones.
 
 ## Recent Enhancements
+
+**2026-04-10 (suggest cross-file patch consolidation - COMPLETE!):**
+
+* ✅ **`suggest` now consolidates duplicate patches across files**: When comparing a directory pair, patches that are identical in content but appear across multiple files (each with a per-file `include`) are now merged into a single patch with a minimal covering glob `include` pattern. This produces smaller, more maintainable configs and mirrors the "consolidate similar operations" recommendation from `kustomark analyze`.
+* ✅ **`computeMinimalGlob(paths)`**: New exported helper that computes the most specific glob covering a list of relative file paths. Strategy: find the longest common directory prefix; if all files share the same extension, emit `prefix/**/*.ext` (or `prefix/*.ext` when all files are directly in the same dir); for mixed extensions, omit the extension suffix.
+* ✅ **`consolidatePatches(patches, scored)`**: New exported function that groups patches by content identity (all fields except `include`), then for each group of 2+: replaces per-file includes with a single glob. Non-consolidatable ops (`copy-file`, `rename-file`, `move-file`, `delete-file`) are never merged. The highest score in each group is used for the consolidated entry.
+* ✅ **`patchesConsolidated` stat**: `SuggestResult.stats` gains a `patchesConsolidated` counter (number of duplicate patches merged away). Text output at verbosity ≥ 1 prints `"Patches consolidated: N duplicate(s) merged into glob includes"` when non-zero.
+* ✅ **Wired into `suggestCommand`**: Consolidation runs after content patches + file-op patches are accumulated, before `generateConfig`. Verification (`--verify`) and downstream stats both use the consolidated patch list.
+* ✅ **16 new tests** across two describe blocks:
+  * `computeMinimalGlob` (7 tests): same dir same ext → `dir/*.ext`, cross-dir same ext → `**/*.ext`, common ancestor + subdirs → `prefix/**/*.ext`, mixed ext → `**/*`, single file, root-level files, empty array.
+  * `consolidatePatches` (9 tests): two identical replace patches → single glob patch, different patches stay separate, three identical set-frontmatter → consolidated, delete-file never consolidated, highest score used, cross-dir glob, empty input, no-include patches deduplicated without adding include, mixed same+different → partial consolidation.
+* ✅ **4,247 tests passing**: Up from 4,231.
+
+**Files modified:**
+
+* `src/cli/suggest-command.ts` — Added `NON_CONSOLIDATABLE_OPS`, `patchIdentityKey`, `computeMinimalGlob`, `consolidatePatches`; added `patchesConsolidated` to `SuggestResult.stats`; wired consolidation into `suggestCommand`; updated `outputText` to print consolidation stat.
+* `tests/cli/suggest.test.ts` — 16 new tests in `computeMinimalGlob` and `consolidatePatches` describe blocks.
+
+**Status:** suggest cross-file patch consolidation COMPLETE! ✅
+
+***
 
 **2026-04-10 (suggest json-merge batch detection - COMPLETE!):**
 
